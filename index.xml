@@ -29,18 +29,18 @@ Markdown
 {\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 ReaPack Repository Template\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 A collection of effects and scripts created for my students. They are not useful to the general public, but versions for public use will likely be released in the future.\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 SCRIPTS\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 \u8226? Numbers2Notes - A Nashville Number System Chord Creation Tool\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Import and Export Chord Charts\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Create MIDI tracks\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Print Chord Charts\sa180\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 \u8226? numbers2notes_spectrum - Creates a MIDI item containing the chord tones in all octaves.\par}
+{\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab Numbers2Notes - A Nashville Number System Chord Creation Tool\par}
+{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab Import and Export Chord Charts\par}
+{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab Create MIDI tracks\par}
+{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab Print Chord Charts\sa180\par}
+{\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab numbers2notes_spectrum - Creates a MIDI item containing the chord tones in all octaves.\sa180\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 EFFECTS\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 \u8226? MidiOnOff - Simple Effect to turn MIDI on and OFF via MIDI\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 \u8226? ReaCenterMIDIpitch - Recenters MIDI pitches around a user definable center pitch.\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 \u8226? ReaPulse - A specialized version of RCJach's MIDI Note Beat Repeater effect.\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 \u8226? Swing Track MIDI - Applies swing to even eights from 0 to 100% on individual MIDI tracks.\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 \u8226? Swing Project MIDI - Applies swing to even eights from 0 to 100% across all tracks with the SwingTrackMIDI effect.\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 \u8226? Wait-A-Moment - Sets a short delay compensation for MIDI arpeggiators.\par}
+{\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab MidiOnOff - Simple Effect to turn MIDI on and OFF via MIDI\par}
+{\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab ReaCenterMIDIpitch - Recenters MIDI pitches around a user definable center pitch.\par}
+{\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab ReaPulse - A specialized version of RCJach's MIDI Note Beat Repeater effect.\par}
+{\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab Swing Track MIDI - Applies swing to even eights from 0 to 100% on individual MIDI tracks.\par}
+{\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab Swing Project MIDI - Applies swing to even eights from 0 to 100% across all tracks with the SwingTrackMIDI effect.\par}
+{\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab Wait-A-Moment - Sets a short delay compensation for MIDI arpeggiators.\sa180\par}
 }
 ]]></description>
   </metadata>
