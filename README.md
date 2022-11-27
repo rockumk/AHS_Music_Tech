@@ -1,4 +1,4 @@
-# ReaPack Repository Template
+# AHS Music Tech Repository
 
 A collection of effects and scripts created for my students.  They are not useful to the general public, but versions for public use will likely be released in the future.
 
