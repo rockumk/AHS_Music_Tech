@@ -1,23 +1,22 @@
 # ReaPack Repository Template
 
-A template for GitHub-hosted ReaPack repositories with automated
-[reapack-index](https://github.com/cfillion/reapack-index)
-running from GitHub Actions.
+A collection of effects and scripts created for my students.  They are not useful to the general public, but versions for public use will likely be released in the future.
 
-Replace the name of the repository in [index.xml](/index.xml) when using this template.
-This will be the name shown in ReaPack.
 
-```xml
-<index version="1" name="Name of your repository here">
-```
+SCRIPTS
 
-Replace the contents of this file ([README.md](/README.md)).
-This will be the text shown when using ReaPack's "About this repository" feature.
+• Numbers2Notes - A Nashville Number System Chord Creation Tool
+   - Import and Export Chord Charts
+   - Create MIDI tracks
+   - Print Chord Charts
 
-reapack-index looks for package files in subfolders.
-The folder tree represents the package categories shown in ReaPack.
+• numbers2notes_spectrum - Creates a MIDI item containing the chord tones in all octaves.
 
-Each package file is expected to begin with a metadata header.
-See [Packaging Documentation](https://github.com/cfillion/reapack-index/wiki/Packaging-Documentation) on reapack-index's wiki.
+EFFECTS
 
-The URL to import in ReaPack is [https://github.com/`<your username>`/`<repository name>`/raw/master/index.xml](https://github.com/cfillion/reapack-repository-template/raw/master/index.xml).
+• MidiOnOff - Simple Effect to turn MIDI on and OFF via MIDI
+• ReaCenterMIDIpitch - Recenters MIDI pitches around a user definable center pitch.
+• ReaPulse - A specialized version of RCJach's MIDI Note Beat Repeater effect.
+• Swing Track MIDI - Applies swing to even eights from 0 to 100% on individual MIDI tracks.
+• Swing Project MIDI - Applies swing to even eights from 0 to 100% across all tracks with the SwingTrackMIDI effect.
+• Wait-A-Moment - Sets a short delay compensation for MIDI arpeggiators.
