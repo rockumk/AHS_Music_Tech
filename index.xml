@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="27b22d696a595dada768e2ef7e45848932c476a6">
+<index version="1" name="AHS_Music_Tech" commit="18b3669440428db694d2776a9ddc873feba3951f">
   <category name="Effects">
-    <reapack name=".PlaceHolder2.lua" type="script" desc="Place Holder to prompt creation of the User Folder">
+    <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart / Preset of Very Short Delay Compensation for MIDI processing">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 This does nothing but assure that the User_Data folder is created.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 HeadStart\par}
 }
 ]]></description>
       </metadata>
-      <version name="1.1" author="rockumk (Rock Kennedy)" time="2022-11-27T23:27:33Z">
-        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/9a468640fe12a24499eea7df9b83a045f2db3de1/Effects/.PlaceHolder2.lua</source>
+      <version name="1.0.0" author="Cockos (altered by Rock Kennedy)" time="2022-11-27T23:48:00Z">
+        <changelog><![CDATA[- Name Change]]></changelog>
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/910fb893e69e121369ada1a47d4fb393d534f719/Effects/HeadStart.jsfx</source>
       </version>
     </reapack>
   </category>
