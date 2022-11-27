@@ -5,18 +5,18 @@ A collection of effects and scripts created for my students.  They are not usefu
 
 SCRIPTS
 
-• Numbers2Notes - A Nashville Number System Chord Creation Tool
+- Numbers2Notes - A Nashville Number System Chord Creation Tool
    - Import and Export Chord Charts
    - Create MIDI tracks
    - Print Chord Charts
 
-• numbers2notes_spectrum - Creates a MIDI item containing the chord tones in all octaves.
+- numbers2notes_spectrum - Creates a MIDI item containing the chord tones in all octaves.
 
 EFFECTS
 
-• MidiOnOff - Simple Effect to turn MIDI on and OFF via MIDI
+- MidiOnOff - Simple Effect to turn MIDI on and OFF via MIDI
 
-• ReaCenterMIDIpitch - Recenters MIDI pitches around a user definable center pitch.
+- ReaCenterMIDIpitch - Recenters MIDI pitches around a user definable center pitch.
 
 • ReaPulse - A specialized version of RCJach's MIDI Note Beat Repeater effect.
 
