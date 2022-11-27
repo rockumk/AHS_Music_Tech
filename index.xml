@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="eb8d8730a04e258da9be01315b02092169e8f4c0">
+<index version="1" name="AHS_Music_Tech" commit="4b9bea2e2923951ef95418f4fdf47821a5e141d7">
   <category name="Example">
     <reapack name="cfillion_Hello world.lua" type="script" desc="Hello world">
       <metadata>
@@ -19,10 +19,13 @@ Markdown
       <version name="1.0" author="cfillion" time="2021-01-04T23:30:32Z">
         <source main="main">https://github.com/cfillion/reapack-repository-template/raw/58a3e39ba95bd0f35846aa1f39aa4cb2574295e1/Example/cfillion_Hello%20world.lua</source>
       </version>
+      <version name="1.0.1" author="cfillion" time="2022-11-27T21:41:29Z">
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/4b9bea2e2923951ef95418f4fdf47821a5e141d7/Example/cfillion_Hello%20world.lua</source>
+      </version>
     </reapack>
   </category>
   <category name="Example/User_Data">
-    <reapack name="PlaceHolder.lua" type="script">
+    <reapack name="PlaceHolder.lua" type="script" desc="Place Holder to prompt creation of the User Folder">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
@@ -34,6 +37,9 @@ Markdown
       </metadata>
       <version name="1.0" time="2022-11-27T21:29:18Z">
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/eb8d8730a04e258da9be01315b02092169e8f4c0/Example/User_Data/PlaceHolder.lua</source>
+      </version>
+      <version name="1.1" author="rockumk (Rock Kennedy)" time="2022-11-27T21:40:37Z">
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/be5a77d9015b187799ba3765de1c2c7b4677c56c/Example/User_Data/PlaceHolder.lua</source>
       </version>
     </reapack>
   </category>
