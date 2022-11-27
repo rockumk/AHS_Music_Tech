@@ -18,10 +18,10 @@ EFFECTS
 
 - ReaCenterMIDIpitch - Recenters MIDI pitches around a user definable center pitch.
 
-• ReaPulse - A specialized version of RCJach's MIDI Note Beat Repeater effect.
+- ReaPulse - A specialized version of RCJach's MIDI Note Beat Repeater effect.
 
-• Swing Track MIDI - Applies swing to even eights from 0 to 100% on individual MIDI tracks.
+- Swing Track MIDI - Applies swing to even eights from 0 to 100% on individual MIDI tracks.
 
-• Swing Project MIDI - Applies swing to even eights from 0 to 100% across all tracks with the SwingTrackMIDI effect.
+- Swing Project MIDI - Applies swing to even eights from 0 to 100% across all tracks with the SwingTrackMIDI effect.
 
-• Wait-A-Moment - Sets a short delay compensation for MIDI arpeggiators.
+- Wait-A-Moment - Sets a short delay compensation for MIDI arpeggiators.
