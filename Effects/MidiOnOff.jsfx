@@ -1,10 +1,11 @@
-version: 1.0.0
-desc: MidiOnOff / Alteration of X-Raym's MIDI Notes Octave Tranpose Shift
+version: 1.0.1
+desc: MidiOnOff
+// Alteration of X-Raym's MIDI Notes Octave Tranpose Shift
 author: Rockumk
 about:
   # MidiOnOff
 changelog:
-  - New
+  - Namechange
 
 
 

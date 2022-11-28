@@ -1,10 +1,11 @@
-version: 1.0.0
-desc: SwingProjectMIDI / Sets MIDI swing across all tracks with synced SwingTrackMIDI
+version: 1.0.1
+desc: SwingProjectMIDI
+// Sets MIDI swing across all tracks with synced SwingTrackMIDI
 author: Rock Kennedy
 about:
   # SwingProjectMIDI
 changelog:
-  - None
+  - Name Change
 
 
 

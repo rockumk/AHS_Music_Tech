@@ -1,5 +1,6 @@
-version: 1.0.0
-desc: ReaPulse / Customized MIDI repeater
+version: 1.0.1
+desc: ReaPulsive
+// Customized MIDI repeater
 author: Rock Kennedy
 about:
   # ReaPulsive

@@ -1,5 +1,6 @@
-version: 1.0.0
-desc: ReaCenterMIDIpitch / Transposes MIDI notes to octaves nearest user defined center pitch.
+version: 1.0.1
+desc: ReaCenterMIDIpitch
+// Transposes MIDI notes to octaves nearest user defined center pitch.
 author: Rock Kennedy
 about:
   # ReaCenterMIDIpitch

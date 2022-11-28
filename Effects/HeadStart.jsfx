@@ -1,5 +1,6 @@
-version: 1.0.0
-desc: HeadStart / Preset of Very Short Delay Compensation for MIDI processing
+version: 1.0.1
+desc: HeadStart
+// Preset of Very Short Delay Compensation for MIDI processing
 author: Cockos (altered by Rock Kennedy)
 about:
   # HeadStart
