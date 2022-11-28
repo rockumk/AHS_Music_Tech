@@ -60,7 +60,7 @@ chord_charting_area = [[
 
 {V}	
 
-{P}
+
 
 
 {C}
@@ -361,7 +361,7 @@ Form: ]]
 
 {V}	
 
-{P}
+
 
 
 {C}
