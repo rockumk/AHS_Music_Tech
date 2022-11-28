@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 1.0.1
+-- @version 1.0.2
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes
@@ -60,7 +60,7 @@ chord_charting_area = [[
 
 {V}	
 
-
+{P}
 
 
 {C}
