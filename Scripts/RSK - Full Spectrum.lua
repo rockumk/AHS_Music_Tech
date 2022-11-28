@@ -6,13 +6,8 @@
 --   Duplicates all pitches at every octave.
 -- @changelog
 --   Name Change
-
-
-
-
-
-------------------------------------------     VARIABLES
 noteIndex = 0
+------------------------------------------     VARIABLES
 noteExists = 1
 noteIsSelected = 1
 noteIsmuted = 0
