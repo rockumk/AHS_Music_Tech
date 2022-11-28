@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="9ae6b81625aa9cadc8eeb96f4ad1925a2372710e">
+<index version="1" name="AHS_Music_Tech" commit="6e7884a8d86faccf05f33fc5d41e7b50ec770bd6">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -144,6 +144,22 @@
       </metadata>
       <version name="1.1" author="rockumk (Rock Kennedy)" time="2022-11-27T23:26:16Z">
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/d1a8589b961fddd5224125e9696c49bdc9ebbcbd/Scripts/.PlaceHolder2.lua</source>
+      </version>
+    </reapack>
+  </category>
+  <category name="Scripts/Notes2Numbers/ChordCharts">
+    <reapack name=".PlaceHolder4.lua" type="script" desc="Place Holder to prompt creation of the User Folder">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 This does nothing but assure that the User_Data folder is created.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.1" author="rockumk (Rock Kennedy)" time="2022-11-28T02:15:13Z">
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/6e7884a8d86faccf05f33fc5d41e7b50ec770bd6/Scripts/Notes2Numbers/ChordCharts/.PlaceHolder4.lua</source>
       </version>
     </reapack>
   </category>
