@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="18b3669440428db694d2776a9ddc873feba3951f">
+<index version="1" name="AHS_Music_Tech" commit="1942b624d5bbf29f7837c1672b26bf7bb90fbe07">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart / Preset of Very Short Delay Compensation for MIDI processing">
       <metadata>
@@ -14,6 +14,81 @@
       <version name="1.0.0" author="Cockos (altered by Rock Kennedy)" time="2022-11-27T23:48:00Z">
         <changelog><![CDATA[- Name Change]]></changelog>
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/910fb893e69e121369ada1a47d4fb393d534f719/Effects/HeadStart.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="MidiOnOff.jsfx" type="effect" desc="MidiOnOff / Alteration of X-Raym's MIDI Notes Octave Tranpose Shift">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 MidiOnOff\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.0" author="Rockumk" time="2022-11-28T00:01:00Z">
+        <changelog><![CDATA[- New]]></changelog>
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/1942b624d5bbf29f7837c1672b26bf7bb90fbe07/Effects/MidiOnOff.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="ReaCenterMIDIpitch.jsfx" type="effect" desc="ReaCenterMIDIpitch / Transposes MIDI notes to octaves nearest user defined center pitch.">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 ReaCenterMIDIpitch\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.0" author="Rock Kennedy" time="2022-11-28T00:01:00Z">
+        <changelog><![CDATA[- Name Change]]></changelog>
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/1942b624d5bbf29f7837c1672b26bf7bb90fbe07/Effects/ReaCenterMIDIpitch.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="ReaPulsive.jsfx" type="effect" desc="ReaPulse / Customized MIDI repeater">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 ReaPulsive\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.0" author="Rock Kennedy" time="2022-11-28T00:01:00Z">
+        <changelog><![CDATA[- Name Change]]></changelog>
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/1942b624d5bbf29f7837c1672b26bf7bb90fbe07/Effects/ReaPulsive.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="SwingProjectMIDI.jsfx" type="effect" desc="SwingProjectMIDI / Sets MIDI swing across all tracks with synced SwingTrackMIDI">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 SwingProjectMIDI\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.0" author="Rock Kennedy" time="2022-11-28T00:01:00Z">
+        <changelog><![CDATA[- None]]></changelog>
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/1942b624d5bbf29f7837c1672b26bf7bb90fbe07/Effects/SwingProjectMIDI.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="SwingTrackMIDI.jsfx" type="effect" desc="SwingTrackMIDI / Sets MIDI swing on track from 0 to 100%">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 SwingTrackMIDI\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.0" author="Rock Kennedy" time="2022-11-28T00:01:00Z">
+        <changelog><![CDATA[- None]]></changelog>
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/1942b624d5bbf29f7837c1672b26bf7bb90fbe07/Effects/SwingTrackMIDI.jsfx</source>
       </version>
     </reapack>
   </category>
