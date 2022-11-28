@@ -6,8 +6,6 @@
 --   Numbers2Notes Support File.
 -- @changelog
 --   Name Change
-
-
 local spectrum = {
 make_full_spectrum = function(grid_track)
 --reaper.ShowConsoleMsg("MADE IT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")

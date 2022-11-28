@@ -6,12 +6,6 @@
 --   Numbers2Notes Support File.
 -- @changelog
 --   Name Change
-
-
-
-
-
-
 local musictheory = {
 key_table = {
 ["Ab"] = 8, 

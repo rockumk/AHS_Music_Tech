@@ -6,12 +6,8 @@
 --   Nashville Number System Style Chord Charting for Reaper.
 -- @changelog
 --   Name Change
-
-
-
-
------------------------------------------------   REQUIRED FILES
 local info = debug.getinfo(1, "S")
+-----------------------------------------------   REQUIRED FILES
 local script_path = info.source:match [[^@?(.*[\/])[^\/]-$]]
 package.path = package.path .. ";" .. "?.lua"
 local musictheory = require(script_path .. "numbers2notes_musictheory")

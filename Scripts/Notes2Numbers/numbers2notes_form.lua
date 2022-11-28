@@ -6,13 +6,6 @@
 --   Numbers2Notes Support File.
 -- @changelog
 --   Name Change
-
-
-
-
-
-
-
 local form = {
 
 sections_colors = { 
