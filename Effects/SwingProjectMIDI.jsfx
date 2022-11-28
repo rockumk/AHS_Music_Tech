@@ -1,0 +1,72 @@
+version: 1.0.0
+desc: SwingProjectMIDI / Sets MIDI swing across all tracks with synced SwingTrackMIDI
+author: Rock Kennedy
+about:
+  # SwingProjectMIDI
+changelog:
+  - None
+
+
+
+
+options:gmem=ProjectSwing
+
+
+slider1:0<0,1,1{Numbers2Notes, The Manual Override Below}>What sets the Project Swing?
+slider2:0<0,100,.1>Swing Level - Manual Override
+slider3:0<0,100,.1>VIEW ONLY - Current Swing Level
+
+
+in_pin:none
+out_pin:none
+
+@init
+
+n2nvalue = gmem[2];
+
+slider1 == 0 && n2nvalue >= 0 && n2nvalue <= 100 ? (
+rulingvalue = gmem[2];
+):(
+rulingvalue = slider2;
+);
+
+gmem[1] = rulingvalue; //set var to gmem slot value
+slider3 = rulingvalue;
+
+
+
+@slider
+n2nvalue = gmem[2];
+
+slider1 == 0 && n2nvalue >= 0 && n2nvalue <= 100 ? (
+rulingvalue = gmem[2];
+):(
+rulingvalue = slider2;
+);
+
+gmem[1] = rulingvalue; //set var to gmem slot value
+slider3 = rulingvalue;
+
+
+
+
+@block
+in_beat_pos = beat_position - floor(beat_position);
+in_beat_pos == 0 ? (
+n2nvalue = gmem[2];
+
+slider1 == 0 && n2nvalue >= 0 && n2nvalue <= 100 ? (
+rulingvalue = gmem[2];
+):(
+rulingvalue = slider2;
+);
+
+gmem[1] = rulingvalue; //set var to gmem slot value
+slider3 = rulingvalue;
+);
+
+
+
+
+
+@sample

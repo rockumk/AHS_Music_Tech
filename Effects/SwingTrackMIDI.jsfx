@@ -1,0 +1,166 @@
+version: 1.0.0
+desc: SwingTrackMIDI / Sets MIDI swing on track from 0 to 100%
+author: Rock Kennedy
+about:
+  # SwingTrackMIDI
+changelog:
+  - None
+
+
+
+
+
+options:gmem=ProjectSwing
+
+slider1:0<0,1,1{ProjectSwing, Manual Swing}>ProjectSwing Mode | Manual Swing Settting Mode
+slider2:0<0,100,.1>Manual Swing Setting Amount
+//slider3:0<0,16,1>Channel (0=omni)
+//slider4:0<0,16,1>Bus (0=all buses)
+//slider5:0<0,1,.001>View of Straight 8ths (Downbeat | Upbeat)
+//slider8:0<0,1,.01>View of Down Delay Position
+//slider9:0<0,1,.01>View of Up Delay Position
+//slider10:0<0,1,.01>View of Straight Time
+//slider11:0<0,1,.01>View of Swung Time Positions at Slider Level
+//slider12:0<0,1,.01>View of Delay Amount
+
+in_pin:none
+out_pin:none
+
+@init
+max_ram = __memtop();
+function checkgmem() (
+	slider1 == 0 ? (
+	slider_settings = gmem[1];
+	slider2 = gmem[1];
+	):(
+	slider_settings = slider2;
+	);
+  );
+  
+function SendAllNotesOff() (
+  slider50 = 1;
+  outChannel = 0;
+  opos = mpos;
+  opos >= samplesblock-32 ? (
+    opos = samplesblock-33;
+  );  
+  loop (16,
+    midisend(opos, holdOff1+outChannel, holdOff2, holdOff3);
+    opos +=1;
+    midisend(opos, allOff1+outChannel,  allOff2,  allOff3);
+    opos +=1;
+    outChannel += 1;
+  );
+  ico = 0;
+  loop (128,
+    midisend(opos, 0x80, ico, 0);
+    opos +=1;
+    ico += 1;
+  );
+);
+
+allOff1   = 0xB0;
+allOff2   = 0x7B;
+allOff3   = 0x00;
+holdOff1  = 0xB0;
+holdOff2  = 0x40;
+holdOff3  = 0x00;
+last_chan = slider1;
+lastslider2 = slider2;
+lastslider3 = slider3;
+ext_midi_bus=ext_nodenorm=1;
+buf_l=buf_r=0;
+buf_hdr = 3; // position, length (incl header), bus
+checkgmem();
+SendAllNotesOff();
+
+////////////////////////////////////////////////////////////
+//
+//  ALL MODIFICATIONS DONE IN THIS SLIDERS AND THIS SECTION
+//
+////////////////////////////////////////////////////////////
+
+@slider
+chan = 0;  // REMOVED SLIDERS FOR CHAN SETTING FOR ALL
+bus = 0;  // REMOVED SLIDERS FOR BUS SETTING FOR ALL
+
+checkgmem();
+@block
+
+in_beat_pos = beat_position - floor(beat_position);
+in_beat_pos == 0 ? (
+checkgmem(); 
+);
+
+old_down_delay_pos == down_delay_pos ? (indown=0;) : (indown=1;);
+  
+in_beat_pos <= .50 ? (  // IF IN THE DOWNBEAT
+  //slider5 = 0;  // INDICATE DOWNBEAT
+  all_beat_positions = in_beat_pos; // INDICATE POSITIONS OF STRAIGHT TIME
+  
+  down_delay_pos = (((100-slider_settings)/100) * in_beat_pos)+((slider_settings/100)*(in_beat_pos * 1.3334));                  //MATH TO SET THE UPBEAT POSITIONS
+  //slider8 = down_delay_pos;      // SHOW THE ADJUSTED POSTIONS FOR DOWNBEAT ITEMS
+  old_down_delay_pos = down_delay_pos; // PREP TO CHECK IF ACTIVITY IS IN THE DOWNBEAT
+  ) : (           // ELSE IN THE UPBEAT
+  //slider5 = 1;       // INDICATE UPBEAT
+  all_beat_positions = in_beat_pos;   // INDICATE POSITIONS OF STRAIGHT TIME 
+  up_delay_pos =   // MATH TO SET THE UPBEAT POSITIONS
+  (((100-slider_settings)/100) * .5)+((slider_settings/100)*(.5 * 1.3334)) + 
+  ((((100-slider_settings)/100) * (in_beat_pos - .5)) + ((slider_settings/100) * ((in_beat_pos - .5) * .667)))  ;
+  //slider9 = up_delay_pos;  // SHOW THE ADJUSTED POSTIONS FOR UPBEAT ITEMS
+  old_down_delay_pos = 0;    // PREP TO CHECK IF ACTIVITY IS IN THE DOWNBEAT
+  );
+indown == 1 ? (swungtime = up_delay_pos):(swungtime = down_delay_pos);  // MAKE SLIDER 11 SHOW ALL ADJUSTED POS
+
+delays_in_beats = swungtime - all_beat_positions;              // MAKE SLIDER 12 SHOW THE AMOUNT OF DELAY
+delay_samples = floor((delays_in_beats*60.0/tempo)*srate);    //  SET THE DELAY
+
+//slider10 = all_beat_positions
+//slider11 = swungtime
+//slider12 = delays_in_beats
+
+//  END MODIFICATIONS
+////////////////////////////////////////////////////////////
+
+
+
+
+delay_sc = (delay_samples + samplesblock);
+delay_isc = 1.0 / delay_sc;
+// process incoming events
+while((l=midirecv_buf(offs,buf_r+buf_hdr,max_ram-buf_r-buf_hdr))>0)
+(
+  (bus<0 || midi_bus == bus) &&
+  (chan<0 || (l <= 3 && (fb=buf_r[buf_hdr])<0xf0 && (fb&0xf) == chan)) ? (
+    buf_r[0] = (delay_samples+offs) * delay_isc;
+    buf_r[1] = buf_hdr + l;
+    buf_r[2] = midi_bus;
+    buf_r += buf_hdr + l;
+  ) : (
+    midisend_buf(offs,buf_r+buf_hdr,l);
+  );
+);
+// process outgoing events
+rd = buf_l;
+while (rd<buf_r)
+(
+  rd==buf_l && (offs=floor(rd[0]*delay_sc+0.5)) < samplesblock ? (
+    midi_bus=rd[2];
+    l = rd[1];
+    midisend_buf(max(offs,0),rd+buf_hdr,l-buf_hdr);
+    buf_l = (rd += l);
+  ) : (
+    rd[0] -= samplesblock * delay_isc;
+    rd += rd[1];
+  );
+);
+// compact buf if needed
+buf_l >= buf_r ? (
+  buf_l=buf_r=0;
+) : (
+  buf_l > max(1024,buf_r*.5) ? (
+    (buf_r-=buf_l) > 0 ? memcpy(0,buf_l,buf_r) : buf_r=0;
+    buf_l=0; 
+  );
+);
+
