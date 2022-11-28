@@ -1,11 +1,11 @@
 -- @description Numbers2Notes
--- @version 1.0.3
+-- @version 1.0.4
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes
 --   Nashville Number System Style Chord Charting for Reaper.
 -- @changelog
---   Name Change
+--   Testing Minor Changes
 local info = debug.getinfo(1, "S")
 -----------------------------------------------   REQUIRED FILES
 local script_path = info.source:match [[^@?(.*[\/])[^\/]-$]]
