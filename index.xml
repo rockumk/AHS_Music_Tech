@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="a66b5de1db45711815a934e40592a41757595ca6">
+<index version="1" name="AHS_Music_Tech" commit="b16bc26dcd1f212e28e4aed141b309957d406fc3">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -149,8 +149,106 @@
       </version>
     </reapack>
   </category>
+  <category name="Scripts/Notes2Numbers">
+    <reapack name="Numbers2Notes.lua" type="script" desc="Numbers2Notes">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 Numbers2Notes\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Nashville Number System Style Chord Charting for Reaper.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.1" author="Rock Kennedy" time="2022-11-28T02:40:50Z">
+        <changelog><![CDATA[Name Change]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/70810e228eb50cbf490f2d703f0393c8585239c8/Scripts/Notes2Numbers/Numbers2Notes.lua</source>
+      </version>
+    </reapack>
+    <reapack name="numbers2notes_form.lua" type="script" desc="numbers2notes_form">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 numbers2notes_form\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Numbers2Notes Support File.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.1" author="Rock Kennedy" time="2022-11-28T02:40:50Z">
+        <changelog><![CDATA[Name Change]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/70810e228eb50cbf490f2d703f0393c8585239c8/Scripts/Notes2Numbers/numbers2notes_form.lua</source>
+      </version>
+    </reapack>
+    <reapack name="numbers2notes_help.lua" type="script" desc="numbers2notes_help">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 numbers2notes_help\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Numbers2Notes Support File.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.1" author="Rock Kennedy" time="2022-11-28T02:40:50Z">
+        <changelog><![CDATA[Name Change]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/70810e228eb50cbf490f2d703f0393c8585239c8/Scripts/Notes2Numbers/numbers2notes_help.lua</source>
+      </version>
+    </reapack>
+    <reapack name="numbers2notes_musictheory.lua" type="script" desc="numbers2notes_musictheory">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 numbers2notes_musictheory\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Numbers2Notes Support File.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.1" author="Rock Kennedy" time="2022-11-28T02:40:50Z">
+        <changelog><![CDATA[Name Change]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/70810e228eb50cbf490f2d703f0393c8585239c8/Scripts/Notes2Numbers/numbers2notes_musictheory.lua</source>
+      </version>
+    </reapack>
+    <reapack name="numbers2notes_songs.lua" type="script" desc="numbers2notes_songs">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 numbers2notes_songs\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Numbers2Notes Support File.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.1" author="Rock Kennedy" time="2022-11-28T02:40:50Z">
+        <changelog><![CDATA[Name Change]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/70810e228eb50cbf490f2d703f0393c8585239c8/Scripts/Notes2Numbers/numbers2notes_songs.lua</source>
+      </version>
+    </reapack>
+    <reapack name="numbers2notes_spectrum.lua" type="script" desc="numbers2notes_spectrum">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 numbers2notes_spectrum\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Numbers2Notes Support File.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.1" author="Rock Kennedy" time="2022-11-28T02:40:50Z">
+        <changelog><![CDATA[Name Change]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/70810e228eb50cbf490f2d703f0393c8585239c8/Scripts/Notes2Numbers/numbers2notes_spectrum.lua</source>
+      </version>
+    </reapack>
+  </category>
   <category name="Scripts/Notes2Numbers/ChordCharts">
-    <reapack name=".PlaceHolder4.lua" type="script" desc="Place Holder to prompt creation of the User Folder">
+    <reapack name=".PlaceHolder.lua" type="script" desc="Place Holder to prompt creation of the User Folder">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
@@ -160,8 +258,8 @@
 }
 ]]></description>
       </metadata>
-      <version name="1.1" author="rockumk (Rock Kennedy)" time="2022-11-28T02:15:13Z">
-        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/6e7884a8d86faccf05f33fc5d41e7b50ec770bd6/Scripts/Notes2Numbers/ChordCharts/.PlaceHolder4.lua</source>
+      <version name="1.1" author="rockumk (Rock Kennedy)" time="2022-11-28T02:41:33Z">
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/b16bc26dcd1f212e28e4aed141b309957d406fc3/Scripts/Notes2Numbers/ChordCharts/.PlaceHolder.lua</source>
       </version>
     </reapack>
   </category>
