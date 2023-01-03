@@ -1,11 +1,11 @@
 -- @description Numbers2Notes
--- @version 1.0.4
+-- @version 1.0.7
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes
 --   Nashville Number System Style Chord Charting for Reaper.
 -- @changelog
---   Testing Minor Changes
+--   Colors Now Applied on First Run
 local info = debug.getinfo(1, "S")
 -----------------------------------------------   REQUIRED FILES
 local script_path = info.source:match [[^@?(.*[\/])[^\/]-$]]
@@ -47,7 +47,7 @@ Writer:
 BPM: 
 Key: 
 Swing: 
-Form: ]]
+Form: I V C V C B C O]]
 
 chord_charting_area = [[
 {#}
@@ -349,7 +349,7 @@ Writer:
 BPM: 
 Key: 
 Swing: 
-Form: ]]
+Form: I V C V C B C O]]
                     chord_charting_area = [[
 {#}
 - -
@@ -1866,6 +1866,9 @@ function Setup_Tracks() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
 				count = count + 1
                 plug_order = plug_order - 1
             end
+			track_color = reaper.ColorToNative(v[8][1], v[8][2], v[8][3]) | 0x10000000
+            reaper.SetTrackColor(newly_created_track, track_color)
+			
         end
     end
 
