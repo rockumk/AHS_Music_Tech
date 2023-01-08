@@ -1,11 +1,11 @@
 -- @description Numbers2Notes
--- @version 1.0.7
+-- @version 1.0.8
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes
 --   Nashville Number System Style Chord Charting for Reaper.
 -- @changelog
---   Colors Now Applied on First Run
+--   Collapse added despite error.
 local info = debug.getinfo(1, "S")
 -----------------------------------------------   REQUIRED FILES
 local script_path = info.source:match [[^@?(.*[\/])[^\/]-$]]
@@ -90,7 +90,7 @@ local font = r.ImGui_CreateFont("Roboto Mono", 16)
 r.ImGui_Attach(ctx, font)
 local click_count, text = 0, ""
 local centerx, centery = r.ImGui_Viewport_GetCenter(r.ImGui_GetMainViewport(ctx))
-local window_flags = r.ImGui_WindowFlags_NoResize() | r.ImGui_WindowFlags_MenuBar() | r.ImGui_WindowFlags_NoCollapse()
+local window_flags = r.ImGui_WindowFlags_NoResize() | r.ImGui_WindowFlags_MenuBar() 
 r.ImGui_SetNextWindowSize(ctx, 1300, 700)
 r.ImGui_SetNextWindowPos(ctx, 250, 150)
 --r.ImGui_SetNextWindowPos(ctx, centerx, centery, r.ImGui_Cond_Appearing(), 0.5, 0.5)
