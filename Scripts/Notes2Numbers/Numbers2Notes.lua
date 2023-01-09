@@ -1,11 +1,11 @@
 -- @description Numbers2Notes
--- @version 1.0.8
+-- @version 1.0.9
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes
 --   Nashville Number System Style Chord Charting for Reaper.
 -- @changelog
---   Collapse added despite error.
+--   Fixed Collapse
 local info = debug.getinfo(1, "S")
 -----------------------------------------------   REQUIRED FILES
 local script_path = info.source:match [[^@?(.*[\/])[^\/]-$]]
@@ -89,11 +89,9 @@ local main_viewport = r.ImGui_GetMainViewport(ctx)
 local font = r.ImGui_CreateFont("Roboto Mono", 16)
 r.ImGui_Attach(ctx, font)
 local click_count, text = 0, ""
-local centerx, centery = r.ImGui_Viewport_GetCenter(r.ImGui_GetMainViewport(ctx))
 local window_flags = r.ImGui_WindowFlags_NoResize() | r.ImGui_WindowFlags_MenuBar() 
-r.ImGui_SetNextWindowSize(ctx, 1300, 700)
-r.ImGui_SetNextWindowPos(ctx, 250, 150)
---r.ImGui_SetNextWindowPos(ctx, centerx, centery, r.ImGui_Cond_Appearing(), 0.5, 0.5)
+r.ImGui_SetNextWindowSize(ctx, 1300, 705)
+r.ImGui_SetNextWindowPos(ctx, 7, 65)
 r.ImGui_SetNextWindowCollapsed(ctx, false, nil)
 r.ImGui_SetNextWindowBgAlpha(ctx, 1)
 
@@ -131,6 +129,7 @@ end
 function IM_GUI_Loop()
     local rv
     local rc
+
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_WindowBg(), 0xC8CED3FF)
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_TitleBg(), 0xD5D5D5FF)
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_TitleBgActive(), 0xD5D5D5FF)
@@ -153,11 +152,12 @@ function IM_GUI_Loop()
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_DockingEmptyBg(), 0x00F2FFFF)
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_TableRowBg(), 0xFF000000)
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_TableBorderLight(), 0x0000FFFF)
+    reaper.ImGui_PushFont(ctx, font)
 
     local visible, open =
         reaper.ImGui_Begin(ctx, "Numbers2Notes - Nashville Number Charts for Reaper", true, window_flags)
 
-    r.ImGui_PushFont(ctx, font)
+
 
     if liveMIDI_playing_timer > 1 and liveMIDI_playing_timer < 41 then
         liveMIDI_playing_timer = liveMIDI_playing_timer - 1
@@ -1634,12 +1634,15 @@ reaper.ImGui_Text(ctx, "- Holt")
 
         reaper.ImGui_EndGroup(ctx)
 
-        r.ImGui_PopFont(ctx)
-        reaper.ImGui_PopStyleColor(ctx, 22)
+
+
         r.ImGui_End(ctx)
 
     -- BUTTONS
     end
+	
+        reaper.ImGui_PopStyleColor(ctx, 22)	
+        r.ImGui_PopFont(ctx)
     if open then
         r.defer(IM_GUI_Loop)
     else
