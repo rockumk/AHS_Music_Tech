@@ -1,11 +1,15 @@
 -- @description Numbers2Notes
--- @version 1.0.9
+-- @version 1.1.0
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes
 --   Nashville Number System Style Chord Charting for Reaper.
 -- @changelog
---   Fixed Collapse
+--   Fixed Plugin Bypasses
+
+
+
+
 local info = debug.getinfo(1, "S")
 -----------------------------------------------   REQUIRED FILES
 local script_path = info.source:match [[^@?(.*[\/])[^\/]-$]]
@@ -47,11 +51,11 @@ Writer:
 BPM: 
 Key: 
 Swing: 
-Form: I V C V C B C O]]
+Form: # I V C V C C O]]
 
 chord_charting_area = [[
 {#}
-- 
+- -
 
 {I}
 
@@ -64,11 +68,6 @@ chord_charting_area = [[
 
 
 {C}
-
-
-
-
-{B}
 
 
 
@@ -1774,51 +1773,51 @@ function Setup_Tracks() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
     local track_table = {
         [0] = {"Name","found?bool","trackID","clear contents required?",
             {{"plugin 1 | enabled? = this boolean --->",true},{"plugin 2",false}},
-            "Sends","Volume = MIDI 0 = No 1 = Yes","Color"},
-        [1] = {"N2N Chart", found_bool_chart, trackID_chart, 1, {{"SwingProjectMIDI",true}}, {}, 0, {100, 100, 100}},
-        [2] = {"N2N Grid & Reverb", found_bool_grid_MIDI, trackID_grid_MIDI, 1, {{"JS:Lexikan",true}}, {}, 1, {250, 250, 250}},
+            "Sends","Volume = MIDI 0 = No 1 = Yes","Color","volume"},
+        [1] = {"N2N Chart", found_bool_chart, trackID_chart, 1, {{"SwingProjectMIDI",true}}, {}, 0, {100, 100, 100},0},
+        [2] = {"N2N Grid & Reverb", found_bool_grid_MIDI, trackID_grid_MIDI, 1, {{"JS:Lexikan",true}}, {}, 1, {250, 250, 250},1},
 		-- =========================================================================================================================
         [3] = {"N2N Lead MIDI", found_bool_lead_MIDI, trackID_lead_MIDI, 1, {}, 
-			{4}, 1, {108, 162, 123}},
+			{4}, 1, {108, 162, 123},0},
         [4] = {"N2N Lead", found_bool_lead1, trackID_lead1, 0,
-			{{"Wait-A-Moment",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{"Calibre",true},{"Isolator",true}, {"Holt",true}}, 
-			{2}, 0, {108, 162, 123}},		
+			{{"HeadStart",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{"Calibre",true},{"Isolator",true}, {"Holt",true}}, 
+			{2}, 0, {108, 162, 123},0},		
 		-- =========================================================================================================================
         [5] = {"N2N Chords MIDI", found_bool_chord_MIDI, trackID_chord_MIDI, 1, {}, 
-			{6, 7, 8}, 1, {134, 172, 181}},
+			{6, 7, 8}, 1, {134, 172, 181},0},
         [6] = {"N2N Chord Sustain",found_bool_chord_sus,trackID_chord_sus,0,
-			{{"Wait-A-Moment",true},{"ReaPulse",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true}},
-			{2},0,{134, 172, 181}},
+			{{"HeadStart",true},{"ReaPulsive-8ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true}},
+			{2},0,{134, 172, 181},.1},
         [7] = {"N2N Chord + LibreARP",found_bool_chord_librearp,trackID_chord_librearp,0,
-			{{"Wait-A-Moment",true},{"LibreARP",true},{ "ReaPulse",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{ "pad-synth.jsfx",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true},{ "STFU",false}},
-			{2},0,{134, 172, 181}},
+			{{"HeadStart",true},{"LibreARP",true},{ "ReaPulsive-16ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{ "pad-synth.jsfx",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true},{ "STFU",false}},
+			{2},0,{134, 172, 181},.8},
 		[8] = {"N2N Chord + STFU",found_bool_chord_stfu1,trackID_chord_stfu1,0,
-			{{"Wait-A-Moment",true},{"ReaPulse",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",false},{"STFU",false}},
-			{2},0,{134, 172, 181}},
+			{{"HeadStart",true},{"ReaPulsive-16ths",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",false},{"STFU",false}},
+			{2},0,{134, 172, 181},.4},
 		-- =========================================================================================================================		
         [9] = {"N2N Chord-Bass MIDI", found_bool_chbass_MIDI, trackID_chbass_MIDI, 1, {}, 
-			{10}, 1, {172, 134, 181}},
+			{10}, 1, {172, 134, 181},0}, 
 		[10] = {"N2N Chord and Bass + Merlittzer",found_bool_chbass_merlittzer,trackID_chbass_merlittzer,0,
-			{{"Wait-A-Moment",true},{"ReaPulse",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"MK Merlittzer",true},{"STFU",false}},
-			{2},0,{172, 134, 181}},
+			{{"HeadStart",true},{"ReaPulsive-Quarters",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"MK Merlittzer",true},{"STFU",false}},
+			{2},0,{172, 134, 181},.2},
 		-- =========================================================================================================================
         [11] = {"N2N Bass MIDI", found_bool_bass_MIDI, trackID_bass_MIDI, 1, {}, 
-			{12, 13, 14}, 1, {134, 153, 181}},
+			{12, 13, 14}, 1, {134, 153, 181},0},
 		[12] = {"N2N Bass",found_bool_bass_sus,trackID_bass_sus,0,
-			{{"Wait-A-Moment",true},{"ReaPulse",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true},{"STFU",false}},
-			{2},0,{134, 153, 181}},
+			{{"HeadStart",true},{"ReaPulsive-8ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true},{"STFU",false}},
+			{2},0,{134, 153, 181},.1},
 		[13] = {"N2N Bass + LibreARP",found_bool_bass_librearp,trackID_bass_librearp,0,
-			{{"Wait-A-Moment",true},{"LibreARP",true},{ "ReaPulse",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{ "pad-synth.jsfx",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true},{ "STFU",false}},
-			{2},0,{134, 153, 181}},
+			{{"HeadStart",true},{"LibreARP",true},{"ReaPulsive-16ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",false}},
+			{2},0,{134, 153, 181},.8},
 		[14] = {"N2N Bass + STFU",found_bool_bass_stfu1,trackID_bass_stfu1,0,
-			{{"Wait-A-Moment",true},{"ReaPulse",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",false},{"STFU",false}},
-			{2},0,{134, 153, 181}},
+			{{"HeadStart",true},{"ReaPulsive-8ths",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",true},{"STFU",false}},
+			{2},0,{134, 153, 181},.8},
 		-- =========================================================================================================================			
 		[15] = {"N2N Drums",found_bool_drums,trackID_drums,0,
 			{{"Tattoo",true},{"SwingTrackMIDI",true},{"Sitala",true},{"Calibre",true}},
-			{2},0,{144, 144, 144}}	
+			{2},0,{144, 144, 144},.8}	
 		}
-
+ 
     --Show_To_Dev("Started: " .. string.char(10))
     track_count = reaper.CountTracks(0)
     for i = 0, track_count - 1, 1 do -- CHECK EACH TRACK FOR ONE NAMED "Charted Track'
@@ -1858,20 +1857,21 @@ function Setup_Tracks() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
             newly_created_track = reaper.GetTrack(0, i - 1)
             --Show_To_Dev(tostring(newly_created_track) .. string.char(10))
             reaper.GetSetMediaTrackInfo_String(newly_created_track, "P_NAME", v[1], true)
-            track_table[i][3] = newly_created_track
+            v[3] = newly_created_track
             --Show_To_Dev("yes " .. i.. " " .. tostring(v[2]) .. " | " .. tostring(v[3]) .. " | " .. tostring(v[4]) .. string.char(10))
             plug_order = 1000
-			count = 0
             for j, value in pairs(v[5]) do
                 reaper.TrackFX_AddByName(v[3], v[5][j][1], false, plug_order) -- ADD INSTRUMENT FX
-				
+                plug_order = plug_order - 1
+            end
+			count = 0
+            for j, value in pairs(v[5]) do
 				reaper.TrackFX_SetEnabled(newly_created_track, count, v[5][j][2])
 				count = count + 1
-                plug_order = plug_order - 1
             end
 			track_color = reaper.ColorToNative(v[8][1], v[8][2], v[8][3]) | 0x10000000
             reaper.SetTrackColor(newly_created_track, track_color)
-			
+			reaper.SetTrackUIVolume(newly_created_track, v[9], false, true,0 )
         end
     end
 
