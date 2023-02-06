@@ -1,11 +1,11 @@
 -- @description Numbers2Notes
--- @version 1.1.2
+-- @version 1.1.3
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes
 --   Nashville Number System Style Chord Charting for Reaper.
 -- @changelog
---   Updated BIAB Export Link
+--   Updated Download Links
 
 
 
