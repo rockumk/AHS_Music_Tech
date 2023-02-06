@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="c0d9120c30c815726c29582686a1cd804e696138">
+<index version="1" name="AHS_Music_Tech" commit="0b966627ab641c43a17b369a39675fc7a64269fd">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -294,6 +294,10 @@
       <version name="1.1.2" author="Rock Kennedy" time="2023-02-06T14:54:33Z">
         <changelog><![CDATA[Updated BIAB Export Link]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/c0d9120c30c815726c29582686a1cd804e696138/Scripts/Notes2Numbers/Numbers2Notes.lua</source>
+      </version>
+      <version name="1.1.3" author="Rock Kennedy" time="2023-02-06T15:03:44Z">
+        <changelog><![CDATA[Updated Download Links]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/0b966627ab641c43a17b369a39675fc7a64269fd/Scripts/Notes2Numbers/Numbers2Notes.lua</source>
       </version>
     </reapack>
     <reapack name="numbers2notes_form.lua" type="script" desc="numbers2notes_form">
