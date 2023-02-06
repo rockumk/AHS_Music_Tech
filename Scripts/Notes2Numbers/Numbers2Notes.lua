@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 1.1.1
+-- @version 1.1.2
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes
@@ -1358,7 +1358,7 @@ reaper.ImGui_Text(ctx, "- Holt")
 				reaper.ImGui_Text(ctx,'1) Audition and select your style here:\n')
 				Link("https://tinyurl.com/StylePick09844879") -- hidden database
 				reaper.ImGui_Text(ctx,'2) Copy your selected style\'s "Copy Code" in 1st column.\n3) Paste the code into the BIAB Style blank above.\n4) Press the blue "Convert song to BIAB..." button\n5) Copy the output data and paste it in the form at this site...\n' )
-		Link("https://tinyurl.com/MySong09844879")  -- hidden Form
+		Link("https://forms.office.com/r/Tt2D8u0M6c")  -- hidden Form
 				reaper.ImGui_Text(ctx,"6) Download your files here...\n" )
 		Link("https://tinyurl.com/Song09844879")	-- hidden files
 		
