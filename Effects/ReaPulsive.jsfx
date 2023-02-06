@@ -1,11 +1,11 @@
-version: 1.0.1
+version: 1.0.2
 desc: ReaPulsive
 // Customized MIDI repeater
 author: Rock Kennedy
 about:
   # ReaPulsive
 changelog:
-  - Name Change
+  - Shortened Default Duration - Sustain
 
 
 
@@ -25,7 +25,7 @@ slider11:5<0,9,1{4 Bars,2 Bars,1 Bar,Half Note,Quarter Note,1/8th,1/16th,1/32nd,
 slider12:0<0,4,1{NORMAL,TRIPLET,DOTTED,REST}>Type
 slider13:2<0,4,1{off,1/2,1/4,1/8,1/16}>-Normal Type lock
 slider14:0<0,127,1> Aftertouch -> Velocity
-slider15:100<1,100,1> Duration - Sustain
+slider15:70<1,100,1> Duration - Sustain
 slider20:1<0,1,1{Off,On}>-Sync to Beat
 slider21:1<0,1,1{Off,On}>-On/Off
 
