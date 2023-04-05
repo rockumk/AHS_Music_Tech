@@ -5,7 +5,7 @@
 --   # ZoneMixZero
 --   Sets envelope points on every track at start and end of each region.
 -- @changelog
---   Name Change
+--   Removed selection of points as default
   
 reaper.Undo_BeginBlock()
 reaper.Main_OnCommand(40296, 0) -- select all tracks
@@ -19,8 +19,8 @@ for mi = 0, num_markers + num_regions - 1 do
       local track = reaper.GetTrack(nil, ti)
       local env = reaper.GetTrackEnvelopeByName(track, "Volume")
       if env then
-        reaper.InsertEnvelopePoint(env, start_pos, .501, 0, 0, true, true)
-        reaper.InsertEnvelopePoint(env, end_pos, .501, 0, 0, true, true)
+        reaper.InsertEnvelopePoint(env, start_pos, 0, 0, 0, false, true)
+        reaper.InsertEnvelopePoint(env, end_pos, 0, 0, 0, false, true)
         reaper.Envelope_SortPoints(env)
       end
     end
