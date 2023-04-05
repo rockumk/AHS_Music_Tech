@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="0b966627ab641c43a17b369a39675fc7a64269fd">
+<index version="1" name="AHS_Music_Tech" commit="57c2d55e7c78f18fbcaef76de508765843b25e79">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -240,6 +240,22 @@
       <version name="1.0.1" author="Rock Kennedy" time="2022-11-28T02:20:49Z">
         <changelog><![CDATA[Name Change]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/5bb4ef48e08c73fa5cff9835fe50a509874296b8/Scripts/RSK%20-%20Full%20Spectrum.lua</source>
+      </version>
+    </reapack>
+    <reapack name="ZoneMixZero.lua" type="script" desc="ZoneMixZero">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 ZoneMixZero\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Sets envelope points on every track at start and end of each region.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.0" author="Rock Kennedy" time="2023-04-05T04:23:06Z">
+        <changelog><![CDATA[Name Change]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/57c2d55e7c78f18fbcaef76de508765843b25e79/Scripts/ZoneMixZero.lua</source>
       </version>
     </reapack>
   </category>
