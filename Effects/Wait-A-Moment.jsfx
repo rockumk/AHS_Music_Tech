@@ -1,3 +1,14 @@
+version: 1.0.0
+desc:Wait-A-Moment
+author: Rock Kennedy
+about:
+  # Wait-A-Moment
+changelog:
+  - Fix Version
+
+
+
+
 desc:Wait-A-Moment
 desc:Time Adjustment Delay or Negative Delay
 //tags: delay time PDC
