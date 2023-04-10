@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="800d30bfb80ca7da30eaf4b812997c1570845d5f">
+<index version="1" name="AHS_Music_Tech" commit="36827938e99c2b03ddf1c557ce695829fe480e47">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -275,6 +275,21 @@
       <version name="1.0.1" author="Rock Kennedy" time="2023-04-05T14:13:58Z">
         <changelog><![CDATA[Removed selection of points as default]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/800d30bfb80ca7da30eaf4b812997c1570845d5f/Scripts/ZoneMixZero.lua</source>
+      </version>
+    </reapack>
+    <reapack name="Zonevelope.lua" type="script" desc="Zonvelope">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Zonevelope - Sets volume envelope points on every track at start and end of each region.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.0" author="Rock Kennedy" time="2023-04-10T02:09:22Z">
+        <changelog><![CDATA[First Release]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/36827938e99c2b03ddf1c557ce695829fe480e47/Scripts/Zonevelope.lua</source>
       </version>
     </reapack>
   </category>
