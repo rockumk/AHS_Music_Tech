@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 1.1.4
+-- @version 1.1.5
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes
@@ -741,7 +741,7 @@ Form: I V C V C B C O]]
         end
         if feedback_tab_mode == 9 then
 		
-reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT")
+reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.1.5")
 reaper.ImGui_Text(ctx, "Numbers2Notes does not yet allow the user to select plugins.")
 reaper.ImGui_Text(ctx, "The plugins below are required to fully set up the default configuration.")
 reaper.ImGui_Text(ctx, "")
