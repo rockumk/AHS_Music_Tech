@@ -4230,7 +4230,7 @@ cccchords = urlencode(cccchords)
 
 if cccchords ~= "Error..." then
 
-ulink = '"https://www.chordsheet.com/song/populate-new?title=' .. ctitlefound .. '&artist=' .. cwriterfound .. '&chords=' .. cccchords .. '&key=' .. ckeyfound .. '&bpm=' .. cbpmfound .. '&nns=1"'
+ulink = 'https://www.chordsheet.com/song/populate-new?title=' .. ctitlefound .. '&artist=' .. cwriterfound .. '&chords=' .. cccchords .. '&key=' .. ckeyfound .. '&bpm=' .. cbpmfound .. '&nns=1'
 
 ccclink = ulink
 
