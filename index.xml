@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="5a6dde2cb250c857abe2083e5b00984049e09d90">
+<index version="1" name="AHS_Music_Tech" commit="7cac9ca75da56ffef241a364a5d9c2fc6c5c36c1">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -387,6 +387,10 @@
       <version name="1.1.7" author="Rock Kennedy" time="2024-02-05T15:23:01Z">
         <changelog><![CDATA[Chord letters are now charted, however without slash chord over bass]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/d80533621e06095cd500eb21273ffcddaa2782ab/Scripts/Notes2Numbers/Numbers2Notes2.lua</source>
+      </version>
+      <version name="1.1.8" author="Rock Kennedy" time="2024-02-05T16:30:30Z">
+        <changelog><![CDATA[Chord letters are now charted, however without slash chord over bass]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/7cac9ca75da56ffef241a364a5d9c2fc6c5c36c1/Scripts/Notes2Numbers/Numbers2Notes2.lua</source>
       </version>
     </reapack>
     <reapack name="numbers2notes_form.lua" type="script" desc="numbers2notes_form">
