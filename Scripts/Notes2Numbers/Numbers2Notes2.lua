@@ -1,12 +1,12 @@
 -- @description Numbers2Notes2
--- @version 1.1.8
+-- @version 1.1.9
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes2
---   Nashville Number System Style Chord Charting for Reaper.
+-- # Numbers2Notes2
+-- Nashville Number System Style Chord Charting for Reaper.
 -- @changelog
---   Chord letters are now charted, however without slash chord over bass
--- 	 Updated the Default Sounds (Now requires Surge Clap)
+-- Chord letters are now charted, however without slash chord over bass
+-- Updated the Default Sounds (Now requires Surge Clap Version)
 
 
 
@@ -1847,37 +1847,37 @@ function Setup_Tracks() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
         [4] = {"N2N Lead MIDI", found_bool_lead_MIDI, trackID_lead_MIDI, 1, {}, 
 			{5}, 1, {108, 162, 123},0},
         [5] = {"N2N Lead", found_bool_lead1, trackID_lead1, 0,
-			{{"HeadStart",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"Surge XT.clap",true},{"Calibre",true},{"Isolator",true}, {"Holt",true}}, 
+			{{"HeadStart",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"CLAP:Surge XT",true},{"Calibre",true},{"Isolator",true}, {"Holt",true}}, 
 			{3}, 0, {108, 162, 123},0},		
 		-- =========================================================================================================================
         [6] = {"N2N Chords MIDI", found_bool_chord_MIDI, trackID_chord_MIDI, 1, {}, 
 			{7, 8, 9}, 1, {134, 172, 181},0},
         [7] = {"N2N Chord Sustain",found_bool_chord_sus,trackID_chord_sus,0,
-			{{"HeadStart",true},{"ThisTriggersThat",false},{"ReaPulsive-8ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"Surge XT.clap",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true}},
+			{{"HeadStart",true},{"ThisTriggersThat",false},{"ReaPulsive-8ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"CLAP:Surge XT",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true}},
 			{3},0,{134, 172, 181},.1},
         [8] = {"N2N Chord + LibreARP",found_bool_chord_librearp,trackID_chord_librearp,0,
-			{{"HeadStart",true},{"LibreARP",true},{ "ReaPulsive-8ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{ "Surge XT.clap",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true},{ "STFU",false}},
+			{{"HeadStart",true},{"LibreARP",true},{ "ReaPulsive-8ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{ "CLAP:Surge XT",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true},{ "STFU",false}},
 			{3},0,{134, 172, 181},.8},
 		[9] = {"N2N Chord + STFU",found_bool_chord_stfu1,trackID_chord_stfu1,0,
-			{{"HeadStart",true},{"ReaPulsive-8ths",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"Surge XT.clap",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",false},{"STFU",false}},
+			{{"HeadStart",true},{"ReaPulsive-8ths",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"CLAP:Surge XT",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",false},{"STFU",false}},
 			{3},0,{134, 172, 181},.4},
 		-- =========================================================================================================================		
         [10] = {"N2N Chord-Bass MIDI", found_bool_chbass_MIDI, trackID_chbass_MIDI, 1, {}, 
 			{11}, 1, {172, 134, 181},0}, 
-		[11] = {"N2N Chord and Bass + Merlittzer",found_bool_chbass_merlittzer,trackID_chbass_merlittzer,0,
-			{{"HeadStart",true},{"ReaPulsive-Quarters",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"MK Merlittzer",true},{"STFU",false}},
+		[11] = {"N2N Chord and Bass",found_bool_chbass_merlittzer,trackID_chbass_merlittzer,0,
+			{{"HeadStart",true},{"ReaPulsive-Quarters",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"CLAP:Surge XT",true},{"STFU",false}},
 			{3},0,{172, 134, 181},.2},
 		-- =========================================================================================================================
         [12] = {"N2N Bass MIDI", found_bool_bass_MIDI, trackID_bass_MIDI, 1, {}, 
 			{13, 14, 15}, 1, {134, 153, 181},0},
 		[13] = {"N2N Bass",found_bool_bass_sus,trackID_bass_sus,0,
-			{{"HeadStart",true},{"ReaPulsive-8ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"Surge XT.clap",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true},{"STFU",false}},
+			{{"HeadStart",true},{"ReaPulsive-8ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"CLAP:Surge XT",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true},{"STFU",false}},
 			{3},0,{134, 153, 181},.1},
 		[14] = {"N2N Bass + LibreARP",found_bool_bass_librearp,trackID_bass_librearp,0,
-			{{"HeadStart",true},{"LibreARP",true},{"ReaPulsive-16ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"Surge XT.clap",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",false}},
+			{{"HeadStart",true},{"LibreARP",true},{"ReaPulsive-16ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"CLAP:Surge XT",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",false}},
 			{3},0,{134, 153, 181},.8},
 		[15] = {"N2N Bass + STFU",found_bool_bass_stfu1,trackID_bass_stfu1,0,
-			{{"HeadStart",true},{"ReaPulsive-8ths",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"Surge XT.clap",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",true},{"STFU",false}},
+			{{"HeadStart",true},{"ReaPulsive-8ths",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"CLAP:Surge XT",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",true},{"STFU",false}},
 			{3},0,{134, 153, 181},.8},
 		-- =========================================================================================================================			
 		[16] = {"N2N Drums",found_bool_drums,trackID_drums,0,
