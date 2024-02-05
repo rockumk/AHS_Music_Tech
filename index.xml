@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="5f239b3d6f4fbf61a1713a38c2dcb479fb6cafe4">
+<index version="1" name="AHS_Music_Tech" commit="6e05bf69c5780be3fb4e2bf5a326806704f395d7">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -256,6 +256,22 @@
     </reapack>
   </category>
   <category name="Scripts">
+    <reapack name="Numbers2Notes2.lua" type="script" desc="Numbers2Notes2">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 Numbers2Notes\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Nashville Number System Style Chord Charting for Reaper.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.1.7" author="Rock Kennedy" time="2024-02-05T14:06:16Z">
+        <changelog><![CDATA[Chord letters are now charted, however without slash chord over bass]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/6e05bf69c5780be3fb4e2bf5a326806704f395d7/Scripts/Numbers2Notes2.lua</source>
+      </version>
+    </reapack>
     <reapack name="RSK - Full Spectrum.lua" type="script" desc="RSK_Full_Spectrum">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
