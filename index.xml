@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="46d62ac6d64cb809edc945413f0e05ea370d74ea">
+<index version="1" name="AHS_Music_Tech" commit="5f239b3d6f4fbf61a1713a38c2dcb479fb6cafe4">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -222,6 +222,21 @@
       <version name="1.0.1" author="Rock Kennedy" time="2022-11-28T02:12:29Z">
         <changelog><![CDATA[- Name Change]]></changelog>
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/9ae6b81625aa9cadc8eeb96f4ad1925a2372710e/Effects/SwingTrackMIDIvisual.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="ThisTriggersThat.jsfx" type="effect" desc="ThisTriggersThat">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 One Channel can be used to rhythmically trigger the articulation of another channels\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.6" author="Rockumk" time="2024-02-05T13:57:39Z">
+        <changelog><![CDATA[- Namechange]]></changelog>
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/5f239b3d6f4fbf61a1713a38c2dcb479fb6cafe4/Effects/ThisTriggersThat.jsfx</source>
       </version>
     </reapack>
     <reapack name="Wait-A-Moment.jsfx" type="effect" desc="Wait-A-Moment">
