@@ -1,5 +1,5 @@
 -- @description Numbers2Notes2
--- @version 1.1.9
+-- @version 1.2
 -- @author Rock Kennedy
 -- @about
 -- # Numbers2Notes2
@@ -7,6 +7,7 @@
 -- @changelog
 -- Chord letters are now charted, however without slash chord over bass
 -- Updated the Default Sounds (Now requires Surge Clap Version)
+-- New MIDI output channel used
 
 
 
@@ -125,6 +126,11 @@ chord_charting_area = [[
 
 
 {C}
+
+
+
+
+{B}
 
 
 
@@ -1837,53 +1843,203 @@ function Setup_Tracks() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
 
     -- 0 = Table Column Descriptions
     local track_table = {
-        [0] = {"Name","found?bool","trackID","clear contents required?",
-            {{"plugin 1 | enabled? = this boolean --->",true},{"plugin 2",false}},
-            "Sends","Volume = MIDI 0 = No 1 = Yes","Color","volume"},
+        [0] = {"Track Name","found?bool","trackID","clear contents required?",
+            {
+			{"plugin 1 | enabled? = this boolean --->",true,preset},
+			{"plugin 2",false,"snaps"}},
+            "Sends",
+			"Volume = MIDI 0 = No 1 = Yes",
+			"Color",
+			"volume"
+			},
         [1] = {"N2N # Chart", found_bool_n_chart, trackID_n_chart, 1, {{"SwingProjectMIDI",true}}, {}, 0, {100, 100, 100},0},
         [2] = {"N2N Letter Chart", found_bool_l_chart, trackID_l_chart, 1, {{"SwingProjectMIDI",true}}, {}, 0, {100, 100, 100},0},
-        [3] = {"N2N Grid & Reverb", found_bool_grid_MIDI, trackID_grid_MIDI, 1, {{"JS:Lexikan",true}}, {}, 1, {250, 250, 250},1},
 		-- =========================================================================================================================
-        [4] = {"N2N Lead MIDI", found_bool_lead_MIDI, trackID_lead_MIDI, 1, {}, 
-			{5}, 1, {108, 162, 123},0},
-        [5] = {"N2N Lead", found_bool_lead1, trackID_lead1, 0,
-			{{"HeadStart",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"CLAP:Surge XT",true},{"Calibre",true},{"Isolator",true}, {"Holt",true}}, 
-			{3}, 0, {108, 162, 123},0},		
+        [3] = {"N2N Absolute Grid & Reverb 1", found_bool_grid_MIDI, trackID_grid_MIDI, 1, {}, {}, 1, {250, 250, 250},1},
+        [4] = {"N2N Relative Grid & Reverb 2", found_bool_grid_MIDI, trackID_grid_MIDI, 1, {}, {}, 1, {250, 250, 250},1},
+        [3] = {"N2N Absolute Grid & Reverb", found_bool_grid_MIDI, trackID_grid_MIDI, 1, {{"JS:Lexikan",true}}, {}, 1, {250, 250, 250},1},
 		-- =========================================================================================================================
-        [6] = {"N2N Chords MIDI", found_bool_chord_MIDI, trackID_chord_MIDI, 1, {}, 
-			{7, 8, 9}, 1, {134, 172, 181},0},
-        [7] = {"N2N Chord Sustain",found_bool_chord_sus,trackID_chord_sus,0,
-			{{"HeadStart",true},{"ThisTriggersThat",false},{"ReaPulsive-8ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"CLAP:Surge XT",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true}},
-			{3},0,{134, 172, 181},.1},
-        [8] = {"N2N Chord + LibreARP",found_bool_chord_librearp,trackID_chord_librearp,0,
-			{{"HeadStart",true},{"LibreARP",true},{ "ReaPulsive-8ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{ "CLAP:Surge XT",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true},{ "STFU",false}},
-			{3},0,{134, 172, 181},.8},
-		[9] = {"N2N Chord + STFU",found_bool_chord_stfu1,trackID_chord_stfu1,0,
-			{{"HeadStart",true},{"ReaPulsive-8ths",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"CLAP:Surge XT",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",false},{"STFU",false}},
-			{3},0,{134, 172, 181},.4},
+        [5] = {"N2N Chords MIDI", found_bool_chord_MIDI, trackID_chord_MIDI, 1, {},{6, 7, 8, 9,10,11,12}, 1, {134, 172, 181},0},
+        [6] = {"N2N Chord 1",found_bool_chord_sus,trackID_chord_sus, 0,
+			{
+			{"HeadStart",true},
+			{"ReaCenterMIDIpitch",false},
+			{"LibreARP",false},
+			{"ReaPulsive-8ths",false},
+			{"SwingTrackMIDI",true},
+			{"ThisTriggersThat",false},
+			{"CLAP:Surge XT",true},
+			{"STFU",false},
+			{"STFU",false},
+			{"JS:Guitar Amp",false},
+			{"JS:Saturation",false},	
+			{"JS:ReEq",true},
+			{"JS:Compressor 2",false},			
+			{"Drive",false},						
+			{"JS:Limiter 3",false}
+			},
+			{2, 3},0,{134, 172, 181},.4},
+        [7] = {"N2N Chord 2",found_bool_chord_sus,trackID_chord_sus, 0,
+			{
+			{"HeadStart",true},
+			{"ReaCenterMIDIpitch",false},
+			{"LibreARP",false},
+			{"ReaPulsive-8ths",false},
+			{"SwingTrackMIDI",true},
+			{"ThisTriggersThat",false},
+			{"CLAP:Surge XT",true},
+			{"STFU",false},
+			{"STFU",false},
+			{"JS:Guitar Amp",false},
+			{"JS:Saturation",false},	
+			{"JS:ReEq",true},
+			{"JS:Compressor 2",false},			
+			{"Drive",false},						
+			{"JS:Limiter 3",false}
+			},
+			{2, 3},0,{134, 172, 181},.4},
+        [8] = {"N2N Chord 3",found_bool_chord_sus,trackID_chord_sus, 0,
+			{
+			{"HeadStart",true},
+			{"ReaCenterMIDIpitch",false},
+			{"LibreARP",false},
+			{"ReaPulsive-8ths",false},
+			{"SwingTrackMIDI",true},
+			{"ThisTriggersThat",false},
+			{"CLAP:Surge XT",true},
+			{"STFU",false},
+			{"STFU",false},
+			{"JS:Guitar Amp",false},
+			{"JS:Saturation",false},	
+			{"JS:ReEq",true},
+			{"JS:Compressor 2",false},			
+			{"Drive",false},						
+			{"JS:Limiter 3",false}
+			},
+			{2, 3},0,{134, 172, 181},.4},
+        [9] = {"N2N Chord 4",found_bool_chord_sus,trackID_chord_sus, 0,
+			{
+			{"HeadStart",true},
+			{"ReaCenterMIDIpitch",false},
+			{"LibreARP",false},
+			{"ReaPulsive-8ths",false},
+			{"SwingTrackMIDI",true},
+			{"ThisTriggersThat",false},
+			{"CLAP:Surge XT",true},
+			{"STFU",false},
+			{"STFU",false},
+			{"JS:Guitar Amp",false},
+			{"JS:Saturation",false},	
+			{"JS:ReEq",true},
+			{"JS:Compressor 2",false},			
+			{"Drive",false},						
+			{"JS:Limiter 3",false}
+			},
+			{2, 3},0,{134, 172, 181},.4},
+		[10] = {"N2N Chord 5",found_bool_chord_sus,trackID_chord_sus, 0,
+			{
+			{"HeadStart",true},
+			{"ReaCenterMIDIpitch",false},
+			{"LibreARP",false},
+			{"ReaPulsive-8ths",false},
+			{"SwingTrackMIDI",true},
+			{"ThisTriggersThat",false},
+			{"CLAP:Surge XT",true},
+			{"STFU",false},
+			{"STFU",false},
+			{"JS:Guitar Amp",false},
+			{"JS:Saturation",false},	
+			{"JS:ReEq",true},
+			{"JS:Compressor 2",false},			
+			{"Drive",false},						
+			{"JS:Limiter 3",false}
+			},
+			{2, 3},0,{134, 172, 181},.4},
+		[11] = {"N2N Chord 6",found_bool_chord_sus,trackID_chord_sus, 0,
+			{
+			{"HeadStart",true},
+			{"ReaCenterMIDIpitch",false},
+			{"LibreARP",false},
+			{"ReaPulsive-8ths",false},
+			{"SwingTrackMIDI",true},
+			{"ThisTriggersThat",false},
+			{"CLAP:Surge XT",true},
+			{"STFU",false},
+			{"STFU",false},
+			{"JS:Guitar Amp",false},
+			{"JS:Saturation",false},	
+			{"JS:ReEq",true},
+			{"JS:Compressor 2",false},			
+			{"Drive",false},						
+			{"JS:Limiter 3",false}
+			},
+			{2, 3},0,{134, 172, 181},.4},
+		[12] = {"N2N Chord 7",found_bool_chord_sus,trackID_chord_sus, 0,
+			{
+			{"HeadStart",true},
+			{"ReaCenterMIDIpitch",false},
+			{"LibreARP",false},
+			{"ReaPulsive-8ths",false},
+			{"SwingTrackMIDI",true},
+			{"ThisTriggersThat",false},
+			{"CLAP:Surge XT",true},
+			{"STFU",false},
+			{"STFU",false},
+			{"JS:Guitar Amp",false},
+			{"JS:Saturation",false},	
+			{"JS:ReEq",true},
+			{"JS:Compressor 2",false},			
+			{"Drive",false},						
+			{"JS:Limiter 3",false}
+			},
+			{2, 3},0,{134, 172, 181},.4},	
 		-- =========================================================================================================================		
-        [10] = {"N2N Chord-Bass MIDI", found_bool_chbass_MIDI, trackID_chbass_MIDI, 1, {}, 
-			{11}, 1, {172, 134, 181},0}, 
-		[11] = {"N2N Chord and Bass",found_bool_chbass_merlittzer,trackID_chbass_merlittzer,0,
-			{{"HeadStart",true},{"ReaPulsive-Quarters",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"CLAP:Surge XT",true},{"STFU",false}},
-			{3},0,{172, 134, 181},.2},
+        [13] = {"N2N Chord-Bass MIDI", found_bool_chbass_MIDI, trackID_chbass_MIDI, 1, {}, {14}, 1, {172, 134, 181},0}, 
+        [14] = {"N2N Chord-Bass",found_bool_chord_sus,trackID_chord_sus, 0,
+			{
+			{"HeadStart",true},
+			{"ReaCenterMIDIpitch",false},
+			{"LibreARP",false},
+			{"ReaPulsive-8ths",false},
+			{"SwingTrackMIDI",true},
+			{"ThisTriggersThat",false},
+			{"CLAP:Surge XT",true},
+			{"STFU",false},
+			{"STFU",false},
+			{"JS:Guitar Amp",false},
+			{"JS:Saturation",false},	
+			{"JS:ReEq",true},
+			{"JS:Compressor 2",false},			
+			{"Drive",false},						
+			{"JS:Limiter 3",false}
+			},
+			{2, 3},0,{172, 134, 181},.4},
 		-- =========================================================================================================================
-        [12] = {"N2N Bass MIDI", found_bool_bass_MIDI, trackID_bass_MIDI, 1, {}, 
-			{13, 14, 15}, 1, {134, 153, 181},0},
-		[13] = {"N2N Bass",found_bool_bass_sus,trackID_bass_sus,0,
-			{{"HeadStart",true},{"ReaPulsive-8ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"CLAP:Surge XT",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true},{"STFU",false}},
-			{3},0,{134, 153, 181},.1},
-		[14] = {"N2N Bass + LibreARP",found_bool_bass_librearp,trackID_bass_librearp,0,
-			{{"HeadStart",true},{"LibreARP",true},{"ReaPulsive-16ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"CLAP:Surge XT",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",false}},
-			{3},0,{134, 153, 181},.8},
-		[15] = {"N2N Bass + STFU",found_bool_bass_stfu1,trackID_bass_stfu1,0,
-			{{"HeadStart",true},{"ReaPulsive-8ths",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"CLAP:Surge XT",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",true},{"STFU",false}},
-			{3},0,{134, 153, 181},.8},
+        [15] = {"N2N Bass MIDI", found_bool_bass_MIDI, trackID_bass_MIDI, 1, {}, 
+			{16}, 1, {134, 153, 181},0},
+        [16] = {"N2N Bass",found_bool_chord_sus,trackID_chord_sus, 0,
+			{
+			{"HeadStart",true},
+			{"ReaCenterMIDIpitch",false},
+			{"LibreARP",false},
+			{"ReaPulsive-8ths",false},
+			{"SwingTrackMIDI",true},
+			{"ThisTriggersThat",false},
+			{"CLAP:Surge XT",true},
+			{"STFU",false},
+			{"STFU",false},
+			{"JS:Guitar Amp",false},
+			{"JS:Saturation",false},	
+			{"JS:ReEq",true},
+			{"JS:Compressor 2",false},			
+			{"Drive",false},						
+			{"JS:Limiter 3",false}
+			},
+			{2, 3},0,{134, 153, 181},.4},
 		-- =========================================================================================================================			
-		[16] = {"N2N Drums",found_bool_drums,trackID_drums,0,
-			{{"Tattoo",true},{"SwingTrackMIDI",true},{"Sitala",true},{"Calibre",true}},
-			{3},0,{144, 144, 144},.8}	
+		[17] = {"N2N Drums",found_bool_drums,trackID_drums,0,{{"Tattoo",true},{"SwingTrackMIDI",true},{"Sitala",true},{"Calibre",true}},{3},0,{144, 144, 144},.8}
 		}
+ 
  
     --Show_To_Dev("Started: " .. string.char(10))
     track_count = reaper.CountTracks(0)
@@ -2667,11 +2823,11 @@ function place_TEXT_data(ptd_track_table)
     lead_midi_item_id =
         reaper.CreateNewMIDIItemInProj(ptd_track_table[4][3], ptd_first_run_start_point, ptd_last_end_point, true)
     chords_midi_item_id =
-        reaper.CreateNewMIDIItemInProj(ptd_track_table[6][3], ptd_first_run_start_point, ptd_last_end_point, true)
+        reaper.CreateNewMIDIItemInProj(ptd_track_table[5][3], ptd_first_run_start_point, ptd_last_end_point, true)
     chbass_midi_item_id =
-        reaper.CreateNewMIDIItemInProj(ptd_track_table[10][3], ptd_first_run_start_point, ptd_last_end_point, true)
+        reaper.CreateNewMIDIItemInProj(ptd_track_table[13][3], ptd_first_run_start_point, ptd_last_end_point, true)
     bass_midi_item_id =
-        reaper.CreateNewMIDIItemInProj(ptd_track_table[12][3], ptd_first_run_start_point, ptd_last_end_point, true)
+        reaper.CreateNewMIDIItemInProj(ptd_track_table[15][3], ptd_first_run_start_point, ptd_last_end_point, true)
 
     for i, v in pairs(chord_table) do
         --Show_To_Dev("So!... I = " .. i .. "  " .. tostring(v[1])  .. " | " .. tostring(v[2])  .. " | " .. tostring(v[3]) .. " | " .. tostring(v[4]) .. " | " .. string.char(10))
@@ -2955,6 +3111,7 @@ function place_MIDI_data(
                 pmd_running_ppqpos_total = pmd_note_end_ppqpos
             else
                 for i, v in pairs(tiny_table_of_chord_tones) do
+				thechan = 1
                     if v + pmd_root > 10 then
                         reaper.MIDI_InsertNote(
                             chord_item_first_take,
@@ -2962,7 +3119,7 @@ function place_MIDI_data(
                             0,
                             pmd_running_ppqpos_total,
                             pmd_note_end_ppqpos,
-                            16,
+                            thechan,
                             60 + pmd_root + v - 12,
                             80
                         )
@@ -2972,7 +3129,7 @@ function place_MIDI_data(
                             0,
                             pmd_running_ppqpos_total,
                             pmd_note_end_ppqpos,
-                            16,
+                            thechan,
                             60 + pmd_root + v - 12,
                             80
                         )
@@ -2982,7 +3139,7 @@ function place_MIDI_data(
                             0,
                             pmd_running_ppqpos_total,
                             pmd_note_end_ppqpos,
-                            16,
+                            thechan,
                             60 + pmd_root + v - 12,
                             80
                         )
@@ -2993,7 +3150,7 @@ function place_MIDI_data(
                                 0,
                                 pmd_running_ppqpos_total,
                                 pmd_note_end_ppqpos,
-                                16,
+                                thechan,
                                 60 + bass_note + v - 36,
                                 80
                             )
@@ -3003,7 +3160,7 @@ function place_MIDI_data(
                                 0,
                                 pmd_running_ppqpos_total,
                                 pmd_note_end_ppqpos,
-                                16,
+                                thechan,
                                 60 + bass_note + v - 36,
                                 80
                             )
@@ -3013,7 +3170,7 @@ function place_MIDI_data(
                                 0,
                                 pmd_running_ppqpos_total,
                                 pmd_note_end_ppqpos,
-                                16,
+                                thechan,
                                 60 + bass_note + v - 36,
                                 80
                             )
@@ -3025,7 +3182,7 @@ function place_MIDI_data(
                             0,
                             pmd_running_ppqpos_total,
                             pmd_note_end_ppqpos,
-                            16,
+                            thechan,
                             60 + pmd_root + v,
                             80
                         )
@@ -3035,7 +3192,7 @@ function place_MIDI_data(
                             0,
                             pmd_running_ppqpos_total,
                             pmd_note_end_ppqpos,
-                            16,
+                            thechan,
                             60 + pmd_root + v,
                             80
                         )
@@ -3045,7 +3202,7 @@ function place_MIDI_data(
                             0,
                             pmd_running_ppqpos_total,
                             pmd_note_end_ppqpos,
-                            16,
+                            thechan,
                             60 + pmd_root + v,
                             80
                         )
@@ -3056,7 +3213,7 @@ function place_MIDI_data(
                                 0,
                                 pmd_running_ppqpos_total,
                                 pmd_note_end_ppqpos,
-                                16,
+                                thechan,
                                 60 + bass_note + v - 24,
                                 80
                             )
@@ -3066,7 +3223,7 @@ function place_MIDI_data(
                                 0,
                                 pmd_running_ppqpos_total,
                                 pmd_note_end_ppqpos,
-                                16,
+                                thechan,
                                 60 + bass_note + v - 24,
                                 80
                             )
@@ -3076,7 +3233,7 @@ function place_MIDI_data(
                                 0,
                                 pmd_running_ppqpos_total,
                                 pmd_note_end_ppqpos,
-                                16,
+                                thechan,
                                 60 + bass_note + v - 24,
                                 80
                             )
@@ -6789,4 +6946,3 @@ end
 -- _______________________________________________________________________ MAIN FUNCTION  ____________________
 Initialize_Track_Setup()
 IM_GUI_Loop()
-
