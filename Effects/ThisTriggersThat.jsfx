@@ -1,14 +1,14 @@
-version: 1.6
+version: 1.7
 desc: ThisTriggersThat
 author: Rockumk
 about:
   # One Channel can be used to rhythmically trigger the articulation of another channels
 changelog:
-  - Namechange
+  - New default channels for easier playing
 
 
-slider1:1<1,16,1>Pitch Content MIDI Channel
-slider2:10<1,16,1>Trigger MIDI Channel
+slider1:2<1,16,1>Pitch Content MIDI Channel
+slider2:1<1,16,1>Trigger MIDI Channel
 slider3:0<0,16,1{No - Off,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}>Pass Pitch Content
 slider4:0<0,1,1{No,Yes}>Include Non-Note Data from Pitch Channel
 slider5:0<0,16,1{No - Off,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}>Pass Trigger Notes
@@ -16,17 +16,17 @@ slider6:<0,1,1{No,Yes}>Include Non-Note Data from Trigger Channel
 slider7:-1<-1,16,1{No - Off,Yes - Unchanged,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}>Pass Other MIDI
 slider8:1<0,1,1{Content,Trigger}>Velocity Source (Content or Trigger)
 slider9:1<0,1,1{Strikes Only, Gating}>Trigger Operating Mode (Strikes Only, Gating)
-slider10:0<0,5,1{Off,Quarter,Eighth,Sixteenth,Thirty-Second}>-Delay to Quantize
-slider11:1<1,1000,1> -1
-slider12:1<1,1000,1> -2
-slider13:1<1,1000,1> -3
-slider14:1<1,1000,1> -4
-slider15:1<1,1000,1> -5
-slider16:1<1,1000,1> -6
-slider17:1<1,1000,1> -7
-slider18:1<1,1000,1> -8
-slider19:1<1,1000,1> -9
-slider20:1<1,1000,1> -0
+slider10:0<0,5,1{Off, Whole, Half, Quarter, Eighth, Sixteenth}>Delay to Quantize
+slider11:1<1,1000,1> -1 ignore just for visual feedback during dev
+slider12:1<1,1000,1> -2 ignore just for visual feedback during dev
+slider13:1<1,1000,1> -3 ignore just for visual feedback during dev
+slider14:1<1,1000,1> -4 ignore just for visual feedback during dev
+slider15:1<1,1000,1> -5 ignore just for visual feedback during dev
+slider16:1<1,1000,1> -6 ignore just for visual feedback during dev
+slider17:1<1,1000,1> -7 ignore just for visual feedback during dev
+slider18:1<1,1000,1> -8 ignore just for visual feedback during dev
+slider19:1<1,1000,1> -9 ignore just for visual feedback during dev
+slider20:1<1,1000,1> -0 ignore just for visual feedback during dev
 
 
 @init 
