@@ -1,5 +1,5 @@
 -- @description Numbers2Notes2
--- @version 1.2
+-- @version 1.2.1
 -- @author Rock Kennedy
 -- @about
 -- # Numbers2Notes2
@@ -7,8 +7,7 @@
 -- @changelog
 -- Chord letters are now charted, however without slash chord over bass
 -- Updated the Default Sounds (Now requires Surge Clap Version)
--- New MIDI output channel used
-
+-- Many updated Plugin Selections
 
 
 
@@ -811,7 +810,7 @@ Form: I V C V C B C O]]
         end
         if feedback_tab_mode == 9 then
 		
-reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.1.6")
+reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.2.1")
 reaper.ImGui_Text(ctx, "Numbers2Notes does not yet allow the user to select plugins.")
 reaper.ImGui_Text(ctx, "The plugins below are required to fully set up the default configuration.")
 reaper.ImGui_Text(ctx, "")
@@ -1815,6 +1814,7 @@ function Setup_Tracks() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
     local found_bool_chbass_merlittzer = false
     local found_bool_grid_librearp = false
     local found_bool_reverb = false
+	local found_bool_empty = false
 
     local trackID_n_chart = ""
     local trackID_l_chart = ""	
@@ -1840,6 +1840,7 @@ function Setup_Tracks() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
     local trackID_chbass_merlittzer = ""
     local trackID_grid_librearp = ""
     local trackID_reverb = ""
+	local trackID_empty = ""
 
     -- 0 = Table Column Descriptions
     local track_table = {
@@ -1852,194 +1853,238 @@ function Setup_Tracks() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
 			"Color",
 			"volume"
 			},
-        [1] = {"N2N # Chart", found_bool_n_chart, trackID_n_chart, 1, {{"SwingProjectMIDI",true}}, {}, 0, {100, 100, 100},0},
-        [2] = {"N2N Letter Chart", found_bool_l_chart, trackID_l_chart, 1, {{"SwingProjectMIDI",true}}, {}, 0, {100, 100, 100},0},
+        [1] = {"N2N # Chart", found_bool_n_chart, trackID_n_chart, 1, {{"SwingProjectMIDI",true,nil}}, {}, 0, {100, 100, 100},0},
+        [2] = {"N2N Letter Chart", found_bool_l_chart, trackID_l_chart, 1, {{"SwingProjectMIDI",true,nil}}, {}, 0, {100, 100, 100},0},
 		-- =========================================================================================================================
-        [3] = {"N2N Absolute Grid & Reverb 1", found_bool_grid_MIDI, trackID_grid_MIDI, 1, {}, {}, 1, {250, 250, 250},1},
-        [4] = {"N2N Relative Grid & Reverb 2", found_bool_grid_MIDI, trackID_grid_MIDI, 1, {}, {}, 1, {250, 250, 250},1},
-        [3] = {"N2N Absolute Grid & Reverb", found_bool_grid_MIDI, trackID_grid_MIDI, 1, {{"JS:Lexikan",true}}, {}, 1, {250, 250, 250},1},
+        [3] = {"N2N Absolute Grid & Reverb", found_bool_grid_MIDI, trackID_grid_MIDI, 1, {{"JS:Lexikan",true,nil}}, {}, 1, {250, 250, 250},.17},
+        [4] = {"N2N Relative Grid & Delay", found_bool_grid_MIDI, trackID_grid_MIDI, 1, {{"JS:Khaki Delay S2",true,nil}}, {}, 1, {250, 250, 250},0},
+
 		-- =========================================================================================================================
         [5] = {"N2N Chords MIDI", found_bool_chord_MIDI, trackID_chord_MIDI, 1, {},{6, 7, 8, 9,10,11,12}, 1, {134, 172, 181},0},
         [6] = {"N2N Chord 1",found_bool_chord_sus,trackID_chord_sus, 0,
 			{
-			{"HeadStart",true},
-			{"ReaCenterMIDIpitch",false},
-			{"LibreARP",false},
-			{"ReaPulsive-8ths",false},
-			{"SwingTrackMIDI",true},
-			{"ThisTriggersThat",false},
-			{"CLAP:Surge XT",true},
-			{"STFU",false},
-			{"STFU",false},
-			{"JS:Guitar Amp",false},
-			{"JS:Saturation",false},	
-			{"JS:ReEq",true},
-			{"JS:Compressor 2",false},			
-			{"Drive",false},						
-			{"JS:Limiter 3",false}
+			{"HeadStart",true,nil},
+			{"ReaCenterMIDIpitch",false,nil},
+			{"LibreARP",false,nil},
+			{"ReaPulsive-8ths",false,nil},  
+			{"SwingTrackMIDI",true,nil},
+			{"ThisTriggersThat",false,nil},
+			{"CLAP:Surge XT",true,"N2N_Chords"},
+			{"STFU",false,nil},
+			{"JS:Guitar Amp",false,nil},
+			{"Tube",false,nil},	
+			{"JS:ReEQ",true,nil},
+			{"JS:Compressor 2",false,nil},			
+			{"Drive",false,nil},
+			{"JS:Saike SEQS",false,nil},			
+			{"JS:Limiter 3",false,nil}
 			},
-			{2, 3},0,{134, 172, 181},.4},
+			{3, 4},0,{134, 172, 181},.4},
         [7] = {"N2N Chord 2",found_bool_chord_sus,trackID_chord_sus, 0,
 			{
-			{"HeadStart",true},
-			{"ReaCenterMIDIpitch",false},
-			{"LibreARP",false},
-			{"ReaPulsive-8ths",false},
-			{"SwingTrackMIDI",true},
-			{"ThisTriggersThat",false},
-			{"CLAP:Surge XT",true},
-			{"STFU",false},
-			{"STFU",false},
-			{"JS:Guitar Amp",false},
-			{"JS:Saturation",false},	
-			{"JS:ReEq",true},
-			{"JS:Compressor 2",false},			
-			{"Drive",false},						
-			{"JS:Limiter 3",false}
+			{"HeadStart",true,nil},
+			{"ReaCenterMIDIpitch",false,nil},
+			{"LibreARP",false,nil},
+			{"ReaPulsive-8ths",true,nil},
+			{"SwingTrackMIDI",true,nil},
+			{"ThisTriggersThat",false,nil},
+			{"CLAP:Surge XT",true,"N2N_Blips"},
+			{"STFU",false,nil},
+			{"JS:Guitar Amp",false,nil},
+			{"Tube",false,nil},	
+			{"JS:ReEQ",true,nil},
+			{"JS:Compressor 2",false,nil},			
+			{"Drive",false,nil},	
+			{"JS:Saike SEQS",false,nil},			
+			{"JS:Limiter 3",false,nil}
 			},
-			{2, 3},0,{134, 172, 181},.4},
+			{3, 4},0,{134, 172, 181},.2},
         [8] = {"N2N Chord 3",found_bool_chord_sus,trackID_chord_sus, 0,
 			{
-			{"HeadStart",true},
-			{"ReaCenterMIDIpitch",false},
-			{"LibreARP",false},
-			{"ReaPulsive-8ths",false},
-			{"SwingTrackMIDI",true},
-			{"ThisTriggersThat",false},
-			{"CLAP:Surge XT",true},
-			{"STFU",false},
-			{"STFU",false},
-			{"JS:Guitar Amp",false},
-			{"JS:Saturation",false},	
-			{"JS:ReEq",true},
-			{"JS:Compressor 2",false},			
-			{"Drive",false},						
-			{"JS:Limiter 3",false}
+			{"HeadStart",true,nil},
+			{"ReaCenterMIDIpitch",false,nil},
+			{"LibreARP",true,nil},
+			{"ReaPulsive-8ths",false,nil},
+			{"SwingTrackMIDI",true,nil},
+			{"ThisTriggersThat",false,nil},
+			{"CLAP:Surge XT",true,"N2N_Pie"},
+			{"STFU",false,nil},
+			{"JS:Guitar Amp",false,nil},
+			{"Tube",false,nil},	
+			{"JS:ReEQ",true,nil},
+			{"JS:Compressor 2",false,nil},			
+			{"Drive",false,nil},
+			{"JS:Saike SEQS",false,nil}, 			
+			{"JS:Limiter 3",false,nil}
 			},
-			{2, 3},0,{134, 172, 181},.4},
+			{3, 4},0,{134, 172, 181},.4},
         [9] = {"N2N Chord 4",found_bool_chord_sus,trackID_chord_sus, 0,
 			{
-			{"HeadStart",true},
-			{"ReaCenterMIDIpitch",false},
-			{"LibreARP",false},
-			{"ReaPulsive-8ths",false},
-			{"SwingTrackMIDI",true},
-			{"ThisTriggersThat",false},
-			{"CLAP:Surge XT",true},
-			{"STFU",false},
-			{"STFU",false},
-			{"JS:Guitar Amp",false},
-			{"JS:Saturation",false},	
-			{"JS:ReEq",true},
-			{"JS:Compressor 2",false},			
-			{"Drive",false},						
-			{"JS:Limiter 3",false}
+			{"HeadStart",true,nil},
+			{"ReaCenterMIDIpitch",false,nil},
+			{"LibreARP",true,nil},
+			{"ReaPulsive-8ths",false,nil},
+			{"SwingTrackMIDI",true,nil},
+			{"ThisTriggersThat",false,nil},
+			{"CLAP:Surge XT",true,"N2N_Plucks"},
+			{"STFU",false,nil},
+			{"JS:Guitar Amp",false,nil},
+			{"Tube",false,nil},	
+			{"JS:ReEQ",true,nil},
+			{"JS:Compressor 2",false,nil},			
+			{"Drive",false,nil},	
+			{"JS:Saike SEQS",false,nil}, 			
+			{"JS:Limiter 3",false,nil}
 			},
-			{2, 3},0,{134, 172, 181},.4},
+			{3, 4},0,{134, 172, 181},.4},
 		[10] = {"N2N Chord 5",found_bool_chord_sus,trackID_chord_sus, 0,
 			{
-			{"HeadStart",true},
-			{"ReaCenterMIDIpitch",false},
-			{"LibreARP",false},
-			{"ReaPulsive-8ths",false},
-			{"SwingTrackMIDI",true},
-			{"ThisTriggersThat",false},
-			{"CLAP:Surge XT",true},
-			{"STFU",false},
-			{"STFU",false},
-			{"JS:Guitar Amp",false},
-			{"JS:Saturation",false},	
-			{"JS:ReEq",true},
-			{"JS:Compressor 2",false},			
-			{"Drive",false},						
-			{"JS:Limiter 3",false}
+			{"HeadStart",true,nil},
+			{"ReaCenterMIDIpitch",false,nil},
+			{"LibreARP",true,nil},
+			{"ReaPulsive-8ths",false,nil},
+			{"SwingTrackMIDI",true,nil},
+			{"ThisTriggersThat",false,nil},
+			{"CLAP:Surge XT",true,nil},
+			{"STFU",false,nil},
+			{"JS:Guitar Amp",false,nil},
+			{"Tube",false,nil},	
+			{"JS:ReEQ",true,nil},
+			{"JS:Compressor 2",false,nil},			
+			{"Drive",false,nil},	
+			{"JS:Saike SEQS",false,nil}, 			
+			{"JS:Limiter 3",false,nil}
 			},
-			{2, 3},0,{134, 172, 181},.4},
+			{3, 4},0,{134, 172, 181},.4},
 		[11] = {"N2N Chord 6",found_bool_chord_sus,trackID_chord_sus, 0,
 			{
-			{"HeadStart",true},
-			{"ReaCenterMIDIpitch",false},
-			{"LibreARP",false},
-			{"ReaPulsive-8ths",false},
-			{"SwingTrackMIDI",true},
-			{"ThisTriggersThat",false},
-			{"CLAP:Surge XT",true},
-			{"STFU",false},
-			{"STFU",false},
-			{"JS:Guitar Amp",false},
-			{"JS:Saturation",false},	
-			{"JS:ReEq",true},
-			{"JS:Compressor 2",false},			
-			{"Drive",false},						
-			{"JS:Limiter 3",false}
+			{"HeadStart",true,nil},
+			{"ReaCenterMIDIpitch",false,nil},
+			{"LibreARP",true,nil},
+			{"ReaPulsive-8ths",false,nil},
+			{"SwingTrackMIDI",true,nil},
+			{"ThisTriggersThat",false,nil},
+			{"CLAP:Surge XT",true,nil},
+			{"STFU",false,nil},
+			{"JS:Guitar Amp",false,nil},
+			{"Tube",false,nil},	
+			{"JS:ReEQ",true,nil},
+			{"JS:Compressor 2",false,nil},			
+			{"Drive",false,nil},		
+			{"JS:Saike SEQS",false,nil}, 			
+			{"JS:Limiter 3",false,nil}
 			},
-			{2, 3},0,{134, 172, 181},.4},
+			{3, 4},0,{134, 172, 181},.4},
 		[12] = {"N2N Chord 7",found_bool_chord_sus,trackID_chord_sus, 0,
 			{
-			{"HeadStart",true},
-			{"ReaCenterMIDIpitch",false},
-			{"LibreARP",false},
-			{"ReaPulsive-8ths",false},
-			{"SwingTrackMIDI",true},
-			{"ThisTriggersThat",false},
-			{"CLAP:Surge XT",true},
-			{"STFU",false},
-			{"STFU",false},
-			{"JS:Guitar Amp",false},
-			{"JS:Saturation",false},	
-			{"JS:ReEq",true},
-			{"JS:Compressor 2",false},			
-			{"Drive",false},						
-			{"JS:Limiter 3",false}
+			{"HeadStart",true,nil},
+			{"ReaCenterMIDIpitch",false,nil},
+			{"LibreARP",true,nil},
+			{"ReaPulsive-8ths",false,nil},
+			
+			{"SwingTrackMIDI",true,nil},
+			{"ThisTriggersThat",false,nil},
+			{"CLAP:Surge XT",true,nil},
+			{"STFU",false,nil},
+			
+			{"JS:Guitar Amp",false,nil},
+			{"Tube",false,nil},	
+			{"JS:ReEQ",true,nil},
+			{"JS:Compressor 2",false,nil},	
+			
+			{"Drive",false,nil},		
+			{"JS:Saike SEQS",false,nil}, 			
+			{"JS:Limiter 3",false,nil}
 			},
-			{2, 3},0,{134, 172, 181},.4},	
+			{3, 4},0,{134, 172, 181},.4},	
 		-- =========================================================================================================================		
         [13] = {"N2N Chord-Bass MIDI", found_bool_chbass_MIDI, trackID_chbass_MIDI, 1, {}, {14}, 1, {172, 134, 181},0}, 
         [14] = {"N2N Chord-Bass",found_bool_chord_sus,trackID_chord_sus, 0,
 			{
-			{"HeadStart",true},
-			{"ReaCenterMIDIpitch",false},
-			{"LibreARP",false},
-			{"ReaPulsive-8ths",false},
-			{"SwingTrackMIDI",true},
-			{"ThisTriggersThat",false},
-			{"CLAP:Surge XT",true},
-			{"STFU",false},
-			{"STFU",false},
-			{"JS:Guitar Amp",false},
-			{"JS:Saturation",false},	
-			{"JS:ReEq",true},
-			{"JS:Compressor 2",false},			
-			{"Drive",false},						
-			{"JS:Limiter 3",false}
+			{"HeadStart",true,nil},
+			{"ReaCenterMIDIpitch",false,nil},
+			{"LibreARP",true,nil},
+			{"ReaPulsive-8ths",false,nil},	
+			{"SwingTrackMIDI",true,nil},
+			{"ThisTriggersThat",false,nil},
+			{"CLAP:Surge XT",true,nil},
+			{"STFU",false,nil},
+			{"JS:Guitar Amp",false,nil}, 
+			{"Tube",false,nil},	
+			{"JS:ReEQ",true,nil},
+			{"JS:Compressor 2",false,nil},	
+			{"Drive",false,nil},
+			{"JS:Saike SEQS",false,nil}, 			
+			{"JS:Limiter 3",false,nil}
 			},
-			{2, 3},0,{172, 134, 181},.4},
+			{3, 4},0,{172, 134, 181},.4},
 		-- =========================================================================================================================
         [15] = {"N2N Bass MIDI", found_bool_bass_MIDI, trackID_bass_MIDI, 1, {}, 
 			{16}, 1, {134, 153, 181},0},
         [16] = {"N2N Bass",found_bool_chord_sus,trackID_chord_sus, 0,
 			{
-			{"HeadStart",true},
-			{"ReaCenterMIDIpitch",false},
-			{"LibreARP",false},
-			{"ReaPulsive-8ths",false},
-			{"SwingTrackMIDI",true},
-			{"ThisTriggersThat",false},
-			{"CLAP:Surge XT",true},
-			{"STFU",false},
-			{"STFU",false},
-			{"JS:Guitar Amp",false},
-			{"JS:Saturation",false},	
-			{"JS:ReEq",true},
-			{"JS:Compressor 2",false},			
-			{"Drive",false},						
-			{"JS:Limiter 3",false}
+			{"HeadStart",true,nil},
+			{"ReaCenterMIDIpitch",false,nil},
+			{"LibreARP",false,nil},
+			{"ReaPulsive-halves",true,nil},		
+			{"SwingTrackMIDI",true,nil},
+			{"ThisTriggersThat",false,nil},
+			{"CLAP:Surge XT",true,"N2N_Bass"},
+			{"STFU",false,nil},
+			{"JS:Guitar Amp",false,nil},
+			{"Tube",false,nil},	
+			{"JS:Dis-Treasure",false,nil},	
+			{"JS:LA-2KAN S2",false,nil},
+			{"JS:NC76 S2",false,nil},
+			{"JS:Compressor 2",false,nil},	
+			{"JS:ReEQ",true,nil},	
+			{"Drive",false,nil},	
+			{"JS:Saike SEQS",false,nil},
+			{"JS:Limiter 3",false,nil} 
 			},
-			{2, 3},0,{134, 153, 181},.4},
+			{3, 4},0,{134, 153, 181},1.3},
 		-- =========================================================================================================================			
-		[17] = {"N2N Drums",found_bool_drums,trackID_drums,0,{{"Tattoo",true},{"SwingTrackMIDI",true},{"Sitala",true},{"Calibre",true}},{3},0,{144, 144, 144},.8}
+		[17] = {"N2N Drums",found_bool_drums,trackID_drums,0,
+		{
+		{"Tattoo",true,"35 Set - Old School"},
+		{"SwingTrackMIDI",true,nil},
+		{"Sitala",false,nil},
+		{"Calibre",true,nil},
+		{"Holt",true,nil},
+		{"JS:Violet Envelope Shaper S2",true,"35 Set - Old School"},
+		{"JS:Exciter+Sub",false,nil},
+		{"JS:Tape Recorder S2",false,nil},	
+		{"JS:Guitar Amp",false,nil},	
+		{"Tube",false,nil},	
+		{"JS:Dis-Treasure",true,nil},	
+		{"JS:LA-2KAN S2",false,nil},
+		{"JS:NC76 S2",false,nil},
+		{"JS:Compressor 2",false,nil},
+		{"JS:ReEQ",true,nil},
+		{"Drive",false,nil},	
+		{"JS:Saike SEQS",false,nil}, 
+		{"JS:Limiter 3",false,nil} 
+		},
+		{3,4},0,{144, 144, 144},4},
+		[18] = {"Empty",found_bool_empty,trackID_empty,0,
+		{
+		{"Sitala",false,nil},
+		{"Calibre",true,nil},
+		{"Holt",true,nil},
+		{"JS:Tape Recorder S2",false,nil},
+		{"JS:Guitar Amp",false,nil},	
+		{"Tube",false,nil},	
+		{"JS:Dis-Treasure",true,nil},	
+		{"JS:LA-2KAN S2",false,nil},
+		{"JS:NC76 S2",false,nil},
+		{"JS:Compressor 2",false,nil},
+		{"JS:ReEQ",true,nil},
+		{"Drive",false,nil},	
+		{"JS:Saike SEQS",false,nil}, 
+		{"JS:Limiter 3",false,nil} 
+		},
+		{3,4},0,{222, 222, 222},1}
 		}
- 
  
     --Show_To_Dev("Started: " .. string.char(10))
     track_count = reaper.CountTracks(0)
@@ -2084,7 +2129,10 @@ function Setup_Tracks() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
             --Show_To_Dev("yes " .. i.. " " .. tostring(v[2]) .. " | " .. tostring(v[3]) .. " | " .. tostring(v[4]) .. string.char(10))
             plug_order = 1000
             for j, value in pairs(v[5]) do
-                reaper.TrackFX_AddByName(v[3], v[5][j][1], false, plug_order) -- ADD INSTRUMENT FX
+                addedFX = reaper.TrackFX_AddByName(v[3], v[5][j][1], false, plug_order) -- ADD INSTRUMENT FX
+				if v[5][j][3] ~= nil then
+				reaper.TrackFX_SetPreset(v[3], addedFX, v[5][j][3] )	
+				end
                 plug_order = plug_order - 1
             end
 			count = 0
@@ -2186,7 +2234,10 @@ function Initialize_Track_Setup() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A RE
             --Show_To_Dev("yes " .. i.. " " .. tostring(v[2]) .. " | " .. tostring(v[3]) .. " | " .. tostring(v[4]) .. string.char(10))
             iplug_order = 1000
             for j, value in pairs(v[5]) do
-                reaper.TrackFX_AddByName(v[3], v[5][j], false, iplug_order) -- ADD INSTRUMENT FX
+					addedFX = reaper.TrackFX_AddByName(v[3], v[5][j], false, iplug_order) -- ADD INSTRUMENT FX
+					if v[5][j][3] ~= nil then
+					reaper.TrackFX_SetPreset(v[3], addedFX, v[5][j][3] )
+					end
                 iplug_order = iplug_order - 1
             end
         end
