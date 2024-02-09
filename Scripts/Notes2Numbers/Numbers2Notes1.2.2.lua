@@ -1,11 +1,7 @@
 -- @description Numbers2Notes1.2.2
 -- @version 1.2.2
 -- @author Rock Kennedy
--- @about
---   # Numbers2Notes1.2.2
---   Updated Nashville Number System Style Chord Charting for Reaper.
--- @changelog
---   Many updated Plugin Selections
+
 
 
 
