@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="4b12f8df7915fcf5a2dc236eb2be716356213ff7">
+<index version="1" name="AHS_Music_Tech" commit="d225a6336d79923943ebf61fdc595f073e225052">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -378,16 +378,6 @@
       </version>
     </reapack>
     <reapack name="Numbers2Notes1.2.2.lua" type="script" desc="Numbers2Notes1.2.2">
-      <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
-{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
-\widowctrl\hyphauto
-
-{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 Numbers2Notes1.2.2\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 Updated Nashville Number System Style Chord Charting for Reaper.\par}
-}
-]]></description>
-      </metadata>
       <version name="1.2.2" author="Rock Kennedy" time="2024-02-09T07:00:10Z">
         <changelog><![CDATA[Many updated Plugin Selections]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/4b12f8df7915fcf5a2dc236eb2be716356213ff7/Scripts/Notes2Numbers/Numbers2Notes1.2.2.lua</source>
