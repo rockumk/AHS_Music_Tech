@@ -2,12 +2,10 @@
 -- @version 1.2.2
 -- @author Rock Kennedy
 -- @about
--- # Numbers2Notes1.2.2
--- Nashville Number System Style Chord Charting for Reaper.
+--   # Numbers2Notes1.2.2
+--   Updated Nashville Number System Style Chord Charting for Reaper.
 -- @changelog
--- Chord letters are now charted, however without slash chord over bass
--- Updated the Default Sounds (Now requires Surge Clap Version)
--- Many updated Plugin Selections
+--   Many updated Plugin Selections
 
 
 
