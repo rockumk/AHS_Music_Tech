@@ -1,12 +1,13 @@
 -- @description Numbers2Notes
--- @version 1.1.6
+-- @version 1.2.3
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes
---   Nashville Number System Style Chord Charting for Reaper.
+--   # Numbers2Notes1.2.3
+--   Updated Nashville Number System Style Chord Charting for Reaper.
 -- @changelog
---   Added Version Listing
-
+--   Fixed bug where user closing interface caused error
+--   Fixed bug where no open project caused error
+--   Auto Reload of Last Numbers2Notes Session
 
 
 
@@ -46,6 +47,62 @@ cancel_OM_opperation = false
 OMfalsesofar = 0
 the_itemOM = ""
 
+local JSFX_data_request1 = {
+"Nashville Numbers", 
+"Roman Numerals", 
+"Relative Letter Labels", 
+"Relative Chord Grid",
+"Relative Chords", 
+"Relative Chords and bass",
+"Relative Roots and 5ths", 
+"Relative Roots",
+"Relative Bass",
+"Absolute Letter Labels", 
+"Absolute Chord Grid",
+"Absolute Chords", 
+"Absolute Chords and bass",
+"Absolute Roots and 5ths", 
+"Absolute Roots",
+"Absolute Bass",
+"Preferred Letter Labels", 
+"Preferred Chord Grid",
+"Preferred Chords", 
+"Preferred Chords and bass",
+"Preferred Roots and 5ths", 
+"Preferred Roots",
+"Preferred Bass"
+}
+
+local JSFX_data_request2 = {
+"Unset",
+"C#", 
+"D#", 
+"F#", 
+"G#",
+"A#", 
+"Db",
+"Eb", 
+"Gb",
+"Ab",
+"Bb", 
+"C",
+"D", 
+"E",
+"F",
+"G",
+"A", 
+"B"
+}
+
+
+
+
+
+
+
+
+
+
 header_area = [[Title: 
 Writer: 
 BPM: 
@@ -62,12 +119,17 @@ chord_charting_area = [[
 
 
 
-{V}	
+{V}  
 
 
 
 
 {C}
+
+
+
+
+{B}
 
 
 
@@ -79,7 +141,84 @@ chord_charting_area = [[
 ]]
 
 
------------------------------------------------   							GUI VARIABLES AND SETUP
+-----------------------------------------------                 AUTO LOAD LAST NUMBERS2NOTES CHART   
+function LoadLastNumbers2NotesChart()
+    local info = debug.getinfo(1, 'S')
+    local path = info.source:match[[^@?(.*[\/])[^\/]-$]]
+    local chordchart_path = path .. 'ChordCharts/'
+    
+    -- Define the fixed filename for the last Numbers2Notes chart
+    local filenamewillbe = "Last_Numbers2Notes_Chart.txt"
+    
+    -- Open the file in read mode
+    local full_path = chordchart_path .. filenamewillbe
+    local settings = io.open(full_path, "r")
+    
+    if settings ~= nil then
+        local readfilecontents = settings:read("*all")
+        
+        local textlocationtable = {header_startie, header_endie, chords_startie, chords_endie, lyrics_startie, lyrics_endie, notes_startie, notes_endie}
+        
+        for i,v in pairs(textlocationtable) do
+            textlocationtable[i] = nil
+        end
+        
+        -- Extract the sections of the file as before
+        _, header_startie = string.find(readfilecontents, "<header_area>\n")
+        header_endie, _  = string.find(readfilecontents, "\n</header_area>")
+        _, chords_startie = string.find(readfilecontents, "<chord_charting_area>\n")
+        chords_endie, _  = string.find(readfilecontents, "\n</chord_charting_area>")  
+        _, lyrics_startie = string.find(readfilecontents, "<lyrics_charting_area>\n")
+        lyrics_endie, _  = string.find(readfilecontents, "\n</lyrics_charting_area>")  
+        _, notes_startie = string.find(readfilecontents, "<notes_charting_area>\n")
+        notes_endie, _  = string.find(readfilecontents, "\n</notes_charting_area>")
+        
+        -- Load the content into the respective variables
+        if header_startie ~= nil and header_endie ~= nil and header_endie > header_startie then
+            header_area = string.sub(readfilecontents, header_startie + 1, header_endie - 1)
+        end
+        
+        if chords_startie ~= nil and chords_endie ~= nil and chords_endie > chords_startie then            
+            chord_charting_area = string.sub(readfilecontents, chords_startie + 1, chords_endie - 1)      
+        end
+
+        if lyrics_startie ~= nil and lyrics_endie ~= nil and lyrics_endie > lyrics_startie then            
+            lyrics_charting_area = string.sub(readfilecontents, lyrics_startie + 1, lyrics_endie - 1)
+        end
+
+        if notes_startie ~= nil and notes_endie ~= nil and notes_endie > notes_startie then            
+            notes_charting_area = string.sub(readfilecontents, notes_startie + 1, notes_endie - 1)
+        end
+        
+        settings:close()  -- Close the file after reading
+    else
+        reaper.ShowMessageBox("Last_Numbers2Notes_Chart.txt not found.", "Error", 0)
+    end
+end
+
+
+
+
+-----------------------------------------------                 CHECK IF A PROJECT IS OPEN   
+local function is_project_open()
+    return reaper.GetProjectName(0, "") ~= ""
+end
+
+-----------------------------------------------                 CHECK IF THE "N2N Audition" TRACK EXISTS
+local function get_playback_track()
+    local track_count = reaper.CountTracks(0)
+    for i = 0, track_count - 1 do
+        local track = reaper.GetTrack(0, i)
+        local _, track_name = reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "", false)
+        if track_name == "N2N Audition" then
+            return track
+        end
+    end
+    return nil
+end
+
+
+-----------------------------------------------                 GUI VARIABLES AND SETUP
 
 render_feedback = ""
 r = reaper
@@ -124,7 +263,7 @@ function Link(url)
 end
 
 
------------------------------------------------   							IMGUI LOOP FUNCTION
+-----------------------------------------------                 IMGUI LOOP FUNCTION
 function IM_GUI_Loop()
     local rv
     local rc
@@ -155,6 +294,15 @@ function IM_GUI_Loop()
 
     local visible, open =
         reaper.ImGui_Begin(ctx, "Numbers2Notes - Nashville Number Charts for Reaper", true, window_flags)
+
+        
+        local playback_track = get_playback_track()
+
+        if not playback_track then
+            -- If the track doesn't exist, call Initialize_Track_Setup to create it
+            Initialize_Track_Setup()
+            playback_track = get_playback_track() -- Re-fetch the track after creation
+        end
 
 
 
@@ -194,23 +342,23 @@ function IM_GUI_Loop()
                 r.ImGui_EndTabItem(ctx)
             end
             --[[
-			-- TABS
+      -- TABS
             if r.ImGui_BeginTabItem(ctx, "Lead 1") then
-				charting_tab_mode = 2
-				work_zone = lead1_charting_area
-				r.ImGui_EndTabItem(ctx)
+        charting_tab_mode = 2
+        work_zone = lead1_charting_area
+        r.ImGui_EndTabItem(ctx)
             end
-			if r.ImGui_BeginTabItem(ctx, "Lead 2") then
-				charting_tab_mode = 3
-				work_zone = lead2_charting_area
-				r.ImGui_EndTabItem(ctx)
-			end					
-			if r.ImGui_BeginTabItem(ctx, "Bass") then
-				charting_tab_mode = 4
-				work_zone = bass_charting_area
-				r.ImGui_EndTabItem(ctx)	
+      if r.ImGui_BeginTabItem(ctx, "Lead 2") then
+        charting_tab_mode = 3
+        work_zone = lead2_charting_area
+        r.ImGui_EndTabItem(ctx)
+      end          
+      if r.ImGui_BeginTabItem(ctx, "Bass") then
+        charting_tab_mode = 4
+        work_zone = bass_charting_area
+        r.ImGui_EndTabItem(ctx)  
             end 
-			]]
+      ]]
             if r.ImGui_BeginTabItem(ctx, "Lyrics") then
                 charting_tab_mode = 5
                 work_zone = lyrics_charting_area
@@ -269,6 +417,13 @@ function IM_GUI_Loop()
                 modal_on = true
                 render_all()
             end
+       r.ImGui_SameLine(ctx)
+      if r.ImGui_Button(ctx, "New Render", nil, nil) then
+                modal_on = true
+                render_gather_go()
+            end
+      
+      
         elseif charting_tab_mode == 2 then
             rv, lead1_charting_area =
                 r.ImGui_InputTextMultiline(
@@ -358,7 +513,7 @@ Form: I V C V C B C O]]
 
 
 
-{V}	
+{V}  
 
 
 
@@ -382,12 +537,12 @@ Form: I V C V C B C O]]
                 end
 
                 if r.ImGui_MenuItem(ctx, "Open Chart") then
-				
-				
-					local info = debug.getinfo(1,'S')
-					local path = info.source:match[[^@?(.*[\/])[^\/]-$]]
-					local chordchart_path = path .. 'ChordCharts/'
-				
+        
+        
+          local info = debug.getinfo(1,'S')
+          local path = info.source:match[[^@?(.*[\/])[^\/]-$]]
+          local chordchart_path = path .. 'ChordCharts/'
+        
                     retval, selected_path =
                         reaper.GetUserFileNameForRead(chordchart_path,
                         "Select the Chord Chart you wish to open.",
@@ -402,96 +557,97 @@ Form: I V C V C B C O]]
                     local settings = io.open(selected_path, "r")
                     if settings ~= nil then
                         local readfilecontents = settings:read("*all")
-						
-						
-						local textlocationtable = {header_startie, header_endie, chords_startie, chords_endie, lyrics_startie, lyrics_endie, notes_startie, notes_endie}
-						
-						for i,v in pairs(textlocationtable) do
-						textlocationtable[i] = nil
-						end
-						
+            
+            
+            local textlocationtable = {header_startie, header_endie, chords_startie, chords_endie, lyrics_startie, lyrics_endie, notes_startie, notes_endie}
+            
+            for i,v in pairs(textlocationtable) do
+            textlocationtable[i] = nil
+            end
+            
 
                         _, header_startie = string.find(readfilecontents, "<header_area>\n")
-						header_endie, _  = string.find(readfilecontents, "\n</header_area>")
+            header_endie, _  = string.find(readfilecontents, "\n</header_area>")
                         _, chords_startie = string.find(readfilecontents, "<chord_charting_area>\n")
-						chords_endie, _  = string.find(readfilecontents, "\n</chord_charting_area>")	
+            chords_endie, _  = string.find(readfilecontents, "\n</chord_charting_area>")  
                         --_, lead1_startie = string.find(readfilecontents, "<lead1_charting_area>\n")
-						--lead1_endie, _  = string.find(readfilecontents, "\n</lead1_charting_area>")	
-						--_, lead2_startie = string.find(readfilecontents, "<lead2_charting_area>\n")
-						--lead2_endie, _  = string.find(readfilecontents, "\n</lead2_charting_area>")
+            --lead1_endie, _  = string.find(readfilecontents, "\n</lead1_charting_area>")  
+            --_, lead2_startie = string.find(readfilecontents, "<lead2_charting_area>\n")
+            --lead2_endie, _  = string.find(readfilecontents, "\n</lead2_charting_area>")
                         --_, bass_startie = string.find(readfilecontents, "<bass_charting_area>\n")
-						--bass_endie, _  = string.find(readfilecontents, "\n</bass_charting_area>")	
+            --bass_endie, _  = string.find(readfilecontents, "\n</bass_charting_area>")  
                         _, lyrics_startie = string.find(readfilecontents, "<lyrics_charting_area>\n")
-						lyrics_endie, _  = string.find(readfilecontents, "\n</lyrics_charting_area>")	
+            lyrics_endie, _  = string.find(readfilecontents, "\n</lyrics_charting_area>")  
                         _, notes_startie = string.find(readfilecontents, "<notes_charting_area>\n")
-						notes_endie, _  = string.find(readfilecontents, "\n</notes_charting_area>")
+            notes_endie, _  = string.find(readfilecontents, "\n</notes_charting_area>")
 
 
-						
+            
 
-						
-						
-						
-						--chords_endie, lyrics_startie  = string.find(readfilecontents, "\n</chord_charting_area>\n<lyrics_charting_area>\n")
-						--lyrics_endie, notes_startie  = string.find(readfilecontents, "\n</lyrics_charting_area>\n<notes_charting_area>\n")
-						notes_endie, _  = string.find(readfilecontents, "\n</notes_charting_area>\n</Numbers2NotesProject>")
-						
+            
+            
+            
+            --chords_endie, lyrics_startie  = string.find(readfilecontents, "\n</chord_charting_area>\n<lyrics_charting_area>\n")
+            --lyrics_endie, notes_startie  = string.find(readfilecontents, "\n</lyrics_charting_area>\n<notes_charting_area>\n")
+            notes_endie, _  = string.find(readfilecontents, "\n</notes_charting_area>\n</Numbers2NotesProject>")
+            
 
-						if header_startie ~= nil and header_endie ~= nil and header_endie > header_startie then
+            if header_startie ~= nil and header_endie ~= nil and header_endie > header_startie then
                         header_area = string.sub(readfilecontents, header_startie + 1, header_endie - 1)
-						end
-						
-						if chords_startie ~= nil and chords_endie ~= nil and chords_endie > chords_startie then						
-                        chord_charting_area = string.sub(readfilecontents, chords_startie + 1, chords_endie - 1)			
-						end
+            end
+            
+            if chords_startie ~= nil and chords_endie ~= nil and chords_endie > chords_startie then            
+                        chord_charting_area = string.sub(readfilecontents, chords_startie + 1, chords_endie - 1)      
+            end
 
-						--if lead1_startie ~= nil and lead1_endie ~= nil and lead1_endie > lead1_startie then						
+            --if lead1_startie ~= nil and lead1_endie ~= nil and lead1_endie > lead1_startie then            
                         --lead1_charting_area = string.sub(readfilecontents, lead1_startie + 1, lead1_endie - 1)
-						--end
+            --end
 
-						if lyrics_startie ~= nil and lyrics_endie ~= nil and lyrics_endie > lyrics_startie then						
-						lyrics_charting_area = string.sub(readfilecontents, lyrics_startie + 1, lyrics_endie - 1)
-						end
+            if lyrics_startie ~= nil and lyrics_endie ~= nil and lyrics_endie > lyrics_startie then            
+            lyrics_charting_area = string.sub(readfilecontents, lyrics_startie + 1, lyrics_endie - 1)
+            end
 
-						if notes_startie ~= nil and notes_endie ~= nil and notes_endie > notes_startie then						
-						notes_charting_area = string.sub(readfilecontents, notes_startie + 1, notes_endie - 1)
-						end
-						
-						
-						
+            if notes_startie ~= nil and notes_endie ~= nil and notes_endie > notes_startie then            
+            notes_charting_area = string.sub(readfilecontents, notes_startie + 1, notes_endie - 1)
+            end
+            
+            
+            
                     end
                 end
                 if r.ImGui_MenuItem(ctx, "Save") then -- MENU ITEMS
 
-						Autosave()
+            Autosave()
+            SaveLastNumbers2NotesChart()
                 end
                 if r.ImGui_MenuItem(ctx, "Save as...") then
-						_, quit_title_startso  = string.find(header_area, "Title: ")			-- GET THE PROJECT SETTINGS AND PLACE IN THE SHELL
-						quit_title_endso, _  = string.find(header_area, "Writer:")
-						
-						quittitlefound = string.sub(header_area, quit_title_startso+1, quit_title_endso-2)
-						thetime = os.date('%Y-%m-%d %H-%M-%S')
-						if string.len(quittitlefound) < 30 and quittitlefound ~= nil then
+            _, quit_title_startso  = string.find(header_area, "Title: ")      -- GET THE PROJECT SETTINGS AND PLACE IN THE SHELL
+            quit_title_endso, _  = string.find(header_area, "Writer:")
+            
+            quittitlefound = string.sub(header_area, quit_title_startso+1, quit_title_endso-2)
+            thetime = os.date('%Y-%m-%d %H-%M-%S')
+            if string.len(quittitlefound) < 30 and quittitlefound ~= nil then
 
-						filenamewillbe = quittitlefound .. " " .. thetime .. ".txt"
-						else
-						filenamewillbe = "N2Nautobackup " .. thetime .. ".txt"
-						end
-						
-						local info = debug.getinfo(1,'S')
-						local path = info.source:match[[^@?(.*[\/])[^\/]-$]]
-						local chordchart_path = path .. 'ChordCharts/'
-						retval, fileName =
-							reaper.JS_Dialog_BrowseForSaveFile(
-							"Save Chord Chart as...",
-							chordchart_path,
-							filenamewillbe,
-							".txt"
-						)
+            filenamewillbe = quittitlefound .. " " .. thetime .. ".txt"
+            else
+            filenamewillbe = "N2Nautobackup " .. thetime .. ".txt"
+            end
+            
+            local info = debug.getinfo(1,'S')
+            local path = info.source:match[[^@?(.*[\/])[^\/]-$]]
+            local chordchart_path = path .. 'ChordCharts/'
+            retval, fileName =
+              reaper.JS_Dialog_BrowseForSaveFile(
+              "Save Chord Chart as...",
+              chordchart_path,
+              filenamewillbe,
+              ".txt"
+            )
 
-						write_path = io.open(filenamewillbe, "w")
-						write_path:write("<Numbers2NotesProject>\n<header_area>\n"..header_area .."\n</header_area>\n<chord_charting_area>\n"..chord_charting_area.."\n</chord_charting_area>\n<lyrics_charting_area>\n"..lyrics_charting_area.."\n</lyrics_charting_area>\n<notes_charting_area>\n"..notes_charting_area.."\n</notes_charting_area>\n</Numbers2NotesProject>")
-						write_path:close()	
+            write_path = io.open(filenamewillbe, "w")
+            write_path:write("<Numbers2NotesProject>\n<header_area>\n"..header_area .."\n</header_area>\n<chord_charting_area>\n"..chord_charting_area.."\n</chord_charting_area>\n<lyrics_charting_area>\n"..lyrics_charting_area.."\n</lyrics_charting_area>\n<notes_charting_area>\n"..notes_charting_area.."\n</notes_charting_area>\n</Numbers2NotesProject>")
+            write_path:close()  
                 end
                 --if r.ImGui_MenuItem(ctx, "Quit") then
                 --r.ShowConsoleMsg("Quitting...\n")
@@ -499,7 +655,7 @@ Form: I V C V C B C O]]
                 r.ImGui_EndMenu(ctx)
             end
             --[[if r.ImGui_BeginMenu(ctx, "Edit") then
-                if r.ImGui_MenuItem(ctx, "Select All") then       			-- MENU ITEMS
+                if r.ImGui_MenuItem(ctx, "Select All") then             -- MENU ITEMS
                     r.ShowConsoleMsg("Selecting...\n")
                 end
                 if r.ImGui_MenuItem(ctx, "Cut") then
@@ -513,9 +669,9 @@ Form: I V C V C B C O]]
                 end
                 r.ImGui_EndMenu(ctx)
             end
-			]]
+      ]]
             --[[
-            if r.ImGui_BeginMenu(ctx, "Formats") then						-- MENU ITEMS
+            if r.ImGui_BeginMenu(ctx, "Formats") then            -- MENU ITEMS
                 if r.ImGui_MenuItem(ctx, "Get Formats Info") then
                     r.ShowConsoleMsg("Open Format Info...\n")
                 end
@@ -537,7 +693,7 @@ Form: I V C V C B C O]]
                 if r.ImGui_MenuItem(ctx, "Go to Chordsheet.com") then
                     r.ShowConsoleMsg("Open Chordsheet.com website\n")
                 end
-                r.ImGui_EndMenu(ctx)										-- MENU ITEMS
+                r.ImGui_EndMenu(ctx)                    -- MENU ITEMS
             end
             if r.ImGui_BeginMenu(ctx, "Audition and Render") then
                 if r.ImGui_MenuItem(ctx, "Audition Selection") then
@@ -554,10 +710,10 @@ Form: I V C V C B C O]]
                 end
                 if r.ImGui_MenuItem(ctx, "Render New Chart Tracks") then
                     render_all()
-                end															-- MENU ITEMS
+                end                              -- MENU ITEMS
                 r.ImGui_EndMenu(ctx)
             end
-			]]
+      ]]
             r.ImGui_EndMenuBar(ctx)
         end
         if r.ImGui_BeginTabBar(ctx, "Feedback", r.ImGui_TabBarFlags_None()) then
@@ -568,18 +724,18 @@ Form: I V C V C B C O]]
             if r.ImGui_BeginTabItem(ctx, "Entry") then
                 feedback_tab_mode = 1
                 r.ImGui_EndTabItem(ctx)
-            end -- TABS																	-- TABS
+            end -- TABS                                  -- TABS
 
             --[[
-		 if r.ImGui_BeginTabItem(ctx, "Options") then
-				feedback_tab_mode = 2
-				r.ImGui_EndTabItem(ctx)
+     if r.ImGui_BeginTabItem(ctx, "Options") then
+        feedback_tab_mode = 2
+        r.ImGui_EndTabItem(ctx)
             end
-			if r.ImGui_BeginTabItem(ctx, "Arrange") then
-				feedback_tab_mode = 3
-				r.ImGui_EndTabItem(ctx)
-            end						
-			]]
+      if r.ImGui_BeginTabItem(ctx, "Arrange") then
+        feedback_tab_mode = 3
+        r.ImGui_EndTabItem(ctx)
+            end            
+      ]]
             if r.ImGui_BeginTabItem(ctx, "Import") then
                 feedback_tab_mode = 4
                 r.ImGui_EndTabItem(ctx)
@@ -608,36 +764,36 @@ Form: I V C V C B C O]]
 
 
 
-            --[[			
+            --[[      
 
 
-			if onemotionimport ~= "" then
-				feedback_zone = onemotionimport
-				else
-				feedback_zone = 'While at the OneMotion.com Chord Player go to "Edit all" and copy the contents.'
-				end
-				
-				           -- if r.ImGui_BeginTabItem(ctx, "Chordsheet.com") then
+      if onemotionimport ~= "" then
+        feedback_zone = onemotionimport
+        else
+        feedback_zone = 'While at the OneMotion.com Chord Player go to "Edit all" and copy the contents.'
+        end
+        
+                   -- if r.ImGui_BeginTabItem(ctx, "Chordsheet.com") then
             --    r.ImGui_EndTabItem(ctx)
-			--	feedback_tab_mode = 5				
-			--	feedback_zone = help.Chordsheet_output
-            --end																-- TABS
-			
-							feedback_zone = help.Sample_song
-			
-								if onemotionimport ~= "" then
-				feedback_zone = onemotionimport
-				else
-				feedback_zone = 'While at the OneMotion.com Chord Player go to "Edit all" and copy the contents.'
-				end
-				
-								if onemotionoutput ~= "" then
-				feedback_zone = onemotionoutput
-				else
-				feedback_zone = help.Onemotion_output
-				end
-				
-				]]
+      --  feedback_tab_mode = 5        
+      --  feedback_zone = help.Chordsheet_output
+            --end                                -- TABS
+      
+              feedback_zone = help.Sample_song
+      
+                if onemotionimport ~= "" then
+        feedback_zone = onemotionimport
+        else
+        feedback_zone = 'While at the OneMotion.com Chord Player go to "Edit all" and copy the contents.'
+        end
+        
+                if onemotionoutput ~= "" then
+        feedback_zone = onemotionoutput
+        else
+        feedback_zone = help.Onemotion_output
+        end
+        
+        ]]
             --if r.ImGui_BeginTabItem(ctx, "Help") then
             --feedback_tab_mode = 6
             --feedback_zone = help.Template
@@ -645,27 +801,27 @@ Form: I V C V C B C O]]
             --end
             -- if r.ImGui_BeginTabItem(ctx, "Code Help") then
             --    r.ImGui_EndTabItem(ctx)
-            --	feedback_tab_mode = 8
-            --	feedback_zone = help.Code_help
-            -- end																-- TABS
+            --  feedback_tab_mode = 8
+            --  feedback_zone = help.Code_help
+            -- end                                -- TABS
             --  if r.ImGui_BeginTabItem(ctx, "Section Help") then
             --      r.ImGui_EndTabItem(ctx)
-            --	feedback_tab_mode = 9
-            --	feedback_zone = help.Section_help
+            --  feedback_tab_mode = 9
+            --  feedback_zone = help.Section_help
             --  end
             --  if r.ImGui_BeginTabItem(ctx, "Chord Help") then
             --        r.ImGui_EndTabItem(ctx)
-            --		feedback_tab_mode = 10
-            --		feedback_zone = help.Chord_help
+            --    feedback_tab_mode = 10
+            --    feedback_zone = help.Chord_help
             --    end
             --    if r.ImGui_BeginTabItem(ctx, "Rhythm Help") then
             --         r.ImGui_EndTabItem(ctx)
-            --		feedback_tab_mode = 11
-            --		feedback_zone = help.Rhythm_help
+            --    feedback_tab_mode = 11
+            --    feedback_zone = help.Rhythm_help
             --     end
             --if r.ImGui_BeginTabItem(ctx, "Swing Help") then
             -- r.ImGui_EndTabItem(ctx)
-            --end																-- TABS
+            --end                                -- TABS
             r.ImGui_EndTabBar(ctx)
         end
         if feedback_tab_mode == 4 then
@@ -675,11 +831,11 @@ Form: I V C V C B C O]]
                     r.ImGui_EndTabItem(ctx)
                 end
                 --[[]
-				if r.ImGui_BeginTabItem(ctx, 'Import BIAB Chords') then
-					import_tab_mode = 2
-					r.ImGui_EndTabItem(ctx)
-				end
-				]]
+        if r.ImGui_BeginTabItem(ctx, 'Import BIAB Chords') then
+          import_tab_mode = 2
+          r.ImGui_EndTabItem(ctx)
+        end
+        ]]
                 if r.ImGui_BeginTabItem(ctx, "Import OneMotion Chords") then
                     import_tab_mode = 3
                     r.ImGui_EndTabItem(ctx)
@@ -733,15 +889,15 @@ Form: I V C V C B C O]]
                     r.ImGui_EndTabItem(ctx)
                 end
                 --if r.ImGui_BeginTabItem(ctx, "Swing Help") then
-                --		help_tab_mode = 7
+                --    help_tab_mode = 7
                 --   r.ImGui_EndTabItem(ctx)
                 --end
                 r.ImGui_EndTabBar(ctx)
             end
         end
         if feedback_tab_mode == 9 then
-		
-reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.1.6")
+    
+reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.2.3")
 reaper.ImGui_Text(ctx, "Numbers2Notes does not yet allow the user to select plugins.")
 reaper.ImGui_Text(ctx, "The plugins below are required to fully set up the default configuration.")
 reaper.ImGui_Text(ctx, "")
@@ -790,12 +946,12 @@ reaper.ImGui_Text(ctx, "- Isolator")
 reaper.ImGui_Text(ctx, "- Holt")
 
 
-		
-		
-		
+    
+    
+    
 
-					
-					
+          
+          
 
         end
 
@@ -834,9 +990,9 @@ reaper.ImGui_Text(ctx, "- Holt")
                 the_root_colors[3] * (1.0 / 255.0),
                 1
             )
-					
-			reaper.ImGui_BeginGroup(ctx)
-			reaper.ImGui_Dummy(ctx, 3, 5)
+          
+      reaper.ImGui_BeginGroup(ctx)
+      reaper.ImGui_Dummy(ctx, 3, 5)
             r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), thecolor)
             if r.ImGui_Button(ctx, "Rest", wx, hx) then
                 chord_charting_area = chord_charting_area .. "-  "
@@ -847,7 +1003,7 @@ reaper.ImGui_Text(ctx, "- Holt")
             end
 
             r.ImGui_PopStyleColor(ctx, 1)
-			reaper.ImGui_EndGroup(ctx)
+      reaper.ImGui_EndGroup(ctx)
             r.ImGui_SameLine(ctx)
             reaper.ImGui_Text(ctx, "Hold Shift for Flat Roots / Ctrl to place in chart.\nGlowing = Very Popular / Bright = In Diatonic Scale")
 
@@ -1212,33 +1368,33 @@ reaper.ImGui_Text(ctx, "- Holt")
             reaper.ImGui_Text(ctx, "Not yet implemented.")
 
         --[[
-		--r.ImGui_InputTextMultiline(ctx,"##feedback_zone", render_feedback, 577, 520,reaper.ImGui_InputTextFlags_AllowTabInput())
-				reaper.ImGui_BeginGroup(ctx)
-		reaper.ImGui_Dummy(ctx, 3, 5)
-        if not type(bol) then bol = true end								-- BUTTONS
+    --r.ImGui_InputTextMultiline(ctx,"##feedback_zone", render_feedback, 577, 520,reaper.ImGui_InputTextFlags_AllowTabInput())
+        reaper.ImGui_BeginGroup(ctx)
+    reaper.ImGui_Dummy(ctx, 3, 5)
+        if not type(bol) then bol = true end                -- BUTTONS
         rc, GridTrueFalse = r.ImGui_Checkbox(ctx, "Render Full-Range Chord Grid", GridTrueFalse)
         if not type(bol) then bol = true end
-		rc, ChordsTrueFalse = r.ImGui_Checkbox(ctx, "Render Chords", ChordsTrueFalse)
+    rc, ChordsTrueFalse = r.ImGui_Checkbox(ctx, "Render Chords", ChordsTrueFalse)
         if not type(bol) then bol = true end
-        rc, ChBassTrueFalse = r.ImGui_Checkbox(ctx, "Render Chord + Bass Combo", ChBassTrueFalse)		
+        rc, ChBassTrueFalse = r.ImGui_Checkbox(ctx, "Render Chord + Bass Combo", ChBassTrueFalse)    
         if not type(bol) then bol = true end
-		reaper.ImGui_EndGroup(ctx)
-		r.ImGui_SameLine(ctx)
-		reaper.ImGui_BeginGroup(ctx)
-		reaper.ImGui_Dummy(ctx, 3, 5)	
-		reaper.ImGui_EndGroup(ctx)
-		r.ImGui_SameLine(ctx)
-		reaper.ImGui_BeginGroup(ctx)
-				reaper.ImGui_Dummy(ctx, 3, 5)
-		if not type(bol) then bol = true end
+    reaper.ImGui_EndGroup(ctx)
+    r.ImGui_SameLine(ctx)
+    reaper.ImGui_BeginGroup(ctx)
+    reaper.ImGui_Dummy(ctx, 3, 5)  
+    reaper.ImGui_EndGroup(ctx)
+    r.ImGui_SameLine(ctx)
+    reaper.ImGui_BeginGroup(ctx)
+        reaper.ImGui_Dummy(ctx, 3, 5)
+    if not type(bol) then bol = true end
         rc, Lead1TrueFalse = r.ImGui_Checkbox(ctx, "Render Lead 1", Lead1TrueFalse)
-		if not type(bol) then bol = true end
+    if not type(bol) then bol = true end
         rc, Lead2TrueFalse = r.ImGui_Checkbox(ctx, "Render Lead 2", Lead2TrueFalse)
         if not type(bol) then bol = true end
         rc, BassTrueFalse = r.ImGui_Checkbox(ctx, "Render Bass", BassTrueFalse)
 
-		reaper.ImGui_EndGroup(ctx)
-		]]
+    reaper.ImGui_EndGroup(ctx)
+    ]]
         end
         if feedback_tab_mode == 3 then
             reaper.ImGui_Text(ctx, "Not yet implemented.")
@@ -1320,26 +1476,26 @@ reaper.ImGui_Text(ctx, "- Holt")
         end
 
         if feedback_tab_mode == 5 and export_tab_mode == 1 then
-				reaper.ImGui_Text(ctx, '\n1) Fill in all info including the BIAB style.\n2) In Band in a Box, go to the Edit menu.\n3) Select "Paste Special - from Clipboard text to Song(s) "Ctrl Shift V"\n4) Select "Paste as New Song"\n5) Click OK.\n6) Return to the Edit menu\n7) Again select "Paste Special - from Clipboard text to Song(s)...\n8) Select "Paste into Current Song"\n9) Click OK.\n')
-		 
+        reaper.ImGui_Text(ctx, '\n1) Fill in all info including the BIAB style.\n2) In Band in a Box, go to the Edit menu.\n3) Select "Paste Special - from Clipboard text to Song(s) "Ctrl Shift V"\n4) Select "Paste as New Song"\n5) Click OK.\n6) Return to the Edit menu\n7) Again select "Paste Special - from Clipboard text to Song(s)...\n8) Select "Paste into Current Song"\n9) Click OK.\n')
+     
 
-		
-				reaper.ImGui_Separator(ctx)
-			
-		rv, biab_style = r.ImGui_InputTextMultiline(
+    
+        reaper.ImGui_Separator(ctx)
+      
+    rv, biab_style = r.ImGui_InputTextMultiline(
                 ctx,
                 "BIAB sytle",
                 biab_style,
                 200,
                 23,
                 reaper.ImGui_InputTextFlags_AllowTabInput())
-				reaper.ImGui_SameLine(ctx)
-				if r.ImGui_Button(ctx, "Convert song to BIAB paste-in format", nil , nil) then
+        reaper.ImGui_SameLine(ctx)
+        if r.ImGui_Button(ctx, "Convert song to BIAB paste-in format", nil , nil) then
                 export_biab()
-				end
-		
-		
-				
+        end
+    
+    
+        
                 rv, biab_export_area =
                 r.ImGui_InputTextMultiline(
                 ctx,
@@ -1347,36 +1503,36 @@ reaper.ImGui_Text(ctx, "- Holt")
                 biab_export_area,
                 592,
                 186,
-				
-				
-				
+        
+        
+        
                 reaper.ImGui_InputTextFlags_AllowTabInput())
-				student = false
-				beta = true
-				if student then
-				reaper.ImGui_Text(ctx,'Students...\n')
-				reaper.ImGui_Text(ctx,'1) Audition and select your style here:\n')
-				Link("https://tinyurl.com/StylePick09844879") -- hidden database
-				reaper.ImGui_Text(ctx,'2) Copy your selected style\'s "Copy Code" in 1st column.\n3) Paste the code into the BIAB Style blank above.\n4) Press the blue "Convert song to BIAB..." button\n5) Copy the output data and paste it in the form at this site...\n' )
-		Link("https://forms.office.com/r/Tt2D8u0M6c")  -- hidden Form
-				reaper.ImGui_Text(ctx,"6) Download your files here...\n" )
-		Link("https://k12mnps-my.sharepoint.com/:f:/g/personal/rkennedy_mnps_org/EuickG4Y9Z1Ig1i9gU2CYqcBzAI28jkiDF3hUZHgO3IEDw?e=vq4nCH")	-- hidden files
-		
-				elseif beta then
-				reaper.ImGui_Text(ctx,'Beta Testers you can send me your output and I will try to post your \nfiles online for you. Please be patient it is not an automated process.\n')
-				reaper.ImGui_Text(ctx,'1) Audition and select your style here:\n')
-				Link("https://tinyurl.com/StylePick") -- hidden database
-				reaper.ImGui_Text(ctx,'2) Copy your selected style\'s "Copy Code" in 1st column.\n3) Paste the code into the BIAB Style blank above.\n4) Press the blue "Convert song to BIAB..." button\n5) Copy the output data and paste it in the form at this site...\n' )
-		Link("https://forms.office.com/r/Tt2D8u0M6c")  -- hidden Form
-				reaper.ImGui_Text(ctx,"6) Download your files here...\n" )
-		Link("https://k12mnps-my.sharepoint.com/:f:/g/personal/rkennedy_mnps_org/EuickG4Y9Z1Ig1i9gU2CYqcBzAI28jkiDF3hUZHgO3IEDw?e=vq4nCH")	-- hidden files			
-				
-				else
-				
-				end
-		
-		
-		
+        student = false
+        beta = true
+        if student then
+        reaper.ImGui_Text(ctx,'Students...\n')
+        reaper.ImGui_Text(ctx,'1) Audition and select your style here:\n')
+        Link("https://tinyurl.com/StylePick09844879") -- hidden database
+        reaper.ImGui_Text(ctx,'2) Copy your selected style\'s "Copy Code" in 1st column.\n3) Paste the code into the BIAB Style blank above.\n4) Press the blue "Convert song to BIAB..." button\n5) Copy the output data and paste it in the form at this site...\n' )
+    Link("https://forms.office.com/r/Tt2D8u0M6c")  -- hidden Form
+        reaper.ImGui_Text(ctx,"6) Download your files here...\n" )
+    Link("https://k12mnps-my.sharepoint.com/:f:/g/personal/rkennedy_mnps_org/EuickG4Y9Z1Ig1i9gU2CYqcBzAI28jkiDF3hUZHgO3IEDw?e=vq4nCH")  -- hidden files
+    
+        elseif beta then
+        reaper.ImGui_Text(ctx,'Beta Testers you can send me your output and I will try to post your \nfiles online for you. Please be patient it is not an automated process.\n')
+        reaper.ImGui_Text(ctx,'1) Audition and select your style here:\n')
+        Link("https://tinyurl.com/StylePick") -- hidden database
+        reaper.ImGui_Text(ctx,'2) Copy your selected style\'s "Copy Code" in 1st column.\n3) Paste the code into the BIAB Style blank above.\n4) Press the blue "Convert song to BIAB..." button\n5) Copy the output data and paste it in the form at this site...\n' )
+    Link("https://forms.office.com/r/Tt2D8u0M6c")  -- hidden Form
+        reaper.ImGui_Text(ctx,"6) Download your files here...\n" )
+    Link("https://k12mnps-my.sharepoint.com/:f:/g/personal/rkennedy_mnps_org/EuickG4Y9Z1Ig1i9gU2CYqcBzAI28jkiDF3hUZHgO3IEDw?e=vq4nCH")  -- hidden files      
+        
+        else
+        
+        end
+    
+    
+    
         end
         if feedback_tab_mode == 5 and export_tab_mode == 2 then
             reaper.ImGui_Text(
@@ -1413,18 +1569,18 @@ reaper.ImGui_Text(ctx, "- Holt")
                 "\nNumbers2Notes provides some support for exporting to Chordsheet.Com's \nfree chord chart PDF creation service.\n\nA few things to keep in mind.\n\n  - Only quarter note changes are supported.\n  - Up to 8 chords per bar can be shown but no rhythms will be\n       indicated. Of course you can manually add them by writing\n       them on your print-outs.\n  - Custom links have a 2000 character limit, so very long chord\n       charts may not transfer in their entirety. You may wish to\n       render them in smaller chunks\n  - When you open the link you will need to save to see your PDF.\n  - Download to print.\n  - If you want to save your chord chart at Chordsheet.com, you\n       will need to sign up for their free membership.\n  - The owner of the site has been super cooperative. Please\n       support his efforts.\n\n"
             )
 
-			if ccc_renderd == true then
-						if r.ImGui_Button(ctx, "Update my custom link.", nil , nil) then export_ccc() end			
-			
-			reaper.ImGui_Text(
+      if ccc_renderd == true then
+            if r.ImGui_Button(ctx, "Update my custom link.", nil , nil) then export_ccc() end      
+      
+      reaper.ImGui_Text(
                 ctx,
                 '\n\nYour custom link...\n\n'
-				) 
-			Link(ccclink)
-			
-			else
-						if r.ImGui_Button(ctx, "Create my custom link.", nil , nil) then export_ccc() end
-			end
+        ) 
+      Link(ccclink)
+      
+      else
+            if r.ImGui_Button(ctx, "Create my custom link.", nil , nil) then export_ccc() end
+      end
 
 
         end
@@ -1435,7 +1591,7 @@ reaper.ImGui_Text(ctx, "- Holt")
             reaper.ImGui_Text(ctx, "For more detailed, up-to-date information see:\n")
             Link("https://www.hooktheory.com/trends")
             reaper.ImGui_Separator(ctx)
-						reaper.ImGui_Dummy(ctx, 4,10)
+            reaper.ImGui_Dummy(ctx, 4,10)
             for itt = 1, 12, 1 do
                 if string.len(musictheory.major_trend_table[itt][1]) == 1 then
                     chordlabler = musictheory.major_trend_table[itt][1] .. " "
@@ -1472,9 +1628,9 @@ reaper.ImGui_Text(ctx, "- Holt")
                 )
                 reaper.ImGui_PopStyleColor(ctx, 1)
             end
-			reaper.ImGui_Dummy(ctx, 4,10)
+      reaper.ImGui_Dummy(ctx, 4,10)
             reaper.ImGui_Separator(ctx)
-			reaper.ImGui_Dummy(ctx, 4,10)
+      reaper.ImGui_Dummy(ctx, 4,10)
             reaper.ImGui_Text(ctx, musictheory.major_trend_table[chosentheorychord][1] .. " Moves to...")
             next_chords = musictheory.major_trend_table[chosentheorychord][3]
             for i1, v1 in pairs(next_chords) do
@@ -1639,23 +1795,19 @@ reaper.ImGui_Text(ctx, "- Holt")
 
     -- BUTTONS
     end
-	
-        reaper.ImGui_PopStyleColor(ctx, 22)	
+  
+        reaper.ImGui_PopStyleColor(ctx, 22)  
         r.ImGui_PopFont(ctx)
     if open then
         r.defer(IM_GUI_Loop)
     else
-        reaper.ImGui_DestroyContext(ctx)
-
-			
-	Autosave()
-			
-
-			
+          ctx = nil  -- Set ctx to nil after destroying the context
+          Autosave()
+          SaveLastNumbers2NotesChart()
     end
 end
 
---  ________________________________________________________			ADDITIONAL VARIABLES
+--  ________________________________________________________      ADDITIONAL VARIABLES
 G_split = 0
 G_error_log = "START ERROR LOG - " .. string.char(10)
 G_time_signature_top = 4
@@ -1721,7 +1873,8 @@ function Setup_Tracks() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
     local track_count
     local sut_track_item_count
 
-    local found_bool_chart = false
+    local found_bool_n_chart = false
+  local found_bool_l_chart = false
     local found_bool_lead_MIDI = false
     local found_bool_chord_MIDI = false
     local found_bool_bass_MIDI = false
@@ -1740,12 +1893,14 @@ function Setup_Tracks() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
     local found_bool_bass_librearp = false
     local found_bool_bass_stfu1 = false
     local found_bool_bass_stfu2 = false
-    local found_bool_drums = false	
+    local found_bool_drums = false  
     local found_bool_chbass_merlittzer = false
     local found_bool_grid_librearp = false
     local found_bool_reverb = false
+  local found_bool_empty = false
 
-    local trackID_chart = ""
+    local trackID_n_chart = ""
+    local trackID_l_chart = ""  
     local trackID_lead_MIDI = ""
     local trackID_chord_MIDI = ""
     local trackID_bass_MIDI = ""
@@ -1764,59 +1919,255 @@ function Setup_Tracks() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
     local trackID_bass_librearp = ""
     local trackID_bass_stfu1 = ""
     local trackID_bass_stfu2 = ""
-    local trackID_drums = ""	
+    local trackID_drums = ""  
     local trackID_chbass_merlittzer = ""
     local trackID_grid_librearp = ""
     local trackID_reverb = ""
+  local trackID_empty = ""
 
     -- 0 = Table Column Descriptions
     local track_table = {
-        [0] = {"Name","found?bool","trackID","clear contents required?",
-            {{"plugin 1 | enabled? = this boolean --->",true},{"plugin 2",false}},
-            "Sends","Volume = MIDI 0 = No 1 = Yes","Color","volume"},
-        [1] = {"N2N Chart", found_bool_chart, trackID_chart, 1, {{"SwingProjectMIDI",true}}, {}, 0, {100, 100, 100},0},
-        [2] = {"N2N Grid & Reverb", found_bool_grid_MIDI, trackID_grid_MIDI, 1, {{"JS:Lexikan",true}}, {}, 1, {250, 250, 250},1},
-		-- =========================================================================================================================
-        [3] = {"N2N Lead MIDI", found_bool_lead_MIDI, trackID_lead_MIDI, 1, {}, 
-			{4}, 1, {108, 162, 123},0},
-        [4] = {"N2N Lead", found_bool_lead1, trackID_lead1, 0,
-			{{"HeadStart",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{"Calibre",true},{"Isolator",true}, {"Holt",true}}, 
-			{2}, 0, {108, 162, 123},0},		
-		-- =========================================================================================================================
-        [5] = {"N2N Chords MIDI", found_bool_chord_MIDI, trackID_chord_MIDI, 1, {}, 
-			{6, 7, 8}, 1, {134, 172, 181},0},
-        [6] = {"N2N Chord Sustain",found_bool_chord_sus,trackID_chord_sus,0,
-			{{"HeadStart",true},{"ReaPulsive-8ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true}},
-			{2},0,{134, 172, 181},.1},
-        [7] = {"N2N Chord + LibreARP",found_bool_chord_librearp,trackID_chord_librearp,0,
-			{{"HeadStart",true},{"LibreARP",true},{ "ReaPulsive-16ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{ "pad-synth.jsfx",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true},{ "STFU",false}},
-			{2},0,{134, 172, 181},.8},
-		[8] = {"N2N Chord + STFU",found_bool_chord_stfu1,trackID_chord_stfu1,0,
-			{{"HeadStart",true},{"ReaPulsive-16ths",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",false},{"STFU",false}},
-			{2},0,{134, 172, 181},.4},
-		-- =========================================================================================================================		
-        [9] = {"N2N Chord-Bass MIDI", found_bool_chbass_MIDI, trackID_chbass_MIDI, 1, {}, 
-			{10}, 1, {172, 134, 181},0}, 
-		[10] = {"N2N Chord and Bass + Merlittzer",found_bool_chbass_merlittzer,trackID_chbass_merlittzer,0,
-			{{"HeadStart",true},{"ReaPulsive-Quarters",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"MK Merlittzer",true},{"STFU",false}},
-			{2},0,{172, 134, 181},.2},
-		-- =========================================================================================================================
-        [11] = {"N2N Bass MIDI", found_bool_bass_MIDI, trackID_bass_MIDI, 1, {}, 
-			{12, 13, 14}, 1, {134, 153, 181},0},
-		[12] = {"N2N Bass",found_bool_bass_sus,trackID_bass_sus,0,
-			{{"HeadStart",true},{"ReaPulsive-8ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{ "Calibre",true},{ "Isolator",true},{ "Holt",true},{"STFU",false}},
-			{2},0,{134, 153, 181},.1},
-		[13] = {"N2N Bass + LibreARP",found_bool_bass_librearp,trackID_bass_librearp,0,
-			{{"HeadStart",true},{"LibreARP",true},{"ReaPulsive-16ths",false},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",false}},
-			{2},0,{134, 153, 181},.8},
-		[14] = {"N2N Bass + STFU",found_bool_bass_stfu1,trackID_bass_stfu1,0,
-			{{"HeadStart",true},{"ReaPulsive-8ths",true},{"SwingTrackMIDI",true},{"ReaCenterMIDIpitch",false},{"pad-synth.jsfx",true},{"Calibre",true},{"Isolator",true},{"Holt",true},{"STFU",true},{"STFU",false}},
-			{2},0,{134, 153, 181},.8},
-		-- =========================================================================================================================			
-		[15] = {"N2N Drums",found_bool_drums,trackID_drums,0,
-			{{"Tattoo",true},{"SwingTrackMIDI",true},{"Sitala",true},{"Calibre",true}},
-			{2},0,{144, 144, 144},.8}	
-		}
+        [0] = {"Track Name","found?bool","trackID","clear contents required?",
+            {
+      {"plugin 1 | enabled? = this boolean --->",true,preset},
+      {"plugin 2",false,"snaps"}},
+            "Sends",
+      "Volume = MIDI 0 = No 1 = Yes",
+      "Color",
+      "volume"
+      },
+        [1] = {"N2N # Chart", found_bool_n_chart, trackID_n_chart, 1, {{"SwingProjectMIDI",true,nil}}, {}, 0, {100, 100, 100},0},
+        [2] = {"N2N Letter Chart", found_bool_l_chart, trackID_l_chart, 1, {{"SwingProjectMIDI",true,nil}}, {}, 0, {100, 100, 100},0},
+    -- =========================================================================================================================
+        [3] = {"N2N Absolute Grid & Reverb", found_bool_grid_MIDI, trackID_grid_MIDI, 1, {{"JS:Lexikan",true,nil}}, {}, 1, {250, 250, 250},.17},
+        [4] = {"N2N Relative Grid & Delay", found_bool_grid_MIDI, trackID_grid_MIDI, 1, {{"JS:Khaki Delay S2",true,nil}}, {}, 1, {250, 250, 250},0},
+
+    -- =========================================================================================================================
+        [5] = {"N2N Chords MIDI", found_bool_chord_MIDI, trackID_chord_MIDI, 1, {},{6, 7, 8, 9,10,11,12}, 1, {134, 172, 181},0},
+        [6] = {"N2N Chord 1",found_bool_chord_sus,trackID_chord_sus, 0,
+      {
+      {"HeadStart",true,nil},
+      {"ReaCenterMIDIpitch",false,nil},
+      {"LibreARP",false,nil},
+      {"ReaPulsive-8ths",false,nil},  
+      {"SwingTrackMIDI",true,nil},
+      {"ThisTriggersThat",false,nil},
+      {"CLAP:Surge XT",true,"N2N_Chords"},
+      {"STFU",false,nil},
+      {"JS:Guitar Amp",false,nil},
+      {"Tube",false,nil},  
+      {"JS:ReEQ",true,nil},
+      {"JS:Compressor 2",false,nil},      
+      {"Drive",false,nil},
+      {"JS:Saike SEQS",false,nil},      
+      {"JS:Limiter 3",false,nil}
+      },
+      {3, 4},0,{134, 172, 181},.4},
+        [7] = {"N2N Chord 2",found_bool_chord_sus,trackID_chord_sus, 0,
+      {
+      {"HeadStart",true,nil},
+      {"ReaCenterMIDIpitch",false,nil},
+      {"LibreARP",false,nil},
+      {"ReaPulsive-8ths",true,nil},
+      {"SwingTrackMIDI",true,nil},
+      {"ThisTriggersThat",false,nil},
+      {"CLAP:Surge XT",true,"N2N_Blips"},
+      {"STFU",false,nil},
+      {"JS:Guitar Amp",false,nil},
+      {"Tube",false,nil},  
+      {"JS:ReEQ",true,nil},
+      {"JS:Compressor 2",false,nil},      
+      {"Drive",false,nil},  
+      {"JS:Saike SEQS",false,nil},      
+      {"JS:Limiter 3",false,nil}
+      },
+      {3, 4},0,{134, 172, 181},.2},
+        [8] = {"N2N Chord 3",found_bool_chord_sus,trackID_chord_sus, 0,
+      {
+      {"HeadStart",true,nil},
+      {"ReaCenterMIDIpitch",false,nil},
+      {"LibreARP",true,nil},
+      {"ReaPulsive-8ths",false,nil},
+      {"SwingTrackMIDI",true,nil},
+      {"ThisTriggersThat",false,nil},
+      {"CLAP:Surge XT",true,"N2N_Pie"},
+      {"STFU",false,nil},
+      {"JS:Guitar Amp",false,nil},
+      {"Tube",false,nil},  
+      {"JS:ReEQ",true,nil},
+      {"JS:Compressor 2",false,nil},      
+      {"Drive",false,nil},
+      {"JS:Saike SEQS",false,nil},       
+      {"JS:Limiter 3",false,nil}
+      },
+      {3, 4},0,{134, 172, 181},.4},
+        [9] = {"N2N Chord 4",found_bool_chord_sus,trackID_chord_sus, 0,
+      {
+      {"HeadStart",true,nil},
+      {"ReaCenterMIDIpitch",false,nil},
+      {"LibreARP",true,nil},
+      {"ReaPulsive-8ths",false,nil},
+      {"SwingTrackMIDI",true,nil},
+      {"ThisTriggersThat",false,nil},
+      {"CLAP:Surge XT",true,"N2N_Plucks"},
+      {"STFU",false,nil},
+      {"JS:Guitar Amp",false,nil},
+      {"Tube",false,nil},  
+      {"JS:ReEQ",true,nil},
+      {"JS:Compressor 2",false,nil},      
+      {"Drive",false,nil},  
+      {"JS:Saike SEQS",false,nil},       
+      {"JS:Limiter 3",false,nil}
+      },
+      {3, 4},0,{134, 172, 181},.4},
+    [10] = {"N2N Chord 5",found_bool_chord_sus,trackID_chord_sus, 0,
+      {
+      {"HeadStart",true,nil},
+      {"ReaCenterMIDIpitch",false,nil},
+      {"LibreARP",true,nil},
+      {"ReaPulsive-8ths",false,nil},
+      {"SwingTrackMIDI",true,nil},
+      {"ThisTriggersThat",false,nil},
+      {"CLAP:Surge XT",true,nil},
+      {"STFU",false,nil},
+      {"JS:Guitar Amp",false,nil},
+      {"Tube",false,nil},  
+      {"JS:ReEQ",true,nil},
+      {"JS:Compressor 2",false,nil},      
+      {"Drive",false,nil},  
+      {"JS:Saike SEQS",false,nil},       
+      {"JS:Limiter 3",false,nil}
+      },
+      {3, 4},0,{134, 172, 181},.4},
+    [11] = {"N2N Chord 6",found_bool_chord_sus,trackID_chord_sus, 0,
+      {
+      {"HeadStart",true,nil},
+      {"ReaCenterMIDIpitch",false,nil},
+      {"LibreARP",true,nil},
+      {"ReaPulsive-8ths",false,nil},
+      {"SwingTrackMIDI",true,nil},
+      {"ThisTriggersThat",false,nil},
+      {"CLAP:Surge XT",true,nil},
+      {"STFU",false,nil},
+      {"JS:Guitar Amp",false,nil},
+      {"Tube",false,nil},  
+      {"JS:ReEQ",true,nil},
+      {"JS:Compressor 2",false,nil},      
+      {"Drive",false,nil},    
+      {"JS:Saike SEQS",false,nil},       
+      {"JS:Limiter 3",false,nil}
+      },
+      {3, 4},0,{134, 172, 181},.4},
+    [12] = {"N2N Chord 7",found_bool_chord_sus,trackID_chord_sus, 0,
+      {
+      {"HeadStart",true,nil},
+      {"ReaCenterMIDIpitch",false,nil},
+      {"LibreARP",true,nil},
+      {"ReaPulsive-8ths",false,nil},
+      
+      {"SwingTrackMIDI",true,nil},
+      {"ThisTriggersThat",false,nil},
+      {"CLAP:Surge XT",true,nil},
+      {"STFU",false,nil},
+      
+      {"JS:Guitar Amp",false,nil},
+      {"Tube",false,nil},  
+      {"JS:ReEQ",true,nil},
+      {"JS:Compressor 2",false,nil},  
+      
+      {"Drive",false,nil},    
+      {"JS:Saike SEQS",false,nil},       
+      {"JS:Limiter 3",false,nil}
+      },
+      {3, 4},0,{134, 172, 181},.4},  
+    -- =========================================================================================================================    
+        [13] = {"N2N Chord-Bass MIDI", found_bool_chbass_MIDI, trackID_chbass_MIDI, 1, {}, {14}, 1, {172, 134, 181},0}, 
+        [14] = {"N2N Chord-Bass",found_bool_chord_sus,trackID_chord_sus, 0,
+      {
+      {"HeadStart",true,nil},
+      {"ReaCenterMIDIpitch",false,nil},
+      {"LibreARP",true,nil},
+      {"ReaPulsive-8ths",false,nil},  
+      {"SwingTrackMIDI",true,nil},
+      {"ThisTriggersThat",false,nil},
+      {"CLAP:Surge XT",true,nil},
+      {"STFU",false,nil},
+      {"JS:Guitar Amp",false,nil}, 
+      {"Tube",false,nil},  
+      {"JS:ReEQ",true,nil},
+      {"JS:Compressor 2",false,nil},  
+      {"Drive",false,nil},
+      {"JS:Saike SEQS",false,nil},       
+      {"JS:Limiter 3",false,nil}
+      },
+      {3, 4},0,{172, 134, 181},.4},
+    -- =========================================================================================================================
+        [15] = {"N2N Bass MIDI", found_bool_bass_MIDI, trackID_bass_MIDI, 1, {}, 
+      {16}, 1, {134, 153, 181},0},
+        [16] = {"N2N Bass",found_bool_chord_sus,trackID_chord_sus, 0,
+      {
+      {"HeadStart",true,nil},
+      {"ReaCenterMIDIpitch",false,nil},
+      {"LibreARP",false,nil},
+      {"ReaPulsive-halves",true,nil},    
+      {"SwingTrackMIDI",true,nil},
+      {"ThisTriggersThat",false,nil},
+      {"CLAP:Surge XT",true,"N2N_Bass"},
+      {"STFU",false,nil},
+      {"JS:Guitar Amp",false,nil},
+      {"Tube",false,nil},  
+      {"JS:Dis-Treasure",false,nil},  
+      {"JS:LA-2KAN S2",false,nil},
+      {"JS:NC76 S2",false,nil},
+      {"JS:Compressor 2",false,nil},  
+      {"JS:ReEQ",true,nil},  
+      {"Drive",false,nil},  
+      {"JS:Saike SEQS",false,nil},
+      {"JS:Limiter 3",false,nil} 
+      },
+      {3, 4},0,{134, 153, 181},1.3},
+    -- =========================================================================================================================      
+    [17] = {"N2N Drums",found_bool_drums,trackID_drums,0,
+    {
+    {"Tattoo",true,"35 Set - Old School"},
+    {"SwingTrackMIDI",true,nil},
+    {"Sitala",false,nil},
+    {"Calibre",true,nil},
+    {"Holt",true,nil},
+    {"JS:Violet Envelope Shaper S2",true,"35 Set - Old School"},
+    {"JS:Exciter+Sub",false,nil},
+    {"JS:Tape Recorder S2",false,nil},  
+    {"JS:Guitar Amp",false,nil},  
+    {"Tube",false,nil},  
+    {"JS:Dis-Treasure",true,nil},  
+    {"JS:LA-2KAN S2",false,nil},
+    {"JS:NC76 S2",false,nil},
+    {"JS:Compressor 2",false,nil},
+    {"JS:ReEQ",true,nil},
+    {"Drive",false,nil},  
+    {"JS:Saike SEQS",false,nil}, 
+    {"JS:Limiter 3",false,nil} 
+    },
+    {3,4},0,{144, 144, 144},4},
+    [18] = {"Empty",found_bool_empty,trackID_empty,0,
+    {
+    {"Sitala",false,nil},
+    {"Calibre",true,nil},
+    {"Holt",true,nil},
+    {"JS:Tape Recorder S2",false,nil},
+    {"JS:Guitar Amp",false,nil},  
+    {"Tube",false,nil},  
+    {"JS:Dis-Treasure",true,nil},  
+    {"JS:LA-2KAN S2",false,nil},
+    {"JS:NC76 S2",false,nil},
+    {"JS:Compressor 2",false,nil},
+    {"JS:ReEQ",true,nil},
+    {"Drive",false,nil},  
+    {"JS:Saike SEQS",false,nil}, 
+    {"JS:Limiter 3",false,nil} 
+    },
+    {3,4},0,{222, 222, 222},1}
+    }
  
     --Show_To_Dev("Started: " .. string.char(10))
     track_count = reaper.CountTracks(0)
@@ -1846,7 +2197,7 @@ function Setup_Tracks() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
             sut_track_item_count = reaper.CountTrackMediaItems(current_working_track)
             --Show_To_Dev("track item count =  " .. sut_track_item_count .. string.char(10))
             for i = sut_track_item_count, 1, -1 do
-                --Show_To_Dev("current working track =  " .. tostring(current_working_track) .. " | i = " 	.. i .. string.char(10))
+                --Show_To_Dev("current working track =  " .. tostring(current_working_track) .. " | i = "   .. i .. string.char(10))
 
                 item_index = reaper.GetTrackMediaItem(current_working_track, i - 1)
                 --Show_To_Dev("item_index =  " .. tostring(item_index) .. string.char(10))
@@ -1861,17 +2212,20 @@ function Setup_Tracks() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
             --Show_To_Dev("yes " .. i.. " " .. tostring(v[2]) .. " | " .. tostring(v[3]) .. " | " .. tostring(v[4]) .. string.char(10))
             plug_order = 1000
             for j, value in pairs(v[5]) do
-                reaper.TrackFX_AddByName(v[3], v[5][j][1], false, plug_order) -- ADD INSTRUMENT FX
+                addedFX = reaper.TrackFX_AddByName(v[3], v[5][j][1], false, plug_order) -- ADD INSTRUMENT FX
+        if v[5][j][3] ~= nil then
+        reaper.TrackFX_SetPreset(v[3], addedFX, v[5][j][3] )  
+        end
                 plug_order = plug_order - 1
             end
-			count = 0
+      count = 0
             for j, value in pairs(v[5]) do
-				reaper.TrackFX_SetEnabled(newly_created_track, count, v[5][j][2])
-				count = count + 1
+        reaper.TrackFX_SetEnabled(newly_created_track, count, v[5][j][2])
+        count = count + 1
             end
-			track_color = reaper.ColorToNative(v[8][1], v[8][2], v[8][3]) | 0x10000000
+      track_color = reaper.ColorToNative(v[8][1], v[8][2], v[8][3]) | 0x10000000
             reaper.SetTrackColor(newly_created_track, track_color)
-			reaper.SetTrackUIVolume(newly_created_track, v[9], false, true,0 )
+      reaper.SetTrackUIVolume(newly_created_track, v[9], false, true,0 )
         end
     end
 
@@ -1948,7 +2302,7 @@ function Initialize_Track_Setup() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A RE
             isut_track_item_count = reaper.CountTrackMediaItems(icurrent_working_track)
             --Show_To_Dev("track item count =  " .. isut_track_item_count .. string.char(10))
             for i = isut_track_item_count, 1, -1 do
-                --Show_To_Dev("current working track =  " .. tostring(icurrent_working_track) .. " | i = " 	.. i .. string.char(10))
+                --Show_To_Dev("current working track =  " .. tostring(icurrent_working_track) .. " | i = "   .. i .. string.char(10))
 
                 iitem_index = reaper.GetTrackMediaItem(icurrent_working_track, i - 1)
                 --Show_To_Dev("item_index =  " .. tostring(iitem_index) .. string.char(10))
@@ -1963,7 +2317,10 @@ function Initialize_Track_Setup() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A RE
             --Show_To_Dev("yes " .. i.. " " .. tostring(v[2]) .. " | " .. tostring(v[3]) .. " | " .. tostring(v[4]) .. string.char(10))
             iplug_order = 1000
             for j, value in pairs(v[5]) do
-                reaper.TrackFX_AddByName(v[3], v[5][j], false, iplug_order) -- ADD INSTRUMENT FX
+          addedFX = reaper.TrackFX_AddByName(v[3], v[5][j], false, iplug_order) -- ADD INSTRUMENT FX
+          if v[5][j][3] ~= nil then
+          reaper.TrackFX_SetPreset(v[3], addedFX, v[5][j][3] )
+          end
                 iplug_order = iplug_order - 1
             end
         end
@@ -1987,21 +2344,21 @@ end
 function inital_swaps(chunky1)
     databoy = string.gsub(chunky1, "%^%^", "~")
     --[[
-	databoy = string.gsub(databoy, " r ", " - ")
-	databoy = string.gsub(databoy, " R ", " - ")
-	databoy = string.gsub(databoy, " r" .. string.char(10), " -" .. string.char(10))
-	databoy = string.gsub(databoy, " R" .. string.char(10), " -" .. string.char(10))
-	databoy = string.gsub(databoy, string.char(10) .. "r ", string.char(10) .. "- ")
-	databoy = string.gsub(databoy, string.char(10) .. "R ", string.char(10) .. "r ")
-	databoy = string.gsub(databoy, string.char(10) .. "r" .. string.char(10), string.char(10) .. "-" .. string.char(10))
-	databoy = string.gsub(databoy, string.char(10) .. "R" .. string.char(10), string.char(10) .. "-" .. string.char(10))
-	databoy = string.gsub(databoy, "(r ", "(- ")
-	databoy = string.gsub(databoy, "(R ", "(- ")
-	databoy = string.gsub(databoy, "(r)", "(-)")
-	databoy = string.gsub(databoy, "(R)", "(-)")
-	databoy = string.gsub(databoy, " r)", " -)")
-	databoy = string.gsub(databoy, " R)", " -)")
-	--Show_To_Dev(databoy)
+  databoy = string.gsub(databoy, " r ", " - ")
+  databoy = string.gsub(databoy, " R ", " - ")
+  databoy = string.gsub(databoy, " r" .. string.char(10), " -" .. string.char(10))
+  databoy = string.gsub(databoy, " R" .. string.char(10), " -" .. string.char(10))
+  databoy = string.gsub(databoy, string.char(10) .. "r ", string.char(10) .. "- ")
+  databoy = string.gsub(databoy, string.char(10) .. "R ", string.char(10) .. "r ")
+  databoy = string.gsub(databoy, string.char(10) .. "r" .. string.char(10), string.char(10) .. "-" .. string.char(10))
+  databoy = string.gsub(databoy, string.char(10) .. "R" .. string.char(10), string.char(10) .. "-" .. string.char(10))
+  databoy = string.gsub(databoy, "(r ", "(- ")
+  databoy = string.gsub(databoy, "(R ", "(- ")
+  databoy = string.gsub(databoy, "(r)", "(-)")
+  databoy = string.gsub(databoy, "(R)", "(-)")
+  databoy = string.gsub(databoy, " r)", " -)")
+  databoy = string.gsub(databoy, " R)", " -)")
+  --Show_To_Dev(databoy)
 ]]
     return databoy
 end
@@ -2012,37 +2369,53 @@ end
 
 
 function Autosave()
-			_, quit_title_startso  = string.find(header_area, "Title: ")			-- GET THE PROJECT SETTINGS AND PLACE IN THE SHELL
-			quit_title_endso, _  = string.find(header_area, "Writer:")
-			
-			quittitlefound = string.sub(header_area, quit_title_startso+1, quit_title_endso-2)
-			thetime = os.date('%Y-%m-%d %H-%M-%S')
-			if string.len(quittitlefound) < 30 and quittitlefound ~= nil then
+      _, quit_title_startso  = string.find(header_area, "Title: ")      -- GET THE PROJECT SETTINGS AND PLACE IN THE SHELL
+      quit_title_endso, _  = string.find(header_area, "Writer:")
+      
+      quittitlefound = string.sub(header_area, quit_title_startso+1, quit_title_endso-2)
+      thetime = os.date('%Y-%m-%d %H-%M-%S')
+      if string.len(quittitlefound) < 30 and quittitlefound ~= nil then
 
-			filenamewillbe = quittitlefound .. " " .. thetime .. ".txt"
-			else
-			filenamewillbe = "N2Nautobackup " .. thetime .. ".txt"
-			end
-			
-			local info = debug.getinfo(1,'S')
-			local path = info.source:match[[^@?(.*[\/])[^\/]-$]]
-			local chordchart_path = path .. 'ChordCharts/'
-			--retval, fileName =
-			--	reaper.JS_Dialog_BrowseForSaveFile(
-			--	"Save Chord Chart as...",
-			--	chordchart_path,
-			--	filenamewillbe,
-			--	".txt"
-			--)
+      filenamewillbe = quittitlefound .. " " .. thetime .. ".txt"
+      else
+      filenamewillbe = "N2Nautobackup " .. thetime .. ".txt"
+      end
+      
+      local info = debug.getinfo(1,'S')
+      local path = info.source:match[[^@?(.*[\/])[^\/]-$]]
+      local chordchart_path = path .. 'ChordCharts/'
+      --retval, fileName =
+      --  reaper.JS_Dialog_BrowseForSaveFile(
+      --  "Save Chord Chart as...",
+      --  chordchart_path,
+      --  filenamewillbe,
+      --  ".txt"
+      --)
 
-			write_path = io.open(chordchart_path..filenamewillbe, "w")
-			write_path:write("<Numbers2NotesProject>\n<header_area>\n"..header_area .."\n</header_area>\n<chord_charting_area>\n"..chord_charting_area.."\n</chord_charting_area>\n<lyrics_charting_area>\n"..lyrics_charting_area.."\n</lyrics_charting_area>\n<notes_charting_area>\n"..notes_charting_area.."\n</notes_charting_area>\n</Numbers2NotesProject>")
-			write_path:close()	
+      write_path = io.open(chordchart_path..filenamewillbe, "w")
+      write_path:write("<Numbers2NotesProject>\n<header_area>\n"..header_area .."\n</header_area>\n<chord_charting_area>\n"..chord_charting_area.."\n</chord_charting_area>\n<lyrics_charting_area>\n"..lyrics_charting_area.."\n</lyrics_charting_area>\n<notes_charting_area>\n"..notes_charting_area.."\n</notes_charting_area>\n</Numbers2NotesProject>")
+      write_path:close()  
 
 end
 
 
-
+function SaveLastNumbers2NotesChart()
+    local info = debug.getinfo(1, 'S')
+    local path = info.source:match[[^@?(.*[\/])[^\/]-$]]
+    local chordchart_path = path .. 'ChordCharts/'
+    
+    -- Define the fixed filename for the last Numbers2Notes chart
+    local filenamewillbe = "Last_Numbers2Notes_Chart.txt"
+    
+    -- Open the file in write mode, which will overwrite if the file already exists
+    write_path = io.open(chordchart_path .. filenamewillbe, "w")
+    
+    -- Write the current project state to the file
+    write_path:write("<Numbers2NotesProject>\n<header_area>\n"..header_area .."\n</header_area>\n<chord_charting_area>\n"..chord_charting_area.."\n</chord_charting_area>\n<lyrics_charting_area>\n"..lyrics_charting_area.."\n</lyrics_charting_area>\n<notes_charting_area>\n"..notes_charting_area.."\n</notes_charting_area>\n</Numbers2NotesProject>")
+    
+    -- Close the file
+    write_path:close()  
+end
 
 
 
@@ -2100,7 +2473,7 @@ function set_the_bpm(stk_progression)
     starting_bpm = ""
     _, key_endchar = string.find(stk_progression, "BPM:")
     if key_endchar == nil then
-        Show_To_Dev("BMP not set." .. string.char(10))
+        --Show_To_Dev("BMP not set." .. string.char(10))
         starting_bpm = project_bpm
     else
         return_char_location, _ =
@@ -2155,7 +2528,7 @@ function set_the_swing(stk_progression)
     starting_swing = ""
     _, key_endchar = string.find(stk_progression, "Swing")
     if key_endchar == nil then
-        Show_To_Dev("Swing not set." .. string.char(10))
+        --Show_To_Dev("Swing not set." .. string.char(10))
         starting_swing = project_swing
     else
         return_char_location, _ =
@@ -2190,9 +2563,9 @@ function set_the_swing(stk_progression)
                     starting_swing = project_swing
                 else
                     starting_swing = number_from_string
-					reaper.gmem_attach("ProjectSwing")
-					reaper.gmem_write(2, starting_swing)
-					
+          reaper.gmem_attach("ProjectSwing")
+          reaper.gmem_write(2, starting_swing)
+          
                     render_feedback = render_feedback .. "Swing set to " .. number_from_string .. string.char(10)
                 end
             end
@@ -2406,11 +2779,11 @@ function presentdata(p_split, p_error_log)
             datapeek = datapeek .. " k = " .. k .. " / value = " .. v .. string.char(10)
         end
     end
-    Show_To_Dev(datapeek .. string.char(10))
+    --Show_To_Dev(datapeek .. string.char(10))
 
     --THIS SPLIT IS WRONG !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    Show_To_Dev("Split = " .. p_split .. string.char(10))
-    Show_To_Dev("Error Record:" .. string.char(10) .. p_error_log .. string.char(10))
+    --Show_To_Dev("Split = " .. p_split .. string.char(10))
+    --Show_To_Dev("Error Record:" .. string.char(10) .. p_error_log .. string.char(10))
 end
 
 -- _______________________________________________________________________  ASSIGN EACH CHORD AND SPLIT SECTION IT'S PORTION OF TIME  ____________________
@@ -2474,7 +2847,7 @@ function process_nested_split_sections(pnss_split, pnss_error_log)
     return pnss_split, pnss_error_log
 end
 
--- _______________________________________________________________________ PLACE TEXT ITEMS
+-- _______________________________________________________________________ PLACE TEXT ITEMS  / ITEMS WILL NOT YET BE COLOR CODED
 
 function place_TEXT_data(ptd_track_table)
     local ptd_updating_start_ppqpos = 0
@@ -2488,10 +2861,9 @@ function place_TEXT_data(ptd_track_table)
     local ptd_new_text_item = ""
 
     for i, value in pairs(chord_table) do
-        if string.sub(value[4], 1, 2) == "{$" then
-        --Show_To_Dev("DRIVING ME CRAZY...............................!!!!!!!!!!!!!")
+        --if string.sub(value[4], 1, 2) == "{$" then
         --Show_To_Dev(string.char(10) .. i .. string.char(10))
-        end
+        --end
         ptd_note_end_ppqpos = ptd_updating_start_ppqpos + value[3]
         --Show_To_Dev("text start ppqos: " .. ptd_updating_start_ppqpos .. " end ppqpos: " .. ptd_note_end_ppqpos .. string.char(10))
         ptd_last_updated_ppqpos = ptd_note_end_ppqpos
@@ -2512,13 +2884,20 @@ function place_TEXT_data(ptd_track_table)
         -- CREATE A TEXT ITEM ON THE TRACK
         ptd_new_MIDI_item =
             reaper.CreateNewMIDIItemInProj(ptd_track_table[1][3], ptd_measure_start_point, ptd_measure_end_point, true)
-
+        ptd_new_MIDI_item_2 =
+            reaper.CreateNewMIDIItemInProj(ptd_track_table[2][3], ptd_measure_start_point, ptd_measure_end_point, true)
         text_position = reaper.GetMediaItemInfo_Value(ptd_new_MIDI_item, "D_POSITION")
         text_length = reaper.GetMediaItemInfo_Value(ptd_new_MIDI_item, "D_LENGTH")
         ptd_new_text_item = reaper.AddMediaItemToTrack(ptd_track_table[1][3]) -- Text Item from Track
+        ptd_new_text_item_2 = reaper.AddMediaItemToTrack(ptd_track_table[2][3]) -- Text Item from Track
         reaper.SetMediaItemInfo_Value(ptd_new_text_item, "D_POSITION", text_position)
         reaper.SetMediaItemInfo_Value(ptd_new_text_item, "D_LENGTH", text_length)
+        reaper.SetMediaItemInfo_Value(ptd_new_text_item_2, "D_POSITION", text_position)
+        reaper.SetMediaItemInfo_Value(ptd_new_text_item_2, "D_LENGTH", text_length)    
+    
         reaper.DeleteTrackMediaItem(ptd_track_table[1][3], ptd_new_MIDI_item)
+        reaper.DeleteTrackMediaItem(ptd_track_table[2][3], ptd_new_MIDI_item_2)    
+    
         ptd_chord_entry_to_text = chord_table[i][4]
         if ptd_chord_entry_to_text == "-" then
             ptd_chord_entry_to_text = "Rest"
@@ -2526,6 +2905,60 @@ function place_TEXT_data(ptd_track_table)
         if text ~= nil then
             reaper.ULT_SetMediaItemNote(ptd_new_text_item, ptd_chord_entry_to_text)
         end
+        if text ~= nil then
+    if string.sub(ptd_chord_entry_to_text, 1, 1) == "#" then
+    numberRoot = string.sub(ptd_chord_entry_to_text, 1, 2)
+    notSharped = false
+    isFlatted = false
+    chordtypy = string.sub(ptd_chord_entry_to_text, 3, string.len(ptd_chord_entry_to_text))
+    elseif  string.sub(ptd_chord_entry_to_text, 1, 1) == "b" then
+    numberRoot = string.sub(ptd_chord_entry_to_text, 1, 2)
+    chordtypy = string.sub(ptd_chord_entry_to_text, 3, string.len(ptd_chord_entry_to_text))
+    notSharped = true
+        isFlatted = true
+    else
+    numberRoot = string.sub(ptd_chord_entry_to_text, 1, 1)
+    chordtypy = string.sub(ptd_chord_entry_to_text, 2, string.len(ptd_chord_entry_to_text))
+    notSharped = true
+    isFlatted = false
+    end
+    
+        if chordtypy == nil then
+    chordtypy = ""
+    end
+    
+    
+    flatOrNot =  musictheory.is_it_flat_table[current_key]
+
+    
+    local rootShiftedAmount = musictheory.root_table[numberRoot]
+    local keyShiftedAmount = musictheory.key_table[current_key]
+    
+    if rootShiftedAmount ~= nil then
+
+      local finalshifty = rootShiftedAmount + keyShiftedAmount
+      if finalshifty > 11 then
+      finalshifty = finalshifty - 12
+      end
+      if finalshifty < 0 then
+      finalshifty = finalshifty + 12
+      end
+      
+      if flatOrNot and notSharped then
+      reaper.ULT_SetMediaItemNote(ptd_new_text_item_2, musictheory.flats_table[finalshifty]..chordtypy)
+      elseif isFlatted then
+      reaper.ULT_SetMediaItemNote(ptd_new_text_item_2, musictheory.flats_table[finalshifty]..chordtypy)
+      else
+      reaper.ULT_SetMediaItemNote(ptd_new_text_item_2, musictheory.sharps_table[finalshifty]..chordtypy)
+      end
+      
+    else
+    reaper.ULT_SetMediaItemNote(ptd_new_text_item_2, ptd_chord_entry_to_text)
+    
+    
+    end
+        end    
+    
         ptd_text_item_count = ptd_text_item_count + 1
         ptd_updating_start_ppqpos = ptd_note_end_ppqpos
         ptd_last_end_point = ptd_measure_end_point
@@ -2536,15 +2969,15 @@ function place_TEXT_data(ptd_track_table)
     end
 
     grid_midi_item_id =
-        reaper.CreateNewMIDIItemInProj(ptd_track_table[2][3], ptd_first_run_start_point, ptd_last_end_point, true)
-    lead_midi_item_id =
         reaper.CreateNewMIDIItemInProj(ptd_track_table[3][3], ptd_first_run_start_point, ptd_last_end_point, true)
+    lead_midi_item_id =
+        reaper.CreateNewMIDIItemInProj(ptd_track_table[4][3], ptd_first_run_start_point, ptd_last_end_point, true)
     chords_midi_item_id =
         reaper.CreateNewMIDIItemInProj(ptd_track_table[5][3], ptd_first_run_start_point, ptd_last_end_point, true)
     chbass_midi_item_id =
-        reaper.CreateNewMIDIItemInProj(ptd_track_table[9][3], ptd_first_run_start_point, ptd_last_end_point, true)
+        reaper.CreateNewMIDIItemInProj(ptd_track_table[13][3], ptd_first_run_start_point, ptd_last_end_point, true)
     bass_midi_item_id =
-        reaper.CreateNewMIDIItemInProj(ptd_track_table[11][3], ptd_first_run_start_point, ptd_last_end_point, true)
+        reaper.CreateNewMIDIItemInProj(ptd_track_table[15][3], ptd_first_run_start_point, ptd_last_end_point, true)
 
     for i, v in pairs(chord_table) do
         --Show_To_Dev("So!... I = " .. i .. "  " .. tostring(v[1])  .. " | " .. tostring(v[2])  .. " | " .. tostring(v[3]) .. " | " .. tostring(v[4]) .. " | " .. string.char(10))
@@ -2566,18 +2999,18 @@ function place_MIDI_data(
     local pmd_running_ppqpos_total = 0
     local pmd_note_end_ppqpos = 0
     local pmd_error_log = ""
-
     local pmd_item_red = 192
     local pmd_item_green = 192
     local pmd_item_blue = 192
     local ptd_rgb_color = {192, 192, 192}
-
+  
     for i, value in pairs(chord_table) do
         pmd_root = ""
         chord_type = ""
         local pmd_item_to_color = reaper.GetTrackMediaItem(pmd_track_table[1][3], i - 1)
+        local pmd_item_to_color_2 = reaper.GetTrackMediaItem(pmd_track_table[2][3], i - 1)
         if string.sub(value[4], 1, 1) == "-" then
-            --   																					NON-NOTE SITUATIONS
+            --                                             NON-NOTE SITUATIONS
             pmd_note_end_ppqpos = pmd_running_ppqpos_total + value[3]
             pmd_running_ppqpos_total = pmd_note_end_ppqpos
             text_item_color = reaper.ColorToNative(133, 133, 133) | 0x1000000
@@ -2626,7 +3059,7 @@ function place_MIDI_data(
             (musictheory.root_table[string.sub(value[4], 1, 1)] == nil and string.sub(value[4], 1, 1) ~= "b" and
                 string.sub(value[4], 1, 1) ~= "#")
          then
-            --   																					ACTUAL NORMAL CHORD SITUATIONS
+            --                                             ACTUAL NORMAL CHORD SITUATIONS
             -- MISSING SOMETHING HERE?  WORRIED ALL CASES NOT COVERED
             pmd_error_log = -- SPECIAL CASE DETECTED
                 pmd_error_log ..
@@ -2636,28 +3069,28 @@ function place_MIDI_data(
             marker_name_from_value4 = value[4], 3, -2
             table.insert(G_region_table, {pmd_running_ppqpos_total, marker_name_from_value4})
 
-			if chord_table[i + 1] ~= nil then 
-			next_records_value_4 = chord_table[i + 1][4]
-			next_records_value_3 = chord_table[i + 1][3]
-			user_left_section_empty = false
-			else
-			user_left_section_empty = true   
-			end
-			
+      if chord_table[i + 1] ~= nil then 
+      next_records_value_4 = chord_table[i + 1][4]
+      next_records_value_3 = chord_table[i + 1][3]
+      user_left_section_empty = false
+      else
+      user_left_section_empty = true   
+      end
+      
 
-			
+      
 
-			
-			if next_records_value_4 == nil or string.sub(next_records_value_4, 1,2) == "{$" or chord_table[i + 1] == nil then
-				user_left_section_empty = true
-			else
-				user_left_section_empty = false          
+      
+      if next_records_value_4 == nil or string.sub(next_records_value_4, 1,2) == "{$" or chord_table[i + 1] == nil then
+        user_left_section_empty = true
+      else
+        user_left_section_empty = false          
 
-			end
-			
+      end
+      
 
 
-			
+      
 
             if string.sub(next_records_value_4, 1, 1) == "-" then
                 pmd_note_end_ppqpos = pmd_running_ppqpos_total
@@ -2702,7 +3135,7 @@ function place_MIDI_data(
                     string.sub(next_records_value_4, 1, 1) ~= "b" and
                     string.sub(next_records_value_4, 1, 1) ~= "#")
              then
-                --   																					I HAVE LOST TRACK OF WHAT THIS SITUATION IS...
+                --                                             I HAVE LOST TRACK OF WHAT THIS SITUATION IS...
                 pmd_error_log =
                     pmd_error_log ..
                     "Invalid root character " .. string.sub(next_records_value_4, 1, 1) .. " used." .. string.char(10)
@@ -2726,13 +3159,13 @@ function place_MIDI_data(
                 pmd_root = musictheory.root_table[string.sub(next_records_value_4, 1, 1)]
                 chord_type = string.sub(next_records_value_4, 2, string.len(next_records_value_4))
                 color_table = musictheory.root_colors[string.sub(next_records_value_4, 1, 1)]
-				--reaper.ShowConsoleMsg(next_records_value_4.."\n")
-				if user_left_section_empty == false then
+        --reaper.ShowConsoleMsg(next_records_value_4.."\n")
+        if user_left_section_empty == false then
                 text_item_color = reaper.ColorToNative(color_table[1], color_table[2], color_table[3]) | 0x1000000
                 reaper.SetMediaItemInfo_Value(pmd_item_to_color, "I_CUSTOMCOLOR", text_item_color)
-				else
-				render_feedback = render_feedback .. "\nMinor error. Don't enter sections with no chords...\n" .. 'Remove the empty section(s) from either the "Form:" field or from the\nChord entry area and re-render.\n\n'
-				end
+        else
+        render_feedback = render_feedback .. "\nMinor error. Don't enter sections with no chords...\n" .. 'Remove the empty section(s) from either the "Form:" field or from the\nChord entry area and re-render.\n\n'
+        end
             end
         else
 
@@ -2778,7 +3211,7 @@ function place_MIDI_data(
                 chord_type = "z"
             end
 
-            --   																					GOOD PLACE FOR THE EFFECT OF THE KEY CHANGE
+            --                                             GOOD PLACE FOR THE EFFECT OF THE KEY CHANGE
 
             if musictheory.key_table[current_key] == nil then
                 --Show_To_Dev("Invalid Key " .. current_key .. " used." .. string.char(10))
@@ -2795,7 +3228,7 @@ function place_MIDI_data(
                 end
             end
 
-            --   																					END THE KEY CHANGE
+            --                                             END THE KEY CHANGE
 
             --lead_item = reaper.GetMediaItem(0, 0)
             lead_item_first_take = reaper.GetMediaItemTake(pmd_lead_midi_item_id, 0)
@@ -2805,7 +3238,7 @@ function place_MIDI_data(
             bass_item_first_take = reaper.GetMediaItemTake(pmd_bass_midi_item_id, 0)
             --chord_and_bass_item = reaper.GetMediaItem(0, 3)
             chbass_item_first_take = reaper.GetMediaItemTake(pmd_chbass_midi_item_id, 0)
-            --bass_item = reaper.GetMediaItem(0, 4)
+            --grid_item? = reaper.GetMediaItem(0, 4)
             grid_item_first_take = reaper.GetMediaItemTake(pmd_grid_midi_item_id, 0)
 
             pmd_note_end_ppqpos = pmd_running_ppqpos_total + value[3]
@@ -2828,6 +3261,7 @@ function place_MIDI_data(
                 pmd_running_ppqpos_total = pmd_note_end_ppqpos
             else
                 for i, v in pairs(tiny_table_of_chord_tones) do
+        thechan = 1
                     if v + pmd_root > 10 then
                         reaper.MIDI_InsertNote(
                             chord_item_first_take,
@@ -2835,7 +3269,7 @@ function place_MIDI_data(
                             0,
                             pmd_running_ppqpos_total,
                             pmd_note_end_ppqpos,
-                            16,
+                            thechan,
                             60 + pmd_root + v - 12,
                             80
                         )
@@ -2845,7 +3279,7 @@ function place_MIDI_data(
                             0,
                             pmd_running_ppqpos_total,
                             pmd_note_end_ppqpos,
-                            16,
+                            thechan,
                             60 + pmd_root + v - 12,
                             80
                         )
@@ -2855,7 +3289,7 @@ function place_MIDI_data(
                             0,
                             pmd_running_ppqpos_total,
                             pmd_note_end_ppqpos,
-                            16,
+                            thechan,
                             60 + pmd_root + v - 12,
                             80
                         )
@@ -2866,7 +3300,7 @@ function place_MIDI_data(
                                 0,
                                 pmd_running_ppqpos_total,
                                 pmd_note_end_ppqpos,
-                                16,
+                                thechan,
                                 60 + bass_note + v - 36,
                                 80
                             )
@@ -2876,7 +3310,7 @@ function place_MIDI_data(
                                 0,
                                 pmd_running_ppqpos_total,
                                 pmd_note_end_ppqpos,
-                                16,
+                                thechan,
                                 60 + bass_note + v - 36,
                                 80
                             )
@@ -2886,7 +3320,7 @@ function place_MIDI_data(
                                 0,
                                 pmd_running_ppqpos_total,
                                 pmd_note_end_ppqpos,
-                                16,
+                                thechan,
                                 60 + bass_note + v - 36,
                                 80
                             )
@@ -2898,7 +3332,7 @@ function place_MIDI_data(
                             0,
                             pmd_running_ppqpos_total,
                             pmd_note_end_ppqpos,
-                            16,
+                            thechan,
                             60 + pmd_root + v,
                             80
                         )
@@ -2908,7 +3342,7 @@ function place_MIDI_data(
                             0,
                             pmd_running_ppqpos_total,
                             pmd_note_end_ppqpos,
-                            16,
+                            thechan,
                             60 + pmd_root + v,
                             80
                         )
@@ -2918,7 +3352,7 @@ function place_MIDI_data(
                             0,
                             pmd_running_ppqpos_total,
                             pmd_note_end_ppqpos,
-                            16,
+                            thechan,
                             60 + pmd_root + v,
                             80
                         )
@@ -2929,7 +3363,7 @@ function place_MIDI_data(
                                 0,
                                 pmd_running_ppqpos_total,
                                 pmd_note_end_ppqpos,
-                                16,
+                                thechan,
                                 60 + bass_note + v - 24,
                                 80
                             )
@@ -2939,7 +3373,7 @@ function place_MIDI_data(
                                 0,
                                 pmd_running_ppqpos_total,
                                 pmd_note_end_ppqpos,
-                                16,
+                                thechan,
                                 60 + bass_note + v - 24,
                                 80
                             )
@@ -2949,7 +3383,7 @@ function place_MIDI_data(
                                 0,
                                 pmd_running_ppqpos_total,
                                 pmd_note_end_ppqpos,
-                                16,
+                                thechan,
                                 60 + bass_note + v - 24,
                                 80
                             )
@@ -2960,6 +3394,37 @@ function place_MIDI_data(
             pmd_running_ppqpos_total = pmd_note_end_ppqpos
         end
     end
+  
+  
+  
+  -- Count the items in Track 1
+  
+  
+  
+----------------------------------
+--COPY COLORS IN THE NUMBER CHART AND PUT IT IN THE LETTER CHART
+  
+  
+trackWhoseColorsWeNeed = reaper.GetTrack(0,0)
+trackWhoseColorsWellSet = reaper.GetTrack(0,1)
+  
+local precoloritemCount =  reaper.CountTrackMediaItems(trackWhoseColorsWeNeed)
+
+for i = 0, precoloritemCount-1 do
+    -- Get the item in Track 1
+    local preitem = reaper.GetTrackMediaItem(trackWhoseColorsWeNeed,i)
+    -- Get the color of the item in Track 1
+    local dacolor = reaper.GetMediaItemInfo_Value(preitem, "I_CUSTOMCOLOR")
+    
+    -- Assuming corresponding item in Track 2 is at the same index
+    local postitem = reaper.GetTrackMediaItem(trackWhoseColorsWellSet,i)
+    if postitem then
+        -- Apply the color to the item in Track 2
+        reaper.SetMediaItemInfo_Value(postitem, "I_CUSTOMCOLOR", dacolor)
+    end
+end
+  
+  
     return pmd_error_log, pmd_running_ppqpos_total, grid_item_first_take
 end
 
@@ -3049,13 +3514,13 @@ function chords_to_onemotion()
     local om_notice = ""
     local ombeats = 0
     for i, value in pairs(chord_table) do
-		--reaper.ShowConsoleMsg(value[4].."\n")
+    --reaper.ShowConsoleMsg(value[4].."\n")
         if string.sub(value[4], 1, 2) == "{$" then
             om_marker = string.sub(value[4], 3, string.len(value[4]) - 2)
 
             onemotionoutput = onemotionoutput .. "<" .. om_marker .. "> "
         elseif string.sub(value[4], 1, 1) == "-" then
-			reaper.ShowConsoleMsg('ei 1 = ' .. value[1].. ' 2 = ' .. value[2] .. ' 3 = ' .. (value[3])/960 .. ' 4 = ' .. value[4] ..'\n')
+      reaper.ShowConsoleMsg('ei 1 = ' .. value[1].. ' 2 = ' .. value[2] .. ' 3 = ' .. (value[3])/960 .. ' 4 = ' .. value[4] ..'\n')
             ombeats = math.floor(value[3] / G_ticks_per_measure)
             if ombeats ~= (value[3] / G_ticks_per_measure) then
                 if is_synco_found == false then
@@ -3078,7 +3543,7 @@ function chords_to_onemotion()
             --    datapeek = datapeek .. " k = " .. k .. " / value = " .. v .. string.char(10)
             --end
             ombeats = math.floor(value[3] / G_ticks_per_measure)
-			reaper.ShowConsoleMsg('e 1 = ' .. value[1].. ' 2 = ' .. value[2] .. ' 3 = ' .. (value[3])/960 .. ' 4 = ' .. value[4] ..'\n')
+      reaper.ShowConsoleMsg('e 1 = ' .. value[1].. ' 2 = ' .. value[2] .. ' 3 = ' .. (value[3])/960 .. ' 4 = ' .. value[4] ..'\n')
             if ombeats ~= (value[3] / G_ticks_per_measure) then
                 if is_synco_found == false then
                     om_notice =
@@ -3102,8 +3567,8 @@ function chords_to_onemotion()
                 om_root = string.sub(value[4], 1, 1)
                 om_type_start = 2
             end
-			current_key = set_the_key(header_area)
-			current_key_shift = musictheory.key_table[current_key]
+      current_key = set_the_key(header_area)
+      current_key_shift = musictheory.key_table[current_key]
 
             local the_om_key_index = musictheory.root_table[om_root]
             if the_om_key_index == nil then
@@ -3114,12 +3579,12 @@ function chords_to_onemotion()
                 the_om_key_index = the_om_key_index + current_key_shift - 24
             elseif the_om_key_index + current_key_shift >= 12 then
                 the_om_key_index = the_om_key_index + current_key_shift - 12
-			else
-                the_om_key_index = the_om_key_index + current_key_shift		
-			
+      else
+                the_om_key_index = the_om_key_index + current_key_shift    
+      
             end
 
-			--reaper.ShowConsoleMsg(the_om_key_index.."\n")
+      --reaper.ShowConsoleMsg(the_om_key_index.."\n")
             if musictheory.is_it_flat_table[current_key] == true then
                 the_absolute_chord = musictheory.flats_table[the_om_key_index]
             else
@@ -3130,14 +3595,14 @@ function chords_to_onemotion()
             else
 
 
-				om_slash_start_pos, _ = string.find(value[4],"/")
-				if om_slash_start_pos ~= nil then
-			reaper.ShowConsoleMsg("found one\n")
-			type_end_pos = om_slash_start_pos - 1
-			else
-			
-			type_end_pos = string.len(value[4])
-				end
+        om_slash_start_pos, _ = string.find(value[4],"/")
+        if om_slash_start_pos ~= nil then
+      reaper.ShowConsoleMsg("found one\n")
+      type_end_pos = om_slash_start_pos - 1
+      else
+      
+      type_end_pos = string.len(value[4])
+        end
 
                 onemotion_chord_type =
                     musictheory.to_onemotion_translation[string.sub(value[4], om_type_start, type_end_pos)]
@@ -3148,11 +3613,11 @@ function chords_to_onemotion()
 
 
                 if onemotion_chord_type == nil then
-					--reaper.ShowConsoleMsg("value was ".. value[4] .. "\n")
+          --reaper.ShowConsoleMsg("value was ".. value[4] .. "\n")
                     onemotionoutput = onemotionoutput .. ombeats .. the_absolute_chord .. " "
 
                 else
-						--reaper.ShowConsoleMsg(onemotion_chord_type.."\n")
+            --reaper.ShowConsoleMsg(onemotion_chord_type.."\n")
                     onemotionoutput = onemotionoutput .. ombeats .. the_absolute_chord .. onemotion_chord_type .. " "
                 end
             end
@@ -3168,35 +3633,36 @@ end
 
 
 function render_all()
-	
-    reaper.ClearConsole() -- 			CLEAR THE CONSOLE
-	
+  
+    reaper.ClearConsole() --       CLEAR THE CONSOLE
+    
 
-	Autosave()
-
-	
-	
-	thetime = os.date('%Y-%m-%d %H-%M-%S')
-	render_feedback = render_feedback .. "Rendered at " .. thetime .."\n"
+  Autosave()
+  SaveLastNumbers2NotesChart()
+  
+  
+  thetime = os.date('%Y-%m-%d %H-%M-%S')
+  render_feedback = render_feedback .. "Rendered at " .. thetime .."\n"
     reaper.PreventUIRefresh(1)
 
     chord_charting_area = inital_swaps(chord_charting_area)
-    G_track_list, G_track_table = Setup_Tracks() -- 260 		--SET UP TRACKS
+    G_track_list, G_track_table = Setup_Tracks() -- 260     --SET UP TRACKS WITH THE RIGHT COLORS NAMES AND PLUGINS
 
-    unfolded_user_data, error_zone = form.process_the_form(header_area, chord_charting_area) -- FORM		 DEAL WITH UNFOLDING THE FORM
-    progression = Set_The_Current_Simulated_Userinput_Data(unfolded_user_data) -- 388 		SET INITIAL SIMULATED USER INPUT
+    unfolded_user_data, error_zone = form.process_the_form(header_area, chord_charting_area) -- FORM     DEAL WITH UNFOLDING THE FORM
+    progression = Set_The_Current_Simulated_Userinput_Data(unfolded_user_data) -- 388     SET INITIAL SIMULATED USER INPUT
     --Show_To_Dev("Charting Area = " .. string.char(10) .. chord_charting_area .. string.char(10))
     current_key = set_the_key(header_area)
     current_bpm = set_the_bpm(header_area)
-	set_the_swing(header_area)
-    G_split, G_error_log = orgainize_input_into_bars(G_error_log) -- 395 		ORGANIZE BARS
+  set_the_swing(header_area)
+    G_split, G_error_log = orgainize_input_into_bars(G_error_log) -- 395     ORGANIZE BARS
     --presentdata(G_split, G_error_log)
-    G_split, G_error_log = process_nested_split_sections(G_split, G_error_log) -- 620 		PROCESS SPLIT CHORDS
+    G_split, G_error_log = process_nested_split_sections(G_split, G_error_log) -- 620     PROCESS SPLIT CHORDS
     --presentdata(G_split, G_error_log)
-    -- 662 		PLACE THE TEXT ITEMS IN TRACKS
+    -- 662     PLACE THE TEXT ITEMS IN TRACKS
 
     process_pushes()
     presentdata(G_split, G_error_log)
+  -- MIDI WILL BE CREATED BUT UNPOPULATED AFTER THIS STEP (NASHVILLE NUMBERS WILL NOT BE COLOR CODED BUT WILL HAVE NUMBER TEXT COMMENTS)
     G_text_item_count,
         G_lead_midi_item_id,
         G_chords_midi_item_id,
@@ -3204,7 +3670,7 @@ function render_all()
         G_chbass_midi_item_id,
         G_grid_midi_item_id = place_TEXT_data(G_track_table)
 
-    -- 743 		PLACE THE MIDI ITEMS IN TRACKS
+    -- 743     PLACE THE MIDI ITEMS IN TRACKS - AFTER STEP MOST MIDI DATA WILL BE PLACED IN TRACKS _ NO MARKERS YET - GRID NOT YET BUILT FROM CHORDS
 
     _, final_ppqpos_total, G_grid_item_first_take =
         place_MIDI_data(
@@ -3216,15 +3682,16 @@ function render_all()
         G_grid_midi_item_id,
         G_track_table
     )
-
+  --OLD MARKERS WILL BE REMOVED AND NEW MARKERS WILL BE PLACED IN PLACE_SPECIAL
     place_special()
 
     ----Show_To_Dev(moops)
+  -- SPECTRUM MAKE WILL CAUSE THE CHORDS TO BE SPEAD OUT TO THE ENTIRE MIDI NOTE RANGE TO SHOW HARMONY ACROSS THE SPECTRUM
     notneeded = spectrum.make_full_spectrum(G_grid_item_first_take)
 
-    close_all_fx_windows = reaper.NamedCommandLookup("_S&M_WNCLS3") -- CLOSE 	FX WINDOWS ON 1st OPEN
+    close_all_fx_windows = reaper.NamedCommandLookup("_S&M_WNCLS3") -- CLOSE   FX WINDOWS ON 1st OPEN
     reaper.Main_OnCommand(close_all_fx_windows, 0)
-    -- RESET 	VARIABLES FOR NEXT RUN
+    -- RESET   VARIABLES FOR NEXT RUN
     G_split = 0
     G_error_log = "START ERROR LOG - " .. string.char(10)
     G_time_signature_top = 4
@@ -3306,7 +3773,7 @@ function import_onemotion()
                 omi_inchord = true
             else
                 if omi_inmarker == false then
-					omi_inchord = true
+          omi_inchord = true
                 end
                 omi_chord = omi_chord .. string.sub(omi_import_text, i, i)
             end
@@ -3568,7 +4035,7 @@ function SetVMidiInput(chan, dev_name)
             reaper.SetMediaTrackInfo_Value(tr, "I_RECMODE", 2)
             reaper.SetMediaTrackInfo_Value(tr, "B_MUTE", 1)
             reaper.SetMediaTrackInfo_Value(tr, "B_SHOWINTCP", 0)
-            reaper.SetMediaTrackInfo_Value(tr, "B_SHOWINMIXER", 0)			
+            reaper.SetMediaTrackInfo_Value(tr, "B_SHOWINMIXER", 0)      
             reaper.SetMediaTrackInfo_Value(tr, "I_RECINPUT", val)
             audition_track = tr
         --reaper.ShowConsoleMsg(tostring(audition_track))
@@ -3595,22 +4062,22 @@ end
 
 
 function Export_OM()
-	OM_ex_warning = ""
-	reaper.PreventUIRefresh(1)
-	the_last_ccc_bar_content = "" -- CLEAR OUT THE OLD AND SET UP THE SHELL FOR THE NEW DATA
-	_, ckey_startso  = string.find(header_area, "Key: ")
-	ckey_endso, _  = string.find(header_area, "Swing:")
-	_, cbpm_startso  = string.find(header_area, "BPM: ")
-	cbpm_endso, _  = string.find(header_area, "Key:")
-	cbpmfound = string.sub(header_area, cbpm_startso+1, cbpm_endso-2)
-	ckeyfound = string.sub(header_area, ckey_startso+1, ckey_endso-2)
-	theresultofprocessOMbars = Process_OM_bars()
-	--if cancel_OM_opperation == true then
-	--	onemotionoutput = the_OM_fail
---	else
-		onemotionoutput = theresultofprocessOMbars
-	--end
-	reaper.PreventUIRefresh(-1)
+  OM_ex_warning = ""
+  reaper.PreventUIRefresh(1)
+  the_last_ccc_bar_content = "" -- CLEAR OUT THE OLD AND SET UP THE SHELL FOR THE NEW DATA
+  _, ckey_startso  = string.find(header_area, "Key: ")
+  ckey_endso, _  = string.find(header_area, "Swing:")
+  _, cbpm_startso  = string.find(header_area, "BPM: ")
+  cbpm_endso, _  = string.find(header_area, "Key:")
+  cbpmfound = string.sub(header_area, cbpm_startso+1, cbpm_endso-2)
+  ckeyfound = string.sub(header_area, ckey_startso+1, ckey_endso-2)
+  theresultofprocessOMbars = Process_OM_bars()
+  --if cancel_OM_opperation == true then
+  --  onemotionoutput = the_OM_fail
+--  else
+    onemotionoutput = theresultofprocessOMbars
+  --end
+  reaper.PreventUIRefresh(-1)
 end
 
 -- ==============================================================================
@@ -3625,7 +4092,7 @@ end
 function Process_OM_bars()
 local processmore_OM_table = {}
 local insubdepth = 0
-local inmeasurenow = false		-- !!!!!!!!!!!!!!!!   GET THE DATA READY TO BE PUT INTO TABLES ONE CHAR AT A TIME  !!!!!!
+local inmeasurenow = false    -- !!!!!!!!!!!!!!!!   GET THE DATA READY TO BE PUT INTO TABLES ONE CHAR AT A TIME  !!!!!!
 cancel_OM_opperation = false
 the_OM_fail = ""
 OM_ex_warning = ""
@@ -3729,104 +4196,104 @@ unfolded_OM_data = string.gsub(unfolded_OM_data, "%)", ") ")
 unfolded_OM_data = Swapout(unfolded_OM_data, OM_swaplist)
 
 for i = 1,string.len(unfolded_OM_data) do
-	if cancel_OM_opperation == true then
-		the_OM_fail = 'Subdivision close ")" found without first being opened with "(".\n'
-		cancel_OM_opperation = true
-		break	
-	elseif string.sub(unfolded_OM_data,i,i) == "{" and inmarker == true then  -- WARN WHEN THERE IS A {{ USER ERROR
-		the_OM_fail = 'Don\'t use a "{" until you first close off the marker you are in.\n'
-		cancel_OM_opperation = true
-		break
-	elseif string.sub(unfolded_OM_data,i,i) == "}" and inmarker == false then	 -- WARN WHEN THERE IS A LONE } USER ERROR
-		the_OM_fail = 'Marker closer "}" found without a previous marker starter "{".\n'
-		cancel_OM_opperation = true
-		break
-	elseif string.sub(unfolded_OM_data,i,i) == "{" and inmeasurenow == true then	 -- WARN WHEN THERE IS A { in measure USER ERROR
-		the_OM_fail = 'You should not use "{" in the middle of a measure.\n'
-		cancel_OM_opperation = true
-		break	
-	elseif string.sub(unfolded_OM_data,i,i) == "}" and inmeasurenow == true then	 -- WARN WHEN THERE IS A } in measure USER ERROR
-		the_OM_fail = 'You should not use "}" in the middle of a measure.\n'
-		cancel_OM_opperation = true
-		break	
-	elseif string.sub(unfolded_OM_data,i,i) == "[" and inmeasurenow == true then	 -- WARN WHEN THERE IS A ]] USER ERROR
-		the_OM_fail = 'Incident of mismatched braces.  Make sure to use "[" and "]" in pairs.\n'
-		cancel_OM_opperation = true
-		break	
-	elseif string.sub(unfolded_OM_data,i,i) == "]" and inmeasurenow == false then  -- WARN WHEN THERE IS A [[ USER ERROR
-		the_OM_fail = 'Incident of mismatched braces.  Make sure to use "[" and "]" in pairs.\n'
-		cancel_OM_opperation = true
-		break
-	elseif  string.sub(unfolded_OM_data,i,i) == "(" and inmeasurenow == false then   -- WARN WHEN THERE IS A ( in a measure USER ERROR
-		the_OM_fail = 'Subdivisions marked with "(" should only occur in measure markers "[  ]".\n'
-		cancel_OM_opperation = true
-		break
-	elseif  string.sub(unfolded_OM_data,i,i) == ")" and inmeasurenow == false then   -- WARN WHEN THERE IS A ) in a measure USER ERROR
-		the_OM_fail = 'Subdivisions closings marked with ")" should only occur in within measure markers "[  ]".\n'
-		cancel_OM_opperation = true
-		break
-	elseif  string.sub(unfolded_OM_data,i,i) == ")" and inmeasurenow == true  and inmarker == false then
-		OM_rebuild = OM_rebuild .. ")"		-- CHANGE IN MEASURE SEPS TO COLON
-		if insubdepth == 0 then
-			the_OM_fail = 'Subdivision close ")" found without first being opened with "(".\n'
-			cancel_OM_opperation = true
-		else
-			insubdepth = insubdepth - 1
-		end
-	elseif  string.sub(unfolded_OM_data,i,i) == "(" and inmeasurenow == true  and inmarker == false then
-		OM_rebuild = OM_rebuild .. "("		-- CHANGE IN MEASURE SEPS TO COLON
-		insubdepth = insubdepth + 1
-	elseif insubdepth < 0 then	 -- WARN WHEN THERE IS A ]] USER ERROR
-		the_OM_fail = the_OM_fail .. 'Incident of mismatched parentensis.  Make sure to use "(" and ")" in pairs.\n'
-		cancel_OM_opperation = true
-		break
-	elseif string.sub(unfolded_OM_data,i,i) == "{" then
-		inmarker = true
-		OM_rebuild = OM_rebuild .. string.sub(unfolded_OM_data,i,i)			-- OM_rebuild WITH IN BRACE AS IS (UNLESS...)		
-	elseif string.sub(unfolded_OM_data,i,i) == "}" then
-		inmarker = false
-		OM_rebuild = OM_rebuild .. string.sub(unfolded_OM_data,i,i)			-- OM_rebuild WITH IN BRACE AS IS (UNLESS...)				
-	elseif string.sub(unfolded_OM_data,i,i) == "[" and inmeasurenow == false then
-		inmeasurenow = true
-		OM_rebuild = OM_rebuild .. string.sub(unfolded_OM_data,i,i)			-- OM_rebuild WITH IN BRACE AS IS (UNLESS...)
-	elseif string.sub(unfolded_OM_data,i,i) == "]" and inmeasurenow == true then
-		inmeasurenow = false
-		OM_rebuild = OM_rebuild .. string.sub(unfolded_OM_data,i,i)			-- OM_rebuild WITH OUT BRACE AS IS (UNLESS...)
-	elseif string.sub(unfolded_OM_data,i,i) == " " and inmeasurenow == false and inmarker == false and insubdepth == 0 then
-		OM_rebuild = OM_rebuild .. ","													-- CHANGE MEASURE SEPARATORS TO COMMA
-	elseif string.sub(unfolded_OM_data,i,i) == " " and inmeasurenow == true  and inmarker == false and insubdepth > 0  then
-		OM_rebuild = OM_rebuild .. ";"
-	elseif string.sub(unfolded_OM_data,i,i) == " " and inmeasurenow == true  and inmarker == false and insubdepth == 0 then
-		OM_rebuild = OM_rebuild .. ":"													-- CHANGE IN MEASURE SEPS TO COLON		
-	else
-		OM_rebuild = OM_rebuild .. string.sub(unfolded_OM_data,i,i)						-- PASS EVERYTHING ELSE AS IS
-	end
+  if cancel_OM_opperation == true then
+    the_OM_fail = 'Subdivision close ")" found without first being opened with "(".\n'
+    cancel_OM_opperation = true
+    break  
+  elseif string.sub(unfolded_OM_data,i,i) == "{" and inmarker == true then  -- WARN WHEN THERE IS A {{ USER ERROR
+    the_OM_fail = 'Don\'t use a "{" until you first close off the marker you are in.\n'
+    cancel_OM_opperation = true
+    break
+  elseif string.sub(unfolded_OM_data,i,i) == "}" and inmarker == false then   -- WARN WHEN THERE IS A LONE } USER ERROR
+    the_OM_fail = 'Marker closer "}" found without a previous marker starter "{".\n'
+    cancel_OM_opperation = true
+    break
+  elseif string.sub(unfolded_OM_data,i,i) == "{" and inmeasurenow == true then   -- WARN WHEN THERE IS A { in measure USER ERROR
+    the_OM_fail = 'You should not use "{" in the middle of a measure.\n'
+    cancel_OM_opperation = true
+    break  
+  elseif string.sub(unfolded_OM_data,i,i) == "}" and inmeasurenow == true then   -- WARN WHEN THERE IS A } in measure USER ERROR
+    the_OM_fail = 'You should not use "}" in the middle of a measure.\n'
+    cancel_OM_opperation = true
+    break  
+  elseif string.sub(unfolded_OM_data,i,i) == "[" and inmeasurenow == true then   -- WARN WHEN THERE IS A ]] USER ERROR
+    the_OM_fail = 'Incident of mismatched braces.  Make sure to use "[" and "]" in pairs.\n'
+    cancel_OM_opperation = true
+    break  
+  elseif string.sub(unfolded_OM_data,i,i) == "]" and inmeasurenow == false then  -- WARN WHEN THERE IS A [[ USER ERROR
+    the_OM_fail = 'Incident of mismatched braces.  Make sure to use "[" and "]" in pairs.\n'
+    cancel_OM_opperation = true
+    break
+  elseif  string.sub(unfolded_OM_data,i,i) == "(" and inmeasurenow == false then   -- WARN WHEN THERE IS A ( in a measure USER ERROR
+    the_OM_fail = 'Subdivisions marked with "(" should only occur in measure markers "[  ]".\n'
+    cancel_OM_opperation = true
+    break
+  elseif  string.sub(unfolded_OM_data,i,i) == ")" and inmeasurenow == false then   -- WARN WHEN THERE IS A ) in a measure USER ERROR
+    the_OM_fail = 'Subdivisions closings marked with ")" should only occur in within measure markers "[  ]".\n'
+    cancel_OM_opperation = true
+    break
+  elseif  string.sub(unfolded_OM_data,i,i) == ")" and inmeasurenow == true  and inmarker == false then
+    OM_rebuild = OM_rebuild .. ")"    -- CHANGE IN MEASURE SEPS TO COLON
+    if insubdepth == 0 then
+      the_OM_fail = 'Subdivision close ")" found without first being opened with "(".\n'
+      cancel_OM_opperation = true
+    else
+      insubdepth = insubdepth - 1
+    end
+  elseif  string.sub(unfolded_OM_data,i,i) == "(" and inmeasurenow == true  and inmarker == false then
+    OM_rebuild = OM_rebuild .. "("    -- CHANGE IN MEASURE SEPS TO COLON
+    insubdepth = insubdepth + 1
+  elseif insubdepth < 0 then   -- WARN WHEN THERE IS A ]] USER ERROR
+    the_OM_fail = the_OM_fail .. 'Incident of mismatched parentensis.  Make sure to use "(" and ")" in pairs.\n'
+    cancel_OM_opperation = true
+    break
+  elseif string.sub(unfolded_OM_data,i,i) == "{" then
+    inmarker = true
+    OM_rebuild = OM_rebuild .. string.sub(unfolded_OM_data,i,i)      -- OM_rebuild WITH IN BRACE AS IS (UNLESS...)    
+  elseif string.sub(unfolded_OM_data,i,i) == "}" then
+    inmarker = false
+    OM_rebuild = OM_rebuild .. string.sub(unfolded_OM_data,i,i)      -- OM_rebuild WITH IN BRACE AS IS (UNLESS...)        
+  elseif string.sub(unfolded_OM_data,i,i) == "[" and inmeasurenow == false then
+    inmeasurenow = true
+    OM_rebuild = OM_rebuild .. string.sub(unfolded_OM_data,i,i)      -- OM_rebuild WITH IN BRACE AS IS (UNLESS...)
+  elseif string.sub(unfolded_OM_data,i,i) == "]" and inmeasurenow == true then
+    inmeasurenow = false
+    OM_rebuild = OM_rebuild .. string.sub(unfolded_OM_data,i,i)      -- OM_rebuild WITH OUT BRACE AS IS (UNLESS...)
+  elseif string.sub(unfolded_OM_data,i,i) == " " and inmeasurenow == false and inmarker == false and insubdepth == 0 then
+    OM_rebuild = OM_rebuild .. ","                          -- CHANGE MEASURE SEPARATORS TO COMMA
+  elseif string.sub(unfolded_OM_data,i,i) == " " and inmeasurenow == true  and inmarker == false and insubdepth > 0  then
+    OM_rebuild = OM_rebuild .. ";"
+  elseif string.sub(unfolded_OM_data,i,i) == " " and inmeasurenow == true  and inmarker == false and insubdepth == 0 then
+    OM_rebuild = OM_rebuild .. ":"                          -- CHANGE IN MEASURE SEPS TO COLON    
+  else
+    OM_rebuild = OM_rebuild .. string.sub(unfolded_OM_data,i,i)            -- PASS EVERYTHING ELSE AS IS
+  end
 end
 
-		inmarkernow = false
-		OM_rebuild2 = ""
+    inmarkernow = false
+    OM_rebuild2 = ""
 for i = 1,string.len(OM_rebuild) do
-		current_singleOMchar = string.sub(OM_rebuild,i,i)
-		if current_singleOMchar == "{" then
-			inmarkernow = true
-			OM_rebuild2 = OM_rebuild2 .. current_singleOMchar				
-		elseif current_singleOMchar == "}" then
-			inmarkernow = false
-			OM_rebuild2 = OM_rebuild2 .. current_singleOMchar				
-		elseif stuff_to_purge_from_chords[current_singleOMchar] == nil then
-			OM_rebuild2 = OM_rebuild2 .. current_singleOMchar						-- PASS EVERYTHING ELSE AS IS
-		elseif inmarkernow == true then
-			OM_rebuild2 = OM_rebuild2 .. current_singleOMchar						-- PASS EVERYTHING ELSE AS IS		
-		else
-		end
+    current_singleOMchar = string.sub(OM_rebuild,i,i)
+    if current_singleOMchar == "{" then
+      inmarkernow = true
+      OM_rebuild2 = OM_rebuild2 .. current_singleOMchar        
+    elseif current_singleOMchar == "}" then
+      inmarkernow = false
+      OM_rebuild2 = OM_rebuild2 .. current_singleOMchar        
+    elseif stuff_to_purge_from_chords[current_singleOMchar] == nil then
+      OM_rebuild2 = OM_rebuild2 .. current_singleOMchar            -- PASS EVERYTHING ELSE AS IS
+    elseif inmarkernow == true then
+      OM_rebuild2 = OM_rebuild2 .. current_singleOMchar            -- PASS EVERYTHING ELSE AS IS    
+    else
+    end
 end
 
 
-	--reaper.ShowConsoleMsg(unfolded_OM_data.. "\n")
-	--reaper.ShowConsoleMsg(OM_rebuild.. "\n")
-	--reaper.ShowConsoleMsg("THE FAIL: " .. the_OM_fail.. "\n")	
+  --reaper.ShowConsoleMsg(unfolded_OM_data.. "\n")
+  --reaper.ShowConsoleMsg(OM_rebuild.. "\n")
+  --reaper.ShowConsoleMsg("THE FAIL: " .. the_OM_fail.. "\n")  
 
-OM_main_bars_table = Split(OM_rebuild2, ",")											-- PUT THE DATA INTO TABLE
+OM_main_bars_table = Split(OM_rebuild2, ",")                      -- PUT THE DATA INTO TABLE
 OM_rebuild = ""        -- clear memory
 OM_rebuild2 = ""        -- clear memory
 unfolded_OM_data = ""        -- clear memory
@@ -3836,39 +4303,39 @@ unfolded_OM_data = ""        -- clear memory
 
 
 -----
-for iOM,vOM in pairs(OM_main_bars_table) do		--  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    DETERMINE IF MULTIBAR !!!!!!!!!!
-	if vOM ~= nil and vOM ~= "" then
-		if string.find(vOM, "%[") then
-			processmore_OM_table[iOM] = {true,1}											-- TAG AS MULTIBAR IN this TABLE
-		elseif string.find(vOM, "{") then
-			processmore_OM_table[iOM] = {false,0}											-- A) SECTION HEADER - NOT A MEASURE
-		else
-			processmore_OM_table[iOM] = {false,1}	
-			OM_main_bars_table[iOM] = OM_main_bars_table[iOM]   -- TAG AS A SINGLE BAR
-		end
-	end	
+for iOM,vOM in pairs(OM_main_bars_table) do    --  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    DETERMINE IF MULTIBAR !!!!!!!!!!
+  if vOM ~= nil and vOM ~= "" then
+    if string.find(vOM, "%[") then
+      processmore_OM_table[iOM] = {true,1}                      -- TAG AS MULTIBAR IN this TABLE
+    elseif string.find(vOM, "{") then
+      processmore_OM_table[iOM] = {false,0}                      -- A) SECTION HEADER - NOT A MEASURE
+    else
+      processmore_OM_table[iOM] = {false,1}  
+      OM_main_bars_table[iOM] = OM_main_bars_table[iOM]   -- TAG AS A SINGLE BAR
+    end
+  end  
 end
 -----
 
 -----------------
-for iOMpm,vOMpm in pairs(processmore_OM_table) do	
-	OM_start_brace_pos, _  = string.find(OM_main_bars_table[iOMpm], "%[")
-	if OM_start_brace_pos ~=nil and OM_start_brace_pos > 1 then
-		should_be_multiple = string.sub(OM_main_bars_table[iOMpm],1, OM_start_brace_pos - 1)
-		if'number' == type(tonumber(should_be_multiple)) then
-			processmore_OM_table[iOMpm][2] = tonumber(should_be_multiple)
-			--reaper.ShowConsoleMsg(tostring(should_be_multiple) .. "\n")
-		else
-			processmore_OM_table[iOMpm][2] = 1
-			the_OM_fail = the_OM_fail .. 'Only numbers should preceed the "[" symbol.'
-		end
-		OM_main_bars_table[iOMpm] = string.sub(OM_main_bars_table[iOMpm], OM_start_brace_pos + 1, string.len(OM_main_bars_table[iOMpm])-1)
-	elseif OM_start_brace_pos ~=nil and OM_start_brace_pos == 1 then
-		OM_main_bars_table[iOMpm] = string.sub(OM_main_bars_table[iOMpm], OM_start_brace_pos + 1, string.len(OM_main_bars_table[iOMpm])-1)
-	end
-	_, OM_bar_chord_count = string.gsub(OM_main_bars_table[iOMpm], ":", "")
-	processmore_OM_table[iOMpm][3] = OM_bar_chord_count	+ 1
-	processmore_OM_table[iOMpm][4] = Split(OM_main_bars_table[iOMpm], ":")
+for iOMpm,vOMpm in pairs(processmore_OM_table) do  
+  OM_start_brace_pos, _  = string.find(OM_main_bars_table[iOMpm], "%[")
+  if OM_start_brace_pos ~=nil and OM_start_brace_pos > 1 then
+    should_be_multiple = string.sub(OM_main_bars_table[iOMpm],1, OM_start_brace_pos - 1)
+    if'number' == type(tonumber(should_be_multiple)) then
+      processmore_OM_table[iOMpm][2] = tonumber(should_be_multiple)
+      --reaper.ShowConsoleMsg(tostring(should_be_multiple) .. "\n")
+    else
+      processmore_OM_table[iOMpm][2] = 1
+      the_OM_fail = the_OM_fail .. 'Only numbers should preceed the "[" symbol.'
+    end
+    OM_main_bars_table[iOMpm] = string.sub(OM_main_bars_table[iOMpm], OM_start_brace_pos + 1, string.len(OM_main_bars_table[iOMpm])-1)
+  elseif OM_start_brace_pos ~=nil and OM_start_brace_pos == 1 then
+    OM_main_bars_table[iOMpm] = string.sub(OM_main_bars_table[iOMpm], OM_start_brace_pos + 1, string.len(OM_main_bars_table[iOMpm])-1)
+  end
+  _, OM_bar_chord_count = string.gsub(OM_main_bars_table[iOMpm], ":", "")
+  processmore_OM_table[iOMpm][3] = OM_bar_chord_count  + 1
+  processmore_OM_table[iOMpm][4] = Split(OM_main_bars_table[iOMpm], ":")
 end
 
 -----------------
@@ -3882,129 +4349,129 @@ OMfalsesofar = 0
 tablerecords = ""
 chordchunk = {}
 for i1, tablerecords in pairs(processmore_OM_table) do
-	right_now_table = {}
-	if tablerecords[1] == false and tablerecords[2] == 0 then   -- NO MEASURE MARKER ONLY
-		-- COULD DO THE SECTION SWAPOUTS RIGHT HERE
-		nextlayer_table_elem_count = nextlayer_table_elem_count + 1
-		nextlayer_table[nextlayer_table_elem_count] = {processmore_OM_table[i1][1],processmore_OM_table[i1][2],nextlayer_table_elem_count,processmore_OM_table[i1][4]}
-	elseif tablerecords[1] == false and tablerecords[2] > 0 then  -- SINGLE CHORD
-		nextlayer_table_elem_count = nextlayer_table_elem_count + 1		
-		nextlayer_table[nextlayer_table_elem_count] = {processmore_OM_table[i1][1],processmore_OM_table[i1][2],nextlayer_table_elem_count,processmore_OM_table[i1][4]}
-	elseif tablerecords[1] == true then
-		divtotal = 0
-		for i2, chordchunk in pairs(tablerecords[4]) do			--  PROCESS EACH CHORD CHUNK
-			--reaper.ShowConsoleMsg("chunk: " .. chordchunk .." -- \n")		
-			start_pos_OM_par, _  = string.find(chordchunk, "%(")  -- LOOK IN THAT CHUNK FOR (
-			if start_pos_OM_par ~= nil and type(tonumber(string.sub(chordchunk,1,start_pos_OM_par - 1))) == "number" then
-				divmult =  tonumber(string.sub(chordchunk,1,start_pos_OM_par - 1))     --  FOUND ANOTHER DIGIT
-				--reaper.ShowConsoleMsg("start_pos_OM_par " .. start_pos_OM_par .." -- \n")   -- SHOW WHERE
-			elseif start_pos_OM_par ~= nil then              -- FOUND DIVISION MULTI THAT ISN'T A NUMBER
-				divmult = 1
-				local subdivOM = string.sub(chordchunk,1,subdiv_numlength)
-				--reaper.ShowConsoleMsg("USER ERROR DON'T PUT ANYTHING BUT NUMBERS " .. 'BY "("\n')
-			else
-				--reaper.ShowConsoleMsg("THERE WAS NO MULTI\n")
-				divmult = 1
-			end	
-			--reaper.ShowConsoleMsg("divmult = " .. divmult .. "\n")
-			divtotal = divtotal + divmult
-		end		
-		--reaper.ShowConsoleMsg("divtotal = " .. divtotal .. "\n")
-			for i2, chordchunk in pairs(tablerecords[4]) do			--  PROCESS EACH CHORD CHUNK	
-			start_pos_OM_par, _  = string.find(chordchunk, "%(")  -- LOOK IN THAT CHUNK FOR (
-			if start_pos_OM_par ~= nil and type(tonumber(string.sub(chordchunk,1,start_pos_OM_par - 1))) == "number" then
-				divmult =  tonumber(string.sub(chordchunk,1,start_pos_OM_par - 1))     --  FOUND ANOTHER DIGIT
-				nextlayer_table_elem_count = nextlayer_table_elem_count + 1
-				new_multi = (processmore_OM_table[i1][2]*divmult)/divtotal
-				revised_chunk = string.sub(chordchunk,start_pos_OM_par + 1,string.len(chordchunk)-1)
-				start_pos_OM_inwardpar, _  = string.find(revised_chunk, "%(")
-				start_pos_OM_inwardsep, _  = string.find(revised_chunk, ";")
-				if start_pos_OM_inwardpar == nil and start_pos_OM_inwardsep == nil then
-				nextlayer_table[nextlayer_table_elem_count] = {false,new_multi,nextlayer_table_elem_count,{revised_chunk}}				
-				else
-					OMfalsesofar = OMfalsesofar + 1
-					revisedandcleaned = ""
-					local par_count_depth = 0
-					for iggie = 1,string.len(revised_chunk), 1 do
-						if par_count_depth < 0 then
-							--user error SEND MESSAGE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						elseif string.sub(revised_chunk,iggie,iggie) == "(" then 
-							newcharreplace = "("
-							par_count_depth = par_count_depth + 1
-						elseif string.sub(revised_chunk,iggie,iggie) == ")" then 
-							newcharreplace = ")"
-							par_count_depth = par_count_depth - 1							
-						elseif string.sub(revised_chunk,iggie,iggie) == ";" and par_count_depth == 0 then 
-							newcharreplace = ","
-						else
-							newcharreplace = string.sub(revised_chunk,iggie,iggie)
-						end
-						revisedandcleaned = revisedandcleaned .. newcharreplace
-					end
-					table_of_div_chunks =  Split(revisedandcleaned, ",")
-					nextlayer_table[nextlayer_table_elem_count] = {true,new_multi,nextlayer_table_elem_count,{}}
-					for idc, vdc in pairs(table_of_div_chunks) do
-						nextlayer_table[nextlayer_table_elem_count][4][idc] = vdc
-					end
-				end	
-			elseif start_pos_OM_par ~= nil then              -- FOUND DIVISION MULTI THAT ISN'T A NUMBER
-				nextlayer_table_elem_count = nextlayer_table_elem_count + 1
-				new_multi = processmore_OM_table[i1][2]/divtotal
-				revised_chunk = string.sub(chordchunk,start_pos_OM_par + 1,string.len(chordchunk)-1)				
-				start_pos_OM_inwardpar, _  = string.find(revised_chunk, "%(")
-				start_pos_OM_inwardsep, _  = string.find(revised_chunk, ";")				
-				if start_pos_OM_inwardpar == nil and start_pos_OM_inwardsep == nil then				
-					nextlayer_table[nextlayer_table_elem_count] = {false,new_multi,nextlayer_table_elem_count,{revised_chunk}}
-				else
-					OMfalsesofar = OMfalsesofar + 1
-					revisedandcleaned = ""
-					local par_count_depth = 0
-					for iggie = 1,string.len(revised_chunk), 1 do
-						if par_count_depth < 0 then
-							--user error SEND MESSAGE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						elseif string.sub(revised_chunk,iggie,iggie) == "(" then 
-							newcharreplace = "("
-							par_count_depth = par_count_depth + 1
-						elseif string.sub(revised_chunk,iggie,iggie) == ")" then 
-							newcharreplace = ")"
-							par_count_depth = par_count_depth - 1							
-						elseif string.sub(revised_chunk,iggie,iggie) == ";" and par_count_depth == 0 then 
-							newcharreplace = ","
-						else
-							newcharreplace = string.sub(revised_chunk,iggie,iggie)
-						end
-						revisedandcleaned = revisedandcleaned .. newcharreplace
-					end
-					table_of_div_chunks =  Split(revisedandcleaned, ",")
-					nextlayer_table[nextlayer_table_elem_count] = {true,new_multi,nextlayer_table_elem_count,{}}
-					for idc, vdc in pairs(table_of_div_chunks) do
-						nextlayer_table[nextlayer_table_elem_count][4][idc] = vdc
-					end
-					-- ALERT USER THAT INPUT IS MESSED UP
-				end
-			else
-				nextlayer_table_elem_count = nextlayer_table_elem_count + 1
-				new_multi = processmore_OM_table[i1][2]/divtotal
-				nextlayer_table[nextlayer_table_elem_count] = {false,new_multi,nextlayer_table_elem_count,{processmore_OM_table[i1][4][i2]}}
-			end	
-		end		
-		
-		
-		
-		
-	end		
---reaper.ShowConsoleMsg(nextlayer_table_elem_count .. ' - ' .. tostring(nextlayer_table[nextlayer_table_elem_count][4]) .. "\n")	
+  right_now_table = {}
+  if tablerecords[1] == false and tablerecords[2] == 0 then   -- NO MEASURE MARKER ONLY
+    -- COULD DO THE SECTION SWAPOUTS RIGHT HERE
+    nextlayer_table_elem_count = nextlayer_table_elem_count + 1
+    nextlayer_table[nextlayer_table_elem_count] = {processmore_OM_table[i1][1],processmore_OM_table[i1][2],nextlayer_table_elem_count,processmore_OM_table[i1][4]}
+  elseif tablerecords[1] == false and tablerecords[2] > 0 then  -- SINGLE CHORD
+    nextlayer_table_elem_count = nextlayer_table_elem_count + 1    
+    nextlayer_table[nextlayer_table_elem_count] = {processmore_OM_table[i1][1],processmore_OM_table[i1][2],nextlayer_table_elem_count,processmore_OM_table[i1][4]}
+  elseif tablerecords[1] == true then
+    divtotal = 0
+    for i2, chordchunk in pairs(tablerecords[4]) do      --  PROCESS EACH CHORD CHUNK
+      --reaper.ShowConsoleMsg("chunk: " .. chordchunk .." -- \n")    
+      start_pos_OM_par, _  = string.find(chordchunk, "%(")  -- LOOK IN THAT CHUNK FOR (
+      if start_pos_OM_par ~= nil and type(tonumber(string.sub(chordchunk,1,start_pos_OM_par - 1))) == "number" then
+        divmult =  tonumber(string.sub(chordchunk,1,start_pos_OM_par - 1))     --  FOUND ANOTHER DIGIT
+        --reaper.ShowConsoleMsg("start_pos_OM_par " .. start_pos_OM_par .." -- \n")   -- SHOW WHERE
+      elseif start_pos_OM_par ~= nil then              -- FOUND DIVISION MULTI THAT ISN'T A NUMBER
+        divmult = 1
+        local subdivOM = string.sub(chordchunk,1,subdiv_numlength)
+        --reaper.ShowConsoleMsg("USER ERROR DON'T PUT ANYTHING BUT NUMBERS " .. 'BY "("\n')
+      else
+        --reaper.ShowConsoleMsg("THERE WAS NO MULTI\n")
+        divmult = 1
+      end  
+      --reaper.ShowConsoleMsg("divmult = " .. divmult .. "\n")
+      divtotal = divtotal + divmult
+    end    
+    --reaper.ShowConsoleMsg("divtotal = " .. divtotal .. "\n")
+      for i2, chordchunk in pairs(tablerecords[4]) do      --  PROCESS EACH CHORD CHUNK  
+      start_pos_OM_par, _  = string.find(chordchunk, "%(")  -- LOOK IN THAT CHUNK FOR (
+      if start_pos_OM_par ~= nil and type(tonumber(string.sub(chordchunk,1,start_pos_OM_par - 1))) == "number" then
+        divmult =  tonumber(string.sub(chordchunk,1,start_pos_OM_par - 1))     --  FOUND ANOTHER DIGIT
+        nextlayer_table_elem_count = nextlayer_table_elem_count + 1
+        new_multi = (processmore_OM_table[i1][2]*divmult)/divtotal
+        revised_chunk = string.sub(chordchunk,start_pos_OM_par + 1,string.len(chordchunk)-1)
+        start_pos_OM_inwardpar, _  = string.find(revised_chunk, "%(")
+        start_pos_OM_inwardsep, _  = string.find(revised_chunk, ";")
+        if start_pos_OM_inwardpar == nil and start_pos_OM_inwardsep == nil then
+        nextlayer_table[nextlayer_table_elem_count] = {false,new_multi,nextlayer_table_elem_count,{revised_chunk}}        
+        else
+          OMfalsesofar = OMfalsesofar + 1
+          revisedandcleaned = ""
+          local par_count_depth = 0
+          for iggie = 1,string.len(revised_chunk), 1 do
+            if par_count_depth < 0 then
+              --user error SEND MESSAGE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            elseif string.sub(revised_chunk,iggie,iggie) == "(" then 
+              newcharreplace = "("
+              par_count_depth = par_count_depth + 1
+            elseif string.sub(revised_chunk,iggie,iggie) == ")" then 
+              newcharreplace = ")"
+              par_count_depth = par_count_depth - 1              
+            elseif string.sub(revised_chunk,iggie,iggie) == ";" and par_count_depth == 0 then 
+              newcharreplace = ","
+            else
+              newcharreplace = string.sub(revised_chunk,iggie,iggie)
+            end
+            revisedandcleaned = revisedandcleaned .. newcharreplace
+          end
+          table_of_div_chunks =  Split(revisedandcleaned, ",")
+          nextlayer_table[nextlayer_table_elem_count] = {true,new_multi,nextlayer_table_elem_count,{}}
+          for idc, vdc in pairs(table_of_div_chunks) do
+            nextlayer_table[nextlayer_table_elem_count][4][idc] = vdc
+          end
+        end  
+      elseif start_pos_OM_par ~= nil then              -- FOUND DIVISION MULTI THAT ISN'T A NUMBER
+        nextlayer_table_elem_count = nextlayer_table_elem_count + 1
+        new_multi = processmore_OM_table[i1][2]/divtotal
+        revised_chunk = string.sub(chordchunk,start_pos_OM_par + 1,string.len(chordchunk)-1)        
+        start_pos_OM_inwardpar, _  = string.find(revised_chunk, "%(")
+        start_pos_OM_inwardsep, _  = string.find(revised_chunk, ";")        
+        if start_pos_OM_inwardpar == nil and start_pos_OM_inwardsep == nil then        
+          nextlayer_table[nextlayer_table_elem_count] = {false,new_multi,nextlayer_table_elem_count,{revised_chunk}}
+        else
+          OMfalsesofar = OMfalsesofar + 1
+          revisedandcleaned = ""
+          local par_count_depth = 0
+          for iggie = 1,string.len(revised_chunk), 1 do
+            if par_count_depth < 0 then
+              --user error SEND MESSAGE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            elseif string.sub(revised_chunk,iggie,iggie) == "(" then 
+              newcharreplace = "("
+              par_count_depth = par_count_depth + 1
+            elseif string.sub(revised_chunk,iggie,iggie) == ")" then 
+              newcharreplace = ")"
+              par_count_depth = par_count_depth - 1              
+            elseif string.sub(revised_chunk,iggie,iggie) == ";" and par_count_depth == 0 then 
+              newcharreplace = ","
+            else
+              newcharreplace = string.sub(revised_chunk,iggie,iggie)
+            end
+            revisedandcleaned = revisedandcleaned .. newcharreplace
+          end
+          table_of_div_chunks =  Split(revisedandcleaned, ",")
+          nextlayer_table[nextlayer_table_elem_count] = {true,new_multi,nextlayer_table_elem_count,{}}
+          for idc, vdc in pairs(table_of_div_chunks) do
+            nextlayer_table[nextlayer_table_elem_count][4][idc] = vdc
+          end
+          -- ALERT USER THAT INPUT IS MESSED UP
+        end
+      else
+        nextlayer_table_elem_count = nextlayer_table_elem_count + 1
+        new_multi = processmore_OM_table[i1][2]/divtotal
+        nextlayer_table[nextlayer_table_elem_count] = {false,new_multi,nextlayer_table_elem_count,{processmore_OM_table[i1][4][i2]}}
+      end  
+    end    
+    
+    
+    
+    
+  end    
+--reaper.ShowConsoleMsg(nextlayer_table_elem_count .. ' - ' .. tostring(nextlayer_table[nextlayer_table_elem_count][4]) .. "\n")  
 end
 
 if OMfalsesofar > 0 then
 cyclecount = cyclecount + 1
 
-	--reaper.ShowConsoleMsg("-------CYCLE COUNT = ------" .. cyclecount ..  "-------PM------\n")
-	--table_printed_strings = Table_Print(processmore_OM_table)	
-	--reaper.ShowConsoleMsg(table_printed_strings)
-	--reaper.ShowConsoleMsg("---------------------------NL----------\n")	
-	--table_printed_strings = Table_Print(nextlayer_table)
-	--reaper.ShowConsoleMsg(table_printed_strings)	
+  --reaper.ShowConsoleMsg("-------CYCLE COUNT = ------" .. cyclecount ..  "-------PM------\n")
+  --table_printed_strings = Table_Print(processmore_OM_table)  
+  --reaper.ShowConsoleMsg(table_printed_strings)
+  --reaper.ShowConsoleMsg("---------------------------NL----------\n")  
+  --table_printed_strings = Table_Print(nextlayer_table)
+  --reaper.ShowConsoleMsg(table_printed_strings)  
 
 processmore_OM_table = {}
 processmore_OM_table = nextlayer_table
@@ -4019,45 +4486,45 @@ goto run_an_unfolding_cycle
 else
 
 
-	borrow_time = 0
-	
-	
+  borrow_time = 0
+  
+  
 
-	for ice = nextlayer_table_elem_count, 1, -1 do
-		if (nextlayer_table[ice][2] * 4) - borrow_time > 0 then
-			nextlayer_table[ice][2] = (nextlayer_table[ice][2] * 4) - borrow_time
-		else
-			-- message to user about problem
-		end
-		if string.sub(nextlayer_table[ice][4][1],1,1) == "~" and nextlayer_table_elem_count > 1 then
-			borrow_time = .5
-			nextlayer_table[ice][2] = nextlayer_table[ice][2] + borrow_time
-			nextlayer_table[ice][4][1] = string.sub(nextlayer_table[ice][4][1],2,string.len(nextlayer_table[ice][4][1]))
-		elseif string.sub(nextlayer_table[ice][4][1],1,1) == "<"  and nextlayer_table_elem_count > 1 then
-			borrow_time = .25
-			nextlayer_table[ice][2] = nextlayer_table[ice][2] + borrow_time
-			nextlayer_table[ice][4][1] = string.sub(nextlayer_table[ice][4][1],2,string.len(nextlayer_table[ice][4][1]))
-		elseif string.sub(nextlayer_table[ice][4][1],1,1) == "~" and nextlayer_table_elem_count == 1 then
-			-- message to user about problem
-		elseif string.sub(nextlayer_table[ice][4][1],1,1) == "<"  and nextlayer_table_elem_count == 1 then
-			-- message to user about problem		
-		else
-			borrow_time = 0		
-		end
-	end
+  for ice = nextlayer_table_elem_count, 1, -1 do
+    if (nextlayer_table[ice][2] * 4) - borrow_time > 0 then
+      nextlayer_table[ice][2] = (nextlayer_table[ice][2] * 4) - borrow_time
+    else
+      -- message to user about problem
+    end
+    if string.sub(nextlayer_table[ice][4][1],1,1) == "~" and nextlayer_table_elem_count > 1 then
+      borrow_time = .5
+      nextlayer_table[ice][2] = nextlayer_table[ice][2] + borrow_time
+      nextlayer_table[ice][4][1] = string.sub(nextlayer_table[ice][4][1],2,string.len(nextlayer_table[ice][4][1]))
+    elseif string.sub(nextlayer_table[ice][4][1],1,1) == "<"  and nextlayer_table_elem_count > 1 then
+      borrow_time = .25
+      nextlayer_table[ice][2] = nextlayer_table[ice][2] + borrow_time
+      nextlayer_table[ice][4][1] = string.sub(nextlayer_table[ice][4][1],2,string.len(nextlayer_table[ice][4][1]))
+    elseif string.sub(nextlayer_table[ice][4][1],1,1) == "~" and nextlayer_table_elem_count == 1 then
+      -- message to user about problem
+    elseif string.sub(nextlayer_table[ice][4][1],1,1) == "<"  and nextlayer_table_elem_count == 1 then
+      -- message to user about problem    
+    else
+      borrow_time = 0    
+    end
+  end
 
-	
+  
 cyclecount = cyclecount + 1
-	--reaper.ShowConsoleMsg("-----LAST CYCLE COUNT = ---" .. cyclecount ..  "------PM-------\n")
-	--table_printed_strings = Table_Print(processmore_OM_table)	
-	--reaper.ShowConsoleMsg(table_printed_strings)
-	--reaper.ShowConsoleMsg("-----------------------------NL--------\n")	
-	--table_printed_strings = Table_Print(nextlayer_table)
-	--reaper.ShowConsoleMsg(table_printed_strings)		
+  --reaper.ShowConsoleMsg("-----LAST CYCLE COUNT = ---" .. cyclecount ..  "------PM-------\n")
+  --table_printed_strings = Table_Print(processmore_OM_table)  
+  --reaper.ShowConsoleMsg(table_printed_strings)
+  --reaper.ShowConsoleMsg("-----------------------------NL--------\n")  
+  --table_printed_strings = Table_Print(nextlayer_table)
+  --reaper.ShowConsoleMsg(table_printed_strings)    
 
 
-	theresultofprocessOMbars = ""
-	OM_swaplist2 = {
+  theresultofprocessOMbars = ""
+  OM_swaplist2 = {
 {"%$r%$","rest"},
 {"{"," <"},
 {"}","> "},
@@ -4065,121 +4532,121 @@ cyclecount = cyclecount + 1
 {" <","<"}
 }
 
-		if musictheory.key_table[ckeyfound] ~= nil then
-		keyshifter_OM = musictheory.key_table[ckeyfound]
-		isitflat = musictheory.is_it_flat_table[ckeyfound]
-		--reaper.ShowConsoleMsg("Keyshift = " .. keyshifter_OM .. " Is flat is " .. tostring(isitflat) .. "\n")
-		
-		else 
-		-- message and cancel
-		--reaper.ShowConsoleMsg("was nil\n")
-		end
-	for iome = 1, nextlayer_table_elem_count, 1 do
-		the_itemOM = nextlayer_table[iome][4][1]
-		the_itemOM = Swapout(the_itemOM, OM_swaplist2)
-		if string.sub(the_itemOM,1,1) == "b" or string.sub(the_itemOM,1,1) == "#" then
-		da_root = string.sub(the_itemOM,1,2)
-		da_rest =  string.sub(the_itemOM,3,string.len(the_itemOM))
-		else
-		da_root = string.sub(the_itemOM,1,1)
-		da_rest =  string.sub(the_itemOM,2,string.len(the_itemOM))
-		end
-		
-		if musictheory.root_table[da_root] ~= nil then
-			combo_shift = musictheory.root_table[da_root] + keyshifter_OM
-			if combo_shift > 23 then
-				combo_shift = combo_shift - 24
-			elseif combo_shift > 11 then
-				combo_shift = combo_shift - 12
-			elseif combo_shift < 0 then
-				combo_shift = combo_shift + 12
-			else
-			end
-			if isitflat then
-				letter_r_root = musictheory.flats_table[combo_shift]
-			else
-				letter_r_root = musictheory.sharps_table[combo_shift]
-			end
-			
-			
-			
-			
-cob_start, cob_end  = string.find(da_rest, "/")		
+    if musictheory.key_table[ckeyfound] ~= nil then
+    keyshifter_OM = musictheory.key_table[ckeyfound]
+    isitflat = musictheory.is_it_flat_table[ckeyfound]
+    --reaper.ShowConsoleMsg("Keyshift = " .. keyshifter_OM .. " Is flat is " .. tostring(isitflat) .. "\n")
+    
+    else 
+    -- message and cancel
+    --reaper.ShowConsoleMsg("was nil\n")
+    end
+  for iome = 1, nextlayer_table_elem_count, 1 do
+    the_itemOM = nextlayer_table[iome][4][1]
+    the_itemOM = Swapout(the_itemOM, OM_swaplist2)
+    if string.sub(the_itemOM,1,1) == "b" or string.sub(the_itemOM,1,1) == "#" then
+    da_root = string.sub(the_itemOM,1,2)
+    da_rest =  string.sub(the_itemOM,3,string.len(the_itemOM))
+    else
+    da_root = string.sub(the_itemOM,1,1)
+    da_rest =  string.sub(the_itemOM,2,string.len(the_itemOM))
+    end
+    
+    if musictheory.root_table[da_root] ~= nil then
+      combo_shift = musictheory.root_table[da_root] + keyshifter_OM
+      if combo_shift > 23 then
+        combo_shift = combo_shift - 24
+      elseif combo_shift > 11 then
+        combo_shift = combo_shift - 12
+      elseif combo_shift < 0 then
+        combo_shift = combo_shift + 12
+      else
+      end
+      if isitflat then
+        letter_r_root = musictheory.flats_table[combo_shift]
+      else
+        letter_r_root = musictheory.sharps_table[combo_shift]
+      end
+      
+      
+      
+      
+cob_start, cob_end  = string.find(da_rest, "/")    
 if cob_start ~= nil then
 da_bass = string.sub(da_rest, cob_start + 1, string.len(da_rest))
 
 
-		if string.sub(da_bass,1,1) == "b" then
-		da_real_bass = string.sub(da_bass,1,2)
-		da_pre_bass =  string.sub(da_rest,1,cob_start)
-			--reaper.ShowConsoleMsg("flat = " .. da_real_bass .. "\n")
-		elseif string.sub(da_bass,1,1) == "#" then
-		da_real_bass = string.sub(da_bass,1,2)
-		da_pre_bass =  string.sub(da_rest,1,cob_start)		
-		--reaper.ShowConsoleMsg("sharp = " .. da_real_bass .. "\n")
-		else
-		da_real_bass = string.sub(da_bass,1,1)
-		da_pre_bass =  string.sub(da_rest,1,cob_start)
-		end
-		
-		if musictheory.root_table[da_real_bass] ~= nil then
-			combo_shift = musictheory.root_table[da_real_bass] + keyshifter_OM
-			if combo_shift > 23 then
-				combo_shift = combo_shift - 24
-			elseif combo_shift > 11 then
-				combo_shift = combo_shift - 12
-			elseif combo_shift < 0 then
-				combo_shift = combo_shift + 12
-			else
-			end
-			if isitflat then
-				letter_bass = musictheory.flats_table[combo_shift]
-			else
-				letter_bass = musictheory.sharps_table[combo_shift]
-			end
-		
-	
-			the_itemOM = letter_r_root .. da_pre_bass .. letter_bass
+    if string.sub(da_bass,1,1) == "b" then
+    da_real_bass = string.sub(da_bass,1,2)
+    da_pre_bass =  string.sub(da_rest,1,cob_start)
+      --reaper.ShowConsoleMsg("flat = " .. da_real_bass .. "\n")
+    elseif string.sub(da_bass,1,1) == "#" then
+    da_real_bass = string.sub(da_bass,1,2)
+    da_pre_bass =  string.sub(da_rest,1,cob_start)    
+    --reaper.ShowConsoleMsg("sharp = " .. da_real_bass .. "\n")
+    else
+    da_real_bass = string.sub(da_bass,1,1)
+    da_pre_bass =  string.sub(da_rest,1,cob_start)
+    end
+    
+    if musictheory.root_table[da_real_bass] ~= nil then
+      combo_shift = musictheory.root_table[da_real_bass] + keyshifter_OM
+      if combo_shift > 23 then
+        combo_shift = combo_shift - 24
+      elseif combo_shift > 11 then
+        combo_shift = combo_shift - 12
+      elseif combo_shift < 0 then
+        combo_shift = combo_shift + 12
+      else
+      end
+      if isitflat then
+        letter_bass = musictheory.flats_table[combo_shift]
+      else
+        letter_bass = musictheory.sharps_table[combo_shift]
+      end
+    
+  
+      the_itemOM = letter_r_root .. da_pre_bass .. letter_bass
 
-		end
+    end
 
 
 
 
 
 else
-			the_itemOM = letter_r_root .. da_rest
+      the_itemOM = letter_r_root .. da_rest
 end
 
-			
-			
-			
-			
-			
+      
+      
+      
+      
+      
 
-			
-		else
-		-- warn missing root
-		end
-		
-		if nextlayer_table[iome][2] > 0 then
-		fraction = Provide_Fraction(nextlayer_table[iome][2],1)
-			added_element = " " .. tostring(fraction).. the_itemOM
-		else
-			added_element = " " .. the_itemOM
-		end
-	
-	
+      
+    else
+    -- warn missing root
+    end
+    
+    if nextlayer_table[iome][2] > 0 then
+    fraction = Provide_Fraction(nextlayer_table[iome][2],1)
+      added_element = " " .. tostring(fraction).. the_itemOM
+    else
+      added_element = " " .. the_itemOM
+    end
+  
+  
 
-	
-	
-	--reaper.ShowConsoleMsg(added_element .. "\n")
-	theresultofprocessOMbars = theresultofprocessOMbars .. added_element
-	end
+  
+  
+  --reaper.ShowConsoleMsg(added_element .. "\n")
+  theresultofprocessOMbars = theresultofprocessOMbars .. added_element
+  end
 
-	end	
-	theresultofprocessOMbars =  cbpmfound .. "BPM " .. 	theresultofprocessOMbars 
-	
+  end  
+  theresultofprocessOMbars =  cbpmfound .. "BPM " ..   theresultofprocessOMbars 
+  
 return theresultofprocessOMbars
 
 end
@@ -4199,7 +4666,7 @@ ccc_ex_warning = ""
 ccc_export_area = ""
 reaper.PreventUIRefresh(1)
 the_last_ccc_bar_content = "" -- CLEAR OUT THE OLD AND SET UP THE SHELL FOR THE NEW DATA
-_, ctitle_startso  = string.find(header_area, "Title: ")			-- GET THE PROJECT SETTINGS AND PLACE IN THE SHELL
+_, ctitle_startso  = string.find(header_area, "Title: ")      -- GET THE PROJECT SETTINGS AND PLACE IN THE SHELL
 ctitle_endso, _  = string.find(header_area, "Writer:")
 _, cwriter_startso  = string.find(header_area, "Writer: ")
 cwriter_endso, _  = string.find(header_area, "BPM:")
@@ -4864,18 +5331,18 @@ function process_ccc_bars()
 thefail = ""
     chord_charting_area = inital_swaps(chord_charting_area)
     unfolded_ccc_data, error_zone = form.process_the_form(header_area, chord_charting_area) 
-														-- FORM		 DEAL WITH UNFOLDING THE FORM
+                            -- FORM     DEAL WITH UNFOLDING THE FORM
 unfolded_ccc_data = string.gsub(unfolded_ccc_data, "{", "=")
-	
+  
 unfolded_ccc_data = string.gsub(unfolded_ccc_data, "$}", "|")
 unfolded_ccc_data = string.gsub(unfolded_ccc_data, "%$", "")
 --unfolded_ccc_data = string.gsub(unfolded_ccc_data, "%%", "!Repeat!")
-													   -- CODE THE SIMPLEST AS A OR B SECTIONS DELETE THE REST
-												
+                             -- CODE THE SIMPLEST AS A OR B SECTIONS DELETE THE REST
+                        
 --reaper.ShowConsoleMsg(unfolded_ccc_data.. "\n")
 
-												
-::striplabels::																-- REMOVE THE SECTION LABELS
+                        
+::striplabels::                                -- REMOVE THE SECTION LABELS
 local in_num = string.len(unfolded_ccc_data)
 section_start, _  = string.find(unfolded_ccc_data, "=")
 _, section_end  = string.find(unfolded_ccc_data, "|")
@@ -4889,26 +5356,26 @@ if in_num ~= string.len(unfolded_ccc_data) then
 goto striplabels
 end
 
-																-- CONVERT RETURNS TO SPACES
-																
-		
+                                -- CONVERT RETURNS TO SPACES
+                                
+    
 
 
 
-::flaten::																	-- CONVERT RETURNS TO SPACES
+::flaten::                                  -- CONVERT RETURNS TO SPACES
 in_num = string.len(unfolded_ccc_data)
 unfolded_ccc_data = string.gsub(unfolded_ccc_data, "\n" , " ")
 if in_num ~= string.len(unfolded_ccc_data) then
 goto flaten
 end
 
-::detab::																	-- CONVERT TABS TO SPACES
+::detab::                                  -- CONVERT TABS TO SPACES
 in_num = string.len(unfolded_ccc_data)
 unfolded_ccc_data = string.gsub(unfolded_ccc_data, "\t" , " ")
 if in_num ~= string.len(unfolded_ccc_data) then
 goto detab
 end
-																			-- TRIM DOWN TO SINGLE SPACES
+                                      -- TRIM DOWN TO SINGLE SPACES
 ::trimwhitespace::
 in_num = string.len(unfolded_ccc_data)
 unfolded_ccc_data = string.gsub(unfolded_ccc_data, "  " , " ")
@@ -4916,35 +5383,35 @@ if in_num ~= string.len(unfolded_ccc_data) then
 goto trimwhitespace
 end
 
-::reducecr::																-- ?? TRIM BACK RETURNS (didn't I do this)
+::reducecr::                                -- ?? TRIM BACK RETURNS (didn't I do this)
 in_num = string.len(unfolded_ccc_data)
 unfolded_ccc_data = string.gsub(unfolded_ccc_data, "\n\n" , "\n")
 if in_num ~= string.len(unfolded_ccc_data) then
 goto reducecr
 end
 
-::fluffen::																	-- SEPARATE BRACED MEASURES BY A SPACE
+::fluffen::                                  -- SEPARATE BRACED MEASURES BY A SPACE
 in_num = string.len(unfolded_ccc_data)
 unfolded_ccc_data = string.gsub(unfolded_ccc_data, "%]%[" , "] [")
 if in_num ~= string.len(unfolded_ccc_data) then
 goto fluffen
 end
 
-::squish1::																	-- TRIM OUT SPACES FROM INSIDE IN BRACES
+::squish1::                                  -- TRIM OUT SPACES FROM INSIDE IN BRACES
 in_num = string.len(unfolded_ccc_data)
 unfolded_ccc_data = string.gsub(unfolded_ccc_data, "%[ " , "[")
 if in_num ~= string.len(unfolded_ccc_data) then
 goto squish1
 end
-																			
-::squish2::																	-- TRIM OUT SPACES FROM INSIDE OUT BRACES
+                                      
+::squish2::                                  -- TRIM OUT SPACES FROM INSIDE OUT BRACES
 in_num = string.len(unfolded_ccc_data)
 unfolded_ccc_data = string.gsub(unfolded_ccc_data, " %]" , "]")
 if in_num ~= string.len(unfolded_ccc_data) then
 goto squish2
 end
 
-::derestrest::																	-- CONVERT ALL REST TO Chordsheet REST 1.
+::derestrest::                                  -- CONVERT ALL REST TO Chordsheet REST 1.
 in_num = string.len(unfolded_ccc_data)
 unfolded_ccc_data = string.gsub(unfolded_ccc_data, " %- " , " rr ")
 unfolded_ccc_data = string.gsub(unfolded_ccc_data, " R " , " rr ")
@@ -4953,316 +5420,316 @@ goto derestrest
 end
 
 
-	::derest::																	-- CONVERT ALL REST TO Chordsheet REST 1.
+  ::derest::                                  -- CONVERT ALL REST TO Chordsheet REST 1.
 in_num = string.len(unfolded_ccc_data)
 unfolded_ccc_data = string.gsub(unfolded_ccc_data, " rr " , " r ")
 if in_num ~= string.len(unfolded_ccc_data) then
 goto derest
 end
 
-		
+    
 
 
 
 
 
 
-local inmeasurenow = false		-- !!!!!!!!!!!!!!!!   GET THE DATA READY TO BE PUT INTO TABLES ONE CHAR AT A TIME  !!!!!!
+local inmeasurenow = false    -- !!!!!!!!!!!!!!!!   GET THE DATA READY TO BE PUT INTO TABLES ONE CHAR AT A TIME  !!!!!!
 measurechord_count = 0
 rebuild = ""
 for i = 1,string.len(unfolded_ccc_data) do
-	if string.sub(unfolded_ccc_data,i,i) == "=" then
-		rebuild = rebuild .. string.sub(unfolded_ccc_data,i,i)			-- REBUILD WITH SECTION SWAP AS IS
-		inmeasurenow = false
-	elseif string.sub(unfolded_ccc_data,i,i) == "[" and inmeasurenow == false then
-		inmeasurenow = true
-		rebuild = rebuild .. string.sub(unfolded_ccc_data,i,i)			-- REBUILD WITH IN BRACE AS IS (UNLESS...)
-	elseif string.sub(unfolded_ccc_data,i,i) == "]" and inmeasurenow == true then
-		inmeasurenow = false
-		rebuild = rebuild .. string.sub(unfolded_ccc_data,i,i)			-- REBUILD WITH OUT BRACE AS IS (UNLESS...)
-	elseif string.sub(unfolded_ccc_data,i,i) == "]" and inmeasurenow == false then  -- WARN WHEN THERE IS A [[ USER ERROR
-		thefail = thefail .. 'Incident of mismatched braces.  Make sure to use "[" and "]" in pairs.\n'
-	elseif string.sub(unfolded_ccc_data,i,i) == "[" and inmeasurenow == true then	 -- WARN WHEN THERE IS A ]] USER ERROR
-		thefail = thefail .. 'Incident of mismatched braces.  Make sure to use "[" and "]" in pairs.\n'
-	elseif string.sub(unfolded_ccc_data,i,i) == " " and inmeasurenow == false then
-		rebuild = rebuild .. ","													-- CHANGE MEASURE SEPARATORS TO COMMA
-	elseif string.sub(unfolded_ccc_data,i,i) == " " and inmeasurenow == true then
-		rebuild = rebuild .. ":"													-- CHANGE IN MEASURE SEPS TO COLON
-	else
-		rebuild = rebuild .. string.sub(unfolded_ccc_data,i,i)						-- PASS EVERYTHING ELSE AS IS
-	end
+  if string.sub(unfolded_ccc_data,i,i) == "=" then
+    rebuild = rebuild .. string.sub(unfolded_ccc_data,i,i)      -- REBUILD WITH SECTION SWAP AS IS
+    inmeasurenow = false
+  elseif string.sub(unfolded_ccc_data,i,i) == "[" and inmeasurenow == false then
+    inmeasurenow = true
+    rebuild = rebuild .. string.sub(unfolded_ccc_data,i,i)      -- REBUILD WITH IN BRACE AS IS (UNLESS...)
+  elseif string.sub(unfolded_ccc_data,i,i) == "]" and inmeasurenow == true then
+    inmeasurenow = false
+    rebuild = rebuild .. string.sub(unfolded_ccc_data,i,i)      -- REBUILD WITH OUT BRACE AS IS (UNLESS...)
+  elseif string.sub(unfolded_ccc_data,i,i) == "]" and inmeasurenow == false then  -- WARN WHEN THERE IS A [[ USER ERROR
+    thefail = thefail .. 'Incident of mismatched braces.  Make sure to use "[" and "]" in pairs.\n'
+  elseif string.sub(unfolded_ccc_data,i,i) == "[" and inmeasurenow == true then   -- WARN WHEN THERE IS A ]] USER ERROR
+    thefail = thefail .. 'Incident of mismatched braces.  Make sure to use "[" and "]" in pairs.\n'
+  elseif string.sub(unfolded_ccc_data,i,i) == " " and inmeasurenow == false then
+    rebuild = rebuild .. ","                          -- CHANGE MEASURE SEPARATORS TO COMMA
+  elseif string.sub(unfolded_ccc_data,i,i) == " " and inmeasurenow == true then
+    rebuild = rebuild .. ":"                          -- CHANGE IN MEASURE SEPS TO COLON
+  else
+    rebuild = rebuild .. string.sub(unfolded_ccc_data,i,i)            -- PASS EVERYTHING ELSE AS IS
+  end
 end
-ccc_main_bars_table = Split(rebuild, ",")											-- PUT THE DATA INTO TABLE
+ccc_main_bars_table = Split(rebuild, ",")                      -- PUT THE DATA INTO TABLE
 
 
 
 
 
 
-local warned = false																		-- PREPING VARIABLES
+local warned = false                                    -- PREPING VARIABLES
 local rewarned = false
 local newtablevalue = ""
 local processmore_table = {}
 local ccc_post_table_chord_data = ""
 
 
-for ib,vb in pairs(ccc_main_bars_table) do		--  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    DETERMINE IF MULTIBAR !!!!!!!!!!
-	if string.find(vb, "%[") then
-		processmore_table[ib] = {true,1}											-- TAG AS MULTIBAR IN this TABLE
-	elseif string.find(vb, "=") then
-		processmore_table[ib] = {false,0}											-- A) SECTION HEADER - NOT A MEASURE
-	else
-		processmore_table[ib] = {false,1}											-- TAG AS A SINGLE BAR
-	end
-		--reaper.ShowConsoleMsg(tostring(processmore_table[ib][1]).."\n")
+for ib,vb in pairs(ccc_main_bars_table) do    --  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    DETERMINE IF MULTIBAR !!!!!!!!!!
+  if string.find(vb, "%[") then
+    processmore_table[ib] = {true,1}                      -- TAG AS MULTIBAR IN this TABLE
+  elseif string.find(vb, "=") then
+    processmore_table[ib] = {false,0}                      -- A) SECTION HEADER - NOT A MEASURE
+  else
+    processmore_table[ib] = {false,1}                      -- TAG AS A SINGLE BAR
+  end
+    --reaper.ShowConsoleMsg(tostring(processmore_table[ib][1]).."\n")
 end
 
 
 
-for ipm,vpm in pairs(processmore_table) do		-- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!    DEAL WITH ALL THE MULTIBARS     !!!!!!!
+for ipm,vpm in pairs(processmore_table) do    -- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!    DEAL WITH ALL THE MULTIBARS     !!!!!!!
 barmultiplier = 0
-	if processmore_table[ipm][1] then
-		if string.sub(ccc_main_bars_table[ipm],1,1) ~= "[" then				-- 	CHECK TO SEE IF MULTIBAR
-			if string.find(ccc_main_bars_table[ipm],":") then
-				startsbrace,endbrace = string.find(ccc_main_bars_table[ipm],"%[",1)
-				--reaper.ShowConsoleMsg(startsbrace.."\n")
-				barmultiplier = tonumber(string.sub(ccc_main_bars_table[ipm],1,startsbrace-1))
-				if barmultiplier ~= nil and barmultiplier ~= 1 then				-- MULTIBAR WITH MULTI CHORDS = BAD
-					if warned == false then
-						ccc_ex_warning = ccc_ex_warning .. '- Multibars with more than one chord are not supported in Chordsheet.com export\nbecause they easily result in rhythms Chordsheet.com can not accept as input.\nThese measures have been rendered as "NC" which will help you find \nand adjust them.\n\n'
-						warned = true
-					end
-					newtablevalue = "NC "
-					for count = 1,barmultiplier-1,1 do
-						newtablevalue = newtablevalue .. "NC "
-					end
-					processmore_table[ipm][1] = false
-					processmore_table[ipm][2] = barmultiplier
-					
-				elseif barmultiplier ~= nil and barmultiplier == 1 then	
-					newtablevalue = string.sub(ccc_main_bars_table[ipm],startsbrace, string.len(ccc_main_bars_table[ipm]))
+  if processmore_table[ipm][1] then
+    if string.sub(ccc_main_bars_table[ipm],1,1) ~= "[" then        --   CHECK TO SEE IF MULTIBAR
+      if string.find(ccc_main_bars_table[ipm],":") then
+        startsbrace,endbrace = string.find(ccc_main_bars_table[ipm],"%[",1)
+        --reaper.ShowConsoleMsg(startsbrace.."\n")
+        barmultiplier = tonumber(string.sub(ccc_main_bars_table[ipm],1,startsbrace-1))
+        if barmultiplier ~= nil and barmultiplier ~= 1 then        -- MULTIBAR WITH MULTI CHORDS = BAD
+          if warned == false then
+            ccc_ex_warning = ccc_ex_warning .. '- Multibars with more than one chord are not supported in Chordsheet.com export\nbecause they easily result in rhythms Chordsheet.com can not accept as input.\nThese measures have been rendered as "NC" which will help you find \nand adjust them.\n\n'
+            warned = true
+          end
+          newtablevalue = "NC "
+          for count = 1,barmultiplier-1,1 do
+            newtablevalue = newtablevalue .. "NC "
+          end
+          processmore_table[ipm][1] = false
+          processmore_table[ipm][2] = barmultiplier
+          
+        elseif barmultiplier ~= nil and barmultiplier == 1 then  
+          newtablevalue = string.sub(ccc_main_bars_table[ipm],startsbrace, string.len(ccc_main_bars_table[ipm]))
 
-					processmore_table[ipm][1] = true
-					processmore_table[ipm][2] = 0				
+          processmore_table[ipm][1] = true
+          processmore_table[ipm][2] = 0        
 
-				else												-- LIKELY USER SCREW UP NON NUMBER MULTIBAR ie G[2m 5]
-					ccc_ex_warning = ccc_ex_warning .. '- Looks like your chord entry has formatting error.\nIt has been rendered as "NC" so you can find and manually adjust the error.'
-					newtablevalue = "NC "
-					processmore_table[ipm][1] = false
-					processmore_table[ipm][2] = 1
-				end
-				
-			else																-- ONLY ONE INTERNAL CHORD ALL GOOD
-				startsbrace,endbrace = string.find(ccc_main_bars_table[ipm],"%[",1)
-				--reaper.ShowConsoleMsg(startsbrace.."\n")
-				barmultiplier = tonumber(string.sub(ccc_main_bars_table[ipm],1,startsbrace-1))
-				if barmultiplier ~= nil then   ---!!!!!!!!!!!!!!!!!!! THIS WORKS BUT SHOULDN'T !!! WHY ???????????
-					newtablevalue_part = string.sub(ccc_main_bars_table[ipm],startsbrace+1, string.len(ccc_main_bars_table[ipm])-1)
-					for count = 1,barmultiplier,1 do
-						newtablevalue = newtablevalue .. " " .. newtablevalue_part .. " "
-					end
-					processmore_table[ipm][2] = barmultiplier				
-				else								-- LIKELY USER ERROR - ONLY 1 INTERNAL CHORD, BUT BAD MULTI ie G[4]
-					ccc_ex_warning = ccc_ex_warning .. '- Looks like your chord entry has formatting error.\nIt has been rendered as ' .. string.sub(ccc_main_bars_table[ipm],startsbrace+1,string.len(ccc_main_bars_table[ipm])-1) .. ' so you can find and manually adjust the error.\n'
-					newtablevalue = string.sub(ccc_main_bars_table[ipm],startsbrace+1,string.len(ccc_main_bars_table[ipm])-1)
-					processmore_table[ipm][1] = false
-					processmore_table[ipm][2] = 1
-				end
-			end
-			ccc_main_bars_table[ipm] = newtablevalue
-		end
-	--reaper.ShowConsoleMsg(tostring(processmore_table[ib][1]).."\n")
-	end
+        else                        -- LIKELY USER SCREW UP NON NUMBER MULTIBAR ie G[2m 5]
+          ccc_ex_warning = ccc_ex_warning .. '- Looks like your chord entry has formatting error.\nIt has been rendered as "NC" so you can find and manually adjust the error.'
+          newtablevalue = "NC "
+          processmore_table[ipm][1] = false
+          processmore_table[ipm][2] = 1
+        end
+        
+      else                                -- ONLY ONE INTERNAL CHORD ALL GOOD
+        startsbrace,endbrace = string.find(ccc_main_bars_table[ipm],"%[",1)
+        --reaper.ShowConsoleMsg(startsbrace.."\n")
+        barmultiplier = tonumber(string.sub(ccc_main_bars_table[ipm],1,startsbrace-1))
+        if barmultiplier ~= nil then   ---!!!!!!!!!!!!!!!!!!! THIS WORKS BUT SHOULDN'T !!! WHY ???????????
+          newtablevalue_part = string.sub(ccc_main_bars_table[ipm],startsbrace+1, string.len(ccc_main_bars_table[ipm])-1)
+          for count = 1,barmultiplier,1 do
+            newtablevalue = newtablevalue .. " " .. newtablevalue_part .. " "
+          end
+          processmore_table[ipm][2] = barmultiplier        
+        else                -- LIKELY USER ERROR - ONLY 1 INTERNAL CHORD, BUT BAD MULTI ie G[4]
+          ccc_ex_warning = ccc_ex_warning .. '- Looks like your chord entry has formatting error.\nIt has been rendered as ' .. string.sub(ccc_main_bars_table[ipm],startsbrace+1,string.len(ccc_main_bars_table[ipm])-1) .. ' so you can find and manually adjust the error.\n'
+          newtablevalue = string.sub(ccc_main_bars_table[ipm],startsbrace+1,string.len(ccc_main_bars_table[ipm])-1)
+          processmore_table[ipm][1] = false
+          processmore_table[ipm][2] = 1
+        end
+      end
+      ccc_main_bars_table[ipm] = newtablevalue
+    end
+  --reaper.ShowConsoleMsg(tostring(processmore_table[ib][1]).."\n")
+  end
 end
-ccc_measurecount_total = 0						-- LABEL ALL THE MEASURES ACCORDING TO THEIR MEASURE NUMBER 
+ccc_measurecount_total = 0            -- LABEL ALL THE MEASURES ACCORDING TO THEIR MEASURE NUMBER 
 for i,v in pairs(processmore_table) do
-	ccc_measurecount_total = ccc_measurecount_total + processmore_table[i][2]
-	processmore_table[i][3] = ccc_measurecount_total
+  ccc_measurecount_total = ccc_measurecount_total + processmore_table[i][2]
+  processmore_table[i][3] = ccc_measurecount_total
 end
 
 
 
 
-in_item_table = {}					--  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DEAL WITH BRACED MEASURE INTERNALS
+in_item_table = {}          --  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DEAL WITH BRACED MEASURE INTERNALS
 for i,v in pairs(processmore_table) do
-	if processmore_table[i][1] then
-		inmeasure_table = Split(string.sub(ccc_main_bars_table[i],2,string.len(ccc_main_bars_table[i])-1), ":")
-		--reaper.ShowConsoleMsg(string.sub(ccc_main_bars_table[i],2,string.len(ccc_main_bars_table[i])-1) .. "\n")
-		buileroo = ""
-		split_mult_total = 0
-		chord_count_total = 0
-			in_item_table = {}		
-		for ibt,vbt in pairs(inmeasure_table) do
-			chord_count_total = chord_count_total + 1		
+  if processmore_table[i][1] then
+    inmeasure_table = Split(string.sub(ccc_main_bars_table[i],2,string.len(ccc_main_bars_table[i])-1), ":")
+    --reaper.ShowConsoleMsg(string.sub(ccc_main_bars_table[i],2,string.len(ccc_main_bars_table[i])-1) .. "\n")
+    buileroo = ""
+    split_mult_total = 0
+    chord_count_total = 0
+      in_item_table = {}    
+    for ibt,vbt in pairs(inmeasure_table) do
+      chord_count_total = chord_count_total + 1    
 
-		
-			item_split_starter,item_split_ender = string.find(vbt, "%(",1)	
-			if item_split_starter ~= nil then
-				--reaper.ShowConsoleMsg("found it\n")
-				split_mult = tonumber(string.sub(vbt,1,item_split_starter-1))
-				split_mult_total = split_mult_total + split_mult
-				in_item_table[ibt] = {split_mult, string.sub(vbt,item_split_starter + 1,string.len(vbt) - 1)}
-				--reaper.ShowConsoleMsg("splitmult = ".. split_mult .. " SplitMult Total = " .. split_mult_total .. " Cell: " .. in_item_table[ibt][2] .. "\n")				
-			else
-				--reaper.ShowConsoleMsg("nope\n")	
-				split_mult = 1				
-				split_mult_total = split_mult_total + split_mult
-				--reaper.ShowConsoleMsg("splitmult = ".. split_mult .. " SplitMult Total = " .. split_mult_total .. ' string = ' .. string.sub(vbt,1,string.len(vbt)) .. "\n")
-				in_item_table[ibt] = {1,vbt}
-				--reaper.ShowConsoleMsg("splitmult = ".. split_mult .. " SplitMult Total = " .. split_mult_total .. " Cell: " .. in_item_table[ibt][2] .. "\n")		
-			end
-		end
+    
+      item_split_starter,item_split_ender = string.find(vbt, "%(",1)  
+      if item_split_starter ~= nil then
+        --reaper.ShowConsoleMsg("found it\n")
+        split_mult = tonumber(string.sub(vbt,1,item_split_starter-1))
+        split_mult_total = split_mult_total + split_mult
+        in_item_table[ibt] = {split_mult, string.sub(vbt,item_split_starter + 1,string.len(vbt) - 1)}
+        --reaper.ShowConsoleMsg("splitmult = ".. split_mult .. " SplitMult Total = " .. split_mult_total .. " Cell: " .. in_item_table[ibt][2] .. "\n")        
+      else
+        --reaper.ShowConsoleMsg("nope\n")  
+        split_mult = 1        
+        split_mult_total = split_mult_total + split_mult
+        --reaper.ShowConsoleMsg("splitmult = ".. split_mult .. " SplitMult Total = " .. split_mult_total .. ' string = ' .. string.sub(vbt,1,string.len(vbt)) .. "\n")
+        in_item_table[ibt] = {1,vbt}
+        --reaper.ShowConsoleMsg("splitmult = ".. split_mult .. " SplitMult Total = " .. split_mult_total .. " Cell: " .. in_item_table[ibt][2] .. "\n")    
+      end
+    end
 ----------------------------------------------------------------------------------------
-		
-		for ig,vg in pairs(in_item_table) do
-			addstart = 1
-			if string.sub(vg[2],1,1) == " " then
-				addstart = 2
-			else
-			end
-			if string.sub(vg[2],addstart,addstart) == "^" then
-				if string.sub(vg[2],addstart + 1 ,addstart + 1) == "^" then
-					addstart = addstart + 2
-				else
-					addstart = addstart + 1
-				end
-			else
-			end
-			if string.sub(vg[2],addstart,addstart) == "b" or string.sub(vg[2],addstart,addstart) == "#" then
-				addstart = addstart + 2
-			else
-				addstart = addstart + 1
-			end
-			endtype,_ = string.find(vg[2], "/")
-			if endtype ~= nil then endtype = endtype - 1 end
-			if endtype == nil then endtype,_ = string.find(string.sub(vg[2],2,string.len(vg[2]))," ") end
-			if endtype == nil then endtype = string.len(vg[2]) end
-				replacetype = string.sub(vg[2],addstart, endtype)
-				--reaper.ShowConsoleMsg(replacetype .. "\n")
-			if musictheory.to_ccc_translation[replacetype] ~= nil then
-				in_item_table[ig][2] = string.sub(vg[2],1,addstart-1) .. musictheory.to_ccc_translation[replacetype] .. string.sub(vg[2],endtype + 1, string.len(vg[2]))
-			end
-		end
-		
-		
-		
-		
-		
-----------------------------------------------------------------------------------------		
-		if chord_count_total == 1 then
-			buileroo = in_item_table[1][2] .. " "
-		elseif chord_count_total == 2 and in_item_table[1][1] == in_item_table[2][1] then
-			buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. " "
-		elseif chord_count_total == 2 and tonumber(in_item_table[1][1]) == 3 and tonumber(in_item_table[2][1]) == 1 then
-			buileroo = in_item_table[1][2] .. "_/_/_" .. in_item_table[2][2] .. " "
-		elseif chord_count_total == 2 and tonumber(in_item_table[1][1]) == 1 and tonumber(in_item_table[2][1]) == 3 then
-			buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. "_/_/ "
-		elseif chord_count_total == 2 and in_item_table[1][1] > in_item_table[2][1] then
-			ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. ccc_main_bars_table[i] .. ' may have been simplified.\n'
-			buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. " "
-		elseif chord_count_total == 2 and in_item_table[1][1] < in_item_table[2][1] then
-			ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. ccc_main_bars_table[i] .. ' may have been simplified.\n'
-			buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. " "			
-		elseif chord_count_total == 3 and tonumber(in_item_table[1][1]) == 2 and tonumber(in_item_table[2][1]) == 1 and tonumber(in_item_table[3][1]) == 1 then
-			buileroo = in_item_table[1][2] .. "_/_" .. in_item_table[2][2] .. "_" .. in_item_table[3][2] .. " "
-		elseif chord_count_total == 3 and tonumber(in_item_table[1][1]) == 1 and tonumber(in_item_table[2][1]) == 1 and tonumber(in_item_table[3][1]) == 2 then
-			buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. "_" .. in_item_table[3][2] .. "_/ "
-		elseif chord_count_total == 3 and tonumber(in_item_table[1][1]) == 1 and tonumber(in_item_table[2][1]) == 2 and tonumber(in_item_table[3][1]) == 1 then
-			buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. "_/_" .. in_item_table[3][2] .. " "
-		elseif chord_count_total == 3 and tonumber(in_item_table[1][1]) > tonumber(in_item_table[2][1]) and tonumber(in_item_table[1][1]) > tonumber(in_item_table[3][1]) then
-			buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. "_" .. in_item_table[3][2] .. " "
-			ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. ccc_main_bars_table[i] .. ' may have been simplified.\n'			
-		elseif chord_count_total == 3 and tonumber(in_item_table[3][1]) > tonumber(in_item_table[1][1]) and tonumber(in_item_table[3][1]) > tonumber(in_item_table[2][1]) then
-			buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. "_" .. in_item_table[3][2] .. " "
-			ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. ccc_main_bars_table[i] .. ' may have been simplified.\n'			
-		elseif chord_count_total == 3 and tonumber(in_item_table[2][1]) > tonumber(in_item_table[1][1]) and tonumber(in_item_table[2][1]) > tonumber(in_item_table[3][1]) then
-			ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. ccc_main_bars_table[i] .. ' may have been simplified.\n'		
-			buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. "_" .. in_item_table[3][2] .. " "
-			
-		elseif chord_count_total == 4 and tonumber(in_item_table[1][1]) == tonumber(in_item_table[2][1]) and  tonumber(in_item_table[1][1]) == tonumber(in_item_table[3][1]) and tonumber(in_item_table[1][1]) == tonumber(in_item_table[4][1]) then
-			buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. "_" .. in_item_table[3][2] .. "_" .. in_item_table[4][2] .. " "
+    
+    for ig,vg in pairs(in_item_table) do
+      addstart = 1
+      if string.sub(vg[2],1,1) == " " then
+        addstart = 2
+      else
+      end
+      if string.sub(vg[2],addstart,addstart) == "^" then
+        if string.sub(vg[2],addstart + 1 ,addstart + 1) == "^" then
+          addstart = addstart + 2
+        else
+          addstart = addstart + 1
+        end
+      else
+      end
+      if string.sub(vg[2],addstart,addstart) == "b" or string.sub(vg[2],addstart,addstart) == "#" then
+        addstart = addstart + 2
+      else
+        addstart = addstart + 1
+      end
+      endtype,_ = string.find(vg[2], "/")
+      if endtype ~= nil then endtype = endtype - 1 end
+      if endtype == nil then endtype,_ = string.find(string.sub(vg[2],2,string.len(vg[2]))," ") end
+      if endtype == nil then endtype = string.len(vg[2]) end
+        replacetype = string.sub(vg[2],addstart, endtype)
+        --reaper.ShowConsoleMsg(replacetype .. "\n")
+      if musictheory.to_ccc_translation[replacetype] ~= nil then
+        in_item_table[ig][2] = string.sub(vg[2],1,addstart-1) .. musictheory.to_ccc_translation[replacetype] .. string.sub(vg[2],endtype + 1, string.len(vg[2]))
+      end
+    end
+    
+    
+    
+    
+    
+----------------------------------------------------------------------------------------    
+    if chord_count_total == 1 then
+      buileroo = in_item_table[1][2] .. " "
+    elseif chord_count_total == 2 and in_item_table[1][1] == in_item_table[2][1] then
+      buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. " "
+    elseif chord_count_total == 2 and tonumber(in_item_table[1][1]) == 3 and tonumber(in_item_table[2][1]) == 1 then
+      buileroo = in_item_table[1][2] .. "_/_/_" .. in_item_table[2][2] .. " "
+    elseif chord_count_total == 2 and tonumber(in_item_table[1][1]) == 1 and tonumber(in_item_table[2][1]) == 3 then
+      buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. "_/_/ "
+    elseif chord_count_total == 2 and in_item_table[1][1] > in_item_table[2][1] then
+      ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. ccc_main_bars_table[i] .. ' may have been simplified.\n'
+      buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. " "
+    elseif chord_count_total == 2 and in_item_table[1][1] < in_item_table[2][1] then
+      ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. ccc_main_bars_table[i] .. ' may have been simplified.\n'
+      buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. " "      
+    elseif chord_count_total == 3 and tonumber(in_item_table[1][1]) == 2 and tonumber(in_item_table[2][1]) == 1 and tonumber(in_item_table[3][1]) == 1 then
+      buileroo = in_item_table[1][2] .. "_/_" .. in_item_table[2][2] .. "_" .. in_item_table[3][2] .. " "
+    elseif chord_count_total == 3 and tonumber(in_item_table[1][1]) == 1 and tonumber(in_item_table[2][1]) == 1 and tonumber(in_item_table[3][1]) == 2 then
+      buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. "_" .. in_item_table[3][2] .. "_/ "
+    elseif chord_count_total == 3 and tonumber(in_item_table[1][1]) == 1 and tonumber(in_item_table[2][1]) == 2 and tonumber(in_item_table[3][1]) == 1 then
+      buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. "_/_" .. in_item_table[3][2] .. " "
+    elseif chord_count_total == 3 and tonumber(in_item_table[1][1]) > tonumber(in_item_table[2][1]) and tonumber(in_item_table[1][1]) > tonumber(in_item_table[3][1]) then
+      buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. "_" .. in_item_table[3][2] .. " "
+      ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. ccc_main_bars_table[i] .. ' may have been simplified.\n'      
+    elseif chord_count_total == 3 and tonumber(in_item_table[3][1]) > tonumber(in_item_table[1][1]) and tonumber(in_item_table[3][1]) > tonumber(in_item_table[2][1]) then
+      buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. "_" .. in_item_table[3][2] .. " "
+      ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. ccc_main_bars_table[i] .. ' may have been simplified.\n'      
+    elseif chord_count_total == 3 and tonumber(in_item_table[2][1]) > tonumber(in_item_table[1][1]) and tonumber(in_item_table[2][1]) > tonumber(in_item_table[3][1]) then
+      ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. ccc_main_bars_table[i] .. ' may have been simplified.\n'    
+      buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. "_" .. in_item_table[3][2] .. " "
+      
+    elseif chord_count_total == 4 and tonumber(in_item_table[1][1]) == tonumber(in_item_table[2][1]) and  tonumber(in_item_table[1][1]) == tonumber(in_item_table[3][1]) and tonumber(in_item_table[1][1]) == tonumber(in_item_table[4][1]) then
+      buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. "_" .. in_item_table[3][2] .. "_" .. in_item_table[4][2] .. " "
 
-		elseif chord_count_total == 4 and split_mult_total > 4 then
-			ccc_ex_warning = ccc_ex_warning .. '- Around measure '  .. processmore_table[i][3] .. ' ' .. '\nthe rhythm of chords ' .. ccc_main_bars_table[i] .. '\n was simplified due to Chord Sheet limititations.\n'
-			buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. "_" .. in_item_table[3][2] .. "_" .. in_item_table[4][2] .. " "
-			
-			
-		elseif chord_count_total == 5 then
-			ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. ' rhythm could not be rendered due to Chord Sheet limitations.\n'
-			buileroo = in_item_table[1][2] .. '_' .. in_item_table[2][2] .. '_' .. in_item_table[3][2] .. '_' .. in_item_table[4][2] .. "_" .. in_item_table[5][2] .. " "				
-			
-		elseif chord_count_total == 6 then
-			ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. ' rhythm could not be rendered due to Chord Sheet limitations.\n'
-			buileroo = in_item_table[1][2] .. '_' .. in_item_table[2][2] .. '_' .. in_item_table[3][2] .. '_' .. in_item_table[4][2] .. "_" .. in_item_table[5][2] .. '_' .. in_item_table[6][2] .. " "				
-			
-		elseif chord_count_total == 7 then
-			ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. ' rhythm could not be rendered due to Chord Sheet limitations.\n'
-			buileroo = in_item_table[1][2] .. '_' .. in_item_table[2][2] .. '_' .. in_item_table[3][2] .. '_' .. in_item_table[4][2] .. "_" .. in_item_table[5][2] .. '_' .. in_item_table[6][2] .. '_' .. in_item_table[7][2] .. " "			
-			
-			
-		elseif chord_count_total == 8 then
-			ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. ' rhythm could not be rendered due to Chord Sheet limitations.\n'
-			buileroo = in_item_table[1][2] .. '_' .. in_item_table[2][2] .. '_' .. in_item_table[3][2] .. '_' .. in_item_table[4][2] .. "_" .. in_item_table[5][2] .. '_' .. in_item_table[6][2] .. '_' .. in_item_table[7][2] .. '_' .. in_item_table[8][2] .. " "
-			
-		
-			
-			
-		elseif chord_count_total > 8 then
-			ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. ' ' .. ccc_main_bars_table[i] .. '\nonly the chords ' .. in_item_table[1][2] .. ' ' .. in_item_table[2][2] .. ' ' .. in_item_table[3][2] .. ' ' .. in_item_table[4][2] .. " " .. in_item_table[5][2] .. ' ' .. in_item_table[6][2] .. ' ' .. in_item_table[7][2] .. ' ' .. in_item_table[8][2] .. '\n could be rendered due to Chord Sheet limit of 8 chords per bar.\n'
-			buileroo = in_item_table[1][2] .. '_' .. in_item_table[2][2] .. '_' .. in_item_table[3][2] .. '_' .. in_item_table[4][2] .. "_" .. in_item_table[5][2] .. '_' .. in_item_table[6][2] .. '_' .. in_item_table[7][2] .. '_' .. in_item_table[8][2] .. " "
-			
-		else
-			buileroo = ccc_main_bars_table[i]
-		end
-		
-		ccc_main_bars_table[i] = buileroo
+    elseif chord_count_total == 4 and split_mult_total > 4 then
+      ccc_ex_warning = ccc_ex_warning .. '- Around measure '  .. processmore_table[i][3] .. ' ' .. '\nthe rhythm of chords ' .. ccc_main_bars_table[i] .. '\n was simplified due to Chord Sheet limititations.\n'
+      buileroo = in_item_table[1][2] .. "_" .. in_item_table[2][2] .. "_" .. in_item_table[3][2] .. "_" .. in_item_table[4][2] .. " "
+      
+      
+    elseif chord_count_total == 5 then
+      ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. ' rhythm could not be rendered due to Chord Sheet limitations.\n'
+      buileroo = in_item_table[1][2] .. '_' .. in_item_table[2][2] .. '_' .. in_item_table[3][2] .. '_' .. in_item_table[4][2] .. "_" .. in_item_table[5][2] .. " "        
+      
+    elseif chord_count_total == 6 then
+      ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. ' rhythm could not be rendered due to Chord Sheet limitations.\n'
+      buileroo = in_item_table[1][2] .. '_' .. in_item_table[2][2] .. '_' .. in_item_table[3][2] .. '_' .. in_item_table[4][2] .. "_" .. in_item_table[5][2] .. '_' .. in_item_table[6][2] .. " "        
+      
+    elseif chord_count_total == 7 then
+      ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. ' rhythm could not be rendered due to Chord Sheet limitations.\n'
+      buileroo = in_item_table[1][2] .. '_' .. in_item_table[2][2] .. '_' .. in_item_table[3][2] .. '_' .. in_item_table[4][2] .. "_" .. in_item_table[5][2] .. '_' .. in_item_table[6][2] .. '_' .. in_item_table[7][2] .. " "      
+      
+      
+    elseif chord_count_total == 8 then
+      ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. ' rhythm could not be rendered due to Chord Sheet limitations.\n'
+      buileroo = in_item_table[1][2] .. '_' .. in_item_table[2][2] .. '_' .. in_item_table[3][2] .. '_' .. in_item_table[4][2] .. "_" .. in_item_table[5][2] .. '_' .. in_item_table[6][2] .. '_' .. in_item_table[7][2] .. '_' .. in_item_table[8][2] .. " "
+      
+    
+      
+      
+    elseif chord_count_total > 8 then
+      ccc_ex_warning = ccc_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. ' ' .. ccc_main_bars_table[i] .. '\nonly the chords ' .. in_item_table[1][2] .. ' ' .. in_item_table[2][2] .. ' ' .. in_item_table[3][2] .. ' ' .. in_item_table[4][2] .. " " .. in_item_table[5][2] .. ' ' .. in_item_table[6][2] .. ' ' .. in_item_table[7][2] .. ' ' .. in_item_table[8][2] .. '\n could be rendered due to Chord Sheet limit of 8 chords per bar.\n'
+      buileroo = in_item_table[1][2] .. '_' .. in_item_table[2][2] .. '_' .. in_item_table[3][2] .. '_' .. in_item_table[4][2] .. "_" .. in_item_table[5][2] .. '_' .. in_item_table[6][2] .. '_' .. in_item_table[7][2] .. '_' .. in_item_table[8][2] .. " "
+      
+    else
+      buileroo = ccc_main_bars_table[i]
+    end
+    
+    ccc_main_bars_table[i] = buileroo
 
-	else
-		this_single_chord = ccc_main_bars_table[i]
-		addstart = 1
-		if string.sub(this_single_chord,1,1) == " " then
-			addstart = 2
-		else
-		end
-		if string.sub(this_single_chord,addstart,addstart) == "<" then
-			if string.sub(this_single_chord,addstart + 1 ,addstart + 1) == "<" then
-				addstart = addstart + 2
-			else
-				addstart = addstart + 1
-			end
-		else
-		end
-		if string.sub(this_single_chord,addstart,addstart) == "b" or string.sub(this_single_chord,addstart,addstart) == "#" then
-			addstart = addstart + 2
-		else
-			addstart = addstart + 1
-		end
-		endtype,_ = string.find(this_single_chord, "/")
-		if endtype ~= nil then endtype = endtype - 1 end
-		if endtype == nil then endtype,_ = string.find(string.sub(this_single_chord,2,string.len(this_single_chord))," ") end
-		if endtype == nil then endtype = string.len(this_single_chord) end
-		replacetype = string.sub(this_single_chord,addstart, endtype)
-		--reaper.ShowConsoleMsg(replacetype .. "\n")
-		if musictheory.to_ccc_translation[replacetype] ~= nil then
-			ccc_main_bars_table[i] = string.sub(this_single_chord,1,addstart-1) .. musictheory.to_ccc_translation[replacetype] .. string.sub(this_single_chord,endtype + 1, string.len(this_single_chord))
-		end
-	end
+  else
+    this_single_chord = ccc_main_bars_table[i]
+    addstart = 1
+    if string.sub(this_single_chord,1,1) == " " then
+      addstart = 2
+    else
+    end
+    if string.sub(this_single_chord,addstart,addstart) == "<" then
+      if string.sub(this_single_chord,addstart + 1 ,addstart + 1) == "<" then
+        addstart = addstart + 2
+      else
+        addstart = addstart + 1
+      end
+    else
+    end
+    if string.sub(this_single_chord,addstart,addstart) == "b" or string.sub(this_single_chord,addstart,addstart) == "#" then
+      addstart = addstart + 2
+    else
+      addstart = addstart + 1
+    end
+    endtype,_ = string.find(this_single_chord, "/")
+    if endtype ~= nil then endtype = endtype - 1 end
+    if endtype == nil then endtype,_ = string.find(string.sub(this_single_chord,2,string.len(this_single_chord))," ") end
+    if endtype == nil then endtype = string.len(this_single_chord) end
+    replacetype = string.sub(this_single_chord,addstart, endtype)
+    --reaper.ShowConsoleMsg(replacetype .. "\n")
+    if musictheory.to_ccc_translation[replacetype] ~= nil then
+      ccc_main_bars_table[i] = string.sub(this_single_chord,1,addstart-1) .. musictheory.to_ccc_translation[replacetype] .. string.sub(this_single_chord,endtype + 1, string.len(this_single_chord))
+    end
+  end
 
 end
 
-for i,v in pairs(ccc_main_bars_table) do							--	DEAL WITH REPEATS ON THE WAY TO TEXT
-	if v == "!Repeat!" then
-	ccc_post_table_chord_data = ccc_post_table_chord_data .. "  "  .. the_last_ccc_bar_content
-	else
-	ccc_post_table_chord_data = ccc_post_table_chord_data .. "  "  .. v
-	the_last_ccc_bar_content = v
-	end
+for i,v in pairs(ccc_main_bars_table) do              --  DEAL WITH REPEATS ON THE WAY TO TEXT
+  if v == "!Repeat!" then
+  ccc_post_table_chord_data = ccc_post_table_chord_data .. "  "  .. the_last_ccc_bar_content
+  else
+  ccc_post_table_chord_data = ccc_post_table_chord_data .. "  "  .. v
+  the_last_ccc_bar_content = v
+  end
 end
-																					
---ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "| Â |", "|A) ")		-- SWAP OUT FOR A)
---ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "| Å |", "|B) ")			-- AND B) SECTION MARKS
---ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "<<", "")			-- SWAP OUT FOR 16th 
---ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "<", "")					-- AND 8th PUSHES IN ccc FORMAT
+                                          
+--ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "| Â |", "|A) ")    -- SWAP OUT FOR A)
+--ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "| Å |", "|B) ")      -- AND B) SECTION MARKS
+--ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "<<", "")      -- SWAP OUT FOR 16th 
+--ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "<", "")          -- AND 8th PUSHES IN ccc FORMAT
 
 --reaper.ShowConsoleMsg("cf = "..unencoded_keyfound.. "\n")
 ccc_key_shift = musictheory.key_table[unencoded_keyfound]
@@ -5287,58 +5754,58 @@ return "Error...",0,"Check your key.\nNumbers2Notes, like many Nashville Number 
 end
 
 
-	for i,v in pairs(musictheory.cccroot_table) do
-		if v + ccc_key_shift >= 12 then
-			totalshift = v + ccc_key_shift - 12
-		elseif v + ccc_key_shift < 0 then
-			totalshift = v + ccc_key_shift + 12			
-		else
-			totalshift = v + ccc_key_shift
-		end
-		--reaper.ShowConsoleMsg("ccctf = "..tostring(totalshift).. "\n")
-		if ccc_flat then
-				ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, " ".. i, musictheory.flats_table[totalshift])
-		else
-				ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, " ".. i, musictheory.sharps_table[totalshift])
-		end
-	end
+  for i,v in pairs(musictheory.cccroot_table) do
+    if v + ccc_key_shift >= 12 then
+      totalshift = v + ccc_key_shift - 12
+    elseif v + ccc_key_shift < 0 then
+      totalshift = v + ccc_key_shift + 12      
+    else
+      totalshift = v + ccc_key_shift
+    end
+    --reaper.ShowConsoleMsg("ccctf = "..tostring(totalshift).. "\n")
+    if ccc_flat then
+        ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, " ".. i, musictheory.flats_table[totalshift])
+    else
+        ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, " ".. i, musictheory.sharps_table[totalshift])
+    end
+  end
 
-	for i,v in pairs(musictheory.cccroot_table) do
-		if v + ccc_key_shift >= 12 then
-			totalshift = v + ccc_key_shift - 12
-		elseif v + ccc_key_shift < 0 then
-			totalshift = v + ccc_key_shift + 12					
-		else
-			totalshift = v + ccc_key_shift	
-		end
-		--reaper.ShowConsoleMsg("ccctf = "..tostring(totalshift).. "\n")
-		if ccc_flat then
-				ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "/".. i, "/".. musictheory.flats_table[totalshift])
-		else
-				ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "/".. i, "/".. musictheory.sharps_table[totalshift])
-		end
-	end
-
-
-	for i,v in pairs(musictheory.cccroot_table) do
-		if v + ccc_key_shift >= 12 then
-			totalshift = v + ccc_key_shift - 12
-		elseif v + ccc_key_shift < 0 then
-			totalshift = v + ccc_key_shift + 12				
-		else
-			totalshift = v + ccc_key_shift
-		end
-		--reaper.ShowConsoleMsg("ccctf = "..tostring(totalshift).. "\n")
-		if ccc_flat then
-				ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "_".. i, "_".. musictheory.flats_table[totalshift])
-		else
-				ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "_".. i, "_".. musictheory.sharps_table[totalshift])
-		end
-	end
+  for i,v in pairs(musictheory.cccroot_table) do
+    if v + ccc_key_shift >= 12 then
+      totalshift = v + ccc_key_shift - 12
+    elseif v + ccc_key_shift < 0 then
+      totalshift = v + ccc_key_shift + 12          
+    else
+      totalshift = v + ccc_key_shift  
+    end
+    --reaper.ShowConsoleMsg("ccctf = "..tostring(totalshift).. "\n")
+    if ccc_flat then
+        ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "/".. i, "/".. musictheory.flats_table[totalshift])
+    else
+        ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "/".. i, "/".. musictheory.sharps_table[totalshift])
+    end
+  end
 
 
+  for i,v in pairs(musictheory.cccroot_table) do
+    if v + ccc_key_shift >= 12 then
+      totalshift = v + ccc_key_shift - 12
+    elseif v + ccc_key_shift < 0 then
+      totalshift = v + ccc_key_shift + 12        
+    else
+      totalshift = v + ccc_key_shift
+    end
+    --reaper.ShowConsoleMsg("ccctf = "..tostring(totalshift).. "\n")
+    if ccc_flat then
+        ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "_".. i, "_".. musictheory.flats_table[totalshift])
+    else
+        ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "_".. i, "_".. musictheory.sharps_table[totalshift])
+    end
+  end
 
-::doubleclean::																	-- CONVERT RETURNS TO SPACES
+
+
+::doubleclean::                                  -- CONVERT RETURNS TO SPACES
 in_num = string.len(ccc_post_table_chord_data)
 ccc_post_table_chord_data = string.gsub(ccc_post_table_chord_data, "  " , " ")
 if in_num ~= string.len(ccc_post_table_chord_data) then
@@ -5348,20 +5815,20 @@ end
 last_ccc_rebuild_for_4bar_lines = ""
 spacecounter = 1
 for i = 1,string.len(ccc_post_table_chord_data),1 do
-	if string.sub(ccc_post_table_chord_data,i,i) == " " then
-		if spacecounter == 4 then 
-		spacecounter = 1
-		last_ccc_rebuild_for_4bar_lines = last_ccc_rebuild_for_4bar_lines .. "\n"
-		else
-		spacecounter = spacecounter + 1
-		last_ccc_rebuild_for_4bar_lines = last_ccc_rebuild_for_4bar_lines .. string.sub(ccc_post_table_chord_data,i,i)
-		end
-	elseif string.sub(ccc_post_table_chord_data,i,i) == "|" then
-		last_ccc_rebuild_for_4bar_lines = last_ccc_rebuild_for_4bar_lines .. "\n"
-		spacecounter = 0		
-	else
-		last_ccc_rebuild_for_4bar_lines = last_ccc_rebuild_for_4bar_lines .. string.sub(ccc_post_table_chord_data,i,i)
-	end
+  if string.sub(ccc_post_table_chord_data,i,i) == " " then
+    if spacecounter == 4 then 
+    spacecounter = 1
+    last_ccc_rebuild_for_4bar_lines = last_ccc_rebuild_for_4bar_lines .. "\n"
+    else
+    spacecounter = spacecounter + 1
+    last_ccc_rebuild_for_4bar_lines = last_ccc_rebuild_for_4bar_lines .. string.sub(ccc_post_table_chord_data,i,i)
+    end
+  elseif string.sub(ccc_post_table_chord_data,i,i) == "|" then
+    last_ccc_rebuild_for_4bar_lines = last_ccc_rebuild_for_4bar_lines .. "\n"
+    spacecounter = 0    
+  else
+    last_ccc_rebuild_for_4bar_lines = last_ccc_rebuild_for_4bar_lines .. string.sub(ccc_post_table_chord_data,i,i)
+  end
 
 
 end
@@ -5371,8 +5838,8 @@ ccc_post_table_chord_data = last_ccc_rebuild_for_4bar_lines
 the_ccc_bar_count = 0
 --reaper.ShowConsoleMsg("\n-----------------------------------------\n")
 for i,v in pairs(processmore_table) do
-	the_ccc_bar_count = the_ccc_bar_count + tonumber(processmore_table[i][2])
-	--reaper.ShowConsoleMsg("COUNT = " .. tonumber(processmore_table[i][2]) .. "TOTAL = " .. the_ccc_bar_count .. "\n")
+  the_ccc_bar_count = the_ccc_bar_count + tonumber(processmore_table[i][2])
+  --reaper.ShowConsoleMsg("COUNT = " .. tonumber(processmore_table[i][2]) .. "TOTAL = " .. the_ccc_bar_count .. "\n")
 end
 return ccc_post_table_chord_data, the_ccc_bar_count, thefail
 end
@@ -5989,8 +6456,8 @@ local headshell = [[
 !C!
 [ChordsEnd]
 [SongEnd]"]]
-to_biab_export_area = headshell									
-_, title_startso  = string.find(header_area, "Title: ")			-- GET THE PROJECT SETTINGS AND PLACE IN THE SHELL
+to_biab_export_area = headshell                  
+_, title_startso  = string.find(header_area, "Title: ")      -- GET THE PROJECT SETTINGS AND PLACE IN THE SHELL
 title_endso, _  = string.find(header_area, "Writer:")
 _, writer_startso  = string.find(header_area, "Writer: ")
 writer_endso, _  = string.find(header_area, "BPM:")
@@ -6007,7 +6474,7 @@ to_biab_export_area = string.gsub(to_biab_export_area, "!T!", titlefound)
 to_biab_export_area = string.gsub(to_biab_export_area, "!K!", keyfound)
 to_biab_export_area = string.gsub(to_biab_export_area, "!B!", bpmfound)
 to_biab_export_area = string.gsub(to_biab_export_area, "!S!", biab_style)
-biab_bars, biab_bar_count = process_biab_bars()								-- MOST WORK IS HERE IN THIS SUB
+biab_bars, biab_bar_count = process_biab_bars()                -- MOST WORK IS HERE IN THIS SUB
 to_biab_export_area = string.gsub(to_biab_export_area, "!F!", biab_bar_count)
 to_biab_export_area = string.gsub(to_biab_export_area, "!C!", biab_bars)
 if string.len(biab_ex_warning) > 0 then
@@ -6026,15 +6493,15 @@ function process_biab_bars()
 thefail = ""
     chord_charting_area = inital_swaps(chord_charting_area)
     unfolded_biab_data, error_zone = form.process_the_form(header_area, chord_charting_area) 
-														-- FORM		 DEAL WITH UNFOLDING THE FORM
-unfolded_biab_data = string.gsub(unfolded_biab_data, "{$Intro$}", "Â")	
+                            -- FORM     DEAL WITH UNFOLDING THE FORM
+unfolded_biab_data = string.gsub(unfolded_biab_data, "{$Intro$}", "Â")  
 unfolded_biab_data = string.gsub(unfolded_biab_data, "{$Verse$}", "Â")
 unfolded_biab_data = string.gsub(unfolded_biab_data, "{$Chorus$}", "Å")
 unfolded_biab_data = string.gsub(unfolded_biab_data, "{$Outro$}", "Å")
 unfolded_biab_data = string.gsub(unfolded_biab_data, "%%", "!Repeat!")
-													   -- CODE THE SIMPLEST AS A OR B SECTIONS DELETE THE REST
-													   
-::striplabels::																-- REMOVE THE SECTION LABELS
+                             -- CODE THE SIMPLEST AS A OR B SECTIONS DELETE THE REST
+                             
+::striplabels::                                -- REMOVE THE SECTION LABELS
 local in_num = string.len(unfolded_biab_data)
 section_start, _  = string.find(unfolded_biab_data, "{%$")
 _, section_end  = string.find(unfolded_biab_data, "%$}")
@@ -6048,26 +6515,26 @@ if in_num ~= string.len(unfolded_biab_data) then
 goto striplabels
 end
 
-																-- CONVERT RETURNS TO SPACES
-																
-		
+                                -- CONVERT RETURNS TO SPACES
+                                
+    
 
 
 
-::flaten::																	-- CONVERT RETURNS TO SPACES
+::flaten::                                  -- CONVERT RETURNS TO SPACES
 in_num = string.len(unfolded_biab_data)
 unfolded_biab_data = string.gsub(unfolded_biab_data, "\n" , " ")
 if in_num ~= string.len(unfolded_biab_data) then
 goto flaten
 end
 
-::detab::																	-- CONVERT TABS TO SPACES
+::detab::                                  -- CONVERT TABS TO SPACES
 in_num = string.len(unfolded_biab_data)
 unfolded_biab_data = string.gsub(unfolded_biab_data, "\t" , " ")
 if in_num ~= string.len(unfolded_biab_data) then
 goto detab
 end
-																			-- TRIM DOWN TO SINGLE SPACES
+                                      -- TRIM DOWN TO SINGLE SPACES
 ::trimwhitespace::
 in_num = string.len(unfolded_biab_data)
 unfolded_biab_data = string.gsub(unfolded_biab_data, "  " , " ")
@@ -6075,35 +6542,35 @@ if in_num ~= string.len(unfolded_biab_data) then
 goto trimwhitespace
 end
 
-::reducecr::																-- ?? TRIM BACK RETURNS (didn't I do this)
+::reducecr::                                -- ?? TRIM BACK RETURNS (didn't I do this)
 in_num = string.len(unfolded_biab_data)
 unfolded_biab_data = string.gsub(unfolded_biab_data, "\n\n" , "\n")
 if in_num ~= string.len(unfolded_biab_data) then
 goto reducecr
 end
 
-::fluffen::																	-- SEPARATE BRACED MEASURES BY A SPACE
+::fluffen::                                  -- SEPARATE BRACED MEASURES BY A SPACE
 in_num = string.len(unfolded_biab_data)
 unfolded_biab_data = string.gsub(unfolded_biab_data, "%]%[" , "] [")
 if in_num ~= string.len(unfolded_biab_data) then
 goto fluffen
 end
 
-::squish1::																	-- TRIM OUT SPACES FROM INSIDE IN BRACES
+::squish1::                                  -- TRIM OUT SPACES FROM INSIDE IN BRACES
 in_num = string.len(unfolded_biab_data)
 unfolded_biab_data = string.gsub(unfolded_biab_data, "%[ " , "[")
 if in_num ~= string.len(unfolded_biab_data) then
 goto squish1
 end
-																			
-::squish2::																	-- TRIM OUT SPACES FROM INSIDE OUT BRACES
+                                      
+::squish2::                                  -- TRIM OUT SPACES FROM INSIDE OUT BRACES
 in_num = string.len(unfolded_biab_data)
 unfolded_biab_data = string.gsub(unfolded_biab_data, " %]" , "]")
 if in_num ~= string.len(unfolded_biab_data) then
 goto squish2
 end
 
-::derest::																	-- CONVERT ALL REST TO BIAB REST 1.
+::derest::                                  -- CONVERT ALL REST TO BIAB REST 1.
 in_num = string.len(unfolded_biab_data)
 unfolded_biab_data = string.gsub(unfolded_biab_data, " %- " , " 1. ")
 unfolded_biab_data = string.gsub(unfolded_biab_data, " R " , " 1. ")
@@ -6113,303 +6580,303 @@ goto derest
 end
 
 
-			
+      
 
 
 
 
 
 
-local inmeasurenow = false		-- !!!!!!!!!!!!!!!!   GET THE DATA READY TO BE PUT INTO TABLES ONE CHAR AT A TIME  !!!!!!
+local inmeasurenow = false    -- !!!!!!!!!!!!!!!!   GET THE DATA READY TO BE PUT INTO TABLES ONE CHAR AT A TIME  !!!!!!
 measurechord_count = 0
 rebuild = ""
 for i = 1,string.len(unfolded_biab_data) do
-	if string.sub(unfolded_biab_data,i,i) == "Â" or string.sub(unfolded_biab_data,i,i) == "Å" then
-		rebuild = rebuild .. string.sub(unfolded_biab_data,i,i)			-- REBUILD WITH SECTION SWAP AS IS
-		inmeasurenow = false
-	elseif string.sub(unfolded_biab_data,i,i) == "[" and inmeasurenow == false then
-		inmeasurenow = true
-		rebuild = rebuild .. string.sub(unfolded_biab_data,i,i)			-- REBUILD WITH IN BRACE AS IS (UNLESS...)
-	elseif string.sub(unfolded_biab_data,i,i) == "]" and inmeasurenow == true then
-		inmeasurenow = false
-		rebuild = rebuild .. string.sub(unfolded_biab_data,i,i)			-- REBUILD WITH OUT BRACE AS IS (UNLESS...)
-	elseif string.sub(unfolded_biab_data,i,i) == "]" and inmeasurenow == false then  -- WARN WHEN THERE IS A [[ USER ERROR
-		thefail = thefail .. 'Incident of mismatched braces.  Make sure to use "[" and "]" in pairs.\n'
-	elseif string.sub(unfolded_biab_data,i,i) == "[" and inmeasurenow == true then	 -- WARN WHEN THERE IS A ]] USER ERROR
-		thefail = thefail .. 'Incident of mismatched braces.  Make sure to use "[" and "]" in pairs.\n'
-	elseif string.sub(unfolded_biab_data,i,i) == " " and inmeasurenow == false then
-		rebuild = rebuild .. ","													-- CHANGE MEASURE SEPARATORS TO COMMA
-	elseif string.sub(unfolded_biab_data,i,i) == " " and inmeasurenow == true then
-		rebuild = rebuild .. ":"													-- CHANGE IN MEASURE SEPS TO COLON
-	else
-		rebuild = rebuild .. string.sub(unfolded_biab_data,i,i)						-- PASS EVERYTHING ELSE AS IS
-	end
+  if string.sub(unfolded_biab_data,i,i) == "Â" or string.sub(unfolded_biab_data,i,i) == "Å" then
+    rebuild = rebuild .. string.sub(unfolded_biab_data,i,i)      -- REBUILD WITH SECTION SWAP AS IS
+    inmeasurenow = false
+  elseif string.sub(unfolded_biab_data,i,i) == "[" and inmeasurenow == false then
+    inmeasurenow = true
+    rebuild = rebuild .. string.sub(unfolded_biab_data,i,i)      -- REBUILD WITH IN BRACE AS IS (UNLESS...)
+  elseif string.sub(unfolded_biab_data,i,i) == "]" and inmeasurenow == true then
+    inmeasurenow = false
+    rebuild = rebuild .. string.sub(unfolded_biab_data,i,i)      -- REBUILD WITH OUT BRACE AS IS (UNLESS...)
+  elseif string.sub(unfolded_biab_data,i,i) == "]" and inmeasurenow == false then  -- WARN WHEN THERE IS A [[ USER ERROR
+    thefail = thefail .. 'Incident of mismatched braces.  Make sure to use "[" and "]" in pairs.\n'
+  elseif string.sub(unfolded_biab_data,i,i) == "[" and inmeasurenow == true then   -- WARN WHEN THERE IS A ]] USER ERROR
+    thefail = thefail .. 'Incident of mismatched braces.  Make sure to use "[" and "]" in pairs.\n'
+  elseif string.sub(unfolded_biab_data,i,i) == " " and inmeasurenow == false then
+    rebuild = rebuild .. ","                          -- CHANGE MEASURE SEPARATORS TO COMMA
+  elseif string.sub(unfolded_biab_data,i,i) == " " and inmeasurenow == true then
+    rebuild = rebuild .. ":"                          -- CHANGE IN MEASURE SEPS TO COLON
+  else
+    rebuild = rebuild .. string.sub(unfolded_biab_data,i,i)            -- PASS EVERYTHING ELSE AS IS
+  end
 end
-BIAB_main_bars_table = Split(rebuild, ",")											-- PUT THE DATA INTO TABLE
+BIAB_main_bars_table = Split(rebuild, ",")                      -- PUT THE DATA INTO TABLE
 
 
 
 
 
 
-local warned = false																		-- PREPING VARIABLES
+local warned = false                                    -- PREPING VARIABLES
 local rewarned = false
 local newtablevalue = ""
 local processmore_table = {}
 local BIAB_post_table_chord_data = ""
 
 
-for ib,vb in pairs(BIAB_main_bars_table) do		--  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    DETERMINE IF MULTIBAR !!!!!!!!!!
-	if string.find(vb, "%[") then
-		processmore_table[ib] = {true,1}											-- TAG AS MULTIBAR IN this TABLE
-	elseif string.find(vb, "Â") then
-		processmore_table[ib] = {false,0}											-- A) SECTION HEADER - NOT A MEASURE
-	elseif string.find(vb, "Å") then
-		processmore_table[ib] = {false,0}											-- B) SECTION HEADER - NOT A MEASURE	
-	else
-		processmore_table[ib] = {false,1}											-- TAG AS A SINGLE BAR
-	end
-		--reaper.ShowConsoleMsg(tostring(processmore_table[ib][1]).."\n")
+for ib,vb in pairs(BIAB_main_bars_table) do    --  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!    DETERMINE IF MULTIBAR !!!!!!!!!!
+  if string.find(vb, "%[") then
+    processmore_table[ib] = {true,1}                      -- TAG AS MULTIBAR IN this TABLE
+  elseif string.find(vb, "Â") then
+    processmore_table[ib] = {false,0}                      -- A) SECTION HEADER - NOT A MEASURE
+  elseif string.find(vb, "Å") then
+    processmore_table[ib] = {false,0}                      -- B) SECTION HEADER - NOT A MEASURE  
+  else
+    processmore_table[ib] = {false,1}                      -- TAG AS A SINGLE BAR
+  end
+    --reaper.ShowConsoleMsg(tostring(processmore_table[ib][1]).."\n")
 end
 
 
 
-for ipm,vpm in pairs(processmore_table) do		-- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!    DEAL WITH ALL THE MULTIBARS     !!!!!!!
+for ipm,vpm in pairs(processmore_table) do    -- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!    DEAL WITH ALL THE MULTIBARS     !!!!!!!
 barmultiplier = 0
-	if processmore_table[ipm][1] then
-		if string.sub(BIAB_main_bars_table[ipm],1,1) ~= "[" then				-- 	CHECK TO SEE IF MULTIBAR
-			if string.find(BIAB_main_bars_table[ipm],":") then
-				startsbrace,endbrace = string.find(BIAB_main_bars_table[ipm],"%[",1)
-				--reaper.ShowConsoleMsg(startsbrace.."\n")
-				barmultiplier = tonumber(string.sub(BIAB_main_bars_table[ipm],1,startsbrace-1))
-				if barmultiplier ~= nil and barmultiplier ~= 1 then				-- MULTIBAR WITH MULTI CHORDS = BAD
-					if warned == false then
-						biab_ex_warning = biab_ex_warning .. '- Multibars with more than one chord are not supported in BIAB export\nbecause they easily result in rhythms BIAB can not accept as input.\nThese measures have been rendered as "1.d" which will sound drums only\nallowing you to find and adjust them.\n\n'
-						warned = true
-					end
-					newtablevalue = "1.d"
-					for count = 1,barmultiplier-1,1 do
-						newtablevalue = newtablevalue .. " | "
-					end
-					processmore_table[ipm][1] = false
-					processmore_table[ipm][2] = barmultiplier
-				elseif  barmultiplier ~= nil and barmultiplier == 1 then   -- THERE IS A 1 MULTIBAR - JUST REMOVE MULTI
-				
-					newtablevalue = string.sub(BIAB_main_bars_table[ipm],startsbrace + 1, string.len(BIAB_main_bars_table[ipm])-1)
-					processmore_table[ipm][1] = false
-					processmore_table[ipm][2] = 1	
-				else												-- LIKELY USER SCREW UP NON NUMBER MULTIBAR ie G[2m 5]
-					biab_ex_warning = biab_ex_warning .. '- Looks like your chord entry has formatting error.\nIt has been rendered as "1b.d" so you can find and manually adjust the error.'
-					newtablevalue = "1b.d"
-					processmore_table[ipm][1] = false
-					processmore_table[ipm][2] = 1
-				end
-				
-			else																-- ONLY ONE INTERNAL CHORD ALL GOOD
-				startsbrace,endbrace = string.find(BIAB_main_bars_table[ipm],"%[",1)
-				--reaper.ShowConsoleMsg(startsbrace.."\n")
-				barmultiplier = tonumber(string.sub(BIAB_main_bars_table[ipm],1,startsbrace-1))
-				if  barmultiplier ~= nil and barmultiplier == 1 then   -- THERE IS A 1 MULTIBAR - JUST REMOVE MULTI
-					newtablevalue = string.sub(BIAB_main_bars_table[ipm],startsbrace + 1, string.len(BIAB_main_bars_table[ipm])-1)
-					processmore_table[ipm][1] = false
-					processmore_table[ipm][2] = 1
-					
-					
-					
-				elseif barmultiplier ~= nil then   ---!!!!!!!!!!!!!!!!!!! THIS WORKS BUT SHOULDN'T !!! WHY ???????????
-					newtablevalue = string.sub(BIAB_main_bars_table[ipm],startsbrace, string.len(BIAB_main_bars_table[ipm])-1)
-					for count = 1,barmultiplier-1,1 do
-						newtablevalue = newtablevalue .. " | "
-					end
-					processmore_table[ipm][2] = barmultiplier				
-				else								-- LIKELY USER ERROR - ONLY 1 INTERNAL CHORD, BUT BAD MULTI ie G[4]
-					biab_ex_warning = biab_ex_warning .. '- Looks like your chord entry has formatting error.\nIt has been rendered as ' .. string.sub(BIAB_main_bars_table[ipm],startsbrace+1,string.len(BIAB_main_bars_table[ipm])-1) .. ' so you can find and manually adjust the error.\n'
-					newtablevalue = string.sub(BIAB_main_bars_table[ipm],startsbrace+1,string.len(BIAB_main_bars_table[ipm])-1)
-					processmore_table[ipm][1] = false
-					processmore_table[ipm][2] = 1
-				end
-			end
-			BIAB_main_bars_table[ipm] = newtablevalue
-		end
-	--reaper.ShowConsoleMsg(tostring(processmore_table[ib][1]).."\n")
-	end
+  if processmore_table[ipm][1] then
+    if string.sub(BIAB_main_bars_table[ipm],1,1) ~= "[" then        --   CHECK TO SEE IF MULTIBAR
+      if string.find(BIAB_main_bars_table[ipm],":") then
+        startsbrace,endbrace = string.find(BIAB_main_bars_table[ipm],"%[",1)
+        --reaper.ShowConsoleMsg(startsbrace.."\n")
+        barmultiplier = tonumber(string.sub(BIAB_main_bars_table[ipm],1,startsbrace-1))
+        if barmultiplier ~= nil and barmultiplier ~= 1 then        -- MULTIBAR WITH MULTI CHORDS = BAD
+          if warned == false then
+            biab_ex_warning = biab_ex_warning .. '- Multibars with more than one chord are not supported in BIAB export\nbecause they easily result in rhythms BIAB can not accept as input.\nThese measures have been rendered as "1.d" which will sound drums only\nallowing you to find and adjust them.\n\n'
+            warned = true
+          end
+          newtablevalue = "1.d"
+          for count = 1,barmultiplier-1,1 do
+            newtablevalue = newtablevalue .. " | "
+          end
+          processmore_table[ipm][1] = false
+          processmore_table[ipm][2] = barmultiplier
+        elseif  barmultiplier ~= nil and barmultiplier == 1 then   -- THERE IS A 1 MULTIBAR - JUST REMOVE MULTI
+        
+          newtablevalue = string.sub(BIAB_main_bars_table[ipm],startsbrace + 1, string.len(BIAB_main_bars_table[ipm])-1)
+          processmore_table[ipm][1] = false
+          processmore_table[ipm][2] = 1  
+        else                        -- LIKELY USER SCREW UP NON NUMBER MULTIBAR ie G[2m 5]
+          biab_ex_warning = biab_ex_warning .. '- Looks like your chord entry has formatting error.\nIt has been rendered as "1b.d" so you can find and manually adjust the error.'
+          newtablevalue = "1b.d"
+          processmore_table[ipm][1] = false
+          processmore_table[ipm][2] = 1
+        end
+        
+      else                                -- ONLY ONE INTERNAL CHORD ALL GOOD
+        startsbrace,endbrace = string.find(BIAB_main_bars_table[ipm],"%[",1)
+        --reaper.ShowConsoleMsg(startsbrace.."\n")
+        barmultiplier = tonumber(string.sub(BIAB_main_bars_table[ipm],1,startsbrace-1))
+        if  barmultiplier ~= nil and barmultiplier == 1 then   -- THERE IS A 1 MULTIBAR - JUST REMOVE MULTI
+          newtablevalue = string.sub(BIAB_main_bars_table[ipm],startsbrace + 1, string.len(BIAB_main_bars_table[ipm])-1)
+          processmore_table[ipm][1] = false
+          processmore_table[ipm][2] = 1
+          
+          
+          
+        elseif barmultiplier ~= nil then   ---!!!!!!!!!!!!!!!!!!! THIS WORKS BUT SHOULDN'T !!! WHY ???????????
+          newtablevalue = string.sub(BIAB_main_bars_table[ipm],startsbrace, string.len(BIAB_main_bars_table[ipm])-1)
+          for count = 1,barmultiplier-1,1 do
+            newtablevalue = newtablevalue .. " | "
+          end
+          processmore_table[ipm][2] = barmultiplier        
+        else                -- LIKELY USER ERROR - ONLY 1 INTERNAL CHORD, BUT BAD MULTI ie G[4]
+          biab_ex_warning = biab_ex_warning .. '- Looks like your chord entry has formatting error.\nIt has been rendered as ' .. string.sub(BIAB_main_bars_table[ipm],startsbrace+1,string.len(BIAB_main_bars_table[ipm])-1) .. ' so you can find and manually adjust the error.\n'
+          newtablevalue = string.sub(BIAB_main_bars_table[ipm],startsbrace+1,string.len(BIAB_main_bars_table[ipm])-1)
+          processmore_table[ipm][1] = false
+          processmore_table[ipm][2] = 1
+        end
+      end
+      BIAB_main_bars_table[ipm] = newtablevalue
+    end
+  --reaper.ShowConsoleMsg(tostring(processmore_table[ib][1]).."\n")
+  end
 end
-biab_measurecount_total = 0						-- LABEL ALL THE MEASURES ACCORDING TO THEIR MEASURE NUMBER 
+biab_measurecount_total = 0            -- LABEL ALL THE MEASURES ACCORDING TO THEIR MEASURE NUMBER 
 for i,v in pairs(processmore_table) do
-	biab_measurecount_total = biab_measurecount_total + processmore_table[i][2]
-	processmore_table[i][3] = biab_measurecount_total
+  biab_measurecount_total = biab_measurecount_total + processmore_table[i][2]
+  processmore_table[i][3] = biab_measurecount_total
 end
 
 
 
 
-in_item_table = {}					--  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DEAL WITH BRACED MEASURE INTERNALS
+in_item_table = {}          --  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DEAL WITH BRACED MEASURE INTERNALS
 for i,v in pairs(processmore_table) do
-	if processmore_table[i][1] then
-		inmeasure_table = Split(string.sub(BIAB_main_bars_table[i],2,string.len(BIAB_main_bars_table[i])-1), ":")
-		--reaper.ShowConsoleMsg(string.sub(BIAB_main_bars_table[i],2,string.len(BIAB_main_bars_table[i])-1) .. "\n")
-		buileroo = ""
-		split_mult_total = 0
-		chord_count_total = 0
-			in_item_table = {}		
-		for ibt,vbt in pairs(inmeasure_table) do
-			chord_count_total = chord_count_total + 1		
+  if processmore_table[i][1] then
+    inmeasure_table = Split(string.sub(BIAB_main_bars_table[i],2,string.len(BIAB_main_bars_table[i])-1), ":")
+    --reaper.ShowConsoleMsg(string.sub(BIAB_main_bars_table[i],2,string.len(BIAB_main_bars_table[i])-1) .. "\n")
+    buileroo = ""
+    split_mult_total = 0
+    chord_count_total = 0
+      in_item_table = {}    
+    for ibt,vbt in pairs(inmeasure_table) do
+      chord_count_total = chord_count_total + 1    
 
-		
-			item_split_starter,item_split_ender = string.find(vbt, "%(",1)	
-			if item_split_starter ~= nil then
-				--reaper.ShowConsoleMsg("found it\n")
-				split_mult = tonumber(string.sub(vbt,1,item_split_starter-1))
-				split_mult_total = split_mult_total + split_mult
-				in_item_table[ibt] = {split_mult, string.sub(vbt,item_split_starter + 1,string.len(vbt) - 1)}
-				--reaper.ShowConsoleMsg("splitmult = ".. split_mult .. " SplitMult Total = " .. split_mult_total .. " Cell: " .. in_item_table[ibt][2] .. "\n")				
-			else
-				--reaper.ShowConsoleMsg("nope\n")	
-				split_mult = 1				
-				split_mult_total = split_mult_total + split_mult
-				--reaper.ShowConsoleMsg("splitmult = ".. split_mult .. " SplitMult Total = " .. split_mult_total .. ' string = ' .. string.sub(vbt,1,string.len(vbt)) .. "\n")
-				in_item_table[ibt] = {1,vbt}
-				--reaper.ShowConsoleMsg("splitmult = ".. split_mult .. " SplitMult Total = " .. split_mult_total .. " Cell: " .. in_item_table[ibt][2] .. "\n")		
-			end
-		end
+    
+      item_split_starter,item_split_ender = string.find(vbt, "%(",1)  
+      if item_split_starter ~= nil then
+        --reaper.ShowConsoleMsg("found it\n")
+        split_mult = tonumber(string.sub(vbt,1,item_split_starter-1))
+        split_mult_total = split_mult_total + split_mult
+        in_item_table[ibt] = {split_mult, string.sub(vbt,item_split_starter + 1,string.len(vbt) - 1)}
+        --reaper.ShowConsoleMsg("splitmult = ".. split_mult .. " SplitMult Total = " .. split_mult_total .. " Cell: " .. in_item_table[ibt][2] .. "\n")        
+      else
+        --reaper.ShowConsoleMsg("nope\n")  
+        split_mult = 1        
+        split_mult_total = split_mult_total + split_mult
+        --reaper.ShowConsoleMsg("splitmult = ".. split_mult .. " SplitMult Total = " .. split_mult_total .. ' string = ' .. string.sub(vbt,1,string.len(vbt)) .. "\n")
+        in_item_table[ibt] = {1,vbt}
+        --reaper.ShowConsoleMsg("splitmult = ".. split_mult .. " SplitMult Total = " .. split_mult_total .. " Cell: " .. in_item_table[ibt][2] .. "\n")    
+      end
+    end
 ----------------------------------------------------------------------------------------
-		
-		for ig,vg in pairs(in_item_table) do
-			addstart = 1
-			if string.sub(vg[2],1,1) == " " then
-				addstart = 2
-			else
-			end
-			if string.sub(vg[2],addstart,addstart) == "^" then
-				if string.sub(vg[2],addstart + 1 ,addstart + 1) == "^" then
-					addstart = addstart + 2
-				else
-					addstart = addstart + 1
-				end
-			else
-			end
-			if string.sub(vg[2],addstart,addstart) == "b" or string.sub(vg[2],addstart,addstart) == "#" then
-				addstart = addstart + 2
-			else
-				addstart = addstart + 1
-			end
-			endtype,_ = string.find(vg[2], "/")
-			if endtype ~= nil then endtype = endtype - 1 end
-			if endtype == nil then endtype,_ = string.find(string.sub(vg[2],2,string.len(vg[2]))," ") end
-			if endtype == nil then endtype = string.len(vg[2]) end
-				replacetype = string.sub(vg[2],addstart, endtype)
-				--reaper.ShowConsoleMsg(replacetype .. "\n")
-			if musictheory.to_biab_translation[replacetype] ~= nil then
-				in_item_table[ig][2] = string.sub(vg[2],1,addstart-1) .. musictheory.to_biab_translation[replacetype] .. string.sub(vg[2],endtype + 1, string.len(vg[2]))
-			end
-		end
-		
-		
-		
-		
-		
-----------------------------------------------------------------------------------------		
-		if chord_count_total == 1 then
-			buileroo = in_item_table[1][2] .. " "
-			
-		
-		elseif chord_count_total == 2 and in_item_table[1][1] == in_item_table[2][1] then
-			buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " "
-		elseif chord_count_total == 2 and tonumber(in_item_table[1][1]) == 3 and tonumber(in_item_table[2][1]) == 1 then
-			buileroo = in_item_table[1][2] .. " / / " .. in_item_table[2][2] .. " "
-		elseif chord_count_total == 2 and tonumber(in_item_table[1][1]) == 1 and tonumber(in_item_table[2][1]) == 3 then
-			buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " / / "
-		elseif chord_count_total == 2 and in_item_table[1][1] > in_item_table[2][1] then
-			biab_ex_warning = biab_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. BIAB_main_bars_table[i] .. ' may have been simplified.\n'
-			buileroo = in_item_table[1][2] .. " / / " .. in_item_table[2][2] .. " "
-		elseif chord_count_total == 2 and in_item_table[1][1] < in_item_table[2][1] then
-			biab_ex_warning = biab_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. BIAB_main_bars_table[i] .. ' may have been simplified.\n'
-			buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " / / "			
+    
+    for ig,vg in pairs(in_item_table) do
+      addstart = 1
+      if string.sub(vg[2],1,1) == " " then
+        addstart = 2
+      else
+      end
+      if string.sub(vg[2],addstart,addstart) == "^" then
+        if string.sub(vg[2],addstart + 1 ,addstart + 1) == "^" then
+          addstart = addstart + 2
+        else
+          addstart = addstart + 1
+        end
+      else
+      end
+      if string.sub(vg[2],addstart,addstart) == "b" or string.sub(vg[2],addstart,addstart) == "#" then
+        addstart = addstart + 2
+      else
+        addstart = addstart + 1
+      end
+      endtype,_ = string.find(vg[2], "/")
+      if endtype ~= nil then endtype = endtype - 1 end
+      if endtype == nil then endtype,_ = string.find(string.sub(vg[2],2,string.len(vg[2]))," ") end
+      if endtype == nil then endtype = string.len(vg[2]) end
+        replacetype = string.sub(vg[2],addstart, endtype)
+        --reaper.ShowConsoleMsg(replacetype .. "\n")
+      if musictheory.to_biab_translation[replacetype] ~= nil then
+        in_item_table[ig][2] = string.sub(vg[2],1,addstart-1) .. musictheory.to_biab_translation[replacetype] .. string.sub(vg[2],endtype + 1, string.len(vg[2]))
+      end
+    end
+    
+    
+    
+    
+    
+----------------------------------------------------------------------------------------    
+    if chord_count_total == 1 then
+      buileroo = in_item_table[1][2] .. " "
+      
+    
+    elseif chord_count_total == 2 and in_item_table[1][1] == in_item_table[2][1] then
+      buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " "
+    elseif chord_count_total == 2 and tonumber(in_item_table[1][1]) == 3 and tonumber(in_item_table[2][1]) == 1 then
+      buileroo = in_item_table[1][2] .. " / / " .. in_item_table[2][2] .. " "
+    elseif chord_count_total == 2 and tonumber(in_item_table[1][1]) == 1 and tonumber(in_item_table[2][1]) == 3 then
+      buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " / / "
+    elseif chord_count_total == 2 and in_item_table[1][1] > in_item_table[2][1] then
+      biab_ex_warning = biab_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. BIAB_main_bars_table[i] .. ' may have been simplified.\n'
+      buileroo = in_item_table[1][2] .. " / / " .. in_item_table[2][2] .. " "
+    elseif chord_count_total == 2 and in_item_table[1][1] < in_item_table[2][1] then
+      biab_ex_warning = biab_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. BIAB_main_bars_table[i] .. ' may have been simplified.\n'
+      buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " / / "      
 
-		elseif chord_count_total == 3 and tonumber(in_item_table[1][1]) == 2 and tonumber(in_item_table[2][1]) == 1 and tonumber(in_item_table[3][1]) == 1 then
-			buileroo = in_item_table[1][2] .. " / " .. in_item_table[2][2] .. " " .. in_item_table[3][2] .. " "
-		elseif chord_count_total == 3 and tonumber(in_item_table[1][1]) == 1 and tonumber(in_item_table[2][1]) == 1 and tonumber(in_item_table[3][1]) == 2 then
-			buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " " .. in_item_table[3][2] .. " / "
-		elseif chord_count_total == 3 and tonumber(in_item_table[1][1]) == 1 and tonumber(in_item_table[2][1]) == 2 and tonumber(in_item_table[3][1]) == 1 then
-			buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " / " .. in_item_table[3][2] .. " "
-		elseif chord_count_total == 3 and tonumber(in_item_table[1][1]) > tonumber(in_item_table[2][1]) and tonumber(in_item_table[1][1]) > tonumber(in_item_table[3][1]) then
-			buileroo = in_item_table[1][2] .. " / " .. in_item_table[2][2] .. " " .. in_item_table[3][2] .. " "
-			biab_ex_warning = biab_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. BIAB_main_bars_table[i] .. ' may have been simplified.\n'			
-		elseif chord_count_total == 3 and tonumber(in_item_table[3][1]) > tonumber(in_item_table[1][1]) and tonumber(in_item_table[3][1]) > tonumber(in_item_table[2][1]) then
-			buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " " .. in_item_table[3][2] .. " / "
-			biab_ex_warning = biab_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. BIAB_main_bars_table[i] .. ' may have been simplified.\n'			
-		elseif chord_count_total == 3 and tonumber(in_item_table[2][1]) > tonumber(in_item_table[1][1]) and tonumber(in_item_table[2][1]) > tonumber(in_item_table[3][1]) then
-			biab_ex_warning = biab_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. BIAB_main_bars_table[i] .. ' may have been simplified.\n'		
-			buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " / " .. in_item_table[3][2] .. " "
-			
-		elseif chord_count_total == 4 and tonumber(in_item_table[1][1]) == tonumber(in_item_table[2][1]) and  tonumber(in_item_table[1][1]) == tonumber(in_item_table[3][1]) and tonumber(in_item_table[1][1]) == tonumber(in_item_table[4][1]) then
-			buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " " .. in_item_table[3][2] .. " " .. in_item_table[4][2] .. " "
+    elseif chord_count_total == 3 and tonumber(in_item_table[1][1]) == 2 and tonumber(in_item_table[2][1]) == 1 and tonumber(in_item_table[3][1]) == 1 then
+      buileroo = in_item_table[1][2] .. " / " .. in_item_table[2][2] .. " " .. in_item_table[3][2] .. " "
+    elseif chord_count_total == 3 and tonumber(in_item_table[1][1]) == 1 and tonumber(in_item_table[2][1]) == 1 and tonumber(in_item_table[3][1]) == 2 then
+      buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " " .. in_item_table[3][2] .. " / "
+    elseif chord_count_total == 3 and tonumber(in_item_table[1][1]) == 1 and tonumber(in_item_table[2][1]) == 2 and tonumber(in_item_table[3][1]) == 1 then
+      buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " / " .. in_item_table[3][2] .. " "
+    elseif chord_count_total == 3 and tonumber(in_item_table[1][1]) > tonumber(in_item_table[2][1]) and tonumber(in_item_table[1][1]) > tonumber(in_item_table[3][1]) then
+      buileroo = in_item_table[1][2] .. " / " .. in_item_table[2][2] .. " " .. in_item_table[3][2] .. " "
+      biab_ex_warning = biab_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. BIAB_main_bars_table[i] .. ' may have been simplified.\n'      
+    elseif chord_count_total == 3 and tonumber(in_item_table[3][1]) > tonumber(in_item_table[1][1]) and tonumber(in_item_table[3][1]) > tonumber(in_item_table[2][1]) then
+      buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " " .. in_item_table[3][2] .. " / "
+      biab_ex_warning = biab_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. BIAB_main_bars_table[i] .. ' may have been simplified.\n'      
+    elseif chord_count_total == 3 and tonumber(in_item_table[2][1]) > tonumber(in_item_table[1][1]) and tonumber(in_item_table[2][1]) > tonumber(in_item_table[3][1]) then
+      biab_ex_warning = biab_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. '\n' .. BIAB_main_bars_table[i] .. ' may have been simplified.\n'    
+      buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " / " .. in_item_table[3][2] .. " "
+      
+    elseif chord_count_total == 4 and tonumber(in_item_table[1][1]) == tonumber(in_item_table[2][1]) and  tonumber(in_item_table[1][1]) == tonumber(in_item_table[3][1]) and tonumber(in_item_table[1][1]) == tonumber(in_item_table[4][1]) then
+      buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " " .. in_item_table[3][2] .. " " .. in_item_table[4][2] .. " "
 
-		elseif chord_count_total == 4 and split_mult_total > 4 then
-			biab_ex_warning = biab_ex_warning .. '- Around measure '  .. processmore_table[i][3] .. ' ' .. '\nthe rhythm of chords ' .. BIAB_main_bars_table[i] .. '\n was simplified due to BIAB limititations.\n'
-			buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " " .. in_item_table[3][2] .. " " .. in_item_table[4][2] .. " "
-			
-		elseif chord_count_total > 4 then
-			biab_ex_warning = biab_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. ' ' .. BIAB_main_bars_table[i] .. '\nonly the chords ' .. in_item_table[1][2] .. ' ' .. in_item_table[2][2] .. ' ' .. in_item_table[3][2] .. ' ' .. in_item_table[4][2] .. '\n could be rendered due to BIAB limit of 4 chords per bar.\n'
-			buileroo = in_item_table[1][2] .. ' ' .. in_item_table[2][2] .. ' ' .. in_item_table[3][2] .. ' ' .. in_item_table[4][2] .. " "
-			
-		else
-			buileroo = BIAB_main_bars_table[i]
-		end
-		
-		BIAB_main_bars_table[i] = buileroo
+    elseif chord_count_total == 4 and split_mult_total > 4 then
+      biab_ex_warning = biab_ex_warning .. '- Around measure '  .. processmore_table[i][3] .. ' ' .. '\nthe rhythm of chords ' .. BIAB_main_bars_table[i] .. '\n was simplified due to BIAB limititations.\n'
+      buileroo = in_item_table[1][2] .. " " .. in_item_table[2][2] .. " " .. in_item_table[3][2] .. " " .. in_item_table[4][2] .. " "
+      
+    elseif chord_count_total > 4 then
+      biab_ex_warning = biab_ex_warning .. '- Around measure ' .. processmore_table[i][3] .. ' ' .. BIAB_main_bars_table[i] .. '\nonly the chords ' .. in_item_table[1][2] .. ' ' .. in_item_table[2][2] .. ' ' .. in_item_table[3][2] .. ' ' .. in_item_table[4][2] .. '\n could be rendered due to BIAB limit of 4 chords per bar.\n'
+      buileroo = in_item_table[1][2] .. ' ' .. in_item_table[2][2] .. ' ' .. in_item_table[3][2] .. ' ' .. in_item_table[4][2] .. " "
+      
+    else
+      buileroo = BIAB_main_bars_table[i]
+    end
+    
+    BIAB_main_bars_table[i] = buileroo
 
-	else
-		this_single_chord = BIAB_main_bars_table[i]
-		addstart = 1
-		if string.sub(this_single_chord,1,1) == " " then
-			addstart = 2
-		else
-		end
-		if string.sub(this_single_chord,addstart,addstart) == "^" then
-			if string.sub(this_single_chord,addstart + 1 ,addstart + 1) == "^" then
-				addstart = addstart + 2
-			else
-				addstart = addstart + 1
-			end
-		else
-		end
-		if string.sub(this_single_chord,addstart,addstart) == "b" or string.sub(this_single_chord,addstart,addstart) == "#" then
-			addstart = addstart + 2
-		else
-			addstart = addstart + 1
-		end
-		endtype,_ = string.find(this_single_chord, "/")
-		if endtype ~= nil then endtype = endtype - 1 end
-		if endtype == nil then endtype,_ = string.find(string.sub(this_single_chord,2,string.len(this_single_chord))," ") end
-		if endtype == nil then endtype = string.len(this_single_chord) end
-		replacetype = string.sub(this_single_chord,addstart, endtype)
-		--reaper.ShowConsoleMsg(replacetype .. "\n")
-		if musictheory.to_biab_translation[replacetype] ~= nil then
-			BIAB_main_bars_table[i] = string.sub(this_single_chord,1,addstart-1) .. musictheory.to_biab_translation[replacetype] .. string.sub(this_single_chord,endtype + 1, string.len(this_single_chord))
-		end
-	end
+  else
+    this_single_chord = BIAB_main_bars_table[i]
+    addstart = 1
+    if string.sub(this_single_chord,1,1) == " " then
+      addstart = 2
+    else
+    end
+    if string.sub(this_single_chord,addstart,addstart) == "^" then
+      if string.sub(this_single_chord,addstart + 1 ,addstart + 1) == "^" then
+        addstart = addstart + 2
+      else
+        addstart = addstart + 1
+      end
+    else
+    end
+    if string.sub(this_single_chord,addstart,addstart) == "b" or string.sub(this_single_chord,addstart,addstart) == "#" then
+      addstart = addstart + 2
+    else
+      addstart = addstart + 1
+    end
+    endtype,_ = string.find(this_single_chord, "/")
+    if endtype ~= nil then endtype = endtype - 1 end
+    if endtype == nil then endtype,_ = string.find(string.sub(this_single_chord,2,string.len(this_single_chord))," ") end
+    if endtype == nil then endtype = string.len(this_single_chord) end
+    replacetype = string.sub(this_single_chord,addstart, endtype)
+    --reaper.ShowConsoleMsg(replacetype .. "\n")
+    if musictheory.to_biab_translation[replacetype] ~= nil then
+      BIAB_main_bars_table[i] = string.sub(this_single_chord,1,addstart-1) .. musictheory.to_biab_translation[replacetype] .. string.sub(this_single_chord,endtype + 1, string.len(this_single_chord))
+    end
+  end
 
 end
 
 
 
 
-for i,v in pairs(BIAB_main_bars_table) do							--	DEAL WITH REPEATS ON THE WAY TO TEXT
-	if v == "!Repeat!" then
-	BIAB_post_table_chord_data = BIAB_post_table_chord_data .. " | "  .. the_last_BIAB_bar_content
-	else
-	BIAB_post_table_chord_data = BIAB_post_table_chord_data .. " | "  .. v
-	the_last_BIAB_bar_content = v
-	end
+for i,v in pairs(BIAB_main_bars_table) do              --  DEAL WITH REPEATS ON THE WAY TO TEXT
+  if v == "!Repeat!" then
+  BIAB_post_table_chord_data = BIAB_post_table_chord_data .. " | "  .. the_last_BIAB_bar_content
+  else
+  BIAB_post_table_chord_data = BIAB_post_table_chord_data .. " | "  .. v
+  the_last_BIAB_bar_content = v
+  end
 end
-																					
-BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, "| Â |", "|A) ")		-- SWAP OUT FOR A)
-BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, "| Å |", "|B) ")			-- AND B) SECTION MARKS
-BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, "<<", "^^")			-- SWAP OUT FOR 16th 
-BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, "<", "^")					-- AND 8th PUSHES IN BIAB FORMAT
+                                          
+BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, "| Â |", "|A) ")    -- SWAP OUT FOR A)
+BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, "| Å |", "|B) ")      -- AND B) SECTION MARKS
+BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, "<<", "^^")      -- SWAP OUT FOR 16th 
+BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, "<", "^")          -- AND 8th PUSHES IN BIAB FORMAT
 
-BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, " b1", " 1b")			-- SWAP OUT ROOTS TO BIAB STYLE
+BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, " b1", " 1b")      -- SWAP OUT ROOTS TO BIAB STYLE
 BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, " b2", " 2b")
 BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, " b3", " 3b")
 BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, " b4", " 4b")
@@ -6417,7 +6884,7 @@ BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, " b5", " 5b
 BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, " b6", " 6b")
 BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, " b7", " 7b")
 
-BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, "/b1", "/1b")			-- SWAP OUT BASS TO BIAB STYLE
+BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, "/b1", "/1b")      -- SWAP OUT BASS TO BIAB STYLE
 BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, "/b2", "/2b")
 BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, "/b3", "/3b")
 BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, "/b4", "/4b")
@@ -6428,8 +6895,8 @@ BIAB_post_table_chord_data = string.gsub(BIAB_post_table_chord_data, "/b7", "/7b
 the_BIAB_bar_count = 0
 --reaper.ShowConsoleMsg("\n-----------------------------------------\n")
 for i,v in pairs(processmore_table) do
-	the_BIAB_bar_count = the_BIAB_bar_count + tonumber(processmore_table[i][2])
-	--reaper.ShowConsoleMsg("COUNT = " .. tonumber(processmore_table[i][2]) .. "TOTAL = " .. the_BIAB_bar_count .. "\n")
+  the_BIAB_bar_count = the_BIAB_bar_count + tonumber(processmore_table[i][2])
+  --reaper.ShowConsoleMsg("COUNT = " .. tonumber(processmore_table[i][2]) .. "TOTAL = " .. the_BIAB_bar_count .. "\n")
 end
 return BIAB_post_table_chord_data, the_BIAB_bar_count, thefail
 end
@@ -6448,15 +6915,15 @@ end
 ---------------------------------------------------------Swap out sets of unequal lenght items
 -- \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 function Swapout(haystack, needletable)
-	for swap_i, swap_v in pairs(needletable) do
-	::keepswapping::																	-- CONVERT TABS TO SPACES
-	local current_text_length = string.len(haystack)
-	haystack = string.gsub(haystack, swap_v[1] , swap_v[2])
-		if current_text_length ~= string.len(haystack) then
-		goto keepswapping
-		end
-	end
-	return haystack
+  for swap_i, swap_v in pairs(needletable) do
+  ::keepswapping::                                  -- CONVERT TABS TO SPACES
+  local current_text_length = string.len(haystack)
+  haystack = string.gsub(haystack, swap_v[1] , swap_v[2])
+    if current_text_length ~= string.len(haystack) then
+    goto keepswapping
+    end
+  end
+  return haystack
 end
 
 
@@ -6468,7 +6935,7 @@ end
 
 --  Write to Console - Commented out unless debugging
 function Show_To_Dev(to_dev_message)
-    --reaper.ShowConsoleMsg(to_dev_message)
+    reaper.ShowConsoleMsg(to_dev_message)
 end
 
 
@@ -6502,12 +6969,12 @@ end
 --  A pair of functions that return convert decimals to fractions - NOT ORIGINAL WORK
 
 function Provide_Fraction(numer,denom)
-	fracttop, fractbottom = Convert_Decimal_To_Fraction(numer)
-	if fractbottom == 1 then
-	fractiontoreturn = fracttop
-	else
-	fractiontoreturn = string.format("%d/%d",fracttop, fractbottom)
-	end
+  fracttop, fractbottom = Convert_Decimal_To_Fraction(numer)
+  if fractbottom == 1 then
+  fractiontoreturn = fracttop
+  else
+  fractiontoreturn = string.format("%d/%d",fracttop, fractbottom)
+  end
    return fractiontoreturn
 end
 
@@ -6529,7 +6996,104 @@ function Convert_Decimal_To_Fraction(num)
 end
 
 
+
+
+-- Example functions for each case
+function case1(s1v,s2v,track) reaper.ShowConsoleMsg("Case 1 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case2(s1v,s2v,track) reaper.ShowConsoleMsg("Case 2 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case3(s1v,s2v,track) reaper.ShowConsoleMsg("Case 3 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case4(s1v,s2v,track) reaper.ShowConsoleMsg("Case 4 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case5(s1v,s2v,track) reaper.ShowConsoleMsg("Case 5 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case6(s1v,s2v,track) reaper.ShowConsoleMsg("Case 6 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case7(s1v,s2v,track) reaper.ShowConsoleMsg("Case 7 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case8(s1v,s2v,track) reaper.ShowConsoleMsg("Case 8 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case9(s1v,s2v,track) reaper.ShowConsoleMsg("Case 9 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case10(s1v,s2v,track) reaper.ShowConsoleMsg("Case 10 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case11(s1v,s2v,track) reaper.ShowConsoleMsg("Case 11 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case12(s1v,s2v,track) reaper.ShowConsoleMsg("Case 12 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case13(s1v,s2v,track) reaper.ShowConsoleMsg("Case 13 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case14(s1v,s2v,track) reaper.ShowConsoleMsg("Case 14 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case15(s1v,s2v,track) reaper.ShowConsoleMsg("Case 15 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case16(s1v,s2v,track) reaper.ShowConsoleMsg("Case 16 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case17(s1v,s2v,track) reaper.ShowConsoleMsg("Case 17 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case18(s1v,s2v,track) reaper.ShowConsoleMsg("Case 18 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case19(s1v,s2v,track) reaper.ShowConsoleMsg("Case 19 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case20(s1v,s2v,track) reaper.ShowConsoleMsg("Case 20 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case21(s1v,s2v,track) reaper.ShowConsoleMsg("Case 21 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case22(s1v,s2v,track) reaper.ShowConsoleMsg("Case 22 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+function case23(s1v,s2v,track) reaper.ShowConsoleMsg("Case 23 executed\n" .. s1v .. " \n" .. s2v .. "\n" .. track .. "\n") end
+
+
+-- Dispatch table
+local caseFunctions = {
+    [1] = case1,
+    [2] = case2,
+    [3] = case3,
+    [4] = case4,
+    [5] = case5,
+    [6] = case6,
+    [7] = case7,
+    [8] = case8,
+    [9] = case9,
+    [10] = case10,
+    [11] = case11,
+    [12] = case12,
+    [13] = case13,
+    [14] = case14,
+    [15] = case15,
+    [16] = case16,
+    [17] = case17,
+    [18] = case18,
+    [19] = case19,
+    [20] = case20,
+    [21] = case21,
+    [22] = case22,
+    [23] = case23  
+}
+
+-- Function to find the closest integer
+function closestInteger(num)
+    return math.floor(num + 0.5)
+end
+
+
+
+
+
+
+
+
+
+function render_gather_go()
+    local num_tracks = reaper.GetNumTracks() -- Count the number of tracks
+  --reaper.ShowConsoleMsg("I found " .. num_tracks .. " tracks\n")
+    for i = 1, num_tracks-1 do -- Iterate over all tracks
+        local track = reaper.GetTrack(0, i) -- Get the track
+    local fx_index = reaper.TrackFX_GetByName(track, "#2notes", false )
+    --reaper.ShowConsoleMsg("Found on track " .. i .. " = " .. fx_index .. " \n")
+    if fx_index >= 0 then
+    local slider1value = reaper.TrackFX_GetParamNormalized(track, fx_index, 0) * 23
+    local slider2value = reaper.TrackFX_GetParamNormalized(track, fx_index, 1) * 17  
+    reaper.ShowConsoleMsg('So slider number 1 of track ' .. i .. ' is set to ' ..  slider1value .. ' which corresponds with ' .. JSFX_data_request1[slider1value] .. ' and slider number 2 is set to ' .. slider2value .. ' with the corresponding meaning of ' .. JSFX_data_request2[slider2value + 1] .. '\n')
+    
+    local closestCase = closestInteger(slider1value, slider2value)
+    
+    -- Execute the corresponding function, if it exists
+    if caseFunctions[closestCase] then
+      caseFunctions[closestCase](slider1value, slider2value, i)
+    else
+      reaper.ShowConsoleMsg("No corresponding case for value " .. closestCase)
+    end
+
+    
+    
+    
+    end
+    end
+  modal_on = false
+end
+
 -- _______________________________________________________________________ MAIN FUNCTION  ____________________
 Initialize_Track_Setup()
+LoadLastNumbers2NotesChart()
 IM_GUI_Loop()
-
