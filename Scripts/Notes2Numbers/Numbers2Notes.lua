@@ -1,15 +1,14 @@
 -- @description Numbers2Notes
--- @version 1.2.3
+-- @version 1.2.4
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes1.2.3
+--   # Numbers2Notes1.2.4
 --   Updated Nashville Number System Style Chord Charting for Reaper.
 -- @changelog
---   Fixed bug where user closing interface caused error
---   Fixed bug where no open project caused error
---   Auto Reload of Last Numbers2Notes Session
+--   Required an older version of imgui.
 
-
+package.path = reaper.ImGui_GetBuiltinPath() .. '/?.lua'
+local ImGui = require 'imgui' '0.8.6' -- Version of IMGUI used during development.
 
 local info = debug.getinfo(1, "S")
 -----------------------------------------------   REQUIRED FILES
@@ -897,7 +896,7 @@ Form: I V C V C B C O]]
         end
         if feedback_tab_mode == 9 then
     
-reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.2.3")
+reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.2.4")
 reaper.ImGui_Text(ctx, "Numbers2Notes does not yet allow the user to select plugins.")
 reaper.ImGui_Text(ctx, "The plugins below are required to fully set up the default configuration.")
 reaper.ImGui_Text(ctx, "")
