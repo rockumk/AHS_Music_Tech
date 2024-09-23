@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="f8859c14c3b50e5479caf15c72a1b73a955c61fe">
+<index version="1" name="AHS_Music_Tech" commit="c452b8833abe2360b543d9ae7d6d1c54ec5e1362">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -505,6 +505,20 @@ Auto Reload of Last Numbers2Notes Session]]></changelog>
       </metadata>
       <version name="1.1" author="rockumk (Rock Kennedy)" time="2022-11-28T02:41:33Z">
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/b16bc26dcd1f212e28e4aed141b309957d406fc3/Scripts/Notes2Numbers/ChordCharts/.PlaceHolder.lua</source>
+      </version>
+    </reapack>
+    <reapack name="Last_Numbers2Notes_Chart.txt" type="midinotenames">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 This does nothing but assure that the User_Data folder is created.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="rockumk (Rock Kennedy)" time="2024-09-23T02:55:29Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/c452b8833abe2360b543d9ae7d6d1c54ec5e1362/Scripts/Notes2Numbers/ChordCharts/Last_Numbers2Notes_Chart.txt</source>
       </version>
     </reapack>
   </category>
