@@ -1,0 +1,1068 @@
+
+version: 1.0.0
+desc:Mood2Mode - Easy Transposition to Black or White Keys
+// Customized MIDI repeater
+author: Rock Kennedy
+about:
+  # Allows the user to find tonics, determine and select modes, and transpose notes to black or white keys.
+changelog:
+  - First Version
+
+
+
+
+
+
+// A JSFX script to transpose for easy-play use with Modes, Nashville Number System, and Mode-Specific Options.
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                       
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////        SLIDERS        
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
+
+
+slider1:1<1,7,1{Major,Dorian,Phrygian,Lydian,Mixolydian,Minor,Locrian}>-Mode
+slider2:0<0,11,1{C,C♯/D♭,D,D♯/E♭,E,F,F♯/G♭,G,G♯/A♭,A,A♯/B♭,B}>-Parent Major Tonic
+slider3:0<0,11,1{C,C♯/D♭,D,D♯/E♭,E,F,F♯/G♭,G,G♯/A♭,A,A♯/B♭,B}>-Modal Tonic (Ex. B Minor's focus is B.)
+slider4:1<1,5,1{White Keys,Black Keys 1,Black Keys 2,Black Keys 3,Black Keys 4}>-Option Button Choice
+slider5:0<-24,24,1>-Transposition Amount
+slider7:0<-10000,10000,1>-current_modal_pitchshift
+slider8:0<-10000,10000,1>-option_pitchshift
+slider9:0<-10000,10000,1>-tonic_work
+slider10:0<-10000,10000,1>-Display4 Value
+slider11:0<-10000,10000,1>-NoteGlow
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                       
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////        INIT           
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                       
+@init
+
+// Offsets and Data
+
+selected_mode_names = 0;
+
+array[selected_mode_names + 1] = "Major (Ionian Mode)";
+array[selected_mode_names + 2] = "Dorian Mode";
+array[selected_mode_names + 3] = "Phrygian Mode";
+array[selected_mode_names + 4] = "Lydian Mode";
+array[selected_mode_names + 5] = "Mixolydian Mode";
+array[selected_mode_names + 6] = "Minor (Aeolian Mode)";
+array[selected_mode_names + 7] = "Locrian Mode";
+
+mode_descript_offset = 10;                                                                 // Mode Description Offsets
+array[mode_descript_offset + 1] = "Generally positive. Sweet at low energy. Cheerful, happy, and fun at a higher energy";
+array[mode_descript_offset + 2] = "Generally chill but can sometimes be moody. Not as purely sad as minor can be. Can be romantic or sexy.";
+array[mode_descript_offset + 3] = "Exotic. Can sound foreign or ancient especially to modern Western listeners.";
+array[mode_descript_offset + 4] = "Often mystical or magic sounding. Used in the opening of the Simpsons and the theme to E.T.";
+array[mode_descript_offset + 5] = "Positive but more sas and funk than Major. Often used in rock and roll, blues, and southern rock like Sweet Home Alabama.";
+array[mode_descript_offset + 6] = "Generally sad at low energies, but moving towards tough or angry at higher energies.";
+array[mode_descript_offset + 7] = "Generally unsettling, uneasy, anxious with little sense of stability or resolution.";
+
+mode_pitchshift_offset = 20;                                                                     // Modal Transpostion offsets
+array[mode_pitchshift_offset + 1] = 0;  // Major
+array[mode_pitchshift_offset + 2] = 2;  // Dorian
+array[mode_pitchshift_offset + 3] = 4;  // Phrygian
+array[mode_pitchshift_offset + 4] = 5;  // Lydian
+array[mode_pitchshift_offset + 5] = 7;  // Mixolydian
+array[mode_pitchshift_offset + 6] = 9;  // Minor
+array[mode_pitchshift_offset + 7] = 11; // Locrian
+
+note_map_offset = 100;                                                                        // Note mapping
+array[note_map_offset + 0] = "C";
+array[note_map_offset + 1] = "C#";
+array[note_map_offset + 2] = "D";
+array[note_map_offset + 3] = "D#/Eb";
+array[note_map_offset + 4] = "E";
+array[note_map_offset + 5] = "F";
+array[note_map_offset + 6] = "F#";
+array[note_map_offset + 7] = "G";
+array[note_map_offset + 8] = "G#/Ab";
+array[note_map_offset + 9] = "A";
+array[note_map_offset + 10] = "A#/Bb";
+array[note_map_offset + 11] = "B";
+
+opt_offset = 1000;
+
+// Per-mode offsets
+major_offset =        100;
+dorian_offset =       200;
+phrygian_offset =     300;
+lydian_offset =       400;
+mixolydian_offset =   500;
+minor_offset =        600;
+locrian_offset =      700;
+
+opt_descript_offset   = 0;                                                                     
+opt_m_tonic_n_offset = 10;                                                                                                       
+opt_transpose_offset  = 20;
+opt_gold_note_offset  = 30;
+opt_blue_note_offset  = 40;  
+opt_rankings_offset  = 50;
+                                                                                                                        // MAJOR                              
+                                                                                                                        //                                    
+this_modes_offset = major_offset;                                                                                       //                                    
+                                                                                        // Option Descriptions
+array[opt_offset + this_modes_offset + opt_descript_offset +  1] = "White Keys - Good! Works great for establishing the positive Major vibe.";
+array[opt_offset + this_modes_offset + opt_descript_offset +  2] = "Black Keys 1 - Good Recommended! - Great for Bluegrass, Chinese, and other Major sounding Pentatonic Music";
+array[opt_offset + this_modes_offset + opt_descript_offset +  3] = "Black Keys 2 - Meh - Bluesy";
+array[opt_offset + this_modes_offset + opt_descript_offset +  4] = "Black Keys 3 - Meh";
+array[opt_offset + this_modes_offset + opt_descript_offset +  5] = "Black Keys 4 - Meh";
+                                                                                       // Performance Tonics
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 1] = "C";            
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 2] = "F♯";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 3] = "E♭"; //A
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 4] = "B";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 5] = "C♯";
+                                                                                        // Transpositions
+array[opt_offset + this_modes_offset + opt_transpose_offset + 1] = 0;       
+array[opt_offset + this_modes_offset + opt_transpose_offset + 2] = 6;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 3] = 3;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 4] = 11;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 5] = 1;
+                                                                                        // Highlight Notes
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 1] = 0;           
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 2] = 6;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 3] = 3;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 4] = 11;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 5] = 1;
+                                                                                        // Blues Notes              
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 1] =  3; 
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 2] =  9;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 3] =  9;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 4] =  2;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 5] = -1;
+                                                                                        // Ranking
+array[opt_offset + this_modes_offset + opt_rankings_offset +  1] =  4; 
+array[opt_offset + this_modes_offset + opt_rankings_offset +  2] =  4;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  3] =  2;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  4] =  1;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  5] =  1;                                                                                                            
+                                                                                                                // DORIAN                             
+                                                                                                                           //                                    
+this_modes_offset = dorian_offset;                                                                                         //                                    
+                                                                                        // Option Descriptions
+array[opt_offset + this_modes_offset + opt_descript_offset +  1] = "White Keys - Good! Sounds chill or can have a slick vibe.";
+array[opt_offset + this_modes_offset + opt_descript_offset +  2] = "Black Keys 1 - Good and Recommended! - Pirate and Sea Songs";
+array[opt_offset + this_modes_offset + opt_descript_offset +  3] = "Black Keys 2 - OK";
+array[opt_offset + this_modes_offset + opt_descript_offset +  4] = "Black Keys 4 - Meh";
+array[opt_offset + this_modes_offset + opt_descript_offset +  5] = "Not Available";
+                                                                                        // Performance Tonics
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 1] = "D";            
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 2] = "E♭";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 3] = "A♭";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 4] = "C♯";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 5] = -1; // -1 = Empty / Not Available
+                                                                                        // Transpositions
+array[opt_offset + this_modes_offset + opt_transpose_offset + 1] =  0;       
+array[opt_offset + this_modes_offset + opt_transpose_offset + 2] =  1;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 3] =  6;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 4] = 11;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 5] = -1;
+                                                                                        // Highlight Notes
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 1] =  0;            
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 2] =  1;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 3] =  6;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 4] = 11;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 5] = -1;
+                                                                                        // Blues Notes
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 1] =  8;               
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 2] =  9;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 3] = 11;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 4] = -1;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 5] = -1;
+                                                                                        // Ranking
+array[opt_offset + this_modes_offset + opt_rankings_offset +  1] =  4; 
+array[opt_offset + this_modes_offset + opt_rankings_offset +  2] =  4;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  3] =  2;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  4] =  1;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  5] = -1;  
+                                                                                                                          // PHRYGIAN                           
+                                                                                                                          //                                    
+this_modes_offset = phrygian_offset;                                                                                      //                                    
+                                                                                                      // Option Descriptions
+array[opt_offset + this_modes_offset + opt_descript_offset +  1] = "White Keys - Best Phrygian option! Recommended above all Black Key options.";
+array[opt_offset + this_modes_offset + opt_descript_offset +  2] = "Black Keys 1 - OK but not as good as White Key option";
+array[opt_offset + this_modes_offset + opt_descript_offset +  3] = "Black Keys 2 - OK but not as good as White Key option";
+array[opt_offset + this_modes_offset + opt_descript_offset +  4] = "Not Available";
+array[opt_offset + this_modes_offset + opt_descript_offset +  5] = "Not Available";
+                                                                                                      
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 1] = "E";                               // Performance Tonics
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 2] = "E♭";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 3] = "B♭";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 4] = -1;  // Empty
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 5] = -1;  // Empty
+                                                                                                      // Transpositions
+array[opt_offset + this_modes_offset + opt_transpose_offset + 1] =  0;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 2] = 11;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 3] =  6;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 4] = -1;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 5] = -1;
+                                                                                                      // Highlight Notes
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 1] =  0;                        
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 2] = 11;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 3] =  6;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 4] = -1;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 5] = -1;
+                                                                                                      // Blues Notes
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 1] =  8;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 2] =  9;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 3] =  4;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 4] = -1;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 5] = -1;
+                                                                                        // Ranking
+array[opt_offset + this_modes_offset + opt_rankings_offset +  1] =  4; 
+array[opt_offset + this_modes_offset + opt_rankings_offset +  2] =  2;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  3] =  2;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  4] = -1;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  5] = -1;  
+                                                                                                                          // LYDIAN                             
+                                                                                                                          //                                    
+this_modes_offset = lydian_offset;                                                                                        //                                    
+                                                                                                     // Option Descriptions
+array[opt_offset + this_modes_offset + opt_descript_offset +  1] = "White Keys - Best Lydian option! Recommended above all Black Key options.";
+array[opt_offset + this_modes_offset + opt_descript_offset +  2] = "Black Keys 1 - Best Black Key option, but not as good as the White Key option.";
+array[opt_offset + this_modes_offset + opt_descript_offset +  3] = "Black Keys 2 - Good but tends to give Lydian a Major flavor.";
+array[opt_offset + this_modes_offset + opt_descript_offset +  4] = "Black Keys 3 - Good";
+array[opt_offset + this_modes_offset + opt_descript_offset +  5] = "Not Available";
+                                                                                                     // Performance Tonics
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 1] = "F";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 2] = "E";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 3] = "B";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 4] = "F♯";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 5] = -1;  // Empty
+                                                                                                     // Transpositions
+array[opt_offset + this_modes_offset + opt_transpose_offset + 1] =  0;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 2] = 11;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 3] =  6;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 4] =  1;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 5] = -1;
+                                                                                                     // Highlight Notes
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 1] =  0;            
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 2] = 11;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 3] =  6;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 4] =  1;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 5] = -1;
+                                                                                                     // Blues Notes
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 1] = -1;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 2] = -1;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 3] = -1;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 4] = -1;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 5] = -1;
+                                                                                        // Ranking
+array[opt_offset + this_modes_offset + opt_rankings_offset +  1] =  4; 
+array[opt_offset + this_modes_offset + opt_rankings_offset +  2] =  3;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  3] =  3;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  4] =  3;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  5] = -1;  
+                                                                                                                          // MIXOLYDIAN                         
+                                                                                                                          //                                    
+this_modes_offset = mixolydian_offset;                                                                                    //                                    
+                                                                                                    // Option Descriptions
+array[opt_offset + this_modes_offset + opt_descript_offset +  1] = "White Keys - Good!";
+array[opt_offset + this_modes_offset + opt_descript_offset +  2] = "Black Keys 1 - Great for Majorish Blues, Southern Rock, and Rock and Roll";
+array[opt_offset + this_modes_offset + opt_descript_offset +  3] = "Black Keys 2 - Good. Recommended for a happy, cheerful Black Key option.";
+array[opt_offset + this_modes_offset + opt_descript_offset +  4] = "Black Keys 3 - OK";
+array[opt_offset + this_modes_offset + opt_descript_offset +  5] = "Black Keys 4 - OK, but unresolvable on Black Keys only.";
+                                                                                                    // Performance Tonics
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 1] = "G";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 2] = "C♯";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 3] = "F♯";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 4] = "C♯";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 5] = "A♭";
+                                                                                                    // Transpositions
+array[opt_offset + this_modes_offset + opt_transpose_offset + 1] =  0;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 2] =  8;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 3] = 11;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 4] =  1;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 5] =  6;
+                                                                                                   // Highlight Notes
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 1] =  0;            
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 2] =  8;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 3] = 11;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 4] =  1;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 5] =  6;
+                                                                                                    // Blues Notes
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 1] = 10;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 2] =  9;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 3] =  9;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 4] = 11;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 5] =  4;
+                                                                                        // Ranking
+array[opt_offset + this_modes_offset + opt_rankings_offset +  1] =  4; 
+array[opt_offset + this_modes_offset + opt_rankings_offset +  2] =  4;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  3] =  3;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  4] =  3;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  5] =  2;  
+                                                                                                                          // MINOR                              
+                                                                                                                          //                                    
+this_modes_offset = minor_offset;                                                                                         //                                    
+                                                                                                    // Option Descriptions
+array[opt_offset + this_modes_offset + opt_descript_offset +  1] = "White Keys - Good!";
+array[opt_offset + this_modes_offset + opt_descript_offset +  2] = "Black Keys 1 - Good Recommended!";
+array[opt_offset + this_modes_offset + opt_descript_offset +  3] = "Black Keys 2 - OK";
+array[opt_offset + this_modes_offset + opt_descript_offset +  4] = "Black Keys 3 - Meh";
+array[opt_offset + this_modes_offset + opt_descript_offset +  5] = "Not Available";
+                                                                                                   // Performance Tonics
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 1] =  "A";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 2] = "E♭";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 3] = "A♭";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 4] = "B♭";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 5] =   -1;  // Empty
+                                                                                                   // Transpositions
+array[opt_offset + this_modes_offset + opt_transpose_offset + 1] =  0;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 2] =  6;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 3] = 11;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 4] =  1;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 5] = -1;
+                                                                                                   // Highlight Notes
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 1] =  0;            
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 2] =  6;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 3] = 11;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 4] =  1;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 5] = -1;
+                                                                                                   // Blues Notes
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 1] =  3;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 2] =  9;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 3] =  2;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 4] =  4;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 5] = -1;
+                                                                                        // Ranking
+array[opt_offset + this_modes_offset + opt_rankings_offset +  1] =  4; 
+array[opt_offset + this_modes_offset + opt_rankings_offset +  2] =  4;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  3] =  2;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  4] =  1;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  5] = -1;  
+                                                                                                                            // LOCRIAN                            
+                                                                                                                            //                                    
+this_modes_offset = locrian_offset;                                                                                         //                                    
+                                                                                                     // Option Descriptions
+array[opt_offset + this_modes_offset + opt_descript_offset +  1] = "White Keys - Best Locrian option! Recommended above all Black Key options for full Locrian flavor.";
+array[opt_offset + this_modes_offset + opt_descript_offset +  2] = "Black Keys 1 - OK but not as good as White Key option";
+array[opt_offset + this_modes_offset + opt_descript_offset +  3] = "Black Keys 2 - Meh";
+array[opt_offset + this_modes_offset + opt_descript_offset +  4] = "Not Available";
+array[opt_offset + this_modes_offset + opt_descript_offset +  5] = "Not Available";
+                                                                                                    // Performance Tonics
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 1] = "B";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 2] = "B♭";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 3] = "C";
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 4] =  -1;
+array[opt_offset + this_modes_offset + opt_m_tonic_n_offset + 5] =  -1;  // Empty
+                                                                                                    // Transpositions
+array[opt_offset + this_modes_offset + opt_transpose_offset + 1] =  0;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 2] = 11;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 3] =  1;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 4] = -1;
+array[opt_offset + this_modes_offset + opt_transpose_offset + 5] = -1;
+                                                                                                    // Highlight Notes
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 1] =  0;             
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 2] = 11;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 3] =  1;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 4] = -1;
+array[opt_offset + this_modes_offset + opt_gold_note_offset + 5] = -1;
+                                                                                                    // Blues Notes
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 1] = -1;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 2] = -1;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 3] = -1;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 4] = -1;
+array[opt_offset + this_modes_offset + opt_blue_note_offset + 5] = -1;
+                                                                                        // Ranking
+array[opt_offset + this_modes_offset + opt_rankings_offset +  1] =  4; 
+array[opt_offset + this_modes_offset + opt_rankings_offset +  2] =  2;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  3] =  1;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  4] = -1;
+array[opt_offset + this_modes_offset + opt_rankings_offset +  5] = -1;  
+
+// State tracking
+last_mode =   slider1;       // Last Mode
+last_p_tonic =  slider2;     // Last Parent Tonic / Nashville Number System Tonic
+last_m_tonic =   slider3;    // Last Modal Tonic
+last_option = slider4;       // Last Option
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                                                         
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////        CALCULATION FUNCTION WHICH IS BASICALLY THE @ SLIDER             
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                                                         
+
+function calculate() (
+mode    =  slider1;                                                                         // Get current slider values
+p_tonic =  slider2;
+m_tonic =  slider3;
+option  =  slider4;
+
+current_modal_pitchshift    = array[mode_pitchshift_offset + slider1];                     // Step 1: Calculate the offset from Parent/Nashville Tonic to C
+option_pitchshift           = array[opt_offset + (last_mode * 100) + 20 + slider4];        // Step 2: Set modal pitch shift for the current mode (0,4,5,7,9,11)
+tonic_work                  = current_modal_pitchshift - option_pitchshift;                // Step 3: Subtract the Trans # of the current mode's selected option
+
+slider7  = current_modal_pitchshift;                                                       //TEMP
+slider8  = option_pitchshift;                                                              //TEMP
+slider9  = tonic_work;                                                                     //TEMP
+
+transposition_amount  = p_tonic - array[opt_offset + (slider1 * 100) + 20 + slider4];
+transposition_amount  = transposition_amount < -6 ? transposition_amount + 12 : transposition_amount;
+transposition_amount  = transposition_amount > 6 ? transposition_amount - 12 : transposition_amount;
+
+slider5 = transposition_amount;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Calculate the Modal Offset based on the Mode
+current_modal_pitchshift = array[mode_pitchshift_offset + mode];
+
+// Recalculate Modal tonic Focus Note if Mode or Parent/Nashville Tonic changes
+last_mode != mode || last_p_tonic != p_tonic ? 
+(
+    m_tonic = (p_tonic + current_modal_pitchshift) % 12; // Calculate new tonic Focus Note
+    slider3 = m_tonic; // Update Modal tonic Focus Note slider
+): 0;
+
+// Recalculate Parent/Nashville Tonic if tonic Focus Note changes
+last_m_tonic != m_tonic ? 
+(
+    p_tonic = (m_tonic - current_modal_pitchshift + 12) % 12; // Calculate new Parent/Nashville Tonic
+    slider2 = p_tonic; // Update Parent/Nashville Tonic slider
+): 0;
+
+// Update state tracking
+last_mode     = slider1;
+last_p_tonic  = slider2;
+last_m_tonic  = slider3;
+last_option   = slider4;
+
+);
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                       
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////        SLIDER         
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                       
+
+@slider
+calculate()
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                       
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////        GFX            
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                       
+
+@gfx 1575 895
+// Clear the screen and draw the background image
+gfx_clear = 0;
+gfx_loadimg(0, "AHS_Music_Tech/Mood2ModeBackground.png");
+gfx_blit(0, 1, 0, 0, 0, gfx_w, gfx_h, 0, 0);
+
+// Track mouse clicks
+mouse_clicked = mouse_cap & 1;  // Left mouse button click
+
+// Debug font setup
+gfx_setfont(1, "Arial", 16);
+gfx_a = 1.0;  // Ensure text is fully opaque
+gfx_r = gfx_g = gfx_b = 1.0;  // White text
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////       GFX  SLIDER1 - THE MODE            
+
+// Button dimensions for slider1
+button_width = 315;
+button_height = 185;
+
+// Loop through buttons to check interaction and draw overlays
+i = 1;
+xover = 26;
+ydown = 17;
+
+loop(7,
+    // Hardcode MODE SELECTION button coordinates based on index
+    
+    i == 1 ? ( x =  565 + xover ;   y =  10 + ydown;  );   // Major
+    i == 2 ? ( x =  887 + xover ;   y =  10 + ydown;;  );   // Dorian
+    i == 3 ? ( x = 1208 + xover ;   y =  10 + ydown;;  );   // Phrygian
+    i == 4 ? ( x =  245 + xover ;   y = 203 + ydown;; );   // Lydian
+    i == 5 ? ( x =  565 + xover ;   y = 203 + ydown;; );   // Mixolydian
+    i == 6 ? ( x =  887 + xover ;   y = 203 + ydown;; );   // Minor
+    i == 7 ? ( x = 1208 + xover ;   y = 203 + ydown;; );   // Locrian
+
+    // Check if mouse is over the current button
+    mouse_over = (mouse_x >= x) && (mouse_x <= x + button_width) &&
+                 (mouse_y >= y) && (mouse_y <= y + button_height);
+
+    // Determine button state
+    is_active = (i == slider1);
+
+    // Set overlay based on button state
+    mouse_over ? (
+        // Hovered button (orange tint)
+        font_size = 26; // Font size
+        text_x = 12; // X position of text
+        text_y = 406; // Y position of text
+        modetext = array[selected_mode_names + i]; // Text to display
+        
+        textdivider = " - ";
+        mode_description = array[mode_descript_offset + i];
+        gfx_a = 1; // Full opacity
+        gfx_r = 1; gfx_g = 1; gfx_b = 1; // Text color (white)
+        
+        gfx_setfont(1, "Franklin Gothic Demi", font_size); // Set font: index 1, Arial, size 14
+        gfx_x = text_x; // Set X position
+        gfx_y = text_y; // Set Y position
+        gfx_printf("%s%s%s", modetext, textdivider ,mode_description);
+        
+        gfx_a = 0.2;
+        gfx_r = 1.0; gfx_g = 0.7; gfx_b = 0.0;
+    ) : is_active ? (
+        // Active button (green tint)
+        gfx_a = 0.0;
+        gfx_r = 0.0; gfx_g = 0.0; gfx_b = 0.0;
+    ) : (
+        // Inactive button (black tint)
+        gfx_a = 0.6;
+        gfx_r = 0.0; gfx_g = 0.0; gfx_b = 0.0;
+    );
+
+    // Draw button overlay
+    gfx_rect(x, y, button_width, button_height);
+
+    // Handle mouse click
+    mouse_clicked && mouse_over ? (
+        slider1 = i;  // Update Mode slider
+        calculate()
+    );
+
+    i += 1; // Increment the loop counter
+);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////        GFX  SLIDER2 - PARENT TONIC            
+
+// Button dimensions for slider2
+button_width2 = 69;
+button_height2 = 58;
+
+// Loop through buttons to check interaction and draw overlays
+j = 0;
+x2tweak = 18; y2tweak = 40;
+loop(12,
+    // Hardcode button coordinates based on index
+    
+    j == 0  ? ( x2 = 239 + x2tweak; y2 = 499 + y2tweak; ); // White Keys for Parent Major Tonic Button Locations
+    j == 2  ? ( x2 = 312 + x2tweak; y2 = 499 + y2tweak; );
+    j == 4  ? ( x2 = 386 + x2tweak; y2 = 499 + y2tweak; );
+    j == 5  ? ( x2 = 460 + x2tweak; y2 = 499 + y2tweak; );
+    j == 7  ? ( x2 = 533 + x2tweak; y2 = 499 + y2tweak; );
+    j == 9  ? ( x2 = 607 + x2tweak; y2 = 499 + y2tweak; );
+    j == 11 ? ( x2 = 681 + x2tweak; y2 = 499 + y2tweak; );
+    
+    j == 1  ? ( x2 = 276 + x2tweak; y2 = 436 + y2tweak; ); // Black Keys for Parent Major Tonic Button Locations
+    j == 3  ? ( x2 = 349 + x2tweak; y2 = 436 + y2tweak; );
+    j == 6  ? ( x2 = 497 + x2tweak; y2 = 436 + y2tweak; );
+    j == 8  ? ( x2 = 570 + x2tweak; y2 = 436 + y2tweak; );
+    j == 10 ? ( x2 = 644 + x2tweak; y2 = 436 + y2tweak; );
+
+    // Check if mouse is over the current button
+    mouse_over2 = (mouse_x >= x2) && (mouse_x <= x2 + button_width2) &&
+                  (mouse_y >= y2) && (mouse_y <= y2 + button_height2);
+
+    // Determine button state
+    is_active2 = (j == slider2);
+
+    // Set overlay based on button state
+    mouse_over2 ? (
+        // Hovered button (orange tint)
+        gfx_a = 0.2;
+        gfx_r = 1.0; gfx_g = 0.7; gfx_b = 0.0;
+    ) : is_active2 ? (
+        // Active button (green tint)
+        gfx_a = 0.5;
+        gfx_r = 0.3; gfx_g = 0.7; gfx_b = 0.7;
+    ) : (
+        // Inactive button (blue tint)
+        gfx_a = 0.0;
+        gfx_r = 0.0; gfx_g = 0.0; gfx_b = 0.0;
+    );
+
+    // Draw button overlay
+    gfx_rect(x2, y2, button_width2, button_height2);
+
+
+    // Handle mouse click
+    mouse_clicked && mouse_over2 ? (
+        slider2 = j;  // Update slider2
+        calculate()
+    );
+
+    j += 1; // Increment the loop counter
+);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////        GFX  SLIDER3 - MODAL TONIC            
+
+// Button dimensions for slider3
+button_width3 = 69;
+button_height3 = 58;
+
+// X offset for slider3 buttons
+
+x3tweak = 797;
+y3tweak = 40;
+
+// Loop through buttons to check interaction and draw overlays
+k = 0;
+loop(12,
+    // Hardcode button coordinates based on index
+    
+    k == 0  ? ( x3 = 238 + x3tweak; y3 = 499 + y3tweak; ); // White Keys for Modal Tonic Button Locations
+    k == 2  ? ( x3 = 311 + x3tweak; y3 = 499 + y3tweak; );
+    k == 4  ? ( x3 = 385 + x3tweak; y3 = 499 + y3tweak; );
+    k == 5  ? ( x3 = 459 + x3tweak; y3 = 499 + y3tweak; );
+    k == 7  ? ( x3 = 532 + x3tweak; y3 = 499 + y3tweak; );
+    k == 9  ? ( x3 = 606 + x3tweak; y3 = 499 + y3tweak; );
+    k == 11 ? ( x3 = 679 + x3tweak; y3 = 499 + y3tweak; );
+    
+    k == 1  ? ( x3 = 274 + x3tweak; y3 = 436 + y3tweak; ); // Black Keys for Modal Tonic Button Locations
+    k == 3  ? ( x3 = 348 + x3tweak; y3 = 436 + y3tweak; );
+    k == 6  ? ( x3 = 495 + x3tweak; y3 = 436 + y3tweak; );
+    k == 8  ? ( x3 = 569 + x3tweak; y3 = 436 + y3tweak; );
+    k == 10 ? ( x3 = 643 + x3tweak; y3 = 436 + y3tweak; );
+
+    // Check if mouse is over the current button
+    mouse_over3 = (mouse_x >= x3) && (mouse_x <= x3 + button_width3) &&
+                  (mouse_y >= y3) && (mouse_y <= y3 + button_height3);
+
+    // Determine button state
+    is_active3 = (k == slider3);
+
+    // Set overlay based on button state
+    mouse_over3 ? (
+        // Hovered button (orange tint)
+        gfx_a = 0.2;
+        gfx_r = 1.0; gfx_g = 0.7; gfx_b = 0.0;
+    ) : is_active3 ? (
+        // Active button (green tint)
+        gfx_a = 0.4;
+        gfx_r = 0.9; gfx_g = 0.5; gfx_b = 0.6;
+    ) : (
+        // Inactive button (blue tint)
+        gfx_a = 0.0;
+        gfx_r = 0.0; gfx_g = 0.0; gfx_b = 0.0;
+    );
+
+    // Draw button overlay
+    gfx_rect(x3, y3, button_width3, button_height3);
+
+    // Handle mouse click
+    mouse_clicked && mouse_over3 ? (
+        slider3 = k;  // Update slider3
+        calculate()
+    );
+
+    k += 1; // Increment the loop counter
+);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////        GFX  SLIDER4 - THE OPTION           
+
+
+// Button dimensions for slider5
+button_width5 = 142;
+button_height5 = 122;
+
+// X offset for slider5 buttons
+xoffset5 = 16;  // Adjustable offset
+y5 = 610;
+// Loop through buttons to check interaction and draw overlays
+l = 1;
+loop(5,
+    // Hardcode button coordinates based on index
+    
+    option_status = array[opt_offset + (slider1 * 100) + 10 +  l];
+    option_status < 0 ? (is_option_available = 0;) : (is_option_available = 1;);
+    is_option_available ?    (
+
+    l == 1  ? ( x5 = 277  + xoffset5; ); // Locations for Option Buttons
+    l == 2  ? ( x5 = 539  + xoffset5; );
+    l == 3  ? ( x5 = 796  + xoffset5; );
+    l == 4  ? ( x5 = 1057 + xoffset5; );
+    l == 5  ? ( x5 = 1316 + xoffset5; );
+
+
+    // Check if mouse is over the current button
+    mouse_over5 = (mouse_x >= x5) && (mouse_x <= x5 + button_width5) &&
+                  (mouse_y >= y5) && (mouse_y <= y5 + button_height5);
+    calculate();
+    // Determine button state
+    is_active5 = (l == slider4);
+
+    // Set overlay based on button state
+    mouse_over5 ? (
+    
+    // Hovered button (orange tint)
+    font_size = 26; // Font size
+    text_x = 12; // X position of text
+    text_y = 406; // Y position of text
+    modetext = array[slider1]; // Text to display
+    header_text = "Option: ";
+    textdivider = " - ";
+    option_description = array[opt_offset + (slider1 * 100) + 0 +  l];
+    gfx_a = 1; // Full opacity
+    gfx_r = 1; gfx_g = 1; gfx_b = 1; // Text color (white)
+    
+    gfx_setfont(1, "Franklin Gothic Demi", font_size); // Set font: index 1, Arial, size 14
+    gfx_x = text_x; // Set X position
+    gfx_y = text_y; // Set Y position
+    gfx_printf("%s%s",header_text , option_description);
+
+        // Hovered button (orange tint)
+        gfx_a = 0.3;
+        gfx_r = 1.0; gfx_g = 0.7; gfx_b = 0.0;
+    ) : is_active5 ? (
+        // Active button (green tint)
+        gfx_a = 0.3;
+        gfx_r = 0.3; gfx_g = 0.7; gfx_b = 0.7;
+    ) : (
+        // Inactive button (blue tint)
+        gfx_a = 0.0;
+        gfx_r = 0.0; gfx_g = 0.0; gfx_b = 0.0;
+    );
+
+    // Draw button overlay
+    gfx_rect(x5, y5, button_width5, button_height5);
+
+    xioffset = 106;
+    yi = 611;
+    l == 1  ? ( xi = 273  + xioffset; ); // Locations for Option Buttons
+    l == 2  ? ( xi = 534  + xioffset; );
+    l == 3  ? ( xi = 792  + xioffset; );
+    l == 4  ? ( xi = 1051 + xioffset; );
+    l == 5  ? ( xi = 1310 + xioffset; );
+    scale = .056;
+    extra = 100;
+    option_rating = array[opt_offset + (slider1 * 100) + 50 +  l];
+    option_rating == 1 ? 
+        (
+          gfx_set(1, 1, 1, 1);
+          gfx_loadimg(1, "AHS_Music_Tech/rating1.jpg");
+          gfx_blit(1, scale, 0, 0, 0, gfx_w + extra, gfx_h + extra, xi, yi); // gfx_blit(img_slot, scale, rotation, src_x, src_y, src_w, src_h, dest_x, dest_y)
+        );
+    option_rating == 2 ? 
+        (
+          gfx_set(2, 1, 1, 1);
+          gfx_loadimg(2, "AHS_Music_Tech/rating2.jpg");
+          gfx_blit(2, scale, 0, 0, 0, gfx_w + extra, gfx_h + extra, xi, yi); // gfx_blit(img_slot, scale, rotation, src_x, src_y, src_w, src_h, dest_x, dest_y)
+        );  
+    option_rating == 3 ? 
+        (
+          gfx_set(3, 1, 1, 1);
+          gfx_loadimg(3, "AHS_Music_Tech/rating3.jpg");
+          gfx_blit(3, scale, 0, 0, 0, gfx_w + extra, gfx_h + extra, xi, yi); // gfx_blit(img_slot, scale, rotation, src_x, src_y, src_w, src_h, dest_x, dest_y)
+        );
+    option_rating == 4 ? 
+        (
+          gfx_set(4, 1, 1, 1);
+          gfx_loadimg(4, "AHS_Music_Tech/rating4.jpg");
+          gfx_blit(4, scale, 0, 0, 0, gfx_w + extra, gfx_h + extra, xi, yi); // gfx_blit(img_slot, scale, rotation, src_x, src_y, src_w, src_h, dest_x, dest_y)
+        );         
+
+
+    // Handle mouse click
+    mouse_clicked && mouse_over5 ? (
+        slider4 = l;  
+        calculate();
+    );
+):
+(
+        y5 = 611;
+        xoffset  = 23;
+        l == 1  ? ( x5 = 276  + xoffset; ); // Locations for Option Buttons
+        l == 2  ? ( x5 = 534  + xoffset; );
+        l == 3  ? ( x5 = 792  + xoffset; );
+        l == 4  ? ( x5 = 1049 + xoffset; );
+        l == 5  ? ( x5 = 1308 + xoffset; );
+        
+        gfx_a = 1; gfx_r = 0.0; gfx_g = 0.0; gfx_b = 0.0;
+        gfx_rect(x5, y5, button_width5, button_height5);
+        
+        l == slider4 ? 
+          (
+              mode = last_mode;
+              slider4 = 1; 
+              calculate();
+          );
+);
+
+    l += 1; // Increment the loop counter
+);
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////        GFX  THE DISPLAY KEYBOARD  
+
+// Button dimensions for Keyboard
+button_widthf = 68;
+button_heightf = 58;
+
+// X offset for slider3 buttons
+
+xftweak = 21;
+yftweak = 312;
+yftweakt = 312;
+xftweak2 = 539;
+yftweak2 = 312;
+yftweak2t = 312;
+opt_transpose_offset = 20;                                                                   // Major Focus Notes and Transpositions
+current_tonic = array[opt_offset + (mode *100) + opt_transpose_offset + option];
+current_tonic += current_modal_pitchshift;
+
+slider11 = current_tonic;
+
+current_tonic > 0 ? (calctonic = 0 - current_tonic + 12): (calctonic = abs(0 - current_tonic));
+calctonic += current_modal_pitchshift;
+calctonic > 11 ? (highlight = calctonic - 12):(highlight = calctonic);
+tonic_index1 = array[opt_offset + (slider1 * 100) + 20 +  slider4] + array[20 + slider1];  
+blues_note1 = array[opt_offset + (slider1 * 100) + 40 +  slider4];  
+tonic_index1 > 11 ? (tonic_index1 -= 12;);
+
+
+
+// Loop through buttons to check interaction and draw overlays
+m = 0;
+loop(14,
+    // Hardcode button coordinates based on index
+    
+    m == 0  ? ( xf = 237 + xftweak; yf = 499 + yftweak; noteglow = 0;); // White Keys for Performance Octave 1 Button Locations
+    m == 1  ? ( xf = 311 + xftweak; yf = 499 + yftweak; noteglow = 2;);
+    m == 2  ? ( xf = 385 + xftweak; yf = 499 + yftweak; noteglow = 4;);
+    m == 3  ? ( xf = 459 + xftweak; yf = 499 + yftweak; noteglow = 5;);
+    m == 4  ? ( xf = 533 + xftweak; yf = 499 + yftweak; noteglow = 7;);
+    m == 5  ? ( xf = 607 + xftweak; yf = 499 + yftweak; noteglow = 9;);
+    m == 6  ? ( xf = 681 + xftweak; yf = 499 + yftweak; noteglow = 11;);
+    
+    m == 7  ? ( xf = 237 + xftweak2; yf = 499 + yftweak2; noteglow = 0;);  // White Keys for Performance Octave 2 Button Locations
+    m == 8  ? ( xf = 311 + xftweak2; yf = 499 + yftweak2; noteglow = 2;);
+    m == 9  ? ( xf = 385 + xftweak2; yf = 499 + yftweak2; noteglow = 4;);
+    m == 10 ? ( xf = 459 + xftweak2; yf = 499 + yftweak2; noteglow = 5;);
+    m == 11 ? ( xf = 533 + xftweak2; yf = 499 + yftweak2; noteglow = 7;);  
+    m == 12 ? ( xf = 607 + xftweak2; yf = 499 + yftweak2; noteglow = 9;);
+    m == 13 ? ( xf = 681 + xftweak2; yf = 499 + yftweak2; noteglow = 11;);
+
+    // Determine button state
+    tonic_index1 == noteglow ? (gfx_a = 1; gfx_r = 0.9; gfx_g = 0.7; gfx_b = 0.3;);   // Active button (yellow glow)
+    blues_note1 == noteglow ? (gfx_a = 1; gfx_r = 0.2; gfx_g = 0.2; gfx_b = 0.6;);   // Active button (blue glow)
+    option == 1 && tonic_index1 != noteglow && blues_note1 != noteglow ? (gfx_a =  1; gfx_r = 0.2; gfx_g = 0.4; gfx_b = 0.4;);
+    option != 1 && tonic_index1 != noteglow && blues_note1 != noteglow ? (gfx_a = .6; gfx_r = 0.0; gfx_g = 0.0; gfx_b = 0.0;);
+      
+
+    // Draw button overlay
+    gfx_rect(xf, yf, button_widthf, button_heightf);
+
+    m += 1; // Increment the loop counter
+);
+
+xftweak = 21;
+yftweak = 312;
+yftweakt = 312;
+xftweak2 = 539;
+yftweak2 = 312;
+yftweak2t = 312;
+opt_transpose_offset = 20;                                                                   // Major Focus Notes and Transpositions
+current_tonic = array[opt_offset + (mode *100) + opt_transpose_offset + slider4];
+tonic_index2 = array[opt_offset + (slider1 * 100) + 20 +  slider4] + array[20 + slider1];  
+blues_note2 = array[opt_offset + (slider1 * 100) + 40 +  slider4];  
+tonic_index2 > 11 ? (tonic_index2 -= 12;);
+slider11 = tonic_index2;
+// Loop through buttons to check interaction and draw overlays
+n = 0;
+loop(10,
+    // Hardcode button coordinates based on index
+    
+    n == 0 ? ( xf = 274 + xftweak; yf = 436 + yftweakt; noteglow2 = 1; ); // Black Keys for Performance Octave 1 Button Locations
+    n == 1 ? ( xf = 348 + xftweak; yf = 436 + yftweakt; noteglow2 = 3; );
+    n == 2 ? ( xf = 496 + xftweak; yf = 436 + yftweakt; noteglow2 = 6; );
+    n == 3 ? ( xf = 570 + xftweak; yf = 436 + yftweakt; noteglow2 = 8; );
+    n == 4 ? ( xf = 644 + xftweak; yf = 436 + yftweakt; noteglow2 = 10; );
+    
+    n == 5 ? ( xf = 274 + xftweak2; yf = 436 + yftweak2t; noteglow2 = 1; ); // Black Keys for Performance Octave 2 Button Locations
+    n == 6 ? ( xf = 348 + xftweak2; yf = 436 + yftweak2t; noteglow2 = 3; );
+    n == 7 ? ( xf = 496 + xftweak2; yf = 436 + yftweak2t; noteglow2 = 6; );
+    n == 8 ? ( xf = 570 + xftweak2; yf = 436 + yftweak2t; noteglow2 = 8; );
+    n == 9 ? ( xf = 644 + xftweak2; yf = 436 + yftweak2t; noteglow2 = 10; );
+
+    // Determine button state
+    tonic_index2 == noteglow2 ? (gfx_a = 1; gfx_r = 0.9; gfx_g = 0.7; gfx_b = 0.3;);   // Active button (yellow glow)
+    blues_note2 == noteglow2 ? (gfx_a = 1; gfx_r = 0.2; gfx_g = 0.2; gfx_b = 0.6;);   // Active button (blue glow)
+    option != 1 && tonic_index2 != noteglow2 && blues_note2 != noteglow2 ? (gfx_a =  1; gfx_r = 0.2; gfx_g = 0.4; gfx_b = 0.4;);
+    option == 1 && tonic_index2 != noteglow2 && blues_note2 != noteglow2 ? (gfx_a = .6; gfx_r = 0.0; gfx_g = 0.0; gfx_b = 0.0;); 
+  
+  
+
+    // Draw button overlay
+    gfx_rect(xf, yf, button_widthf, button_heightf);
+
+    n += 1; // Increment the loop counter
+);
+printoffset = 900;
+line_size = 22;
+
+speed = 7;
+x_ant < 1500 ? (x_ant += rand(speed);):(x_ant = 131;);
+x_bra < 1500 ? (x_bra += rand(speed);):(x_bra = 131;);
+x_cai < 1500 ? (x_cai += rand(speed);):(x_cai = 131;);
+x_rae < 1500 ? (x_rae += rand(speed);):(x_rae = 131;);
+x_fra < 1500 ? (x_fra += rand(speed);):(x_fra = 131;);
+
+x_nat < 1500 ? (x_nat += rand(speed);):(x_nat = 131;);
+x_jon < 1500 ? (x_jon += rand(speed);):(x_jon = 131;);
+x_baw < 1500 ? (x_baw += rand(speed);):(x_baw = 131;);
+x_daj < 1500 ? (x_daj += rand(speed);):(x_daj = 131;);
+x_leo < 1500 ? (x_leo += rand(speed);):(x_leo = 131;);
+
+x_bas < 1500 ? (x_bas += rand(speed);):(x_bas = 131;);
+x_cro < 1500 ? (x_cro += rand(speed);):(x_cro = 131;);
+x_dil < 1500 ? (x_dil += rand(speed);):(x_dil = 131;);
+x_lad < 1500 ? (x_lad += rand(speed);):(x_lad = 131;);
+x_kan < 1500 ? (x_kan += rand(speed);):(x_kan = 131;);
+
+
+
+        gfx_a = 1.0;  // Ensure text is fully opaque
+        gfx_r = gfx_g = gfx_b = 1.0;  // White text
+        gfx_setfont(1, "Franklin Gothic Demi", font_size); // Set font: index 1, Arial, size 14
+        
+        gfx_x = 111; // Set X position
+        gfx_y = printoffset; // Set Y position
+        gfx_printf("Dedicated to the Antioch 2025 Music Tech crew...") ;
+        
+        gfx_x = x_ant; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 2); // Set Y position
+        gfx_printf("Anthony") ;
+
+        gfx_x = x_bra; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 3); // Set Y position
+        gfx_printf("Brandon") ;
+
+        gfx_x = x_cai; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 4); // Set Y position
+        gfx_printf("Caiden") ;
+        
+        gfx_x = x_rae; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 5); // Set Y position
+        gfx_printf("Rae") ;
+  
+        gfx_x = x_fra; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 6); // Set Y position
+        gfx_printf("Francisco") ;
+
+        gfx_x = x_nat; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 7); // Set Y position
+        gfx_printf("Nathan") ;
+        
+        gfx_x = x_jon; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 8); // Set Y position
+        gfx_printf("Jonathan") ;
+
+        gfx_x = x_baw; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 9); // Set Y position
+        gfx_printf("Bawi") ;
+        
+        gfx_x = x_daj; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 10); // Set Y position
+        gfx_printf("Dajuan") ;
+        
+        gfx_x = x_leo; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 11); // Set Y position
+        gfx_printf("Leo") ;
+        
+        gfx_x = x_bas; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 12); // Set Y position
+        gfx_printf("Basil") ;
+        
+        gfx_x = x_cro; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 13); // Set Y position
+        gfx_printf("Crovis") ;
+        
+        gfx_x = x_dil; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 14); // Set Y position
+        gfx_printf("Dillon") ;
+        
+        gfx_x = x_lad; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 15); // Set Y position
+        gfx_printf("Ladavian") ;
+        
+        gfx_x = x_kan; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 16); // Set Y position
+        gfx_printf("Kane") ;
+        
+        
+        
+/** debugging area
+        gfx_a = 1.0;  // Ensure text is fully opaque
+        gfx_r = gfx_g = gfx_b = 1.0;  // White text
+        gfx_setfont(1, "Franklin Gothic Demi", font_size); // Set font: index 1, Arial, size 14
+        
+        gfx_x = 111; // Set X position
+        gfx_y = printoffset; // Set Y position
+        gfx_printf("The array index is:  %d\n", opt_offset + (slider1 * 100) + opt_transpose_offset +  slider4) ;
+        
+        gfx_x = 111; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 1); // Set Y position
+        option_description = array[opt_offset + (slider1 * 100) + 0 +  slider4];        
+        gfx_printf("%s",option_description); // Forces string output
+
+        gfx_x = 111; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 2); // Set Y position
+        tonic_name = array[opt_offset + (slider1 * 100) + 10 +  slider4];        
+        gfx_printf("tonic Name: %s\n", tonic_name); // Forces string output
+
+        gfx_x = 111; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 3); // Set Y position
+        tonic_index = array[opt_offset + (slider1 * 100) + 20 +  slider4];        
+        gfx_printf("tonic Index: %d\n", tonic_index); // Forces string output      
+        
+        gfx_x = 111; // Set X position
+        printoffset += linesize;
+        gfx_y = printoffset + (line_size * 4); // Set Y position
+        blues_note = array[opt_offset + (slider1 * 100) + 40 +  slider4];        
+        gfx_printf("Blues Note: %d\n", blues_note); // Forces string output        
+        
+        **/
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                       
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////        BLOCK          
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                       
+
+@block
+// Process incoming MIDI events
+while (
+    midirecv(offset, msg1, msg23) ? (
+        status = msg1 & 0xF0; // Extract the status byte
+        channel = msg1 & 0x0F; // Extract the channel number
+
+        // Check if it's a Note On or Note Off message
+        status == 0x90 || status == 0x80 ? (
+            note = msg23 & 0x7F; // Extract the note number
+            velocity = (msg23 >> 8) & 0x7F; // Extract the velocity
+
+            // Apply transposition amount
+            transposed_note = note + transposition_amount;
+
+            // Clamp the note to MIDI range (0-127)
+            transposed_note = max(0, min(127, transposed_note));
+
+            // Reconstruct the MIDI message with the transposed note
+            msg23 = (velocity << 8) | transposed_note;
+
+            // Send the transposed MIDI message
+            midisend(offset, msg1, msg23);
+        ) : (
+            // Pass through other MIDI messages unchanged
+            midisend(offset, msg1, msg23);
+        );
+    ) : 0; // Exit loop if no more MIDI events
+);
