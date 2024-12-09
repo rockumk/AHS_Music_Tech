@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="c452b8833abe2360b543d9ae7d6d1c54ec5e1362">
+<index version="1" name="AHS_Music_Tech" commit="95bfa9aa2effc878a0e7b4f5e109cf195d546b5b">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -37,6 +37,21 @@
       <version name="1.0.1" author="Rockumk" time="2022-11-28T02:12:29Z">
         <changelog><![CDATA[- Namechange]]></changelog>
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/9ae6b81625aa9cadc8eeb96f4ad1925a2372710e/Effects/MidiOnOff.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="Mood2Mode.jsfx" type="effect" desc="Mood2Mode - Easy Transposition to Black or White Keys">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 Allows the user to find tonics, determine and select modes, and transpose notes to black or white keys.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.1" author="Rock Kennedy" time="2024-12-09T03:36:58Z">
+        <changelog><![CDATA[- First Version]]></changelog>
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/95bfa9aa2effc878a0e7b4f5e109cf195d546b5b/Effects/Mood2Mode.jsfx</source>
       </version>
     </reapack>
     <reapack name="ReaCenterMIDIpitch.jsfx" type="effect" desc="ReaCenterMIDIpitch">
