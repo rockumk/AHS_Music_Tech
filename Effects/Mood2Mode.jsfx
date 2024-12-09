@@ -1,23 +1,24 @@
-version: 1.0.2
+version: 1.0.3
+provides:
+  [data] Mood2Mode/Mood2ModeBackground.png
+  [data] Mood2Mode/rating1.jpg
+  [data] Mood2Mode/rating2.jpg
+  [data] Mood2Mode/rating3.jpg
+  [data] Mood2Mode/rating4.jpg
+
 desc:Mood2Mode - Easy Transposition to Black or White Keys
 // Customized MIDI repeater
 author: Rock Kennedy
 about:
   # Allows the user to find tonics, determine and select modes, and transpose notes to black or white keys.
 changelog:
-  - Added a subdirectory for data
-
-
-
-
-
+  - Updated images
 
 // A JSFX script to transpose for easy-play use with Modes, Nashville Number System, and Mode-Specific Options.
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                       
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////        SLIDERS        
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// 
-
 
 slider1:1<1,7,1{Major,Dorian,Phrygian,Lydian,Mixolydian,Minor,Locrian}>-Mode
 slider2:0<0,11,1{C,C♯/D♭,D,D♯/E♭,E,F,F♯/G♭,G,G♯/A♭,A,A♯/B♭,B}>-Parent Major Tonic
