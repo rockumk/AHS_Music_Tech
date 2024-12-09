@@ -1,4 +1,4 @@
-version: 1.0.4
+version: 1.0.5
 provides:
   [data] ../Data/Mood2Mode/Mood2ModeBackground.png
   [data] ../Data/Mood2Mode/rating1.jpg
