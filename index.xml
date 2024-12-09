@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="46e91b5851e2a2de3407504d91caa1a166751f9d">
+<index version="1" name="AHS_Music_Tech" commit="3d38f7482f4b905adc3b96593a0e44af18f5eeaa">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -63,6 +63,14 @@
         <source type="data" file="../Data/Mood2Mode/rating2.jpg">https://github.com/rockumk/AHS_Music_Tech/raw/46e91b5851e2a2de3407504d91caa1a166751f9d/Data/Mood2Mode/rating2.jpg</source>
         <source type="data" file="../Data/Mood2Mode/rating3.jpg">https://github.com/rockumk/AHS_Music_Tech/raw/46e91b5851e2a2de3407504d91caa1a166751f9d/Data/Mood2Mode/rating3.jpg</source>
         <source type="data" file="../Data/Mood2Mode/rating4.jpg">https://github.com/rockumk/AHS_Music_Tech/raw/46e91b5851e2a2de3407504d91caa1a166751f9d/Data/Mood2Mode/rating4.jpg</source>
+      </version>
+      <version name="1.0.7" time="2024-12-09T14:15:53Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/3d38f7482f4b905adc3b96593a0e44af18f5eeaa/Effects/Mood2Mode.jsfx</source>
+        <source type="data" file="../Data/Mood2Mode/Mood2ModeBackground.png">https://github.com/rockumk/AHS_Music_Tech/raw/3d38f7482f4b905adc3b96593a0e44af18f5eeaa/Data/Mood2Mode/Mood2ModeBackground.png</source>
+        <source type="data" file="../Data/Mood2Mode/rating1.jpg">https://github.com/rockumk/AHS_Music_Tech/raw/3d38f7482f4b905adc3b96593a0e44af18f5eeaa/Data/Mood2Mode/rating1.jpg</source>
+        <source type="data" file="../Data/Mood2Mode/rating2.jpg">https://github.com/rockumk/AHS_Music_Tech/raw/3d38f7482f4b905adc3b96593a0e44af18f5eeaa/Data/Mood2Mode/rating2.jpg</source>
+        <source type="data" file="../Data/Mood2Mode/rating3.jpg">https://github.com/rockumk/AHS_Music_Tech/raw/3d38f7482f4b905adc3b96593a0e44af18f5eeaa/Data/Mood2Mode/rating3.jpg</source>
+        <source type="data" file="../Data/Mood2Mode/rating4.jpg">https://github.com/rockumk/AHS_Music_Tech/raw/3d38f7482f4b905adc3b96593a0e44af18f5eeaa/Data/Mood2Mode/rating4.jpg</source>
       </version>
     </reapack>
     <reapack name="ReaCenterMIDIpitch.jsfx" type="effect" desc="ReaCenterMIDIpitch">
