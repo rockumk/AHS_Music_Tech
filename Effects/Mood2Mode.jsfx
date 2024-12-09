@@ -1,10 +1,10 @@
 version: 1.0.4
 provides:
-  [data] Data/Mood2Mode/Mood2ModeBackground.png
-  [data] Data/Mood2Mode/rating1.jpg
-  [data] Data/Mood2Mode/rating2.jpg
-  [data] Data/Mood2Mode/rating3.jpg
-  [data] Data/Mood2Mode/rating4.jpg
+  [data] ../Data/Mood2Mode/Mood2ModeBackground.png
+  [data] ../Data/Mood2Mode/rating1.jpg
+  [data] ../Data/Mood2Mode/rating2.jpg
+  [data] ../Data/Mood2Mode/rating3.jpg
+  [data] ../Data/Mood2Mode/rating4.jpg
 
 desc:Mood2Mode - Easy Transposition to Black or White Keys
 // Customized MIDI repeater
