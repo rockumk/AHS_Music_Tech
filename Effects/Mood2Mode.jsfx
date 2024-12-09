@@ -1,11 +1,11 @@
-version: 1.0.1
+version: 1.0.2
 desc:Mood2Mode - Easy Transposition to Black or White Keys
 // Customized MIDI repeater
 author: Rock Kennedy
 about:
   # Allows the user to find tonics, determine and select modes, and transpose notes to black or white keys.
 changelog:
-  - First Version
+  - Added a subdirectory for data
 
 
 
@@ -443,7 +443,7 @@ calculate()
 @gfx 1575 895
 // Clear the screen and draw the background image
 gfx_clear = 0;
-gfx_loadimg(0, "AHS_Music_Tech/Mood2ModeBackground.png");
+gfx_loadimg(0, "AHS_Music_Tech/Mood2Mode/Mood2ModeBackground.png");
 gfx_blit(0, 1, 0, 0, 0, gfx_w, gfx_h, 0, 0);
 
 // Track mouse clicks
@@ -731,25 +731,25 @@ loop(5,
     option_rating == 1 ? 
         (
           gfx_set(1, 1, 1, 1);
-          gfx_loadimg(1, "AHS_Music_Tech/rating1.jpg");
+          gfx_loadimg(1, "AHS_Music_Tech/Mood2Mode/rating1.jpg");
           gfx_blit(1, scale, 0, 0, 0, gfx_w + extra, gfx_h + extra, xi, yi); // gfx_blit(img_slot, scale, rotation, src_x, src_y, src_w, src_h, dest_x, dest_y)
         );
     option_rating == 2 ? 
         (
           gfx_set(2, 1, 1, 1);
-          gfx_loadimg(2, "AHS_Music_Tech/rating2.jpg");
+          gfx_loadimg(2, "AHS_Music_Tech/Mood2Mode/rating2.jpg");
           gfx_blit(2, scale, 0, 0, 0, gfx_w + extra, gfx_h + extra, xi, yi); // gfx_blit(img_slot, scale, rotation, src_x, src_y, src_w, src_h, dest_x, dest_y)
         );  
     option_rating == 3 ? 
         (
           gfx_set(3, 1, 1, 1);
-          gfx_loadimg(3, "AHS_Music_Tech/rating3.jpg");
+          gfx_loadimg(3, "AHS_Music_Tech/Mood2Mode/rating3.jpg");
           gfx_blit(3, scale, 0, 0, 0, gfx_w + extra, gfx_h + extra, xi, yi); // gfx_blit(img_slot, scale, rotation, src_x, src_y, src_w, src_h, dest_x, dest_y)
         );
     option_rating == 4 ? 
         (
           gfx_set(4, 1, 1, 1);
-          gfx_loadimg(4, "AHS_Music_Tech/rating4.jpg");
+          gfx_loadimg(4, "AHS_Music_Tech/Mood2Mode/rating4.jpg");
           gfx_blit(4, scale, 0, 0, 0, gfx_w + extra, gfx_h + extra, xi, yi); // gfx_blit(img_slot, scale, rotation, src_x, src_y, src_w, src_h, dest_x, dest_y)
         );         
 
