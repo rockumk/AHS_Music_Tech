@@ -1,12 +1,12 @@
-version: 1.0.8
+version: 1.0.9
 provides:
   [data] ../Data/Mood2Mode/Mood2ModeBackground.png
   [data] ../Data/Mood2Mode/rating1.jpg
   [data] ../Data/Mood2Mode/rating2.jpg
   [data] ../Data/Mood2Mode/rating3.jpg
   [data] ../Data/Mood2Mode/rating4.jpg
-  [data] ../Data/Mood2Mode/on.jpg
-  [data] ../Data/Mood2Mode/off.jpg
+  [data] ../Data/Mood2Mode/on.png
+  [data] ../Data/Mood2Mode/off.png
 
 desc:Mood2Mode - Smart Transposion - Transpose keys and modes to black or white keys for easy playing.
 // Customized MIDI repeater
@@ -18,6 +18,7 @@ changelog:
   - Changed blues note color.
   - Improved description.
   - Commented out easter egg.
+  - Changed on and off jpgs to png files.
 
 // A JSFX script to transpose for easy-play use with Modes, Nashville Number System, and Mode-Specific Options.
 
