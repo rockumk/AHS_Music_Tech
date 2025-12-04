@@ -1,11 +1,19 @@
 -- @description numbers2notes_musictheory
--- @version 1.0.1
+-- @version 1.0.2
 -- @author Rock Kennedy
 -- @about
 --   # numbers2notes_musictheory
---   Numbers2Notes Support File.
+--   Numbers2Notes Support File containing chord definitions and logic tables.
 -- @changelog
---   Name Change
+--   # Fixes
+--   + Fixed incorrect diatonic highlighting for 'add2' chords (now correctly glows on 1, 4, 5).
+--   + Fixed incorrect diatonic highlighting for 'sus' chords (now correctly glows on 1).
+
+
+
+
+
+
 local musictheory = {
 key_table = {
 ["Ab"] = 8, 
@@ -676,7 +684,7 @@ button_table = {
 [3] = {'maj7','maj7   ',{[1]=1,[4]=1}}, 
 [4] = {'7','7      ',{[5]=1}}, 
 [5] = {'6','6      ',{[1]=1,[4]=1,[5]=1}}, 
-[6] = {'add2','add2   ',{[1]=1,[2]=1,[5]=1}}, 
+[6] = {'add2','add2   ',{[1]=1,[4]=1,[5]=1}}, 
 [7] = {'',"       ",{[1]=1,[4]=1,[5]=1}},
 [8] = {"L","            Minor Chords",{}},
 [9] = {'mmaj7','mmaj7  ',{}}, 
@@ -686,7 +694,7 @@ button_table = {
 [13] = {'madd2','madd2  ',{[2]=1,[6]=1}},
 [14] = {'m','m      ',{[2]=1,[3]=1,[6]=1}},
 [15] = {"L","            Suspended Chords",{}},
-[16] = {'sus','sus    ',{[2]=1,[3]=1,[3]=1,[5]=1,[6]=1}}, 
+[16] = {'sus','sus    ',{[1]=1,[2]=1,[3]=1,[5]=1,[6]=1}}, 
 [17] = {'sus24','sus24  ',{[1]=1,[2]=1,[5]=1,[6]=1}}, 
 [18] = {'sus2','sus2   ',{[1]=1,[2]=1,[4]=1,[5]=1,[6]=1}},
 [19] = {"L","            Augmented Chords and Diminished Chords"},
