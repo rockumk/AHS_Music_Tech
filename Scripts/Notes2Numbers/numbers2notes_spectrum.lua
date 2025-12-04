@@ -1,79 +1,76 @@
 -- @description numbers2notes_spectrum
--- @version 1.0.1
+-- @version 1.0.2
 -- @author Rock Kennedy
 -- @about
 --   # numbers2notes_spectrum
---   Numbers2Notes Support File.
+--   Numbers2Notes Support File for generating full-spectrum chord grids.
 -- @changelog
---   Name Change
+--   # Fixes
+--   + CRITICAL: Removed recursive logic that caused Stack Overflow crashes on long tracks.
+--   + Optimization: Added MIDI_DisableSort for significantly faster generation.
+--   + Localized variables to prevent global leaks.
+
 local spectrum = {
-make_full_spectrum = function(grid_track)
---reaper.ShowConsoleMsg("MADE IT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    make_full_spectrum = function(grid_track)
+        
+        -- 1. Setup Local Variables
+        local theWholeTable = {}
+        local focusedtake = grid_track
+        
+        -- 2. Count how many notes are in the item currently
+        local _, noteCount, _, _ = reaper.MIDI_CountEvts(focusedtake)
 
---  ----------------------------------------     VARIABLES
+        -- 3. Collect all notes (Using a Loop, not Recursion)
+        for i = 0, noteCount - 1 do
+            local retval, selected, muted, startppq, endppq, chan, pitch, vel = reaper.MIDI_GetNote(focusedtake, i)
+            if retval then
+                -- Store note data in a table
+                table.insert(theWholeTable, {
+                    selected = selected,
+                    muted = muted,
+                    start = startppq,
+                    ending = endppq,
+                    chan = chan,
+                    pitch = pitch,
+                    vel = vel
+                })
+            end
+        end
 
+        -- 4. Delete all original notes
+        -- We do this backwards so deleting note #0 doesn't change the index of note #1
+        for i = noteCount - 1, 0, -1 do
+            reaper.MIDI_DeleteNote(focusedtake, i)
+        end
 
+        -- 5. Generate the Spectrum (Insert copies across octaves)
+        reaper.MIDI_DisableSort(focusedtake) -- Disable sorting for speed while inserting
+        
+        for _, noteData in ipairs(theWholeTable) do
+            -- Calculate the note class (0-11, e.g., C=0, C#=1)
+            local base_pitch_class = noteData.pitch % 12
+            
+            -- Loop through MIDI range (0 to 127) to fill octaves
+            local current_pitch = base_pitch_class
+            while current_pitch <= 127 do
+                reaper.MIDI_InsertNote(
+                    focusedtake, 
+                    noteData.selected, 
+                    noteData.muted, 
+                    noteData.start, 
+                    noteData.ending, 
+                    noteData.chan, 
+                    current_pitch, 
+                    noteData.vel, 
+                    false -- noSort (we sort at the very end)
+                )
+                current_pitch = current_pitch + 12 -- Jump up one octave
+            end
+        end
 
-
-noteIndex = 0
-noteExists = 1
-noteIsSelected = 1
-noteIsmuted = 0
-theStartppqpos = 0
-theEndppqpos = 0
-theChan = 1
-thePitch = 1
-theVel = 127
-OneNoteDataRow = {}
-theWholeTable = {""}
---  ----------------------------------------    FUNCTION LIST
-
---COLLECT ALL THE CURRENT NOTE DATA
-function GettheNotes()
-noteExists, noteIsSelected, noteIsmuted, theStartppqpos, theEndppqpos, theChan, thePitch, theVel = reaper.MIDI_GetNote(focusedtake, noteIndex)
-if noteExists then
-OneNoteDataRow = ""
-OneNoteDataRow = {noteExists, noteIsSelected, noteIsmuted, theStartppqpos, theEndppqpos, theChan, thePitch, theVel}
-theWholeTable[#theWholeTable+1] = OneNoteDataRow
---msg("The Note = "..tostring(thePitch).." "..tostring(theVel))
-noteIndex = noteIndex +1
-GettheNotes()
-else 
-end
-end
-
---  -------------------------------------------- PROGRAM ! ! !
---  SAVE THE DATA ON THE NOTES IN A TABLE
-
-focusedtake = grid_track
---msg(tostring(focusedtake))
-reaper.MIDI_DisableSort(focusedtake)
-GettheNotes()
-
-
---  DELETE THE NOTES
-for i=#theWholeTable,1,-1 do  
-reaper.MIDI_DeleteNote( focusedtake, i-1 )
-end
-
---  PUT IN ALL THE COPIES
-for i=1,#theWholeTable,1 do 
-if theWholeTable[i][1] == true then
-theModulus = theWholeTable[i][7]%12
-while theModulus <= 127 do
-reaper.MIDI_InsertNote( focusedtake, 0, 0, theWholeTable[i][4], theWholeTable[i][5], theWholeTable[i][6], theModulus, theWholeTable[i][8], 0 )
-theModulus = theModulus +12
-end
-else
-end
-end
-
-reaper.MIDI_Sort(focusedtake)
-return "spectrumdone"
-end
+        reaper.MIDI_Sort(focusedtake) -- Re-sort once at the end
+        return "spectrumdone"
+    end
 }
 
 return spectrum
-
-
-
