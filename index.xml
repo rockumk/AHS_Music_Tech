@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="580c2a22f8935056b4aa85f045f2924d387326f0">
+<index version="1" name="AHS_Music_Tech" commit="c7f937dadb1f7bc26e3d70aa36ae31e6b36e0d81">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -306,18 +306,24 @@
   <category name="Scripts">
     <reapack name="RSK - Full Spectrum.lua" type="script" desc="RSK_Full_Spectrum">
       <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 RSK_Full_Spectrum\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 Duplicates all pitches at every octave.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 RSK_Full_Spectrum\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Duplicates all pitches at every octave. Run this from inside the MIDI Editor.\par}
 }
 ]]></description>
       </metadata>
       <version name="1.0.1" author="Rock Kennedy" time="2022-11-28T02:20:49Z">
         <changelog><![CDATA[Name Change]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/5bb4ef48e08c73fa5cff9835fe50a509874296b8/Scripts/RSK%20-%20Full%20Spectrum.lua</source>
+      </version>
+      <version name="1.0.2" author="Rock Kennedy" time="2025-12-04T02:49:46Z">
+        <changelog><![CDATA[+ CRITICAL: Removed recursive logic that caused Stack Overflow crashes on long tracks.
++ Optimization: Added MIDI_DisableSort for significantly faster generation.
++ Safety: Localized all variables.]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/c7f937dadb1f7bc26e3d70aa36ae31e6b36e0d81/Scripts/RSK%20-%20Full%20Spectrum.lua</source>
       </version>
     </reapack>
     <reapack name="Zonevelope.lua" type="script" desc="Zonvelope">
