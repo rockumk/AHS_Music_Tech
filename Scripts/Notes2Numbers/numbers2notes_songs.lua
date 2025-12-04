@@ -1,12 +1,15 @@
 -- @description numbers2notes_songs
--- @version 1.0.1
+-- @version 1.0.2
 -- @author Rock Kennedy
 -- @about
 --   # numbers2notes_songs
---   Numbers2Notes Support File.
+--   Numbers2Notes Support File containing sample song data.
 -- @changelog
---   Name Change
+--   + Fixed duplicate table key (song18) which was overwriting a sample song. Renamed second instance to song19.
+
+
 local songs = 
+
 {
 song02 = [[
 Key: A
@@ -42,9 +45,9 @@ Onemotionsong = [[
 [1 1/7 6m 6m]     4add2               [1 1/7 6m 6m]      5
 
 {V}
-[6m 2m7]      	1add2               [6m 2m7]      	 1add2
-[6m 2m7]     	 4add2               1add2          	5sus
-[6m 2m7]      	1add2               [6m 2m7]      	 1add2
+[6m 2m7]      	1add2               [6m 2m7]      	1add2
+[6m 2m7]     	4add2               1add2          	5sus
+[6m 2m7]      	1add2               [6m 2m7]      	1add2
 [6m 2m7]      	4add2               1add2          	5sus        
 
 {C}
@@ -376,7 +379,7 @@ song18 = [[ 1 b6 b7 1
 1 b6 b7 3[1]
 ]], 
 
-song18 = [[ 
+song19 = [[ 
 
 Form: A B A B C D D A O
 
