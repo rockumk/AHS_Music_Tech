@@ -1,11 +1,15 @@
 -- @description Numbers2Notes
--- @version 1.2.4
+-- @version 1.2.5
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes1.2.4
+--   # Numbers2Notes 1.2.5
 --   Updated Nashville Number System Style Chord Charting for Reaper.
 -- @changelog
---   Required an older version of imgui.
+--   # Fixes & Improvements
+--   + Fixed Shift/Ctrl modifier keys in the Entry tab (improved Mac & Caps Lock compatibility).
+--   + Fixed Diatonic highlighting errors in the Music Theory engine.
+--   + Fixed potential crash in Spectrum generation on long tracks.
+--   + Fixed duplicate sample song entry.
 
 package.path = reaper.ImGui_GetBuiltinPath() .. '/?.lua'
 local ImGui = require 'imgui' '0.8.6' -- Version of IMGUI used during development.
@@ -896,7 +900,7 @@ Form: I V C V C B C O]]
         end
         if feedback_tab_mode == 9 then
     
-reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.2.4")
+reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.2.5")
 reaper.ImGui_Text(ctx, "Numbers2Notes does not yet allow the user to select plugins.")
 reaper.ImGui_Text(ctx, "The plugins below are required to fully set up the default configuration.")
 reaper.ImGui_Text(ctx, "")
@@ -979,6 +983,10 @@ reaper.ImGui_Text(ctx, "- Holt")
         wx = 77
         hx = 19
         if feedback_tab_mode == 1 then
+		-- Check specifically if SHIFT is held down (returns true/false)
+		local is_shift_down = reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Mod_Shift())
+		
+		
             --reaper.ImGui_Text(ctx, "Entry Buttons:")
 
             the_root_colors = {244, 244, 244}
@@ -1013,7 +1021,6 @@ reaper.ImGui_Text(ctx, "- Holt")
                     reaper.ImGui_Text(ctx, v[2])
                     r.ImGui_SameLine(ctx)
                     r.ImGui_Separator(ctx)
-                    down_key_check = reaper.ImGui_GetKeyMods(ctx)
                 else
                     if transpar > .9 then
                         fade_up = false
@@ -1026,7 +1033,7 @@ reaper.ImGui_Text(ctx, "- Holt")
                         transpar = transpar + .0007
                     end
 
-                    if down_key_check == 2 or down_key_check == 3 then
+                    if is_shift_down then
                         play_root = "1"
                         the_root_colors = musictheory.root_colors[play_root]
                         if v[2] == "       " then
@@ -3981,19 +3988,31 @@ function letters_to_numbers(keysig, letters)
     reaper.PreventUIRefresh(-1)
     return numbers_result
 end
+
 function play_button_midi(v_in, play_root_in)
     local audition_key = set_the_key(header_area)
     audition_key_shift = musictheory.key_table[audition_key]
+    
     if r.ImGui_Button(ctx, play_root_in .. v_in[2], wx, hx) then
         if v_in[1] == "" then
             this_type = "z"
         else
             this_type = v_in[1]
         end
-        down_key_check = reaper.ImGui_GetKeyMods(ctx)
-        if down_key_check == 1 or down_key_check == 3 then
-            chord_charting_area = chord_charting_area .. play_root_in .. v_in[2] .. "  "
+        
+        -- NEW ROBUST CHECK: Is Control (or Command on Mac) held down?
+        local is_ctrl_down = reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Mod_Ctrl())
+        
+        if is_ctrl_down then
+            -- 1. Clean the button name (remove the extra visual spaces inside "sus    ")
+            local clean_chord_name = v_in[2]:gsub("%s+", "") 
+            
+            -- 2. Add the Root + Clean Name + TWO SPACES separator
+            -- This ensures you can click buttons 1, 4, 5 and get "1  4  5  "
+            chord_charting_area = chord_charting_area .. play_root_in .. clean_chord_name .. "  "
         end
+        
+        -- MIDI Playback Logic (Unchanged)
         for i, v in pairs(current_playing_tone_array) do
             reaper.StuffMIDIMessage(0, 128, 48 + v + musictheory.root_table[last_play_root] + audition_key_shift, 111)
         end
