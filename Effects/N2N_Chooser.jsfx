@@ -1,0 +1,250 @@
+desc: N2N Chooser
+// @description N2N Chooser
+// @version 1.0.0
+// @author Rock Kennedy
+// @about
+//   # N2N Chooser
+//   This is a helper plugin for the Numbers2Notes system.
+//   It allows you to tag tracks with specific "Roles" (e.g., Bass, Chords, Text Chart)
+//   so the main Numbers2Notes script knows where to generate content.
+//
+//   Features:
+//   - Visual Dashboard to assign track roles.
+//   - Generation ON/OFF toggle to protect tracks from updates.
+//   - Preferred Key selector for "Capo-style" transposition logic.
+// @changelog
+//   + Initial release
+
+
+
+
+
+
+-slider1:0<0,1,0>On/Off
+-slider2:0<1,29,1>Mode
+-slider3:0<1,17,1>Key
+
+@init
+lastClickedKey = 0;
+
+// ────────────────────── THE ONLY SAFE TOOLTIP METHOD IN JSFX ──────────────────────
+// 712 780
+@gfx 712 820
+
+
+
+
+
+
+mouse_clicked = (mouse_cap & 1) && !last_mouse_cap;
+last_mouse_cap = mouse_cap & 1;
+
+
+
+// ======================================================
+// INSTRUCTION TEXT
+// ======================================================
+gfx_setfont(1,"Arial",27);
+gfx_set(0.7, 0.7, 0.7, 1); // Grey text
+gfx_x = 48; gfx_y = 30;
+gfx_drawstr("Choose what Numbers2Notes will generate on this track:");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ======================================================
+// TOP GENERATION ON / OFF BUTTONS
+// ======================================================
+topBtnH = 50; topMargin = 80; gap = 8;
+btnW = (712 - 2*topMargin - gap)/2;
+
+gfx_setfont(1,"Arial Rounded MT Bold",28,"b");
+
+mouse_over_on  = mouse_x>=topMargin && mouse_x<=topMargin+btnW && mouse_y>=topMargin && mouse_y<=topMargin+topBtnH;
+alpha_on = slider1==0 ? 1.0 : mouse_over_on ? 0.7 : 0.45;
+gfx_set(0.55,0.55,0.55,alpha_on); gfx_rect(topMargin,topMargin,btnW,topBtnH,1);
+gfx_set(1,1,1,alpha_on); gfx_x=topMargin+64; gfx_y=topMargin+10; gfx_printf("Generation ON");
+mouse_clicked && mouse_over_on ? slider1 = 0;
+
+mouse_over_off = mouse_x>=topMargin+btnW+gap && mouse_x<=topMargin+2*btnW+gap && mouse_y>=topMargin && mouse_y<=topMargin+topBtnH;
+alpha_off = slider1==1 ? 1.0 : mouse_over_off ? 0.7 : 0.45;
+gfx_set(0.55,0.55,0.55,alpha_off); gfx_rect(topMargin+btnW+gap,topMargin,btnW,topBtnH,1);
+gfx_set(1,1,1,alpha_off); gfx_x=topMargin+btnW+gap+62; gfx_y=topMargin+10; gfx_printf("Generation OFF");
+mouse_clicked && mouse_over_off ? slider1 = 1;
+
+// ======================================================
+// HEADERS & LAYOUT
+// ======================================================
+StartY = topMargin + topBtnH + 20;
+gfx_setfont(1,"Arial Rounded MT Bold",18,"b");
+gfx_x=50; gfx_y=StartY; gfx_set(1,1,1,1);
+gfx_printf("Numbers"); gfx_x+=92; gfx_printf("Relative");
+gfx_x+=98; gfx_printf("Absolute"); gfx_x+=90; gfx_printf("Preferred Key");
+
+BUTTON_HEIGHT = 20;
+BUTTON_WIDTH  = 150;
+BUTTON_MARGIN = 4;
+ROW_HEIGHT = BUTTON_HEIGHT + BUTTON_MARGIN;
+baseY = StartY + 35;
+
+// ======================================================
+// BUTTON FUNCTION – TOOLTIPS FINALLY WORK
+// ======================================================
+function button(click, id, label, x, y, w, h, tip) local(alpha, mouse_over, this_sets_slider2, is_selected) (
+  mouse_over = mouse_x>=x && mouse_x<=x+w && mouse_y>=y && mouse_y<=y+h;
+  mouse_over ? tooltip_text = tip;
+
+  // What slider2 value does this button set? (only for column buttons)
+  this_sets_slider2 = 
+    id==1 ? 1 :
+    id==2 ? 2 :
+    id==3 ? 28 :
+    id==4 ? 29 :
+    id==5 ? 27 :
+    id>=6 && id<=13 ? id-3 :
+    id>=14 && id<=21 ? id-3 :
+    id>=22 && id<=29 ? id-3 :
+                       0;
+
+  // Does this button match the current selection?
+  is_selected = 
+    (id <= 29) ? (slider2 == this_sets_slider2) :      // column buttons
+                 (slider3 == (id - 44));               // piano keys
+
+  alpha = is_selected ? 1.0 : mouse_over ? 0.75 : 0.35;
+
+  // ────── COLOUR SELECTION (with light white keys) ──────
+  id==1||id==2                     ? gfx_set(0.3,0.7,1.0,0.40) :
+  id>=6 && id<=13                  ? gfx_set(1.0,0.5,0.5,0.40) :
+  id>=14&& id<=21                  ? gfx_set(0.8,0.4,1.0,0.40) :
+  (id>=22&&id<=29)||id==5          ? gfx_set(0.2,0.8,0.5,0.40) :
+  id==3||id==4                      ? gfx_set(1.0,0.6,0.2,0.40) :
+  id>=54 && id<=60                  ? gfx_set(0.59, 0.59, 0.59, 0.92) :  // light white keys
+                                        gfx_set(0.2,0.2,0.2,0.90);     // black keys
+
+  gfx_rect(x,y,w,h,1);
+
+  id>=44 ? gfx_set(0.4,1,.9,alpha) : gfx_set(1,1,1,alpha);
+  gfx_x=x+5; gfx_y=y+2; gfx_drawstr(label);
+
+  click && mouse_over ? id : -1;
+);
+
+// ======================================================
+// COLUMN 1 + SPACING
+// ======================================================
+x=45; y=baseY;
+rv=button(mouse_clicked,1,"Nashville Numbers",x,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Fills this track with text labels of your chords in Nashville Numbers. (ie. 1 4 2m 5)"); rv>-1?(slider2=1;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,2,"Roman Numerals",x,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Fills this track with text labels of your chords in Roman numerals. (ie. I IV ii 5)"); rv>-1?(slider2=2;slider3=0;); y+=ROW_HEIGHT*3;
+
+gfx_set(1,1,1,alpha_on); gfx_x=x+4; gfx_y=y+4; gfx_drawstr("Empty for Live"); y+=ROW_HEIGHT;
+
+rv=button(mouse_clicked,3,"M2M - White Keys",x,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Sets up an empty MIDI track equipted with correctly configured Mood2Mode - White Keys."); rv>-1?(slider2=28;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,4,"M2M - Black Keys",x,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Sets up an empty MIDI track equipted with correctly configured Mood2Mode - Black Keys."); rv>-1?(slider2=29;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,5,"Preferred Key",x,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Sets up an empty MIDI track allowing you to play in a chosen key w/ correct transposition."); rv>-1?(slider2=27;slider3=lastClickedKey;);
+
+// ======================================================
+// COLUMNS 2 / 3 / 4
+// ======================================================
+col2 = 45 + BUTTON_WIDTH + BUTTON_MARGIN;
+col3 = col2 + BUTTON_WIDTH + BUTTON_MARGIN;
+col4 = col3 + BUTTON_WIDTH + BUTTON_MARGIN;
+
+y = baseY;
+
+// Column 2 (red)
+rv=button(mouse_clicked, 6,"Letter Labels",   col2,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a track with text labels of your chords written in the Key of C. (ie. C F Dm G)"); rv>-1?(slider2=3;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked, 7,"Chord Grid",      col2,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track with a chord-grid of all your chords written in the Key of C"); rv>-1?(slider2=4;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked, 8,"Chords",          col2,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track of your chords in the Key of C with transpostition"); rv>-1?(slider2=5;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked, 9,"Chords and Bass", col2,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track your chords and bass in the Key of C with transpostition"); rv>-1?(slider2=6;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,10,"Roots and 5ths",  col2,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track your root and 5ths in the Key of C with transpostition"); rv>-1?(slider2=7;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,11,"Roots",           col2,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track your roots in the Key of C with transpostition"); rv>-1?(slider2=8;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,12,"Bass",            col2,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track your bass part in the Key of C with transpostition"); rv>-1?(slider2=9;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,13,"Scale",           col2,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track your scale in the Key of C with transpostition"); rv>-1?(slider2=10;slider3=0;);
+
+// Column 3 (purple)
+y = baseY;
+rv=button(mouse_clicked,14,"Letter Labels",   col3,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a track with text labels of your chords in their actual key"); rv>-1?(slider2=11;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,15,"Chord Grid",      col3,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track with a chord-grid of all your chords in their actual key"); rv>-1?(slider2=12;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,16,"Chords",          col3,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track of your chords in their actual key"); rv>-1?(slider2=13;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,17,"Chords and Bass", col3,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track of your chords and bass in their actual key"); rv>-1?(slider2=14;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,18,"Roots and 5ths",  col3,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track of your roots and 5ths in their actual key"); rv>-1?(slider2=15;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,19,"Roots",           col3,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track of your roots in their actual key"); rv>-1?(slider2=16;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,20,"Bass",            col3,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track of your bass part in its actual key"); rv>-1?(slider2=17;slider3=0;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,21,"Scale",           col3,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track of your scale in its actual key"); rv>-1?(slider2=18;slider3=0;);
+
+// Column 4 (green)
+y = baseY;
+rv=button(mouse_clicked,22,"Letter Labels",   col4,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a track with text labels of your chords in the key of your choice (guitar w/ cappo)"); rv>-1?(slider2=19;slider3=lastClickedKey;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,23,"Chord Grid",      col4,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track with a chord-grid of all your chords in the key of your choice"); rv>-1?(slider2=20;slider3=lastClickedKey;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,24,"Chords",          col4,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track of your chords in the key of your choice"); rv>-1?(slider2=21;slider3=lastClickedKey;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,25,"Chords and Bass", col4,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track of your chords and bass in the key of your choice"); rv>-1?(slider2=22;slider3=lastClickedKey;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,26,"Roots and 5ths",  col4,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track of your roots and 5ths in the key of your choice"); rv>-1?(slider2=23;slider3=lastClickedKey;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,27,"Roots",           col4,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track of your roots in the key of your choice"); rv>-1?(slider2=24;slider3=lastClickedKey;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,28,"Bass",            col4,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track of your bass part in the key of your choice"); rv>-1?(slider2=25;slider3=lastClickedKey;); y+=ROW_HEIGHT;
+rv=button(mouse_clicked,29,"Scale",           col4,y,BUTTON_WIDTH,BUTTON_HEIGHT,"Creates a MIDI track of your scale in the key of your choice"); rv>-1?(slider2=26;slider3=lastClickedKey;);
+
+// ======================================================
+// PIANO – original look & position
+// ======================================================
+(slider2>=19 && slider2<=27) ? (
+  gfx_set(0.5,0.5,0.5,0.60);
+  gfx_rect(175,476,354,316);
+
+  KeyWIDTH = BUTTON_HEIGHT+12; KeyHEIGHT = BUTTON_WIDTH/2;
+  whiteKeyWIDTH = 1.5*KeyWIDTH; whiteKeyHeight = 2*KeyHEIGHT;
+  PianoStartX = 80 + 2*(BUTTON_WIDTH + BUTTON_MARGIN) - 1.4*BUTTON_WIDTH;
+  y_piano = baseY + 8*ROW_HEIGHT + 104;
+
+  x = PianoStartX + whiteKeyWIDTH*0.65;
+  rv=button(mouse_clicked,44,"C#",x,y_piano,KeyWIDTH,KeyHEIGHT,""); rv>-1?(slider3=0; lastClickedKey=0;);
+  x += whiteKeyWIDTH+2; rv=button(mouse_clicked,45,"D#",x,y_piano,KeyWIDTH,KeyHEIGHT,""); rv>-1?(slider3=1; lastClickedKey=1;);
+  x += (whiteKeyWIDTH+2)*2; rv=button(mouse_clicked,46,"F#",x,y_piano,KeyWIDTH,KeyHEIGHT,""); rv>-1?(slider3=2; lastClickedKey=2;);
+  x += whiteKeyWIDTH+2; rv=button(mouse_clicked,47,"G#",x,y_piano,KeyWIDTH,KeyHEIGHT,""); rv>-1?(slider3=3; lastClickedKey=3;);
+  x += whiteKeyWIDTH+2; rv=button(mouse_clicked,48,"A#",x,y_piano,KeyWIDTH,KeyHEIGHT,""); rv>-1?(slider3=4; lastClickedKey=4;);
+
+  y_piano += KeyHEIGHT+4; x = PianoStartX + whiteKeyWIDTH*0.65;
+  rv=button(mouse_clicked,49,"Db",x,y_piano,KeyWIDTH,KeyHEIGHT,""); rv>-1?(slider3=5; lastClickedKey=5;);
+  x += whiteKeyWIDTH+2; rv=button(mouse_clicked,50,"Eb",x,y_piano,KeyWIDTH,KeyHEIGHT,""); rv>-1?(slider3=6; lastClickedKey=6;);
+  x += (whiteKeyWIDTH+2)*2; rv=button(mouse_clicked,51,"Gb",x,y_piano,KeyWIDTH,KeyHEIGHT,""); rv>-1?(slider3=7; lastClickedKey=7;);
+  x += whiteKeyWIDTH+2; rv=button(mouse_clicked,52,"Ab",x,y_piano,KeyWIDTH,KeyHEIGHT,""); rv>-1?(slider3=8; lastClickedKey=8;);
+  x += whiteKeyWIDTH+2; rv=button(mouse_clicked,53,"Bb",x,y_piano,KeyWIDTH,KeyHEIGHT,""); rv>-1?(slider3=9; lastClickedKey=9;);
+  
+  y_piano += KeyHEIGHT+4; x = PianoStartX;
+  gfx_setfont(1,"Arial Rounded MT Bold",46,"b");
+  gfx_set(0.94, 0.94, 0.97, 0.92);     // super clean, bright white keys (adjust any of the four numbers if you want warmer/cooler)
+  rv=button(mouse_clicked,54,"C",x,y_piano,whiteKeyWIDTH,whiteKeyHeight,""); rv>-1?(slider3=10; lastClickedKey=10;);
+  x+=whiteKeyWIDTH+2; rv=button(mouse_clicked,55,"D",x,y_piano,whiteKeyWIDTH,whiteKeyHeight,""); rv>-1?(slider3=11; lastClickedKey=11;);
+  x+=whiteKeyWIDTH+2; rv=button(mouse_clicked,56,"E",x,y_piano,whiteKeyWIDTH,whiteKeyHeight,""); rv>-1?(slider3=12; lastClickedKey=12;);
+  x+=whiteKeyWIDTH+2; rv=button(mouse_clicked,57,"F",x,y_piano,whiteKeyWIDTH,whiteKeyHeight,""); rv>-1?(slider3=13; lastClickedKey=13;);
+  x+=whiteKeyWIDTH+2; rv=button(mouse_clicked,58,"G",x,y_piano,whiteKeyWIDTH,whiteKeyHeight,""); rv>-1?(slider3=14; lastClickedKey=14;);
+  x+=whiteKeyWIDTH+2; rv=button(mouse_clicked,59,"A",x,y_piano,whiteKeyWIDTH,whiteKeyHeight,""); rv>-1?(slider3=15; lastClickedKey=15;);
+  x+=whiteKeyWIDTH+2; rv=button(mouse_clicked,60,"B",x,y_piano,whiteKeyWIDTH,whiteKeyHeight,""); rv>-1?(slider3=16; lastClickedKey=16;);
+);
+
+// ======================================================
+// TOOLTIP BAR – dark background + bright purple text
+// ======================================================
+helpH = 60;
+gfx_set(0.12,0.12,0.14,0.98);
+gfx_rect(10,395,692,helpH,1);
+
+strlen(tooltip_text) ? (
+  gfx_set(0.7,0.7,.7,1);                 // bright purple
+  gfx_setfont(1,"Arial Rounded MT Bold",18);
+  gfx_x = 42;
+  gfx_y = 395+18;
+  gfx_drawstr(tooltip_text);
+);
