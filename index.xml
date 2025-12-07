@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="3f319f5b0c3254084c217ef7fd8f471b853211df">
+<index version="1" name="AHS_Music_Tech" commit="41cdf8228650d43f01b4a7d393e57f1a641ae9a0">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -81,6 +81,26 @@
         <source type="data" file="../Data/Mood2Mode/rating4.jpg">https://github.com/rockumk/AHS_Music_Tech/raw/e9e172771cbf1afe8a7ee624ce308d5914dc4b92/Data/Mood2Mode/rating4.jpg</source>
         <source type="data" file="../Data/Mood2Mode/on.png">https://github.com/rockumk/AHS_Music_Tech/raw/e9e172771cbf1afe8a7ee624ce308d5914dc4b92/Data/Mood2Mode/on.png</source>
         <source type="data" file="../Data/Mood2Mode/off.png">https://github.com/rockumk/AHS_Music_Tech/raw/e9e172771cbf1afe8a7ee624ce308d5914dc4b92/Data/Mood2Mode/off.png</source>
+      </version>
+    </reapack>
+    <reapack name="N2N_Chooser.jsfx" type="effect" desc="N2N Chooser">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Chooser\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 This is a helper plugin for the Numbers2Notes system. It allows you to tag tracks with specific "Roles" (e.g., Bass, Chords, Text Chart) so the main Numbers2Notes script knows where to generate content.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Features:\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Visual Dashboard to assign track roles.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Generation ON/OFF toggle to protect tracks from updates.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Preferred Key selector for "Capo-style" transposition logic.\sa180\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.0" author="Rock Kennedy" time="2025-12-07T20:08:33Z">
+        <changelog><![CDATA[+ Initial release]]></changelog>
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/41cdf8228650d43f01b4a7d393e57f1a641ae9a0/Effects/N2N_Chooser.jsfx</source>
       </version>
     </reapack>
     <reapack name="ReaCenterMIDIpitch.jsfx" type="effect" desc="ReaCenterMIDIpitch">
