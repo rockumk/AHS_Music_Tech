@@ -1,15 +1,25 @@
 -- @description Numbers2Notes
--- @version 1.2.5
+-- @version 1.2.6
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.2.5
+--   # Numbers2Notes 1.2.6
 --   Updated Nashville Number System Style Chord Charting for Reaper.
 -- @changelog
 --   # Fixes & Improvements
---   + Fixed Shift/Ctrl modifier keys in the Entry tab (improved Mac & Caps Lock compatibility).
---   + Fixed Diatonic highlighting errors in the Music Theory engine.
---   + Fixed potential crash in Spectrum generation on long tracks.
---   + Fixed duplicate sample song entry.
+--   + Moved the Configuration to a separate file
+--   + Simplified track building
+--   + Added checks for needed plugins
+-- @provides
+--   [main] .
+--   numbers2notes_config.lua
+--   numbers2notes_form.lua
+--   numbers2notes_help.lua
+--   numbers2notes_musictheory.lua
+--   numbers2notes_songs.lua
+--   numbers2notes_spectrum.lua
+--   [fx] N2N_Tag.jsfx
+--   [fx] Mood2Mode.jsfx
+
 
 package.path = reaper.ImGui_GetBuiltinPath() .. '/?.lua'
 local ImGui = require 'imgui' '0.8.6' -- Version of IMGUI used during development.
@@ -23,7 +33,10 @@ local spectrum = require(script_path .. "numbers2notes_spectrum")
 local songs = require(script_path .. "numbers2notes_songs")
 local help = require(script_path .. "numbers2notes_help")
 local form = require(script_path .. "numbers2notes_form")
-
+local config = require(script_path .. "numbers2notes_config")
+local track_table = config.track_table
+local pluginsources = config.pluginsources
+local G_startup_missing_report = ""
 
 -----------------------------------------------   GUI VARIABLES AND SETUP
 
@@ -143,6 +156,72 @@ chord_charting_area = [[
 
 ]]
 
+-- ________________________________________________________ PLUGIN AUDIT SYSTEM
+function Check_Plugins_On_Startup()
+    reaper.PreventUIRefresh(1)
+    
+    local missing_log = {}
+    local checked_cache = {} 
+    local missing_count = 0
+
+    -- 1. Create a temporary "Sandbox" track at the end of the project
+    local track_idx = reaper.CountTracks(0)
+    reaper.InsertTrackAtIndex(track_idx, false)
+    local temp_track = reaper.GetTrack(0, track_idx)
+
+    -- 2. Check the "Audition" Synth (Special Case)
+    local pad_check = reaper.TrackFX_AddByName(temp_track, "pad-synth", false, -1)
+    if pad_check == -1 then
+        missing_count = missing_count + 1
+        table.insert(missing_log, "CRITICAL: 'pad-synth' (Auditioning) is missing.\nSource: " .. (pluginsources[3] or "Unknown"))
+    else
+        reaper.TrackFX_Delete(temp_track, pad_check)
+    end
+
+    -- 3. Audit the Track Table
+    for _, track_data in pairs(track_table) do
+        if track_data[5] then -- If track has plugins defined
+            for _, plug_data in pairs(track_data[5]) do
+                local name = plug_data[1]
+                local source_id = plug_data[4] or 99 
+                
+                -- Check cache so we don't check "ReaEQ" 10 times
+                if checked_cache[name] == nil then
+                    local index = reaper.TrackFX_AddByName(temp_track, name, false, -1)
+                    
+                    if index == -1 then
+                        checked_cache[name] = false -- Mark as missing
+                        missing_count = missing_count + 1
+                        
+                        local source_msg = pluginsources[source_id] or "Unknown Source."
+                        table.insert(missing_log, "Missing: " .. name .. "\n-> " .. source_msg)
+                    else
+                        checked_cache[name] = true -- Mark as found
+                        reaper.TrackFX_Delete(temp_track, index) -- Clean up immediately
+                    end
+                end
+            end
+        end
+    end
+
+    -- 4. Clean up the sandbox track
+    reaper.DeleteTrack(temp_track)
+    reaper.PreventUIRefresh(-1)
+
+    -- 5. Generate Report
+    if missing_count > 0 then
+        G_startup_missing_report = "SYSTEM NOT READY: " .. missing_count .. " PLUGINS MISSING\n\n" ..
+                                   "The script cannot build tracks correctly without these plugins.\n" ..
+                                   "Please install them, OR edit 'numbers2notes_config.lua' to remove them.\n\n"
+        for _, msg in pairs(missing_log) do
+            G_startup_missing_report = G_startup_missing_report .. msg .. "\n\n"
+        end
+        return true -- Errors found
+    else
+        return false -- All good
+    end
+end
+
 
 -----------------------------------------------                 AUTO LOAD LAST NUMBERS2NOTES CHART   
 function LoadLastNumbers2NotesChart()
@@ -227,7 +306,7 @@ render_feedback = ""
 r = reaper
 local ctx = r.ImGui_CreateContext("Numbers2Notes")
 local main_viewport = r.ImGui_GetMainViewport(ctx)
-local font = r.ImGui_CreateFont("Roboto Mono", 16)
+local font = r.ImGui_CreateFont("Consolas",15)
 r.ImGui_Attach(ctx, font)
 local click_count, text = 0, ""
 local window_flags = r.ImGui_WindowFlags_NoResize() | r.ImGui_WindowFlags_MenuBar() 
@@ -280,7 +359,7 @@ function IM_GUI_Loop()
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_ChildBg(), 0xC8858500)
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_PopupBg(), 0x77B384F0)
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_BorderShadow(), 0x466C9000)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_FrameBg(), 0xFFFFFFFF)
+    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_FrameBg(), 0xFFFFFFFE)
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_ScrollbarBg(), 0x82589E87)
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Button(), 0x2A9AC0FF)
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_ButtonHovered(), 0xFFF06FCC)
@@ -327,14 +406,65 @@ function IM_GUI_Loop()
     end
 
     if visible then
-        if modal_on == true then
-            r.ImGui_SetNextWindowPos(ctx, 800, 450)
+
+
+if modal_on == true then
             r.ImGui_OpenPopup(ctx, "Status:")
+            
+            -- Center the popup
+            local vp_x, vp_y = r.ImGui_Viewport_GetCenter(main_viewport)
+            r.ImGui_SetNextWindowPos(ctx, vp_x, vp_y, r.ImGui_Cond_Appearing(), 0.5, 0.5)
+
             if r.ImGui_BeginPopupModal(ctx, "Status:", nil, r.ImGui_WindowFlags_AlwaysAutoResize()) then
-                r.ImGui_Text(ctx, "       Processing...       \n\n")
+                
+                -- ERROR STATE: Show Missing Plugins
+                if G_startup_missing_report ~= "" then
+                    r.ImGui_TextColored(ctx, 0xFF5555FF, "MISSING DEPENDENCIES")
+                    r.ImGui_Separator(ctx)
+                    
+                    -- 1. Scrollable, Selectable Text Box (Allows Copying)
+                    if r.ImGui_BeginChild(ctx, "error_scroll", 600, 350) then
+                        r.ImGui_InputTextMultiline(ctx, "##report_display", G_startup_missing_report, -1, -1, r.ImGui_InputTextFlags_ReadOnly())
+                        r.ImGui_EndChild(ctx)
+                    end
+                    
+                    r.ImGui_Separator(ctx)
+                    
+                    -- 2. Buttons
+                    if r.ImGui_Button(ctx, "Copy Report to Clipboard", 200, 30) then
+                        r.ImGui_SetClipboardText(ctx, G_startup_missing_report)
+                    end
+
+                    r.ImGui_SameLine(ctx)
+
+                    if r.ImGui_Button(ctx, "Refresh / Re-Scan", 200, 30) then
+                        local still_broken = Check_Plugins_On_Startup()
+                        if not still_broken then
+                            modal_on = false
+                            G_startup_missing_report = ""
+                            r.ImGui_CloseCurrentPopup(ctx)
+                        end
+                    end
+                    
+                    r.ImGui_SameLine(ctx)
+                    
+                    if r.ImGui_Button(ctx, "Close Script", 120, 30) then
+                        open = false
+                    end
+
+                else
+                    -- NORMAL STATE: Just Processing
+                    r.ImGui_Text(ctx, "       Processing...       \n\n")
+                end
+                
                 r.ImGui_EndPopup(ctx)
             end
         end
+
+
+
+
+
         -- Always center this window when appearing
 
         reaper.ImGui_BeginGroup(ctx)
@@ -900,7 +1030,7 @@ Form: I V C V C B C O]]
         end
         if feedback_tab_mode == 9 then
     
-reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.2.5")
+reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.2.6")
 reaper.ImGui_Text(ctx, "Numbers2Notes does not yet allow the user to select plugins.")
 reaper.ImGui_Text(ctx, "The plugins below are required to fully set up the default configuration.")
 reaper.ImGui_Text(ctx, "")
@@ -1872,379 +2002,105 @@ end
 
 -- ________________________________________________________ SET UP TRACKS
 
-function Setup_Tracks() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
-    local sut_tracklist = {}
-    local sut_current_track = ""
-    local sut_current_trackname = ""
-    local track_count
-    local sut_track_item_count
 
-    local found_bool_n_chart = false
-  local found_bool_l_chart = false
-    local found_bool_lead_MIDI = false
-    local found_bool_chord_MIDI = false
-    local found_bool_bass_MIDI = false
-    local found_bool_chbass_MIDI = false
-    local found_bool_grid_MIDI = false
-    local found_bool_lead1 = false
-    local found_bool_lead2 = false
-    local found_bool_chord_sus = false
-    local found_bool_chord_bluearp = false
-    local found_bool_chord_librearp = false
-    local found_bool_chord_stfu1 = false
-    local found_bool_chord_stfu2 = false
-    local found_bool_chord_stochas = false
-    local found_bool_bass_sus = false
-    local found_bool_bass_bluearp = false
-    local found_bool_bass_librearp = false
-    local found_bool_bass_stfu1 = false
-    local found_bool_bass_stfu2 = false
-    local found_bool_drums = false  
-    local found_bool_chbass_merlittzer = false
-    local found_bool_grid_librearp = false
-    local found_bool_reverb = false
-  local found_bool_empty = false
 
-    local trackID_n_chart = ""
-    local trackID_l_chart = ""  
-    local trackID_lead_MIDI = ""
-    local trackID_chord_MIDI = ""
-    local trackID_bass_MIDI = ""
-    local trackID_chbass_MIDI = ""
-    local trackID_grid_MIDI = ""
-    local trackID_lead1 = ""
-    local trackID_lead2 = ""
-    local trackID_chord_sus = ""
-    local trackID_chord_bluearp = ""
-    local trackID_chord_librearp = ""
-    local trackID_chord_stfu1 = ""
-    local trackID_chord_stfu2 = ""
-    local trackID_chord_stochas = ""
-    local trackID_bass_sus = ""
-    local trackID_bass_bluearp = ""
-    local trackID_bass_librearp = ""
-    local trackID_bass_stfu1 = ""
-    local trackID_bass_stfu2 = ""
-    local trackID_drums = ""  
-    local trackID_chbass_merlittzer = ""
-    local trackID_grid_librearp = ""
-    local trackID_reverb = ""
-  local trackID_empty = ""
+-- ________________________________________________________ SET UP TRACKS (DYNAMIC)
+function Setup_Tracks() 
+    -- 1. Reset internal state of the table
+    for _, v in pairs(track_table) do
+        v[2] = false -- Reset Found Bool
+        v[3] = nil   -- Reset Track Pointer
+    end
 
-    -- 0 = Table Column Descriptions
-    local track_table = {
-        [0] = {"Track Name","found?bool","trackID","clear contents required?",
-            {
-      {"plugin 1 | enabled? = this boolean --->",true,preset},
-      {"plugin 2",false,"snaps"}},
-            "Sends",
-      "Volume = MIDI 0 = No 1 = Yes",
-      "Color",
-      "volume"
-      },
-        [1] = {"N2N # Chart", found_bool_n_chart, trackID_n_chart, 1, {{"SwingProjectMIDI",true,nil}}, {}, 0, {100, 100, 100},0},
-        [2] = {"N2N Letter Chart", found_bool_l_chart, trackID_l_chart, 1, {{"SwingProjectMIDI",true,nil}}, {}, 0, {100, 100, 100},0},
-    -- =========================================================================================================================
-        [3] = {"N2N Absolute Grid & Reverb", found_bool_grid_MIDI, trackID_grid_MIDI, 1, {{"JS:Lexikan",true,nil}}, {}, 1, {250, 250, 250},.17},
-        [4] = {"N2N Relative Grid & Delay", found_bool_grid_MIDI, trackID_grid_MIDI, 1, {{"JS:Khaki Delay S2",true,nil}}, {}, 1, {250, 250, 250},0},
+    -- 2. IDENTIFY EXISTING TRACKS
+    local track_count = reaper.CountTracks(0)
+    for i = 0, track_count - 1 do 
+        local track = reaper.GetTrack(0, i)
+        local _, current_name = reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "", false)
 
-    -- =========================================================================================================================
-        [5] = {"N2N Chords MIDI", found_bool_chord_MIDI, trackID_chord_MIDI, 1, {},{6, 7, 8, 9,10,11,12}, 1, {134, 172, 181},0},
-        [6] = {"N2N Chord 1",found_bool_chord_sus,trackID_chord_sus, 0,
-      {
-      {"HeadStart",true,nil},
-      {"ReaCenterMIDIpitch",false,nil},
-      {"LibreARP",false,nil},
-      {"ReaPulsive-8ths",false,nil},  
-      {"SwingTrackMIDI",true,nil},
-      {"ThisTriggersThat",false,nil},
-      {"CLAP:Surge XT",true,"N2N_Chords"},
-      {"STFU",false,nil},
-      {"JS:Guitar Amp",false,nil},
-      {"Tube",false,nil},  
-      {"JS:ReEQ",true,nil},
-      {"JS:Compressor 2",false,nil},      
-      {"Drive",false,nil},
-      {"JS:Saike SEQS",false,nil},      
-      {"JS:Limiter 3",false,nil}
-      },
-      {3, 4},0,{134, 172, 181},.4},
-        [7] = {"N2N Chord 2",found_bool_chord_sus,trackID_chord_sus, 0,
-      {
-      {"HeadStart",true,nil},
-      {"ReaCenterMIDIpitch",false,nil},
-      {"LibreARP",false,nil},
-      {"ReaPulsive-8ths",true,nil},
-      {"SwingTrackMIDI",true,nil},
-      {"ThisTriggersThat",false,nil},
-      {"CLAP:Surge XT",true,"N2N_Blips"},
-      {"STFU",false,nil},
-      {"JS:Guitar Amp",false,nil},
-      {"Tube",false,nil},  
-      {"JS:ReEQ",true,nil},
-      {"JS:Compressor 2",false,nil},      
-      {"Drive",false,nil},  
-      {"JS:Saike SEQS",false,nil},      
-      {"JS:Limiter 3",false,nil}
-      },
-      {3, 4},0,{134, 172, 181},.2},
-        [8] = {"N2N Chord 3",found_bool_chord_sus,trackID_chord_sus, 0,
-      {
-      {"HeadStart",true,nil},
-      {"ReaCenterMIDIpitch",false,nil},
-      {"LibreARP",true,nil},
-      {"ReaPulsive-8ths",false,nil},
-      {"SwingTrackMIDI",true,nil},
-      {"ThisTriggersThat",false,nil},
-      {"CLAP:Surge XT",true,"N2N_Pie"},
-      {"STFU",false,nil},
-      {"JS:Guitar Amp",false,nil},
-      {"Tube",false,nil},  
-      {"JS:ReEQ",true,nil},
-      {"JS:Compressor 2",false,nil},      
-      {"Drive",false,nil},
-      {"JS:Saike SEQS",false,nil},       
-      {"JS:Limiter 3",false,nil}
-      },
-      {3, 4},0,{134, 172, 181},.4},
-        [9] = {"N2N Chord 4",found_bool_chord_sus,trackID_chord_sus, 0,
-      {
-      {"HeadStart",true,nil},
-      {"ReaCenterMIDIpitch",false,nil},
-      {"LibreARP",true,nil},
-      {"ReaPulsive-8ths",false,nil},
-      {"SwingTrackMIDI",true,nil},
-      {"ThisTriggersThat",false,nil},
-      {"CLAP:Surge XT",true,"N2N_Plucks"},
-      {"STFU",false,nil},
-      {"JS:Guitar Amp",false,nil},
-      {"Tube",false,nil},  
-      {"JS:ReEQ",true,nil},
-      {"JS:Compressor 2",false,nil},      
-      {"Drive",false,nil},  
-      {"JS:Saike SEQS",false,nil},       
-      {"JS:Limiter 3",false,nil}
-      },
-      {3, 4},0,{134, 172, 181},.4},
-    [10] = {"N2N Chord 5",found_bool_chord_sus,trackID_chord_sus, 0,
-      {
-      {"HeadStart",true,nil},
-      {"ReaCenterMIDIpitch",false,nil},
-      {"LibreARP",true,nil},
-      {"ReaPulsive-8ths",false,nil},
-      {"SwingTrackMIDI",true,nil},
-      {"ThisTriggersThat",false,nil},
-      {"CLAP:Surge XT",true,nil},
-      {"STFU",false,nil},
-      {"JS:Guitar Amp",false,nil},
-      {"Tube",false,nil},  
-      {"JS:ReEQ",true,nil},
-      {"JS:Compressor 2",false,nil},      
-      {"Drive",false,nil},  
-      {"JS:Saike SEQS",false,nil},       
-      {"JS:Limiter 3",false,nil}
-      },
-      {3, 4},0,{134, 172, 181},.4},
-    [11] = {"N2N Chord 6",found_bool_chord_sus,trackID_chord_sus, 0,
-      {
-      {"HeadStart",true,nil},
-      {"ReaCenterMIDIpitch",false,nil},
-      {"LibreARP",true,nil},
-      {"ReaPulsive-8ths",false,nil},
-      {"SwingTrackMIDI",true,nil},
-      {"ThisTriggersThat",false,nil},
-      {"CLAP:Surge XT",true,nil},
-      {"STFU",false,nil},
-      {"JS:Guitar Amp",false,nil},
-      {"Tube",false,nil},  
-      {"JS:ReEQ",true,nil},
-      {"JS:Compressor 2",false,nil},      
-      {"Drive",false,nil},    
-      {"JS:Saike SEQS",false,nil},       
-      {"JS:Limiter 3",false,nil}
-      },
-      {3, 4},0,{134, 172, 181},.4},
-    [12] = {"N2N Chord 7",found_bool_chord_sus,trackID_chord_sus, 0,
-      {
-      {"HeadStart",true,nil},
-      {"ReaCenterMIDIpitch",false,nil},
-      {"LibreARP",true,nil},
-      {"ReaPulsive-8ths",false,nil},
-      
-      {"SwingTrackMIDI",true,nil},
-      {"ThisTriggersThat",false,nil},
-      {"CLAP:Surge XT",true,nil},
-      {"STFU",false,nil},
-      
-      {"JS:Guitar Amp",false,nil},
-      {"Tube",false,nil},  
-      {"JS:ReEQ",true,nil},
-      {"JS:Compressor 2",false,nil},  
-      
-      {"Drive",false,nil},    
-      {"JS:Saike SEQS",false,nil},       
-      {"JS:Limiter 3",false,nil}
-      },
-      {3, 4},0,{134, 172, 181},.4},  
-    -- =========================================================================================================================    
-        [13] = {"N2N Chord-Bass MIDI", found_bool_chbass_MIDI, trackID_chbass_MIDI, 1, {}, {14}, 1, {172, 134, 181},0}, 
-        [14] = {"N2N Chord-Bass",found_bool_chord_sus,trackID_chord_sus, 0,
-      {
-      {"HeadStart",true,nil},
-      {"ReaCenterMIDIpitch",false,nil},
-      {"LibreARP",true,nil},
-      {"ReaPulsive-8ths",false,nil},  
-      {"SwingTrackMIDI",true,nil},
-      {"ThisTriggersThat",false,nil},
-      {"CLAP:Surge XT",true,nil},
-      {"STFU",false,nil},
-      {"JS:Guitar Amp",false,nil}, 
-      {"Tube",false,nil},  
-      {"JS:ReEQ",true,nil},
-      {"JS:Compressor 2",false,nil},  
-      {"Drive",false,nil},
-      {"JS:Saike SEQS",false,nil},       
-      {"JS:Limiter 3",false,nil}
-      },
-      {3, 4},0,{172, 134, 181},.4},
-    -- =========================================================================================================================
-        [15] = {"N2N Bass MIDI", found_bool_bass_MIDI, trackID_bass_MIDI, 1, {}, 
-      {16}, 1, {134, 153, 181},0},
-        [16] = {"N2N Bass",found_bool_chord_sus,trackID_chord_sus, 0,
-      {
-      {"HeadStart",true,nil},
-      {"ReaCenterMIDIpitch",false,nil},
-      {"LibreARP",false,nil},
-      {"ReaPulsive-halves",true,nil},    
-      {"SwingTrackMIDI",true,nil},
-      {"ThisTriggersThat",false,nil},
-      {"CLAP:Surge XT",true,"N2N_Bass"},
-      {"STFU",false,nil},
-      {"JS:Guitar Amp",false,nil},
-      {"Tube",false,nil},  
-      {"JS:Dis-Treasure",false,nil},  
-      {"JS:LA-2KAN S2",false,nil},
-      {"JS:NC76 S2",false,nil},
-      {"JS:Compressor 2",false,nil},  
-      {"JS:ReEQ",true,nil},  
-      {"Drive",false,nil},  
-      {"JS:Saike SEQS",false,nil},
-      {"JS:Limiter 3",false,nil} 
-      },
-      {3, 4},0,{134, 153, 181},1.3},
-    -- =========================================================================================================================      
-    [17] = {"N2N Drums",found_bool_drums,trackID_drums,0,
-    {
-    {"Tattoo",true,"35 Set - Old School"},
-    {"SwingTrackMIDI",true,nil},
-    {"Sitala",false,nil},
-    {"Calibre",true,nil},
-    {"Holt",true,nil},
-    {"JS:Violet Envelope Shaper S2",true,"35 Set - Old School"},
-    {"JS:Exciter+Sub",false,nil},
-    {"JS:Tape Recorder S2",false,nil},  
-    {"JS:Guitar Amp",false,nil},  
-    {"Tube",false,nil},  
-    {"JS:Dis-Treasure",true,nil},  
-    {"JS:LA-2KAN S2",false,nil},
-    {"JS:NC76 S2",false,nil},
-    {"JS:Compressor 2",false,nil},
-    {"JS:ReEQ",true,nil},
-    {"Drive",false,nil},  
-    {"JS:Saike SEQS",false,nil}, 
-    {"JS:Limiter 3",false,nil} 
-    },
-    {3,4},0,{144, 144, 144},4},
-    [18] = {"Empty",found_bool_empty,trackID_empty,0,
-    {
-    {"Sitala",false,nil},
-    {"Calibre",true,nil},
-    {"Holt",true,nil},
-    {"JS:Tape Recorder S2",false,nil},
-    {"JS:Guitar Amp",false,nil},  
-    {"Tube",false,nil},  
-    {"JS:Dis-Treasure",true,nil},  
-    {"JS:LA-2KAN S2",false,nil},
-    {"JS:NC76 S2",false,nil},
-    {"JS:Compressor 2",false,nil},
-    {"JS:ReEQ",true,nil},
-    {"Drive",false,nil},  
-    {"JS:Saike SEQS",false,nil}, 
-    {"JS:Limiter 3",false,nil} 
-    },
-    {3,4},0,{222, 222, 222},1}
-    }
- 
-    --Show_To_Dev("Started: " .. string.char(10))
-    track_count = reaper.CountTracks(0)
-    for i = 0, track_count - 1, 1 do -- CHECK EACH TRACK FOR ONE NAMED "Charted Track'
-        --Show_To_Dev(i .. string.char(10))
-        local sut_current_track_id = reaper.GetTrack(0, i)
-        --Show_To_Dev(tostring(sut_current_track_id) .. string.char(10))
-
-        _, sut_current_trackname = reaper.GetTrackName(sut_current_track_id)
-        --Show_To_Dev(sut_current_trackname .. string.char(10))
-
-        for i, v in pairs(track_table) do
-            if sut_current_trackname == v[1] then
-                track_table[i][2] = true
-                track_table[i][3] = sut_current_track_id
-                track_color = reaper.ColorToNative(v[8][1], v[8][2], v[8][3]) | 0x10000000
-                reaper.SetTrackColor(sut_current_track_id, track_color)
-            else
+        for k, v in pairs(track_table) do
+            if current_name == v[1] then
+                v[2] = true  -- Found it!
+                v[3] = track -- Store ID
+                
+                -- Optional: Re-assert color?
+                local track_color = reaper.ColorToNative(v[8][1], v[8][2], v[8][3]) | 0x10000000
+                reaper.SetTrackColor(track, track_color)
             end
-            --Show_To_Dev(i .. " " .. tostring(v[2]) .. " | " .. tostring(v[3]) .. " | " .. tostring(v[4]) .. string.char(10))
         end
     end
-    for i, v in pairs(track_table) do
-        if v[2] == true and v[4] == 1 then
-            local current_working_track = track_table[i][3]
-            --Show_To_Dev("yes " .. i.. " " .. tostring(v[2]) .. " | " .. tostring(v[3]) .. " | " .. tostring(v[4]) .. string.char(10))
-            sut_track_item_count = reaper.CountTrackMediaItems(current_working_track)
-            --Show_To_Dev("track item count =  " .. sut_track_item_count .. string.char(10))
-            for i = sut_track_item_count, 1, -1 do
-                --Show_To_Dev("current working track =  " .. tostring(current_working_track) .. " | i = "   .. i .. string.char(10))
 
-                item_index = reaper.GetTrackMediaItem(current_working_track, i - 1)
-                --Show_To_Dev("item_index =  " .. tostring(item_index) .. string.char(10))
-                reaper.DeleteTrackMediaItem(current_working_track, item_index)
+    -- 3. CREATE NEW TRACKS or CLEAN EXISTING ONES
+    for i, v in pairs(track_table) do
+        if v[2] == true then
+            -- CASE A: TRACK EXISTS
+            -- We ONLY clear the items if the flag v[4] is 1. (Non-Destructive)
+            if v[4] == 1 then
+                local current_track = v[3]
+                local item_count = reaper.CountTrackMediaItems(current_track)
+                for j = item_count, 1, -1 do
+                    local item = reaper.GetTrackMediaItem(current_track, j - 1)
+                    reaper.DeleteTrackMediaItem(current_track, item)
+                end
             end
+            
         elseif v[2] == false then
-            reaper.InsertTrackAtIndex(i - 1, false) -- INSERT A NEW TRACK
-            newly_created_track = reaper.GetTrack(0, i - 1)
-            --Show_To_Dev(tostring(newly_created_track) .. string.char(10))
-            reaper.GetSetMediaTrackInfo_String(newly_created_track, "P_NAME", v[1], true)
-            v[3] = newly_created_track
-            --Show_To_Dev("yes " .. i.. " " .. tostring(v[2]) .. " | " .. tostring(v[3]) .. " | " .. tostring(v[4]) .. string.char(10))
-            plug_order = 1000
-            for j, value in pairs(v[5]) do
-                addedFX = reaper.TrackFX_AddByName(v[3], v[5][j][1], false, plug_order) -- ADD INSTRUMENT FX
-        if v[5][j][3] ~= nil then
-        reaper.TrackFX_SetPreset(v[3], addedFX, v[5][j][3] )  
-        end
+            -- CASE B: TRACK IS MISSING -> CREATE IT
+            reaper.InsertTrackAtIndex(reaper.CountTracks(0), true) 
+            local idx = reaper.CountTracks(0) - 1
+            local new_track = reaper.GetTrack(0, idx)
+            
+            reaper.GetSetMediaTrackInfo_String(new_track, "P_NAME", v[1], true)
+            v[3] = new_track
+            
+            -- Set Volume and Color
+            local track_color = reaper.ColorToNative(v[8][1], v[8][2], v[8][3]) | 0x10000000
+            reaper.SetTrackColor(new_track, track_color)
+            reaper.SetTrackUIVolume(new_track, v[9], false, true, 0)
+
+            -- ADD PLUGINS
+            -- We assume the startup check passed, so we just add them.
+            -- If they are missing here, they just won't load, but it won't crash.
+            local plug_order = 1000 
+            
+            for _, fx_info in pairs(v[5]) do
+                local fx_name = fx_info[1]
+                local fx_enabled = fx_info[2]
+                local fx_preset = fx_info[3]
+                
+                local fx_index = reaper.TrackFX_AddByName(new_track, fx_name, false, plug_order)
+                
+                if fx_index >= 0 then
+                    reaper.TrackFX_SetEnabled(new_track, fx_index, fx_enabled)
+                    if fx_preset ~= nil then
+                        reaper.TrackFX_SetPreset(new_track, fx_index, fx_preset)
+                    end
+                end
                 plug_order = plug_order - 1
             end
-      count = 0
-            for j, value in pairs(v[5]) do
-        reaper.TrackFX_SetEnabled(newly_created_track, count, v[5][j][2])
-        count = count + 1
-            end
-      track_color = reaper.ColorToNative(v[8][1], v[8][2], v[8][3]) | 0x10000000
-            reaper.SetTrackColor(newly_created_track, track_color)
-      reaper.SetTrackUIVolume(newly_created_track, v[9], false, true,0 )
         end
     end
 
+    -- 4. SETUP SENDS
     for i, v in pairs(track_table) do
-        if i > 0 and v[2] == false then
-            for j, w in pairs(v[6]) do
-                --Show_To_Dev("i... " .. i .. " hello... " .. tostring(v[3]) .. " and the send is... " .. tostring(track_table[track_table[i][6][j]][3]) .. string.char(10))
-                reaper.CreateTrackSend(v[3], track_table[track_table[i][6][j]][3])
+        -- Only set up sends if track was newly created (v[2] was false at start of loop, but logic creates it)
+        -- Actually, since we updated v[2] in step 2, we need a way to know if it's new.
+        -- Simplest way: Check if send exists? Or just recreate?
+        -- For now, let's just loop. If send exists, Reaper usually ignores duplicate create calls or adds another.
+        -- To be safe, we only add sends if the track has 0 sends currently? 
+        
+        if reaper.GetTrackNumSends(v[3], 0) == 0 then
+            for _, target_index in pairs(v[6]) do
+                if track_table[target_index] and track_table[target_index][3] then
+                    reaper.CreateTrackSend(v[3], track_table[target_index][3])
+                end
             end
         end
     end
-    return sup_tracklist, track_table
+
+    return nil, track_table
 end
+
 
 function Initialize_Track_Setup() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
     reaper.PreventUIRefresh(1)
@@ -7111,7 +6967,18 @@ function render_gather_go()
   modal_on = false
 end
 
+
+
 -- _______________________________________________________________________ MAIN FUNCTION  ____________________
 Initialize_Track_Setup()
 LoadLastNumbers2NotesChart()
+
+-- RUN THE STARTUP AUDIT
+local errors_found = Check_Plugins_On_Startup()
+if errors_found then
+    modal_on = true -- Force the GUI to open the error popup immediately
+end
+
 IM_GUI_Loop()
+
+
