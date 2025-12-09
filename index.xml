@@ -631,11 +631,17 @@ Auto Reload of Last Numbers2Notes Session]]></changelog>
 {\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 AHS Music Tech Repository\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 A collection of effects and scripts created for my students. They are not useful to the general public, but versions for public use will likely be released in the future.\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 SCRIPTS\par}
-{\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab Numbers2Notes - A Nashville Number System Chord Creation Tool\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Numbers2Notes - A Nashville Number System Chord Creation Tool\par}
 {\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab Import and Export Chord Charts\par}
 {\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab Create MIDI tracks\par}
-{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab Print Chord Charts\sa180\par}
-{\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab numbers2notes_spectrum - Creates a MIDI item containing the chord tones in all octaves.\sa180\par}
+{\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab Print Chord Charts\sa180\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 \u9888 ?\u65039 ? Requirements & Setup\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Before using the script, please check the list of required extensions and plugins here:\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \u55357 ?\u56393 ? {\b {\field{\*\fldinst{HYPERLINK "https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html"}}{\fldrslt{\ul
+Numbers2Notes - View Details, Installation Guide & Requirements
+}}}
+}\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab numbers2notes_spectrum - Creates a MIDI item containing the chord tones in all octaves.\sa180\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 EFFECTS\par}
 {\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab MidiOnOff - Simple Effect to turn MIDI on and OFF via MIDI\par}
 {\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab ReaCenterMIDIpitch - Recenters MIDI pitches around a user definable center pitch.\par}
