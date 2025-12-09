@@ -10,6 +10,10 @@ SCRIPTS
    - Create MIDI tracks
    - Print Chord Charts
 
+## ⚠️ Requirements & Setup
+Before using the script, please check the list of required extensions and plugins here:
+👉 **[View Installation Guide & Requirements](https://rockumk.github.io/AHS_Music_Tech/requirements.html)**
+
 - numbers2notes_spectrum - Creates a MIDI item containing the chord tones in all octaves.
 
 EFFECTS
