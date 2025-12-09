@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Numbers2Notes - Required Plugins</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #252525;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        h1 {
+            color: #4CAF50;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #64b5f6;
+            margin-top: 40px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        .intro {
+            font-size: 1.1em;
+            margin-bottom: 30px;
+            background-color: #333;
+            padding: 15px;
+            border-left: 4px solid #4CAF50;
+        }
+        .tip-box {
+            background-color: #2c3e50;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #f39c12;
+            margin-bottom: 30px;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            background-color: #303030;
+            margin-bottom: 10px;
+            padding: 15px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        a {
+            color: #81c784;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        a:hover {
+            text-decoration: underline;
+            color: #a5d6a7;
+        }
+        .tag {
+            font-size: 0.8em;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background-color: #444;
+            color: #aaa;
+            margin-left: 10px;
+        }
+        .code-box {
+            background-color: #111;
+            padding: 10px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            border: 1px solid #444;
+            border-radius: 4px;
+            word-break: break-all;
+            margin-top: 10px;
+            width: 100%;
+            user-select: all;
+            color: #e6ce31;
+        }
+        .main-repo {
+            border: 2px solid #4CAF50;
+            background-color: #1b2e1b;
+        }
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 0.9em;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Numbers2Notes Requirements</h1>
+    
+    <div class="intro">
+        <p><strong>Welcome Beta Testers!</strong></p>
+        <p>Numbers2Notes is a powerful script that relies on specific extensions and plugins to function correctly. Please follow this guide to set up your environment.</p>
+    </div>
+
+    <!-- REABOOT TIP -->
+    <div class="tip-box">
+        <strong>New to Reaper Customization?</strong><br>
+        If you do not have <em>ReaPack</em> or <em>SWS</em> installed yet, the easiest way to get started is to run the default recipe from <strong><a href="https://reaboot.com" target="_blank" style="color:#f1c40f;">Reaboot.com</a></strong>. This will install the package manager and core extensions automatically.
+    </div>
+
+    <h2>1. Essential Extensions (The Engine)</h2>
+    <p>The script <strong>will not run</strong> without these extensions. Ensure these are installed via ReaPack.</p>
+    
+    <ul>
+        <li style="display:block;">
+            <div style="display:flex; justify-content:space-between;">
+                <strong>ReaTeam Extensions</strong>
+                <span class="tag">System Core</span>
+            </div>
+            <div style="margin-top:5px; font-size:0.9em; color:#bbb;">
+                Must include: <strong>ReaImGui</strong> (Interface), <strong>SWS</strong>, and <strong>js_ReaScriptAPI</strong>.
+            </div>
+            <div class="code-box">https://github.com/ReaTeam/Extensions/raw/master/index.xml</div>
+        </li>
+    </ul>
+
+    <h2>2. JSFX Repositories (The Effects)</h2>
+    <p>Import these repositories into ReaPack <em>(Extensions > ReaPack > Import Repositories...)</em> to get the required audio processors.</p>
+
+    <ul>
+        <li style="display:block;">
+            <div style="display:flex; justify-content:space-between;">
+                <strong>Tukan Studios</strong>
+                <span class="tag">Essential Mixing</span>
+            </div>
+            <div class="code-box">https://raw.githubusercontent.com/TukanStudios/TUKAN_STUDIOS_PLUGINS/main/index2.xml</div>
+        </li>
+        <li style="display:block;">
+            <div style="display:flex; justify-content:space-between;">
+                <strong>Saike Tools</strong>
+                <span class="tag">Sequencers</span>
+            </div>
+            <div class="code-box">https://raw.githubusercontent.com/JoepVanlier/JSFX/master/index.xml</div>
+        </li>
+        <li style="display:block;">
+            <div style="display:flex; justify-content:space-between;">
+                <strong>Geraint's JSFX</strong>
+                <span class="tag">Pad Synth</span>
+            </div>
+            <div class="code-box">https://geraintluff.github.io/jsfx/index.xml</div>
+        </li>
+    </ul>
+
+    <h2>3. VST Instruments & Effects (Direct Download)</h2>
+    <p>Download and install these free plugins to ensure the default band sounds correct.</p>
+    <ul>
+        <li>
+            <span><strong>Surge XT</strong> <span class="tag">Synthesizer</span></span>
+            <a href="https://surge-synthesizer.github.io/" target="_blank">Download &rarr;</a>
+        </li>
+        <li>
+            <span><strong>Sitala</strong> <span class="tag">Drums</span></span>
+            <a href="https://decomposer.de/sitala/" target="_blank">Download &rarr;</a>
+        </li>
+        <li>
+            <span><strong>LibreARP</strong> <span class="tag">Arpeggiator</span></span>
+            <a href="https://librearp.gitlab.io/" target="_blank">Download &rarr;</a>
+        </li>
+        <li>
+            <span><strong>Drum8</strong> (Audiolatry) <span class="tag">Drums</span></span>
+            <a href="https://audiolatry.com/free-drum-kit-plugin/" target="_blank">Download &rarr;</a>
+        </li>
+        <li>
+            <span><strong>Tattoo</strong> (Audio Damage) <span class="tag">Percussion</span></span>
+            <a href="https://www.audiodamage.com/pages/free-and-legacy" target="_blank">Download &rarr;</a>
+        </li>
+        <li>
+            <span><strong>STFU</strong> (Zeek) <span class="tag">Sidechain/Gate</span></span>
+            <a href="https://zeek.at/en/" target="_blank">Download &rarr;</a>
+        </li>
+        <li>
+            <span><strong>Airwindows</strong> <span class="tag">Mixing Tools</span><br>
+            <small>Needed: Calibre, Isolator, Holt, Tube, Drive</small></span>
+            <a href="https://www.airwindows.com/" target="_blank">Download &rarr;</a>
+        </li>
+    </ul>
+
+    <h2>4. Install Numbers2Notes</h2>
+    <p>Once the environment is ready, import this repository to install the main script.</p>
+    
+    <ul>
+        <li class="main-repo" style="display:block;">
+            <div style="display:flex; justify-content:space-between;">
+                <strong>AHS Music Tech (Rock Kennedy)</strong>
+                <span class="tag" style="background-color:#4CAF50; color:white;">Main Script</span>
+            </div>
+            <div class="code-box" style="color: #4CAF50;">https://github.com/rockumk/AHS_Music_Tech/raw/master/index.xml</div>
+        </li>
+    </ul>
+
+    <div class="intro" style="background-color: #2a2a2a; border-left-color: #64b5f6; margin-top:30px;">
+        <p><strong>Note:</strong> If you prefer not to install specific VSTs, the script will warn you on startup. You can disable this warning by editing <code>numbers2notes_config.lua</code> inside the script folder.</p>
+    </div>
+
+    <div class="footer">
+        &copy; 2025 Numbers2Notes Beta Team
+    </div>
+</div>
+
+</body>
+</html>
