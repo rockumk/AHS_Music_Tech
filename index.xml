@@ -629,12 +629,14 @@ Auto Reload of Last Numbers2Notes Session]]></changelog>
 \widowctrl\hyphauto
 
 {\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 AHS Music Tech Repository\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 A collection of effects and scripts created for my students. They are not useful to the general public, but versions for public use will likely be released in the future.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 A collection of effects and scripts primarily created for my students. Versions for public use will likely be released in the future.\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 SCRIPTS\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Numbers2Notes - A Nashville Number System Chord Creation Tool\par}
 {\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab Import and Export Chord Charts\par}
 {\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab Create MIDI tracks\par}
 {\pard \ql \f0 \sa0 \li720 \fi-360 \endash \tx360\tab Print Chord Charts\sa180\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 There is a youtube video demonstrating an early version in action here:\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b https://youtu.be/d9qhkUWvKKI?si=akMf5qpJ_tX5Myw2}\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 \u9888 ?\u65039 ? Requirements & Setup\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 Before using the script, please check the list of required extensions and plugins here:\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 \u55357 ?\u56393 ? {\b {\field{\*\fldinst{HYPERLINK "https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html"}}{\fldrslt{\ul
