@@ -11,6 +11,7 @@ SCRIPTS
    - Print Chord Charts
 
 There is a youtube video demonstrating an early version in action here:
+
 **https://youtu.be/d9qhkUWvKKI?si=akMf5qpJ_tX5Myw2**
 
 ## ⚠️ Requirements & Setup
