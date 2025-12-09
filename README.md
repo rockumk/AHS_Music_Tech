@@ -1,6 +1,6 @@
 # AHS Music Tech Repository
 
-A collection of effects and scripts created for my students.  They are not useful to the general public, but versions for public use will likely be released in the future.
+A collection of effects and scripts primarily created for my students.  Versions for public use will likely be released in the future.
 
 
 SCRIPTS
@@ -9,6 +9,9 @@ SCRIPTS
    - Import and Export Chord Charts
    - Create MIDI tracks
    - Print Chord Charts
+
+There is a youtube video demonstrating an early version in action here:
+**https://youtu.be/d9qhkUWvKKI?si=akMf5qpJ_tX5Myw2**
 
 ## ⚠️ Requirements & Setup
 Before using the script, please check the list of required extensions and plugins here:
