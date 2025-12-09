@@ -1,14 +1,14 @@
 -- @description Numbers2Notes
--- @version 1.2.6
+-- @version 1.2.7
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.2.6
+--   # Numbers2Notes 1.2.7
 --   Updated Nashville Number System Style Chord Charting for Reaper.
 -- @changelog
 --   # Fixes & Improvements
---   + Moved the Configuration to a separate file
---   + Simplified track building
---   + Added checks for needed plugins
+--   + First run no longer fails to load a last state
+--   + A different font is used for Mac and PC
+--   + The carat in text fields is now visible after changes in ReaIMGUI
 -- @provides
 --   [main] .
 --   numbers2notes_config.lua
@@ -17,8 +17,7 @@
 --   numbers2notes_musictheory.lua
 --   numbers2notes_songs.lua
 --   numbers2notes_spectrum.lua
---   [fx] N2N_Tag.jsfx
---   [fx] Mood2Mode.jsfx
+
 
 
 package.path = reaper.ImGui_GetBuiltinPath() .. '/?.lua'
@@ -228,53 +227,96 @@ function LoadLastNumbers2NotesChart()
     local info = debug.getinfo(1, 'S')
     local path = info.source:match[[^@?(.*[\/])[^\/]-$]]
     local chordchart_path = path .. 'ChordCharts/'
-    
-    -- Define the fixed filename for the last Numbers2Notes chart
     local filenamewillbe = "Last_Numbers2Notes_Chart.txt"
-    
-    -- Open the file in read mode
     local full_path = chordchart_path .. filenamewillbe
+    
+    -- 1. SET SAFE DEFAULTS (Prevents crashes if file is missing)
+    if header_area == nil or header_area == "" then
+        header_area = [[Title: 
+Writer: 
+BPM: 
+Key: 
+Swing: 
+Form: # I V C V C B C O]]
+    end
+
+    if chord_charting_area == nil or chord_charting_area == "" then
+        chord_charting_area = [[
+{#}
+- -
+
+{I}
+
+
+
+
+{V}  
+
+
+
+
+{C}
+
+
+
+
+{B}
+
+
+
+
+{O}
+
+
+
+]]
+    end
+
+    -- Ensure others are not nil strings
+    if lyrics_charting_area == nil then lyrics_charting_area = "" end
+    if notes_charting_area == nil then notes_charting_area = "" end
+
+    -- 2. ATTEMPT TO LOAD FILE
     local settings = io.open(full_path, "r")
     
     if settings ~= nil then
+        -- File exists, read it
         local readfilecontents = settings:read("*all")
+        settings:close()
         
-        local textlocationtable = {header_startie, header_endie, chords_startie, chords_endie, lyrics_startie, lyrics_endie, notes_startie, notes_endie}
+        -- Extract the sections
+        local _, header_startie = string.find(readfilecontents, "<header_area>\n")
+        local header_endie, _  = string.find(readfilecontents, "\n</header_area>")
         
-        for i,v in pairs(textlocationtable) do
-            textlocationtable[i] = nil
-        end
+        local _, chords_startie = string.find(readfilecontents, "<chord_charting_area>\n")
+        local chords_endie, _  = string.find(readfilecontents, "\n</chord_charting_area>")  
         
-        -- Extract the sections of the file as before
-        _, header_startie = string.find(readfilecontents, "<header_area>\n")
-        header_endie, _  = string.find(readfilecontents, "\n</header_area>")
-        _, chords_startie = string.find(readfilecontents, "<chord_charting_area>\n")
-        chords_endie, _  = string.find(readfilecontents, "\n</chord_charting_area>")  
-        _, lyrics_startie = string.find(readfilecontents, "<lyrics_charting_area>\n")
-        lyrics_endie, _  = string.find(readfilecontents, "\n</lyrics_charting_area>")  
-        _, notes_startie = string.find(readfilecontents, "<notes_charting_area>\n")
-        notes_endie, _  = string.find(readfilecontents, "\n</notes_charting_area>")
+        local _, lyrics_startie = string.find(readfilecontents, "<lyrics_charting_area>\n")
+        local lyrics_endie, _  = string.find(readfilecontents, "\n</lyrics_charting_area>")  
         
-        -- Load the content into the respective variables
-        if header_startie ~= nil and header_endie ~= nil and header_endie > header_startie then
+        local _, notes_startie = string.find(readfilecontents, "<notes_charting_area>\n")
+        local notes_endie, _  = string.find(readfilecontents, "\n</notes_charting_area>")
+        
+        -- Load content if found (Overwriting defaults)
+        if header_startie and header_endie and header_endie > header_startie then
             header_area = string.sub(readfilecontents, header_startie + 1, header_endie - 1)
         end
         
-        if chords_startie ~= nil and chords_endie ~= nil and chords_endie > chords_startie then            
+        if chords_startie and chords_endie and chords_endie > chords_startie then            
             chord_charting_area = string.sub(readfilecontents, chords_startie + 1, chords_endie - 1)      
         end
 
-        if lyrics_startie ~= nil and lyrics_endie ~= nil and lyrics_endie > lyrics_startie then            
+        if lyrics_startie and lyrics_endie and lyrics_endie > lyrics_startie then            
             lyrics_charting_area = string.sub(readfilecontents, lyrics_startie + 1, lyrics_endie - 1)
         end
 
-        if notes_startie ~= nil and notes_endie ~= nil and notes_endie > notes_startie then            
+        if notes_startie and notes_endie and notes_endie > notes_startie then            
             notes_charting_area = string.sub(readfilecontents, notes_startie + 1, notes_endie - 1)
         end
-        
-        settings:close()  -- Close the file after reading
     else
-        reaper.ShowMessageBox("Last_Numbers2Notes_Chart.txt not found.", "Error", 0)
+        -- File does not exist (First Run).
+        -- We do NOTHING here. No error message. 
+        -- The script will simply proceed using the defaults we set at the top.
     end
 end
 
@@ -306,8 +348,21 @@ render_feedback = ""
 r = reaper
 local ctx = r.ImGui_CreateContext("Numbers2Notes")
 local main_viewport = r.ImGui_GetMainViewport(ctx)
-local font = r.ImGui_CreateFont("Consolas",15)
+
+-- DETECT OS AND SET FONT
+local os_name = reaper.GetOS()
+local font_name = "Consolas" -- Windows Default
+local font_size = 15
+
+if os_name:match("OSX") or os_name:match("macOS") then
+    -- Mac Settings: Bolder, two-word font
+    font_name = "Andale Mono" 
+    font_size = 14 
+end
+
+local font = r.ImGui_CreateFont(font_name, font_size)
 r.ImGui_Attach(ctx, font)
+
 local click_count, text = 0, ""
 local window_flags = r.ImGui_WindowFlags_NoResize() | r.ImGui_WindowFlags_MenuBar() 
 r.ImGui_SetNextWindowSize(ctx, 1300, 705)
@@ -355,6 +410,7 @@ function IM_GUI_Loop()
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_TitleBgActive(), 0xD5D5D5FF)
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_TitleBgCollapsed(), 0x63636382)
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_MenuBarBg(), 0xD5D5D5FF)
+	reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_InputTextCursor(), 0x000000FF)
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Text(), 0x000000FF)
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_ChildBg(), 0xC8858500)
     reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_PopupBg(), 0x77B384F0)
@@ -1030,7 +1086,7 @@ Form: I V C V C B C O]]
         end
         if feedback_tab_mode == 9 then
     
-reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.2.6")
+reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.2.7")
 reaper.ImGui_Text(ctx, "Numbers2Notes does not yet allow the user to select plugins.")
 reaper.ImGui_Text(ctx, "The plugins below are required to fully set up the default configuration.")
 reaper.ImGui_Text(ctx, "")
@@ -1932,7 +1988,7 @@ reaper.ImGui_Text(ctx, "- Holt")
     -- BUTTONS
     end
   
-        reaper.ImGui_PopStyleColor(ctx, 22)  
+        reaper.ImGui_PopStyleColor(ctx, 23)  
         r.ImGui_PopFont(ctx)
     if open then
         r.defer(IM_GUI_Loop)
