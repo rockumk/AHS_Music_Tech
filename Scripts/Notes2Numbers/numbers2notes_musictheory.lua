@@ -1,15 +1,13 @@
 -- @description numbers2notes_musictheory
--- @version 1.0.2
+-- @version 1.0.3
 -- @author Rock Kennedy
+-- @noindex
 -- @about
 --   # numbers2notes_musictheory
 --   Numbers2Notes Support File containing chord definitions and logic tables.
 -- @changelog
 --   # Fixes
---   + Fixed incorrect diatonic highlighting for 'add2' chords (now correctly glows on 1, 4, 5).
---   + Fixed incorrect diatonic highlighting for 'sus' chords (now correctly glows on 1).
-
-
+--   + Removed indexing
 
 
 
