@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="34d72f3e958ebdb91c59d1aa0eceb0580ea7b136">
+<index version="1" name="AHS_Music_Tech" commit="db8543bcf348e57f8b813f95e2af47afbbfbd4be">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -487,101 +487,6 @@ Auto Reload of Last Numbers2Notes Session]]></changelog>
 Fixed bug where no open project caused error
 Auto Reload of Last Numbers2Notes Session]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/69066568ee82c1b04e3298990a8feb45c0035c02/Scripts/Notes2Numbers/Numbers2Notes1.2.3.lua</source>
-      </version>
-    </reapack>
-    <reapack name="numbers2notes_config.lua" type="script" desc="numbers2notes_config">
-      <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
-{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
-\widowctrl\hyphauto
-
-{\pard \ql \f0 \sa180 \li0 \fi0 Configuration file for Numbers2Notes. Contains Plugin Source URLs and the Master Track Layout.\par}
-}
-]]></description>
-      </metadata>
-      <version name="1.0.2" author="Rock Kennedy" time="2025-12-10T01:38:20Z">
-        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/dc425f22b0ed4ad9a2980cf40887101519710f49/Scripts/Notes2Numbers/numbers2notes_config.lua</source>
-      </version>
-    </reapack>
-    <reapack name="numbers2notes_form.lua" type="script" desc="numbers2notes_form">
-      <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
-{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
-\widowctrl\hyphauto
-
-{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 numbers2notes_form\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 Numbers2Notes Support File.\par}
-}
-]]></description>
-      </metadata>
-      <version name="1.0.1" author="Rock Kennedy" time="2022-11-28T02:40:50Z">
-        <changelog><![CDATA[Name Change]]></changelog>
-        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/70810e228eb50cbf490f2d703f0393c8585239c8/Scripts/Notes2Numbers/numbers2notes_form.lua</source>
-      </version>
-      <version name="1.0.2" author="Rock Kennedy" time="2025-12-04T02:31:27Z">
-        <changelog><![CDATA[+ Fixed syntax error on line 190.
-+ Localized variables to prevent global leaks.
-+ Preserved original parsing logic.]]></changelog>
-        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/c8a57bf3816437afb7390ebb590b85b93ab97f8c/Scripts/Notes2Numbers/numbers2notes_form.lua</source>
-      </version>
-    </reapack>
-    <reapack name="numbers2notes_help.lua" type="script" desc="numbers2notes_help">
-      <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
-{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
-\widowctrl\hyphauto
-
-{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 numbers2notes_help\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 Numbers2Notes Support File.\par}
-}
-]]></description>
-      </metadata>
-      <version name="1.0.1" author="Rock Kennedy" time="2022-11-28T02:40:50Z">
-        <changelog><![CDATA[Name Change]]></changelog>
-        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/70810e228eb50cbf490f2d703f0393c8585239c8/Scripts/Notes2Numbers/numbers2notes_help.lua</source>
-      </version>
-    </reapack>
-    <reapack name="numbers2notes_songs.lua" type="script" desc="numbers2notes_songs">
-      <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
-{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
-\widowctrl\hyphauto
-
-{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 numbers2notes_songs\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 Numbers2Notes Support File containing sample song data.\par}
-}
-]]></description>
-      </metadata>
-      <version name="1.0.1" author="Rock Kennedy" time="2022-11-28T02:40:50Z">
-        <changelog><![CDATA[Name Change]]></changelog>
-        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/70810e228eb50cbf490f2d703f0393c8585239c8/Scripts/Notes2Numbers/numbers2notes_songs.lua</source>
-      </version>
-      <version name="1.0.2" author="Rock Kennedy" time="2025-12-04T02:35:26Z">
-        <changelog><![CDATA[+ Fixed duplicate table key (song18) which was overwriting a sample song. Renamed second instance to song19.]]></changelog>
-        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/e8322ff484482cb49ba26c10be7fee2ec03fae0e/Scripts/Notes2Numbers/numbers2notes_songs.lua</source>
-      </version>
-    </reapack>
-    <reapack name="numbers2notes_spectrum.lua" type="script" desc="numbers2notes_spectrum">
-      <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
-{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
-\widowctrl\hyphauto
-
-{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 numbers2notes_spectrum\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 Numbers2Notes Support File for generating full-spectrum chord grids.\par}
-}
-]]></description>
-      </metadata>
-      <version name="1.0.1" author="Rock Kennedy" time="2022-11-28T02:40:50Z">
-        <changelog><![CDATA[Name Change]]></changelog>
-        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/70810e228eb50cbf490f2d703f0393c8585239c8/Scripts/Notes2Numbers/numbers2notes_spectrum.lua</source>
-      </version>
-      <version name="1.0.2" author="Rock Kennedy" time="2025-12-04T02:46:18Z">
-        <changelog><![CDATA[# Fixes
-+ CRITICAL: Removed recursive logic that caused Stack Overflow crashes on long tracks.
-+ Optimization: Added MIDI_DisableSort for significantly faster generation.
-+ Localized variables to prevent global leaks.]]></changelog>
-        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/580c2a22f8935056b4aa85f045f2924d387326f0/Scripts/Notes2Numbers/numbers2notes_spectrum.lua</source>
       </version>
     </reapack>
   </category>
