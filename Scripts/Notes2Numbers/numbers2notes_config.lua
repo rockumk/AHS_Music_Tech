@@ -1,9 +1,12 @@
 -- @description numbers2notes_config
--- @version 1.0.2
+-- @version 1.0.3
+-- @noindex
 -- @author Rock Kennedy
 -- @about
 --   Configuration file for Numbers2Notes.
 --   Contains Plugin Source URLs and the Master Track Layout.
+-- @changelog
+--   + Removed indexing
 
 local config = {}
 

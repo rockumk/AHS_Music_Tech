@@ -1,11 +1,12 @@
 -- @description numbers2notes_songs
--- @version 1.0.2
+-- @version 1.0.3
 -- @author Rock Kennedy
+-- @noindex
 -- @about
 --   # numbers2notes_songs
 --   Numbers2Notes Support File containing sample song data.
 -- @changelog
---   + Fixed duplicate table key (song18) which was overwriting a sample song. Renamed second instance to song19.
+--   + Removed indexing
 
 
 local songs = 

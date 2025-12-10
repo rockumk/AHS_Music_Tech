@@ -1,13 +1,13 @@
 -- @description numbers2notes_form
--- @version 1.0.2
+-- @version 1.0.3
 -- @author Rock Kennedy
+-- @noindex
 -- @about
 --   # numbers2notes_form
 --   Numbers2Notes Support File.
 -- @changelog
---   + Fixed syntax error on line 190.
---   + Localized variables to prevent global leaks.
---   + Preserved original parsing logic.
+--   + Removed indexing
+
 
 local form = {
 

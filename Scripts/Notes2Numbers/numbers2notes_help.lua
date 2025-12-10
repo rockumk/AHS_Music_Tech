@@ -1,11 +1,18 @@
 -- @description numbers2notes_help
--- @version 1.0.1
+-- @version 1.0.3
 -- @author Rock Kennedy
+-- @noindex
 -- @about
 --   # numbers2notes_help
 --   Numbers2Notes Support File.
 -- @changelog
---   Name Change
+--   + Removed indexing
+
+
+
+
+
+
 local help =
 {
 

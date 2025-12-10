@@ -1,5 +1,6 @@
 -- @description numbers2notes_spectrum
--- @version 1.0.2
+-- @version 1.0.3
+-- @noindex
 -- @author Rock Kennedy
 -- @about
 --   # numbers2notes_spectrum
