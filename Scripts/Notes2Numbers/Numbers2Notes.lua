@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version 1.3.0
+-- @version 1.3.1
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.3.0
+--   # Numbers2Notes 1.3.1
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -12,12 +12,11 @@
 --   numbers2notes_musictheory.lua
 --   numbers2notes_songs.lua
 --   numbers2notes_spectrum.lua
---   N2N_Tag.jsfx
 -- @changelog
---   # Major Update 1.3.0
+--   # Major Update 1.3.1
 --   + Restored full dependency installation via ReaPack.
 --   + Added "numbers2notes_config.lua" for easier user customization.
---   + Added "N2N_Tag.jsfx" for flexible track routing.
+--   + Added "N2N_Chooser.jsfx" for flexible track routing.
 --   + Implemented Plugin Audit system to check for required VSTs/JSFX on launch.
 --   + Internal refactoring to remove hardcoded track variables.
 
@@ -1088,7 +1087,7 @@ Form: I V C V C B C O]]
         end
         if feedback_tab_mode == 9 then
     
-reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.3.0")
+reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.3.1")
 reaper.ImGui_Text(ctx, "Numbers2Notes does not yet allow the user to select plugins.")
 reaper.ImGui_Text(ctx, "The plugins below are required to fully set up the default configuration.")
 reaper.ImGui_Text(ctx, "")
