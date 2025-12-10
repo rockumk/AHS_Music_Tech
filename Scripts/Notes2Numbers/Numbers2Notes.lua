@@ -1,23 +1,25 @@
 -- @description Numbers2Notes
--- @version 1.2.7
+-- @version 1.3.0
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.2.7
---   Updated Nashville Number System Style Chord Charting for Reaper.
--- @changelog
---   # Fixes & Improvements
---   + First run no longer fails to load a last state
---   + A different font is used for Mac and PC
---   + The carat in text fields is now visible after changes in ReaIMGUI
+--   # Numbers2Notes 1.3.0
+--   Nashville Number System Style Chord Charting for Reaper.
+--   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
---   [main] .
 --   numbers2notes_config.lua
 --   numbers2notes_form.lua
 --   numbers2notes_help.lua
 --   numbers2notes_musictheory.lua
 --   numbers2notes_songs.lua
 --   numbers2notes_spectrum.lua
-
+--   N2N_Tag.jsfx
+-- @changelog
+--   # Major Update 1.3.0
+--   + Restored full dependency installation via ReaPack.
+--   + Added "numbers2notes_config.lua" for easier user customization.
+--   + Added "N2N_Tag.jsfx" for flexible track routing.
+--   + Implemented Plugin Audit system to check for required VSTs/JSFX on launch.
+--   + Internal refactoring to remove hardcoded track variables.
 
 
 package.path = reaper.ImGui_GetBuiltinPath() .. '/?.lua'
@@ -1086,7 +1088,7 @@ Form: I V C V C B C O]]
         end
         if feedback_tab_mode == 9 then
     
-reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.2.7")
+reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.3.0")
 reaper.ImGui_Text(ctx, "Numbers2Notes does not yet allow the user to select plugins.")
 reaper.ImGui_Text(ctx, "The plugins below are required to fully set up the default configuration.")
 reaper.ImGui_Text(ctx, "")
