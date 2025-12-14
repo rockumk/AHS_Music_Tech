@@ -2,7 +2,7 @@
 -- @version 1.3.1
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.3.1
+--   # Numbers2Notes 1.3.2
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -13,12 +13,13 @@
 --   numbers2notes_songs.lua
 --   numbers2notes_spectrum.lua
 -- @changelog
---   # Major Update 1.3.1
+--   # Major Update 1.3.2
 --   + Restored full dependency installation via ReaPack.
 --   + Added "numbers2notes_config.lua" for easier user customization.
 --   + Added "N2N_Chooser.jsfx" for flexible track routing.
 --   + Implemented Plugin Audit system to check for required VSTs/JSFX on launch.
 --   + Internal refactoring to remove hardcoded track variables.
+--   + Updated numbers2notes_config.lua
 
 
 package.path = reaper.ImGui_GetBuiltinPath() .. '/?.lua'
@@ -1087,53 +1088,9 @@ Form: I V C V C B C O]]
         end
         if feedback_tab_mode == 9 then
     
-reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.3.1")
-reaper.ImGui_Text(ctx, "Numbers2Notes does not yet allow the user to select plugins.")
-reaper.ImGui_Text(ctx, "The plugins below are required to fully set up the default configuration.")
-reaper.ImGui_Text(ctx, "")
-reaper.ImGui_Text(ctx, "INCLUDED JSFX --------------------------------------------")
-reaper.ImGui_Text(ctx, "")
-reaper.ImGui_Text(ctx, "- ReaPulse")
-reaper.ImGui_Text(ctx, "- SwingTrackMIDI")
-reaper.ImGui_Text(ctx, "- SwingProjectMIDI")
-reaper.ImGui_Text(ctx, "- ReaCenterMIDIpitch")
-reaper.ImGui_Text(ctx, "")
-reaper.ImGui_Text(ctx, "3RD PARTY JSFX --------------------------------------------")
-reaper.ImGui_Text(ctx, "")
-reaper.ImGui_Text(ctx, "- pad-synth.jsfx ")
-r.ImGui_SameLine(ctx)
-Link("https://github.com/geraintluff/jsfx-pad-synth")
-reaper.ImGui_Text(ctx, "   Or add the reapack... ")
-r.ImGui_SameLine(ctx)
-Link("https://geraintluff.github.io/jsfx/index.xml")
-reaper.ImGui_Text(ctx, "")
-reaper.ImGui_Text(ctx, "3RD PARTY VST PLUGINS --------------------------------------------")
-reaper.ImGui_Text(ctx, "")
-reaper.ImGui_Text(ctx, "- Dragonfly Room Reverb ")
-r.ImGui_SameLine(ctx)
-Link("https://github.com/michaelwillis/dragonfly-reverb/releases/tag/3.2.5")
-reaper.ImGui_Text(ctx, "- STFU ")
-r.ImGui_SameLine(ctx)
-Link("https://www.kvraudio.com/product/stfu-by-zeek/downloads")
-reaper.ImGui_Text(ctx, "- Tattoo ")
-r.ImGui_SameLine(ctx)
-Link("https://www.audiodamage.com/pages/free-and-legacy")
-reaper.ImGui_Text(ctx, "- Merlittzer ")
-r.ImGui_SameLine(ctx)
-Link("https://plugins4free.com/plugin/2322/")
-reaper.ImGui_Text(ctx, "- LibreARP ")
-r.ImGui_SameLine(ctx)
-Link("https://librearp.gitlab.io/download/")
-reaper.ImGui_Text(ctx, "- Sitala ")
-r.ImGui_SameLine(ctx)
-Link("https://decomposer.de/sitala/")
-reaper.ImGui_Text(ctx, "")
-reaper.ImGui_Text(ctx, "AIRWINDOWS ")
-r.ImGui_SameLine(ctx)
-Link("https://www.airwindows.com/")
-reaper.ImGui_Text(ctx, "- Calibre")
-reaper.ImGui_Text(ctx, "- Isolator")
-reaper.ImGui_Text(ctx, "- Holt")
+reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.3.2")
+reaper.ImGui_Text(ctx, "https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
+
 
 
     
