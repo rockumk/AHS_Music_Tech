@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 1.3.1
+-- @version 1.3.2
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 1.3.2
