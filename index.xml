@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="30c1bf6972c9e6639e2a9ffbd892da5c08f0b8d7">
+<index version="1" name="AHS_Music_Tech" commit="b4de3c3f7a333d839b25507decfb126e796503f7">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -478,6 +478,22 @@ Auto Reload of Last Numbers2Notes Session]]></changelog>
         <source file="numbers2notes_musictheory.lua">https://github.com/rockumk/AHS_Music_Tech/raw/7a5a38078a26fce94670c94c24ea058f6572b960/Scripts/Notes2Numbers/numbers2notes_musictheory.lua</source>
         <source file="numbers2notes_songs.lua">https://github.com/rockumk/AHS_Music_Tech/raw/7a5a38078a26fce94670c94c24ea058f6572b960/Scripts/Notes2Numbers/numbers2notes_songs.lua</source>
         <source file="numbers2notes_spectrum.lua">https://github.com/rockumk/AHS_Music_Tech/raw/7a5a38078a26fce94670c94c24ea058f6572b960/Scripts/Notes2Numbers/numbers2notes_spectrum.lua</source>
+      </version>
+      <version name="1.3.2" author="Rock Kennedy" time="2025-12-14T20:22:35Z">
+        <changelog><![CDATA[# Major Update 1.3.2
++ Restored full dependency installation via ReaPack.
++ Added "numbers2notes_config.lua" for easier user customization.
++ Added "N2N_Chooser.jsfx" for flexible track routing.
++ Implemented Plugin Audit system to check for required VSTs/JSFX on launch.
++ Internal refactoring to remove hardcoded track variables.
++ Updated numbers2notes_config.lua]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/b4de3c3f7a333d839b25507decfb126e796503f7/Scripts/Notes2Numbers/Numbers2Notes.lua</source>
+        <source file="numbers2notes_config.lua">https://github.com/rockumk/AHS_Music_Tech/raw/b4de3c3f7a333d839b25507decfb126e796503f7/Scripts/Notes2Numbers/numbers2notes_config.lua</source>
+        <source file="numbers2notes_form.lua">https://github.com/rockumk/AHS_Music_Tech/raw/b4de3c3f7a333d839b25507decfb126e796503f7/Scripts/Notes2Numbers/numbers2notes_form.lua</source>
+        <source file="numbers2notes_help.lua">https://github.com/rockumk/AHS_Music_Tech/raw/b4de3c3f7a333d839b25507decfb126e796503f7/Scripts/Notes2Numbers/numbers2notes_help.lua</source>
+        <source file="numbers2notes_musictheory.lua">https://github.com/rockumk/AHS_Music_Tech/raw/b4de3c3f7a333d839b25507decfb126e796503f7/Scripts/Notes2Numbers/numbers2notes_musictheory.lua</source>
+        <source file="numbers2notes_songs.lua">https://github.com/rockumk/AHS_Music_Tech/raw/b4de3c3f7a333d839b25507decfb126e796503f7/Scripts/Notes2Numbers/numbers2notes_songs.lua</source>
+        <source file="numbers2notes_spectrum.lua">https://github.com/rockumk/AHS_Music_Tech/raw/b4de3c3f7a333d839b25507decfb126e796503f7/Scripts/Notes2Numbers/numbers2notes_spectrum.lua</source>
       </version>
     </reapack>
     <reapack name="Numbers2Notes1.2.2.lua" type="script" desc="Numbers2Notes1.2.2">
