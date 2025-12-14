@@ -1,12 +1,12 @@
 -- @description numbers2notes_config
--- @version 1.0.3
+-- @version 1.0.4
 -- @noindex
 -- @author Rock Kennedy
 -- @about
 --   Configuration file for Numbers2Notes.
 --   Contains Plugin Source URLs and the Master Track Layout.
 -- @changelog
---   + Removed indexing
+--   + Links Updated
 
 local config = {}
 
@@ -22,13 +22,13 @@ config.pluginsources = {
     
     [5] = "Surge XT (Free Synth): https://surge-synthesizer.github.io/",
     
-    [6] = "Sitala (Drum Sampler): https://decomposer.de/sitala/",
+    [6] = "Sitala (Drum Sampler) for free version search the page for 'old version': https://decomposer.de/sitala/",
     
     [7] = "LibreARP (Arpeggiator): https://librearp.gitlab.io/",
     
     [8] = "Audio Damage 'Tattoo' (Legacy/Free): https://www.audiodamage.com/pages/free-and-legacy",
     
-    [9] = "STFU (Volume Shaper): https://zeek.at/en/",
+    [9] = "STFU (Volume Shaper): https://zeeks.app/",
     
     [10] = "Dragonfly Reverb: https://github.com/michaelwillis/dragonfly-reverb",
     
@@ -38,7 +38,7 @@ config.pluginsources = {
     
     [13] = "Included N2N JSFX (Should be installed with this script).",
     
-    [14] = "Audiolatry Drum8: https://audiolatry.com/free-drum-kit-plugin/",
+    [14] = "Audiolatry Drum8 2: https://audiolatry.gumroad.com/l/drum8",
     
     [99] = "Unknown Source."
 }
@@ -259,7 +259,7 @@ config.track_table = {
     }, {3,4}, 0, {144, 144, 144}, 4},
 
     [18] = {"Empty", false, nil, 0, {
-        {"VST3i: Drum8 (audiolatry) (32 out)", false, nil, 14},
+        {"VST3i: Drum8 2 (audiolatry) (32 out)", false, nil, 14},
         {"Sitala", false, nil, 6},
         {"Calibre", true, nil, 11},
         {"Holt", true, nil, 11},
@@ -276,5 +276,6 @@ config.track_table = {
         {"JS:Limiter 3", false, nil, 12} 
     }, {3,4}, 0, {222, 222, 222}, 1}
 }
+
 
 return config
