@@ -1,0 +1,1601 @@
+desc:N2N Arp
+version: 10.95
+author: Rock Kennedy + AI
+about:
+  # N2N Arp v10.95
+  - LAYOUT: Moved "ALL" button to the left sidebar (next to PASTE LN).
+  - LAYOUT: Restored original spacing for Top Pattern Settings row.
+  - FEATURE: "ALL" Mode applies velocity edits to all active rows.
+  - FIX: Playhead (Green Line) and White Cell Flash are active.
+provides:
+  [main] .
+
+options:gmem=ProjectSwing
+
+slider1:110<1,127,1>-Default Row Velocity
+slider2:0<0,25,1>-Global Humanize
+slider3:2<0,4,1{8,12,16,24,32}>-Global Subdiv
+slider4:4<1,4,1>-Global Bars
+slider5:1<1,512,1>-Instance ID
+slider6:0<0,100,1>-Global Swing
+slider7:36<1,128,1>-Visible Rows
+slider8:36<0,128,1>-View Scroll
+slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
+slider10:0<0,1,1{N2N Script,Live MIDI}>-Chord Source
+slider11:12<10,30,1>-Grid Row Height
+
+@init
+
+// =========================================================
+// VISUALS
+// =========================================================
+COL_L_R = 0.557; COL_L_G = 0.110; COL_L_B = 0.086; 
+COL_M_R = 0.698; COL_M_G = 0.431; COL_M_B = 0.059; 
+COL_H_R = 0.141; COL_H_G = 0.365; COL_H_B = 0.443; 
+
+LOCK_R = 0.3; LOCK_G = 0.6; LOCK_B = 0.7; 
+
+LANE_BG_DIM = 0.6; 
+LABEL_BRIGHTNESS = 4.0;
+grid_height = slider11; 
+ext_noinit = 1.0;
+ext_noundo = 1;
+
+slider7 < 4 ? slider7 = 36; 
+
+// =========================================================
+// REGISTRATION
+// =========================================================
+reg_base = 8000000;
+
+my_key == 0 ? ( 
+    seed = floor(time_precise()*100000)+floor(rand(100000)); 
+    loop(seed%10, rand(100)); 
+    my_key = floor(rand(9000000))+1; 
+);
+
+reg_done = 0; curr_id = slider5;
+while (reg_done == 0 && curr_id <= 512) (
+    slot_val = gmem[reg_base + curr_id];
+    (slot_val == 0 || slot_val == my_key) ? ( gmem[reg_base + curr_id] = my_key; slider5 = curr_id; reg_done = 1; ) : ( curr_id += 1; );
+);
+slider5 > 512 ? slider5 = 512;
+
+// =========================================================
+// MEMORY ALLOCATION
+// =========================================================
+mem_pos = 10000; 
+
+ui_base = mem_pos; mem_pos += 32;
+ui_edit_tab      = ui_base + 0;
+ui_selected_row  = ui_base + 1;
+ui_locked_tab    = ui_base + 2;
+ui_play_prog_tab = ui_base + 3;
+ui_play_offset   = ui_base + 4;
+ui_anchor_valid  = ui_base + 5;
+ui_last_step     = ui_base + 6;
+ui_oct_transpose = ui_base + 7; 
+ui_follow_mode   = ui_base + 8;
+ui_vel_edit_all  = ui_base + 9;
+
+mem[ui_oct_transpose] < -3 || mem[ui_oct_transpose] > 3 ? mem[ui_oct_transpose] = 0;
+mem[ui_locked_tab] < -1 ? mem[ui_locked_tab] = -1; 
+
+input_state_base = mem_pos; mem_pos += 128; 
+input_chan_base  = mem_pos; mem_pos += 128; 
+scale_state_base = mem_pos; mem_pos += 12; 
+scale_tonic      = 0; 
+scale_note_vels  = mem_pos; mem_pos += 128; 
+
+chord_count = 0;
+current_chord_root = -1; 
+chord_notes = mem_pos; mem_pos += 5; 
+chord_vels  = mem_pos; mem_pos += 5; 
+chord_intervals = mem_pos; mem_pos += 5; 
+chord_is_oos = mem_pos; mem_pos += 5; 
+
+// Pitch Role Database
+pitch_role_db = mem_pos; mem_pos += 12;
+
+// DEBUG MEMORY
+debug_slot_pitch = mem_pos; mem_pos += 8; 
+debug_slot_vel   = mem_pos; mem_pos += 8;
+debug_slot_lbl   = mem_pos; mem_pos += 8; 
+
+LANE_COUNT = 9;
+lane_pitch_a = mem_pos; mem_pos += LANE_COUNT;
+lane_pitch_b = mem_pos; mem_pos += LANE_COUNT;
+
+MAX_ROWS = 128; MAX_STEPS = 128; MAX_TABS = 128; TOTAL_TABS = 128;
+
+row_mute_base  = mem_pos; mem_pos += MAX_ROWS;
+row_solo_base  = mem_pos; mem_pos += MAX_ROWS;
+row_note_base  = mem_pos; mem_pos += MAX_ROWS; 
+row_chan_base  = mem_pos; mem_pos += MAX_ROWS; 
+row_level_base = mem_pos; mem_pos += MAX_ROWS;
+row_human_base = mem_pos; mem_pos += MAX_ROWS;
+row_len_base   = mem_pos; mem_pos += MAX_ROWS;
+row_name_idx   = mem_pos; mem_pos += MAX_ROWS;
+row_color_base = mem_pos; mem_pos += MAX_ROWS;
+
+bars_ov_base   = mem_pos; mem_pos += MAX_TABS;
+subdiv_ov_base = mem_pos; mem_pos += MAX_TABS;
+hum_ov_base    = mem_pos; mem_pos += MAX_TABS;
+swing_ov_base  = mem_pos; mem_pos += MAX_TABS;
+half_speed_ov_base = mem_pos; mem_pos += MAX_TABS; 
+
+vel_stride_tab = MAX_ROWS * MAX_STEPS;
+vel_stride_row = MAX_STEPS;
+
+// DATA BUFFERS
+mem_pos = 1000000; 
+vel_base      = mem_pos; mem_pos += (TOTAL_TABS * MAX_ROWS * MAX_STEPS);
+grid_base     = mem_pos; mem_pos += (TOTAL_TABS * MAX_ROWS * MAX_STEPS);
+step_len_base = mem_pos; mem_pos += (TOTAL_TABS * MAX_ROWS * MAX_STEPS);
+
+copy_row_v_buf = mem_pos; mem_pos += MAX_STEPS;
+copy_row_g_buf = mem_pos; mem_pos += MAX_STEPS;
+copy_row_l_buf = mem_pos; mem_pos += MAX_STEPS;
+copy_tab_v_buf = mem_pos; mem_pos += MAX_ROWS * MAX_STEPS;
+copy_tab_g_buf = mem_pos; mem_pos += MAX_ROWS * MAX_STEPS;
+copy_tab_l_buf = mem_pos; mem_pos += MAX_ROWS * MAX_STEPS;
+ownership_map = mem_pos; mem_pos += MAX_STEPS;
+sort_tmp_n = mem_pos; mem_pos += 128;
+sort_tmp_v = mem_pos; mem_pos += 128;
+kill_buf_size = 128 * 17;
+kill_buf = mem_pos; mem_pos += kill_buf_size;
+kill_chan = mem_pos; mem_pos += kill_buf_size; 
+
+pending_pattern = -1; sync_reset_req = 0; sync_offset_beats = 0;
+paint_state = 0; last_paint_idx = -1;
+len_drag_start_idx = -1; len_drag_base_col = 0; len_drag_max = 0;
+popup_cooldown = 0; help_active = 0; drag_accum_gen = 0; 
+drag_lock_row = -1; drag_mode = 0; last_drag_idx = -1;
+
+playback_shift = 0; last_play_tab = -1; last_play_offset = -1; pc_triggered = 0;
+
+input_filter_mask = 32767; 
+
+// N2N CONSTANTS & BUFFER
+GMEM_CTX_OFFSET = 3000000; 
+GMEM_SCALE_OFFSET = 3100000;
+GMEM_GROOVE_OFFSET = 5000000; 
+LOCAL_SCALE_DB = mem_pos; mem_pos += 10000;
+LOCAL_GROOVE_DB = mem_pos; mem_pos += 33; 
+
+parent_tonic = 0;
+scale_entry_count = 0;
+current_mask = 2741; 
+prev_mask = -1; 
+
+i=0; loop(MAX_ROWS, 
+    mem[row_chan_base+i] == 0 ? mem[row_chan_base+i] = 1; 
+    mem[row_level_base+i] == 0 ? mem[row_level_base+i] = 100; 
+    mem[row_len_base+i] == 0 ? mem[row_len_base+i] = 20; 
+    mem[row_human_base+i] = -1; i+=1; 
+);
+
+function get_palette_values(idx) (
+    idx==0 ? (cr=1.0; cg=1.0; cb=1.0;) : 
+    idx==1 ? (cr=1.0; cg=0.4; cb=0.4;) :
+    idx==2 ? (cr=1.0; cg=0.55; cb=0.3;) :
+    idx==3 ? (cr=1.0; cg=0.7; cb=0.2;) :
+    idx==4 ? (cr=1.0; cg=0.85; cb=0.2;) :
+    idx==5 ? (cr=1.0; cg=1.0; cb=0.2;) :
+    idx==6 ? (cr=0.7; cg=1.0; cb=0.2;) :
+    idx==7 ? (cr=0.4; cg=0.9; cb=0.4;) :
+    idx==8 ? (cr=0.2; cg=1.0; cb=0.7;) :
+    idx==9 ? (cr=0.2; cg=0.9; cb=0.9;) :
+    idx==10 ? (cr=0.2; cg=0.7; cb=1.0;) :
+    idx==11 ? (cr=0.4; cg=0.6; cb=1.0;) :
+    idx==12 ? (cr=0.5; cg=0.4; cb=1.0;) :
+    idx==13 ? (cr=0.7; cg=0.4; cb=1.0;) :
+    idx==14 ? (cr=0.9; cg=0.4; cb=1.0;) :
+    idx==15 ? (cr=1.0; cg=0.4; cb=1.0;) :
+    idx==16 ? (cr=1.0; cg=0.4; cb=0.7;) :
+    idx==17 ? (cr=0.5; cg=0.5; cb=0.5;) :
+    (cr=0.9; cg=0.9; cb=0.9;);
+);
+
+function set_ui_color(idx) ( get_palette_values(idx); gfx_set(cr, cg, cb, 1); );
+function clamp(x,a,b) ( x<a ? a : (x>b ? b : x); );
+function fmod_pos(x, m) ( m<=0 ? 0 : x - floor(x/m)*m; );
+function eff_bars(t) ( b=mem[bars_ov_base+t]; (b<1||b>4)?slider4:b; );
+function eff_sub(t) ( ov=mem[subdiv_ov_base+t]; (ov<0||ov>4)?(ov=slider3); ov==0?8:ov==1?12:ov==2?16:ov==3?24:32; );
+function eff_swing(t) ( base_swing = (slider9 == 0) ? gmem[1] : slider6; s = mem[swing_ov_base+t]; s < 0 ? base_swing : s; );
+function eff_hum(t) ( h=mem[hum_ov_base+t]; h<0 ? slider2 : h; );
+function eff_half(t) ( mem[half_speed_ov_base+t]; );
+
+function get_menu_item(list_str, idx, out_str) local(str_len, char_idx, item_ctr, c) (
+    strcpy(out_str, ""); str_len = strlen(list_str); char_idx = 0; item_ctr = 0;
+    while (item_ctr < idx && char_idx < str_len) ( str_getchar(list_str, char_idx) == '|' ? item_ctr += 1; char_idx += 1; );
+    while (char_idx < str_len) ( c = str_getchar(list_str, char_idx); c == '|' ? char_idx = str_len : ( str_setchar(out_str, strlen(out_str), c); ); char_idx += 1; );
+);
+
+function get_note_name_str(n_in, out_str) local(pc) (
+    pc = n_in % 12;
+    pc==0?strcpy(out_str,"C"):pc==1?strcpy(out_str,"C#"):pc==2?strcpy(out_str,"D"):pc==3?strcpy(out_str,"D#"):
+    pc==4?strcpy(out_str,"E"):pc==5?strcpy(out_str,"F"):pc==6?strcpy(out_str,"F#"):pc==7?strcpy(out_str,"G"):
+    pc==8?strcpy(out_str,"G#"):pc==9?strcpy(out_str,"A"):pc==10?strcpy(out_str,"A#"):strcpy(out_str,"B");
+);
+
+// --- CONTEXT AWARE SPELLING ---
+function get_note_name_str_context(n_in, root_ctx, out_str) local(pc, use_flat) (
+    pc = n_in % 12;
+    use_flat = (root_ctx==5 || root_ctx==10 || root_ctx==3 || root_ctx==8 || root_ctx==1 || root_ctx==6);
+    use_flat ? (
+        pc==0?strcpy(out_str,"C"):pc==1?strcpy(out_str,"Db"):pc==2?strcpy(out_str,"D"):pc==3?strcpy(out_str,"Eb"):
+        pc==4?strcpy(out_str,"E"):pc==5?strcpy(out_str,"F"):pc==6?strcpy(out_str,"Gb"):pc==7?strcpy(out_str,"G"):
+        pc==8?strcpy(out_str,"Ab"):pc==9?strcpy(out_str,"A"):pc==10?strcpy(out_str,"Bb"):strcpy(out_str,"B");
+    ) : (
+        pc==0?strcpy(out_str,"C"):pc==1?strcpy(out_str,"C#"):pc==2?strcpy(out_str,"D"):pc==3?strcpy(out_str,"D#"):
+        pc==4?strcpy(out_str,"E"):pc==5?strcpy(out_str,"F"):pc==6?strcpy(out_str,"F#"):pc==7?strcpy(out_str,"G"):
+        pc==8?strcpy(out_str,"G#"):pc==9?strcpy(out_str,"A"):pc==10?strcpy(out_str,"A#"):strcpy(out_str,"B");
+    );
+);
+
+// --- N2N LABEL HELPER (Updated v10.3) ---
+function get_n2n_label_str(idx, out_str) (
+    idx==1?strcpy(out_str, "1") : idx==2?strcpy(out_str, "m2") : idx==3?strcpy(out_str, "2") :
+    idx==4?strcpy(out_str, "m3") : idx==5?strcpy(out_str, "3") : idx==6?strcpy(out_str, "4") :
+    idx==7?strcpy(out_str, "#4") : idx==8?strcpy(out_str, "b5") : idx==9?strcpy(out_str, "5") :
+    idx==10?strcpy(out_str, "#5") : idx==11?strcpy(out_str, "m6") : idx==12?strcpy(out_str, "6") :
+    idx==13?strcpy(out_str, "bb7") : idx==14?strcpy(out_str, "m7") : idx==15?strcpy(out_str, "7") : 
+    strcpy(out_str, "");
+);
+
+// --- N2N COLOR HELPER ---
+function set_n2n_label_color(idx) (
+    idx==1 ? (r=1; g=0.2; b=0.2;) : // Root
+    (idx==2||idx==3) ? (r=0.8; g=0.3; b=0;) : // 2nd
+    (idx==4||idx==5) ? (r=1; g=1; b=0.2;) : // 3rd
+    (idx==6||idx==7) ? (r=0.2; g=1; b=0.2;) : // 4th
+    (idx==8||idx==9||idx==10) ? (r=0.2; g=0.4; b=1;) : // 5th
+    (idx==11||idx==12) ? (r=0.7; g=0.2; b=1;) : // 6th
+    (idx==13||idx==14||idx==15) ? (r=1; g=0.2; b=1;) : // 7th
+    (r=0.5; g=0.5; b=0.5;);
+    gfx_set(r,g,b,1);
+);
+
+function get_interval_info(interval, out_str) (
+    interval==0 ? ( strcpy(out_str, "1"); r=1; g=0.2; b=0.2; ) :
+    interval==1 ? ( strcpy(out_str, "b2"); r=0.8; g=0.3; b=0; ) :
+    interval==2 ? ( strcpy(out_str, "2"); r=1; g=0.5; b=0; ) :
+    interval==3 ? ( strcpy(out_str, "b3"); r=0.8; g=0.6; b=0; ) :
+    interval==4 ? ( strcpy(out_str, "3"); r=1; g=1; b=0.2; ) :
+    interval==5 ? ( strcpy(out_str, "4"); r=0.2; g=1; b=0.2; ) :
+    interval==6 ? ( strcpy(out_str, "b5"); r=0; g=0.6; b=0.6; ) :
+    interval==7 ? ( strcpy(out_str, "5"); r=0.2; g=0.4; b=1; ) :
+    interval==8 ? ( strcpy(out_str, "b6"); r=0.4; g=0.2; b=0.8; ) :
+    interval==9 ? ( strcpy(out_str, "6"); r=0.7; g=0.2; b=1; ) :
+    interval==10 ? ( strcpy(out_str, "b7"); r=0.8; g=0; b=0.6; ) :
+    ( strcpy(out_str, "7"); r=1; g=0.2; b=1; );
+);
+
+function get_scale_notes_between(n_low, n_high, out_buf) 
+local(count, k, pc) 
+(
+    count = 0; k = n_low + 1;
+    (scale_tonic != -1 && n_low < n_high) ? (
+        while (k < n_high) (
+            pc = k % 12;
+            mem[scale_state_base + pc] ? (
+                mem[out_buf + count] = k;
+                count += 1;
+            );
+            k += 1;
+        );
+    );
+    count; 
+);
+
+function next_scale_up(n) local(k, nn, pc)(
+  nn = n + 1;
+  scale_tonic != -1 ? (
+    k=0;
+    while(k<24 && nn<=127) (
+      pc = nn % 12;
+      mem[scale_state_base + pc] ? ( k=9999; ) : ( nn += 1; k += 1; );
+    );
+  );
+  nn > 127 ? 127 : nn;
+);
+
+function next_scale_dn(n) local(k, nn, pc)(
+  nn = n - 1;
+  scale_tonic != -1 ? (
+    k=0;
+    while(k<24 && nn>=0) (
+      pc = nn % 12;
+      mem[scale_state_base + pc] ? ( k=9999; ) : ( nn -= 1; k += 1; );
+    );
+  );
+  nn < 0 ? 0 : nn;
+);
+
+
+
+function assign_lanes()
+local(i, k, swapped, n0, n1, n2, n3, n4, n5, dn1, root,
+      cnt, p_low, p_mid, p_high, gap_count, fill_buf)
+(
+    i=0; loop(LANE_COUNT, mem[lane_pitch_a+i] = -1; mem[lane_pitch_b+i] = -1; i+=1; );
+
+i=0; loop(LANE_COUNT,
+  mem[lane_pitch_a+i] = -1;
+  mem[lane_pitch_b+i] = -1;
+  i+=1;
+);
+
+(chord_count == 1) ? (
+  root = mem[chord_notes+0];
+
+  n1 = next_scale_up(root);
+  n2 = next_scale_up(n1);
+  n3 = next_scale_up(n2);
+  n4 = next_scale_up(n3);
+  n5 = next_scale_up(n4);
+
+  dn1 = next_scale_dn(root);
+
+  mem[lane_pitch_a+7] = root;
+  mem[lane_pitch_a+6] = n1;
+  mem[lane_pitch_a+5] = n1;
+  mem[lane_pitch_a+4] = n2;
+  mem[lane_pitch_a+3] = n3;
+  mem[lane_pitch_a+2] = n3;
+  mem[lane_pitch_a+1] = n4;
+  mem[lane_pitch_a+0] = n5;
+  mem[lane_pitch_a+8] = dn1;
+
+) : chord_count > 0 ? (
+  // your existing chord code starts here, unchanged
+  mem[lane_pitch_a+0] = mem[chord_notes+0];
+  mem[lane_pitch_a+1] = (chord_count > 1) ? mem[chord_notes+1] : -1;
+  mem[lane_pitch_a+2] = (chord_count > 2) ? mem[chord_notes+2] : -1;
+
+  cnt = (chord_count > 3) ? 3 : chord_count; 
+
+        swapped = 1;
+        while (swapped) (
+            swapped = 0; k = 0;
+            loop(cnt - 1,
+                n0 = mem[lane_pitch_a+k]; n1 = mem[lane_pitch_a+k+1];
+                (n1 != -1 && n0 > n1) ? (
+                    mem[lane_pitch_a+k] = n1; mem[lane_pitch_a+k+1] = n0;
+                    swapped = 1;
+                ); k += 1;
+            );
+        );
+        
+        p_low  = mem[lane_pitch_a+0];
+        p_mid  = (cnt > 1) ? mem[lane_pitch_a+1] : -1;
+        p_high = (cnt > 2) ? mem[lane_pitch_a+2] : -1;
+        
+        mem[lane_pitch_a+7] = p_low;
+        mem[lane_pitch_a+4] = p_mid;
+        mem[lane_pitch_a+1] = p_high;
+        
+        mem[lane_pitch_a+0] = -1; mem[lane_pitch_a+2] = -1; mem[lane_pitch_a+1] = p_high;
+
+        fill_buf = 50000; 
+
+        (p_low != -1 && p_mid != -1) ? (
+            gap_count = get_scale_notes_between(p_low, p_mid, fill_buf);
+            gap_count == 0 ? ( mem[lane_pitch_a+6] = p_low; mem[lane_pitch_a+5] = p_mid; ) :
+            gap_count == 1 ? ( mem[lane_pitch_a+6] = mem[fill_buf]; mem[lane_pitch_a+5] = mem[fill_buf]; ) :
+            gap_count >= 2 ? ( mem[lane_pitch_a+6] = mem[fill_buf]; mem[lane_pitch_a+5] = mem[fill_buf + gap_count - 1]; );
+        );
+
+        (p_mid != -1 && p_high != -1) ? (
+            gap_count = get_scale_notes_between(p_mid, p_high, fill_buf);
+            gap_count == 0 ? ( mem[lane_pitch_a+3] = p_mid; mem[lane_pitch_a+2] = p_high; ) :
+            gap_count == 1 ? ( mem[lane_pitch_a+3] = mem[fill_buf]; mem[lane_pitch_a+2] = mem[fill_buf]; ) :
+            gap_count >= 2 ? ( mem[lane_pitch_a+3] = mem[fill_buf]; mem[lane_pitch_a+2] = mem[fill_buf + gap_count - 1]; );
+        );
+
+        p_high != -1 ? ( 
+             gap_count = get_scale_notes_between(p_high, p_high+13, fill_buf); 
+             gap_count > 0 ? ( mem[lane_pitch_a+0] = mem[fill_buf]; ) : ( mem[lane_pitch_a+0] = p_high + 1; );
+        );
+        p_low != -1 ? ( 
+             next_dn = -1; k=1; 
+             scale_tonic != -1 ? ( while(k<12 && next_dn==-1) ( mem[scale_state_base + (p_low-k+120)%12] ? next_dn=p_low-k; k+=1; ); ) : ( next_dn = p_low - 1; ); 
+             mem[lane_pitch_a+8] = next_dn; 
+        );
+    );
+);
+
+// =========================================================
+// ANALYZE INPUT
+// =========================================================
+function analyze_input() local(i, cnt, n, v, j, tmp_n, tmp_v, root_pitch, diff, sort_mode, found_89, pc, n_norm) (
+    
+    cnt = 0; 
+    i = 0; 
+    loop(128, 
+        (mem[input_state_base+i] > 0) ? ( 
+            mem[sort_tmp_n+cnt] = i; 
+            mem[sort_tmp_v+cnt] = mem[input_state_base+i]; 
+            cnt += 1; 
+        ); 
+        i += 1; 
+    );
+    
+    sort_mode = (slider10 == 0) ? 0 : 1;
+    
+    i = 0; 
+    loop(cnt, 
+        j = i + 1; 
+        loop(cnt - 1 - i, 
+            do_swap = 0;
+            (sort_mode == 0) ? ( 
+                (mem[sort_tmp_v+j] > mem[sort_tmp_v+i]) ? do_swap = 1; 
+            ) : ( 
+                (mem[sort_tmp_n+j] < mem[sort_tmp_n+i]) ? do_swap = 1; 
+            );
+            do_swap ? ( 
+                tmp_n = mem[sort_tmp_n+i]; mem[sort_tmp_n+i] = mem[sort_tmp_n+j]; mem[sort_tmp_n+j] = tmp_n; 
+                tmp_v = mem[sort_tmp_v+i]; mem[sort_tmp_v+i] = mem[sort_tmp_v+j]; mem[sort_tmp_v+j] = tmp_v; 
+            ); 
+            j += 1; 
+        ); 
+        i += 1; 
+    );
+    
+    chord_count = 0; 
+    i = 0; 
+    loop(cnt, 
+        (chord_count < 5) ? ( 
+            n = mem[sort_tmp_n+i]; 
+            (chord_count == 0 || n != mem[chord_notes + chord_count - 1]) ? ( 
+                mem[chord_notes + chord_count] = n; 
+                mem[chord_vels + chord_count] = mem[sort_tmp_v+i]; 
+                chord_count += 1; 
+            ); 
+        ); 
+        i += 1; 
+    );
+    
+    global_oos = 0; 
+    (scale_tonic != -1) ? ( 
+        i = 0; 
+        loop(chord_count, 
+            n = mem[chord_notes+i]; 
+            pc = n % 12; 
+            (mem[scale_state_base + pc] == 0) ? global_oos = 1; 
+            i += 1; 
+        ); 
+    );
+    
+    memset(pitch_role_db, 0, 12);
+    i = 0;
+    loop(8, 
+        mem[debug_slot_pitch + i] = -1;
+        mem[debug_slot_vel + i] = 0; 
+        mem[debug_slot_lbl + i] = 0;
+        i += 1;
+    );
+
+    current_chord_root = -1; 
+    found_89 = 0; 
+
+    i = 0; 
+    loop(chord_count, 
+        (mem[chord_vels+i] == 89 || mem[chord_vels+i] == 90) ? ( 
+            current_chord_root = mem[chord_notes+i]; 
+            found_89 = 1; 
+            mem[debug_slot_pitch + 1] = current_chord_root;
+            mem[debug_slot_vel + 1] = mem[chord_vels+i];
+            mem[debug_slot_lbl + 1] = 1; 
+        ); 
+        i += 1; 
+    );
+
+    (found_89) ? (
+        pc = current_chord_root % 12;
+        mem[pitch_role_db + pc] = 1;
+
+        i = 0; 
+        loop(chord_count,
+            n = mem[chord_notes+i];
+            v = mem[chord_vels+i];
+            
+            (v != 89 && v != 90) ? (
+                pc = n % 12;
+                n_norm = n;
+                while (n_norm < current_chord_root) ( n_norm += 12; );
+                diff = n_norm - current_chord_root;
+                while (diff >= 12) ( diff -= 12; ); 
+                
+                (v == 88) ? (
+                    mem[debug_slot_pitch + 2] = n;
+                    mem[debug_slot_vel + 2] = v;
+                    (diff == 1) ? ( mem[pitch_role_db+pc] = 2; mem[debug_slot_lbl + 2] = 2; ) : 
+                    (diff == 2) ? ( mem[pitch_role_db+pc] = 3; mem[debug_slot_lbl + 2] = 3; ); 
+                ) :
+                (v == 87) ? (
+                    mem[debug_slot_pitch + 3] = n;
+                    mem[debug_slot_vel + 3] = v;
+                    (diff == 3) ? ( mem[pitch_role_db+pc] = 4; mem[debug_slot_lbl + 3] = 4; ) : 
+                    (diff == 4) ? ( mem[pitch_role_db+pc] = 5; mem[debug_slot_lbl + 3] = 5; );
+                ) :
+                (v == 86) ? (
+                    mem[debug_slot_pitch + 4] = n;
+                    mem[debug_slot_vel + 4] = v;
+                    (diff == 5) ? ( mem[pitch_role_db+pc] = 6; mem[debug_slot_lbl + 4] = 6; ) : 
+                    (diff == 6) ? ( mem[pitch_role_db+pc] = 7; mem[debug_slot_lbl + 4] = 7; );
+                ) :
+                (v == 85) ? (
+                    mem[debug_slot_pitch + 5] = n;
+                    mem[debug_slot_vel + 5] = v;
+                    (diff == 6) ? ( mem[pitch_role_db+pc] = 8; mem[debug_slot_lbl + 5] = 8; ) : 
+                    (diff == 7) ? ( mem[pitch_role_db+pc] = 9; mem[debug_slot_lbl + 5] = 9; ) :
+                    (diff == 8) ? ( mem[pitch_role_db+pc] = 10; mem[debug_slot_lbl + 5] = 10; );
+                ) :
+                (v == 84) ? (
+                    mem[debug_slot_pitch + 6] = n;
+                    mem[debug_slot_vel + 6] = v;
+                    (diff == 8) ? ( mem[pitch_role_db+pc] = 11; mem[debug_slot_lbl + 6] = 11; ) : 
+                    (diff == 9) ? ( mem[pitch_role_db+pc] = 12; mem[debug_slot_lbl + 6] = 12; );
+                ) :
+                (v == 83) ? (
+                    mem[debug_slot_pitch + 7] = n;
+                    mem[debug_slot_vel + 7] = v;
+                    (diff == 9)  ? ( mem[pitch_role_db+pc] = 15; mem[debug_slot_lbl + 7] = 15; ) :
+                    (diff == 10) ? ( mem[pitch_role_db+pc] = 13; mem[debug_slot_lbl + 7] = 13; ) : 
+                    (diff == 11) ? ( mem[pitch_role_db+pc] = 14; mem[debug_slot_lbl + 7] = 14; );
+                ) : 0;
+            );
+            i += 1;
+        );
+    );
+
+    assign_lanes();
+);
+
+function recalc_scale() local(i, max_v, best_tonic) (
+    i=0; loop(12, mem[scale_state_base+i] = 0; i+=1; ); max_v = 0; best_tonic = -1;
+    i=0; loop(128, v = mem[scale_note_vels+i]; v > 0 ? ( pc = i % 12; mem[scale_state_base + pc] = 1; v > max_v ? ( max_v = v; best_tonic = pc; ); ); i+=1; );
+    scale_tonic = best_tonic;
+);
+
+@serialize
+file_mem(0, ui_base, 32);
+file_mem(0, row_mute_base, MAX_ROWS); file_mem(0, row_solo_base, MAX_ROWS); file_mem(0, row_chan_base, MAX_ROWS); file_mem(0, row_level_base, MAX_ROWS); file_mem(0, row_human_base, MAX_ROWS); file_mem(0, row_len_base, MAX_ROWS); file_mem(0, row_color_base, MAX_ROWS);
+file_mem(0, bars_ov_base, MAX_TABS); file_mem(0, subdiv_ov_base, MAX_TABS); file_mem(0, hum_ov_base, MAX_TABS); file_mem(0, swing_ov_base, MAX_TABS);
+file_mem(0, half_speed_ov_base, MAX_TABS); 
+file_mem(0, vel_base, TOTAL_TABS * MAX_ROWS * MAX_STEPS); file_mem(0, grid_base, TOTAL_TABS * MAX_ROWS * MAX_STEPS); file_mem(0, step_len_base, TOTAL_TABS * MAX_ROWS * MAX_STEPS);
+file_var(0, input_filter_mask);
+
+@block
+// =========================================================
+// N2N DATA LOADING
+// =========================================================
+
+gmem[GMEM_SCALE_OFFSET] == 1 ? (
+    scale_entry_count = gmem[GMEM_SCALE_OFFSET + 1];
+    i_sc = 0; r_ptr = GMEM_SCALE_OFFSET + 2; w_ptr = LOCAL_SCALE_DB;
+    loop(scale_entry_count,
+        mem[w_ptr]   = gmem[r_ptr];   
+        mem[w_ptr+1] = gmem[r_ptr+1]; 
+        r_ptr += 2; w_ptr += 2; i_sc += 1;
+    );
+    gmem[GMEM_SCALE_OFFSET] = 0; 
+);
+
+(scale_entry_count == 0 && gmem[GMEM_SCALE_OFFSET+1] > 0) ? (
+    scale_entry_count = gmem[GMEM_SCALE_OFFSET + 1];
+    i_sc = 0; r_ptr = GMEM_SCALE_OFFSET + 2; w_ptr = LOCAL_SCALE_DB;
+    loop(scale_entry_count,
+        mem[w_ptr]   = gmem[r_ptr];   
+        mem[w_ptr+1] = gmem[r_ptr+1]; 
+        r_ptr += 2; w_ptr += 2; i_sc += 1;
+    );
+);
+
+// SYNC GROOVE MEMORY
+i_gr = 0; max_gr = 0;
+loop(32, 
+    val = gmem[GMEM_GROOVE_OFFSET + i_gr];
+    mem[LOCAL_GROOVE_DB + i_gr] = val; 
+    abs(val) > max_gr ? max_gr = abs(val);
+    i_gr+=1; 
+);
+mem[LOCAL_GROOVE_DB + 32] = max_gr; // Store max for UI
+
+gmem[GMEM_CTX_OFFSET] == 1 ? (
+    parent_tonic = gmem[GMEM_CTX_OFFSET + 2]; 
+);
+
+(parent_tonic == 0 && gmem[GMEM_CTX_OFFSET+2] > 0) ? (
+    parent_tonic = gmem[GMEM_CTX_OFFSET + 2];
+);
+
+// =========================================================
+// N2N SCALE LOGIC
+// =========================================================
+
+(scale_entry_count > 0) ? (
+   i_sc = 0; found = 0;
+   while (i_sc < scale_entry_count && found == 0) (
+       entry_beat = mem[LOCAL_SCALE_DB + i_sc*2];
+       next_beat  = (i_sc < scale_entry_count-1) ? mem[LOCAL_SCALE_DB + (i_sc+1)*2] : 999999;
+       
+       (beat_position >= entry_beat && beat_position < next_beat) ? (
+           current_mask = mem[LOCAL_SCALE_DB + i_sc*2 + 1];
+           found = 1;
+       );
+       i_sc += 1;
+   );
+) : (
+   current_mask == 0 ? current_mask = 2741; 
+);
+
+(current_mask != prev_mask) ? (
+    prev_mask = current_mask;
+    scale_dirty = 1; 
+);
+
+input_source_mode = slider10; 
+input_source_mode == 0 ? (
+    memset(scale_state_base, 0, 12);
+    i_sc = 0;
+    loop(12,
+       is_active = (current_mask & (1 << i_sc));
+       abs_pitch = (parent_tonic + i_sc) % 12;
+       mem[scale_state_base + abs_pitch] = is_active;
+       i_sc += 1;
+    );
+    scale_tonic = parent_tonic;
+);
+
+// =========================================================
+// CORE BLOCK LOGIC (WINDOWED LOOKAHEAD ENGINE)
+// =========================================================
+GM_BASE = 7000000 + (slider5-1)*16; gmem[GM_BASE] != 0x44504531 ? ( gmem[GM_BASE] = 0x44504531; gmem[GM_BASE+1] = -1; gmem[GM_BASE+2] = 2; );
+mem[ui_locked_tab] = gmem[GM_BASE+1]; 
+
+input_dirty = 0; 
+
+while (midirecv(off, m1, m23)) (
+    status = m1 & 0xF0; ch = (m1 & 0x0F) + 1; d1 = m23 & 0x7F; d2 = (m23 >> 8) & 0x7F;
+    
+    pass_filter = 1;
+    (status == 0x90 || status == 0x80) ? (
+        (input_filter_mask & (1 << (ch-1))) == 0 ? pass_filter = 0;
+    );
+
+    (pass_filter == 1) ? (
+        (ch == 16 && ((status == 0xC0) || (status == 0x90 && d2 > 0))) ? ( 
+            target = d1; (target >= 0 && target < 128) ? ( pending_pattern = target; ); 
+            sync_reset_req = 1; 
+        ) :
+        
+        (input_source_mode == 1 && ch == 15) ? ( 
+            (status == 0x90 || status == 0x80) ? ( 
+                is_on = (status == 0x90 && d2 > 0); 
+                is_on ? mem[scale_note_vels+d1] = d2 : mem[scale_note_vels+d1] = 0; 
+                scale_dirty = 1; 
+            ); 
+        ) :
+        
+        ( (input_source_mode == 0 && ch == 2) || (input_source_mode == 1 && ch == 1) ) ? (
+            (status == 0x90 || status == 0x80) ? ( 
+                is_on = (status == 0x90 && d2 > 0); 
+                is_on ? ( mem[input_state_base+d1] = d2; mem[input_chan_base+d1] = ch; ) : ( mem[input_state_base+d1] = 0; ); 
+                input_dirty = 1; 
+            );
+        ) : ( 
+            midisend(off, m1, m23); 
+        );
+    );
+);
+
+(scale_dirty && input_source_mode == 1) ? ( recalc_scale(); input_dirty = 1; ); 
+(scale_dirty && input_source_mode == 0) ? ( input_dirty = 1; scale_dirty = 0; ); 
+
+input_dirty ? analyze_input();
+
+play_state == 0 ? ( 
+    i_k_blk=0; 
+    loop(kill_buf_size, 
+        mem[kill_buf+i_k_blk] > 0 ? ( 
+            kn = i_k_blk % 128; 
+            kc = mem[kill_chan+i_k_blk];
+            kc < 1 ? kc = 1;
+            midisend(0, 0x80 | (kc-1), kn); 
+            mem[kill_buf+i_k_blk] = 0; 
+        ); 
+        i_k_blk+=1; 
+    ); 
+) : (
+    i_k_blk=0; 
+    loop(kill_buf_size, 
+        mem[kill_buf+i_k_blk] > 0 ? ( 
+            mem[kill_buf+i_k_blk] -= samplesblock; 
+            mem[kill_buf+i_k_blk] <= 0 ? ( 
+                kn = i_k_blk % 128; 
+                kc = mem[kill_chan+i_k_blk];
+                kc < 1 ? kc = 1;
+                midisend(0, 0x80 | (kc-1), kn); 
+                mem[kill_buf+i_k_blk] = 0; 
+            ); 
+        ); 
+        i_k_blk+=1; 
+    );
+);
+
+play_state & 1 ? (
+    (pending_pattern >= 0) ? ( cur_pos = beat_position; dist_to_beat = 1.0 - (cur_pos % 1.0); (play_state == 1 || beat_position < 0.1 || dist_to_beat < 0.1) ? ( mem[ui_play_prog_tab] = pending_pattern; gmem[GM_BASE+2] = pending_pattern; pending_pattern = -1; sync_reset_req = 1; ); );
+    t_pl = (mem[ui_locked_tab] >= 0) ? mem[ui_locked_tab] : mem[ui_play_prog_tab]; mem[ui_follow_mode] ? ( mem[ui_edit_tab] = t_pl; );
+    
+    bk_sub_v = eff_sub(t_pl); bk_bar_v = eff_bars(t_pl); bk_swing_v = eff_swing(t_pl); 
+    
+    bk_is_half = eff_half(t_pl); bk_spd_m = bk_is_half ? 0.5 : 1.0;
+    bk_st_v = bk_bar_v * bk_sub_v; bk_st_b = 4 / bk_sub_v; bk_p_l = (bk_bar_v * 4) / bk_spd_m;
+    
+    curr_tab = mem[ui_play_prog_tab]; curr_off = mem[ui_play_offset];
+    
+    (sync_reset_req || curr_tab != last_play_tab || curr_off != last_play_offset) ? (
+        curr_off >= bk_bar_v ? curr_off = 0;
+        target_beat = (curr_off * 4) / bk_spd_m; 
+        snap_grid = 4.0;
+        next_grid = floor((beat_position + (snap_grid*0.5))/snap_grid) * snap_grid;
+        natural_pos = next_grid % bk_p_l; 
+        playback_shift = target_beat - natural_pos;
+        last_play_tab = curr_tab; last_play_offset = curr_off; sync_reset_req = 0;
+    );
+
+    // --- WINDOWED LOOKAHEAD ENGINE ---
+    samps_per_beat = (srate * 60) / tempo;
+    block_dur_beats = samplesblock / samps_per_beat;
+    
+    start_b = beat_position + playback_shift;
+    end_b = start_b + block_dur_beats;
+    
+    steps_per_beat_grid = bk_sub_v / 4;
+    look_margin = steps_per_beat_grid * 1.5;
+    
+    start_step_idx = floor(start_b * steps_per_beat_grid) - look_margin;
+    end_step_idx = ceil(end_b * steps_per_beat_grid) + look_margin;
+    
+    curr_vel_ptr = vel_base + t_pl*vel_stride_tab; 
+    curr_grid_ptr = grid_base + t_pl*vel_stride_tab; 
+    curr_len_ptr = step_len_base + t_pl*vel_stride_tab;
+    
+    s_idx_iter = start_step_idx;
+    loop_count = (end_step_idx - start_step_idx) + 1;
+    
+    loop(loop_count,
+        step_beat_time = s_idx_iter / steps_per_beat_grid;
+        
+        grid_lookup_idx = s_idx_iter;
+        lookup_mod = bk_st_v;
+        p_step = grid_lookup_idx % lookup_mod;
+        while(p_step < 0) ( p_step += lookup_mod; );
+        
+        // Update UI tracker
+        (start_b >= step_beat_time && start_b < step_beat_time + (1.0/steps_per_beat_grid)) ? mem[ui_last_step] = p_step;
+
+        // Swing Offset
+        sw_amt = (bk_swing_v / 100) * 0.33; 
+        step_in_beat = (grid_lookup_idx % steps_per_beat_grid) / steps_per_beat_grid; 
+        swing_offset_beats = 0;
+        (step_in_beat >= 0.5 && step_in_beat < 1.0) ? ( swing_offset_beats = sw_amt; );
+        
+        // Groove Offset
+        step_in_bar_gr = p_step % bk_sub_v;
+        groove_slot = floor(step_in_bar_gr * (32 / bk_sub_v));
+        groove_val = mem[LOCAL_GROOVE_DB + groove_slot];
+        groove_offset_beats = groove_val * 0.125;
+        
+        r_p_blk = 0;
+        ROW_CENTER_OFFSET = 6;
+        
+        loop(MAX_ROWS,
+            p_me = (mem[row_mute_base+r_p_blk] == 0); 
+            p_me ? (
+                row_offset = r_p_blk*vel_stride_row + p_step;
+                
+                mem[curr_grid_ptr+row_offset] ? (
+                    
+                    total_time_beats = step_beat_time + swing_offset_beats + groove_offset_beats;
+                    
+                    bk_is_half ? ( 
+                        total_time_beats = (s_idx_iter / steps_per_beat_grid) * 2.0 
+                                         + (swing_offset_beats + groove_offset_beats) * 2.0; 
+                    );
+
+                    diff_beats = total_time_beats - start_b;
+                    diff_samples = floor(diff_beats * samps_per_beat);
+                    
+                    (diff_samples >= 0 && diff_samples < samplesblock) ? (
+                        
+                        lane_idx = r_p_blk % 9; 
+                        oct_drop = floor(r_p_blk / 9); 
+                        oct_shift = (ROW_CENTER_OFFSET - oct_drop); 
+                        global_trans = mem[ui_oct_transpose];
+                        
+                        pA = mem[lane_pitch_a + lane_idx]; 
+                        pB = mem[lane_pitch_b + lane_idx];
+                        
+                        v_p = mem[curr_vel_ptr+row_offset]; 
+                        v_p <= 0 ? v_p = slider1; 
+                        eff_h = eff_hum(t_pl); 
+                        h_p = (mem[row_human_base+r_p_blk]>=0 ? mem[row_human_base+r_p_blk] : eff_h); 
+                        v_p = clamp(v_p + (rand(h_p*2)-h_p), 1, 127); 
+                        final_vel = floor(v_p * (mem[row_level_base+r_p_blk]/100));
+                        
+                        step_len_val = mem[curr_len_ptr+row_offset]; 
+                        l_val = mem[row_len_base+r_p_blk]; 
+                        ms_per_step = (60000 / tempo) * (4 / bk_sub_v);
+                        bk_is_half ? ( ms_per_step *= 2; ); 
+                        l_ms = (step_len_val > 0) ? (step_len_val * ms_per_step * 0.95) : ((l_val < 64) ? (10 + l_val * 3.75) : (250 + (l_val-64)*11.9)); 
+                        
+                        kill_samps = (srate * l_ms * 0.001); 
+                        chan_mask = mem[row_chan_base + r_p_blk];
+                        
+                        pA != -1 ? ( 
+                            final_note = pA + (oct_shift * 12) + (global_trans * 12); 
+                            while(final_note < 0) ( final_note += 12; ); while(final_note > 127) ( final_note -= 12; );
+                            c_i_blk=0; loop(16, (chan_mask & (1<<c_i_blk)) ? ( 
+                                midisend(diff_samples, 0x90|c_i_blk, final_note|(final_vel<<8)); 
+                                buf_idx = final_note + (c_i_blk*128); 
+                                mem[kill_buf + buf_idx] = kill_samps; 
+                                mem[kill_chan + buf_idx] = c_i_blk + 1;
+                            ); c_i_blk+=1; ); 
+                        );
+                        
+                        pB != -1 ? ( 
+                            final_note = pB + (oct_shift * 12) + (global_trans * 12); 
+                            while(final_note < 0) ( final_note += 12; ); while(final_note > 127) ( final_note -= 12; );
+                            c_i_blk=0; loop(16, (chan_mask & (1<<c_i_blk)) ? ( 
+                                midisend(diff_samples, 0x90|c_i_blk, final_note|(final_vel<<8)); 
+                                buf_idx = final_note + (c_i_blk*128); 
+                                mem[kill_buf + buf_idx] = kill_samps; 
+                                mem[kill_chan + buf_idx] = c_i_blk + 1;
+                            ); c_i_blk+=1; ); 
+                        );
+                    );
+                );
+            ); 
+            r_p_blk += 1;
+        );
+        s_idx_iter += 1;
+    );
+);
+
+@gfx 1470 740
+ext_noundo = 1;
+
+
+!mb && !rmb ? ( 
+    capture_id = 0; 
+    paint_state = 0; 
+    last_paint_idx = -1; 
+    drag_accum_gen = 0; 
+    drag_lock_row = -1; 
+    drag_mode = 0; 
+);
+
+shift_dn = (mouse_cap & 8); ctrl_dn = (mouse_cap & 4);
+
+function calc_vis_beat(t_in) local(sub_v, bar_v, p_l, playing_tab, offset_add, is_half, spd_m, buffer_beats, visual_pos) (
+    sub_v = eff_sub(t_in); bar_v = eff_bars(t_in); 
+    is_half = eff_half(t_in); spd_m = is_half ? 0.5 : 1.0;
+    p_l = (bar_v * 4) / spd_m;
+    
+    l_tab = mem[ui_locked_tab];
+    playing_tab = (l_tab >= 0) ? l_tab : mem[ui_play_prog_tab];
+    offset_add = 0; (play_state & 1 && t_in == playing_tab) ? ( offset_add = playback_shift; );
+    
+    buffer_beats = (samplesblock / srate) * (tempo / 60);
+    visual_pos = beat_position - buffer_beats;
+    
+    play_state & 1 ? fmod_pos(visual_pos + offset_add, p_l) * spd_m : 0;
+);
+lhs_width = 180; 
+btn_height = 18; grid_height = slider11; ROW_HEIGHT = grid_height; 
+function draw_text(x,y,s,r,g,b) ( gfx_set(r,g,b,1); gfx_x=x; gfx_y=y; gfx_drawstr(s); );
+function rect(x,y,w,h,r,g,b,a) ( gfx_set(r,g,b,a); gfx_rect(x,y,w,h); );
+function btn(x,y,w,h,txt) ( rect(x,y,w,h, 0.3,0.3,0.3,1); draw_text(x+5,y+5,txt,1,1,1); (mb && p_mb == 0 && mx>=x && mx<x+w && my>=y && my<y+h); );
+
+function draw_chan_popup(px, py, row_idx) 
+local(bw, bh, i, r, c, bx, by, bit, is_set) 
+(
+    bw = 30; bh = 20; rect(px, py, bw*4 + 4, bh*4 + 4, 0.1, 0.1, 0.1, 1); rect(px+1, py+1, bw*4+2, bh*4+2, 0.2, 0.2, 0.2, 1);
+    mask = (row_idx == -99) ? input_filter_mask : mem[row_chan_base + row_idx]; 
+    i=0; loop(16, c = i % 4; r = floor(i/4); bx = px + 2 + c*bw; by = py + 2 + r*bh; bit = 1 << i; is_set = (mask & bit); is_set ? rect(bx, by, bw-1, bh-1, 0.2, 0.8, 0.4, 1) : rect(bx, by, bw-1, bh-1, 0.3, 0.3, 0.3, 1); sprintf(#cs, "%d", i+1); draw_text(bx+8, by+5, #cs, 1,1,1); 
+    
+    (mb && p_mb == 0 && mx>=bx && mx<bx+bw && my>=by && my<by+bh) ? ( 
+        mask = mask ~ bit; 
+        row_idx == -99 ? (
+            mask = mask & 32767;
+            input_filter_mask = mask;
+        ) : (
+            mask == 0 ? mask = bit;
+            mem[row_chan_base + row_idx] = mask;
+        );
+    ); 
+    i+=1; 
+);
+    (mb && p_mb == 0 && !(mx>=px && mx<px+bw*4+4 && my>=py && my<py+bh*4+4) && popup_cooldown == 0) ? chan_popup_active = 0;
+);
+
+mx=mouse_x; my=mouse_y; mb=mouse_cap&1; rmb=mouse_cap&2; p_mb=l_mb; l_mb=mb; gfx_clear = 0.05; p_mx=l_mx; l_mx=mx; 
+UI_TOP_X=10; UI_TOP_Y=10; HDR_X=UI_TOP_X; HDR_Y=UI_TOP_Y;
+gfx_setfont(1, "Arial", 22, 'b'); draw_text(HDR_X, HDR_Y, "N2N ARP v10.95", COL_H_R*1.9, COL_H_G*1.9, COL_H_B*1.9); gfx_setfont(0);
+row1_y = UI_TOP_Y; x1 = HDR_X + 150; 
+
+function dr_glob(x, y, w, lab, val_in, min_v, max_v, is_signed, slider_idx, override_id) (
+    rect(x, y, w, 20, 0.2, 0.2, 0.2, 1); draw_text(x+5, y+5, lab, 0.7,0.7,0.7); sprintf(#s, "%d", val_in); gfx_measurestr(#s, tw, th); draw_text(x+w-tw-5, y+5, #s, 1,1,1);
+    (mb && p_mb == 0 && mx>=x && mx<x+w && my>=y && my<y+20) ? ( override_id > 0 ? ( capture_id = override_id; ) : ( capture_id = 9000 + slider_idx; ); capture_min = min_v; capture_max = max_v; capture_ptr = (slider_idx == 99) ? ui_oct_transpose : 0; capture_slider_idx = slider_idx; capture_start_x = mx; capture_start_val = (capture_ptr != 0) ? mem[capture_ptr] : (override_id > 0 ? val_in : slider(slider_idx)); drag_accum_gen = 0; );
+);
+
+dr_glob(x1, row1_y, 80, "ROWS:", slider7, 1, 128, 0, 7, 0); x1 += 90;
+dr_glob(x1, row1_y, 80, "HGT:", slider11, 10, 30, 0, 11, 0); x1 += 90;
+dr_glob(x1, row1_y, 80, "ID:", slider5, 1, 64, 0, 5, 0); x1 += 90;
+dr_glob(x1, row1_y, 90, "TRANSP:", mem[ui_oct_transpose], -3, 3, 1, 99, 0); x1 += 100;
+
+src_x = x1; 
+draw_text(src_x, row1_y+5, "SRC:", 0.6,0.6,0.6);
+rect(src_x+40, row1_y, 45, 20, 0.2, 0.2, 0.2, 1);
+slider10 == 0 ? ( draw_text(src_x+45, row1_y+5, "N2N", 0,1,1); ) : ( draw_text(src_x+45, row1_y+5, "MIDI", 1,0.6,0); );
+(mb && p_mb == 0 && mx>=src_x+40 && mx<src_x+85 && my>=row1_y && my<row1_y+20) ? ( slider10 = !slider10; slider_automate(10); );
+x1 += 95;
+
+draw_text(x1, row1_y+5, "SCALE:", 0.6,0.6,0.6); 
+scale_tonic == -1 ? ( draw_text(x1+80, row1_y+5, "---", 1, 0.2, 0.2); ) : (
+    note_x = x1 + 80; i=0; loop(13, pc = (scale_tonic + i) % 12; mem[scale_state_base + pc] ? ( t_n = pc; t_n==0?strcpy(#t,"C"):t_n==1?strcpy(#t,"C#"):t_n==2?strcpy(#t,"D"):t_n==3?strcpy(#t,"D#"):t_n==4?strcpy(#t,"E"):t_n==5?strcpy(#t,"F"):t_n==6?strcpy(#t,"F#"):t_n==7?strcpy(#t,"G"):t_n==8?strcpy(#t,"G#"):t_n==9?strcpy(#t,"A"):t_n==10?strcpy(#t,"A#"):strcpy(#t,"B"); pc == scale_tonic ? gfx_set(1, 0.2, 0.2, 1) : gfx_set(0.8, 0.8, 0.8, 1); gfx_x = note_x; gfx_y = row1_y+5; gfx_drawstr(#t); gfx_measurestr(#t, tw, th); note_x += tw + 8; ); i+=1; );
+);
+
+pat_y = row1_y + 30; pat_w = gfx_w / 64; pat_h = 30; 
+i=0; loop(128, row_idx = floor(i/64); col_idx = i % 64; px = col_idx * pat_w; py = pat_y + (row_idx * 40);
+    is_curr = (mem[ui_edit_tab] == i); is_play = (mem[ui_play_prog_tab] == i); is_lock = (mem[ui_locked_tab] == i);
+    is_curr ? (r=.0; g=.25; b=.45;) : (r=0.35; g=0.35; b=0.35;); rect(px+1, py, pat_w, 33, r, g, b, 1);
+    is_lock ? (lr=.2; lg=.6; lb=.2;) : (lr=COL_H_R*1.5; lg=COL_H_G*1.5; lb=COL_H_B*1.5;); rect(px+2, py+20, pat_w-4, 10, lr, lg, lb, 1);
+    is_play ? ( gfx_set(COL_M_R*1.7, COL_M_G*1.7, COL_M_B*1.7, 1); gfx_circle(px+pat_w/2, py+25, 3, 1); );
+    (i+1) >= 100 ? ( sprintf(#lbl, "%d", floor(((i+1)%100)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i+1)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : (i+1) >= 10 ? ( sprintf(#lbl, "%d", floor((i+1)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i+1)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : ( sprintf(#lbl, "%d", i+1); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); );
+    
+    (mb && p_mb==0 && mx>=px && mx<px+pat_w && capture_id == 0) ? (
+        (my >= py && my < py + 33) ? (
+             (time_precise() - last_tab_clk < 0.3 && last_tab_idx == i) ? ( mem[ui_locked_tab] = i; gmem[GM_BASE+1] = i; mem[ui_follow_mode] = 0; last_tab_clk = 0; mem[ui_edit_tab] = i; ) : ( mem[ui_locked_tab] != -1 ? ( mem[ui_edit_tab] = i; ); mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; last_tab_clk = time_precise(); last_tab_idx = i; ); capture_id = -2; 
+        );
+    ); i+=1;
+);
+
+ctrl_y = pat_y + 90; x2 = UI_TOP_X; mem[ui_locked_tab] == 0 ? mem[ui_edit_tab] = mem[ui_play_prog_tab]; is_follow = mem[ui_follow_mode];
+draw_text(x2, ctrl_y+5, "FOLLOW:", 0.8,0.8,0.8); x2+=60; 
+rect(x2, ctrl_y, 20, 18, 0.2, 0.2, 0.2, 1); is_follow ? ( rect(x2+2, ctrl_y+2, 16, 14, 0, 1, 0, 1); ); 
+(mb && p_mb==0 && mx>=x2 && mx<x2+20 && my>=ctrl_y && my<ctrl_y+20 && capture_id == 0) ? ( mem[ui_follow_mode] = !mem[ui_follow_mode]; mem[ui_follow_mode] ? ( mem[ui_locked_tab] = -1; gmem[GM_BASE+1] = -1; ); capture_id = -2; ); x2 += 30;
+
+t_e = mem[ui_edit_tab]; curr_pat_v_ptr = vel_base + t_e*vel_stride_tab; curr_pat_g_ptr = grid_base + t_e*vel_stride_tab; curr_pat_l_ptr = step_len_base + t_e*vel_stride_tab;
+
+btn(x2, ctrl_y, 70, 18, "COPY") ? ( memcpy(copy_tab_v_buf, curr_pat_v_ptr, vel_stride_tab); memcpy(copy_tab_g_buf, curr_pat_g_ptr, vel_stride_tab); memcpy(copy_tab_l_buf, curr_pat_l_ptr, vel_stride_tab); ); x2+=75;
+btn(x2, ctrl_y, 70, 18, "PASTE") ? ( memcpy(curr_pat_v_ptr, copy_tab_v_buf, vel_stride_tab); memcpy(curr_pat_g_ptr, copy_tab_g_buf, vel_stride_tab); memcpy(curr_pat_l_ptr, copy_tab_l_buf, vel_stride_tab); ); x2+=75;
+btn(x2, ctrl_y, 70, 18, "CLEAR") ? ( memset(curr_pat_g_ptr, 0, vel_stride_tab); memset(curr_pat_v_ptr, 0, vel_stride_tab); memset(curr_pat_l_ptr, 0, vel_stride_tab); ); x2+=85;
+
+dr_glob(x2, ctrl_y, 80, "BARS:", eff_bars(t_e), 1, 4, 0, 4, 9999); (capture_id == 9999) ? ( ov_addr = bars_ov_base + t_e; dist=mx-capture_start_x; val=capture_start_val+floor(dist*0.3); val=clamp(val,1,4); mem[ov_addr]=val; ); x2 += 90;
+
+sub_v = eff_sub(t_e); curr_idx = (sub_v==8?0:sub_v==12?1:sub_v==16?2:sub_v==24?3:4);
+rect(x2, ctrl_y, 80, 20, 0.2,0.2,0.2,1); draw_text(x2+5, ctrl_y+5, "SUB:", 0.7,0.7,0.7); 
+sub_v==8?strcpy(#s,"8"):sub_v==12?strcpy(#s,"12"):sub_v==16?strcpy(#s,"16"):sub_v==24?strcpy(#s,"24"):strcpy(#s,"32"); 
+draw_text(x2+50, ctrl_y+5, #s, 1,1,1);
+(mb && p_mb==0 && mx>=x2 && mx<x2+80 && my>=ctrl_y && my<ctrl_y+20) ? ( capture_id = 11311; capture_start_x = mx; capture_start_val = curr_idx; drag_accum_gen = 0; );
+(capture_id == 11311) ? ( 
+    ov_addr = subdiv_ov_base + t_e; dist=mx-capture_start_x; val=capture_start_val+floor(dist*0.1); 
+    val=clamp(val,0,4); mem[ov_addr]=val; 
+); x2 += 90;
+
+dr_glob(x2, ctrl_y, 80, "HUM:", eff_hum(t_e), 0, 25, 0, 2, 9998); (capture_id == 9998) ? ( ov_addr = hum_ov_base + t_e; dist=mx-capture_start_x; val=capture_start_val+floor(dist*0.5); val=clamp(val,0,25); mem[ov_addr]=val; ); x2 += 110;
+
+sw_x = x2; draw_text(sw_x, ctrl_y+5, "SWING:", 0.7,0.7,0.7); is_sw_local = (mem[swing_ov_base+t_e] >= 0);
+rect(sw_x+50, ctrl_y, 15, 18, 0.2,0.2,0.2,1); is_sw_local ? draw_text(sw_x+53, ctrl_y+5, "M", 1,0.5,0) : draw_text(sw_x+53, ctrl_y+5, "P", 0,1,1);
+rect(sw_x+70, ctrl_y, 40, 20, 0.2,0.2,0.2,1); curr_sw = eff_swing(t_e); sprintf(#s, "%d", curr_sw); draw_text(sw_x+75, ctrl_y+5, #s, 1,1,1);
+(mb && p_mb==0 && mx>=sw_x+50 && mx<sw_x+65 && my>=ctrl_y && my<ctrl_y+20) ? ( is_sw_local ? mem[swing_ov_base+t_e]=-1 : mem[swing_ov_base+t_e]=curr_sw; );
+(mb && p_mb==0 && mx>=sw_x+70 && mx<sw_x+110 && my>=ctrl_y && my<ctrl_y+20) ? ( capture_id = 9997; capture_start_x = mx; capture_start_val = (is_sw_local ? mem[swing_ov_base+t_e] : slider6); drag_accum_gen = 0; );
+(capture_id == 9997) ? ( dist=mx-capture_start_x; val=capture_start_val+floor(dist*0.5); val=clamp(val,0,100); mem[swing_ov_base+t_e]=val; );
+
+x2 += 120;
+curr_sub_val = eff_sub(t_e);
+(curr_sub_val == 24 || curr_sub_val == 32) ? (
+    hf_x = x2; box_h = 20; hf_act = eff_half(t_e);
+    rect(hf_x, ctrl_y, 80, box_h, 0.2, 0.2, 0.2, 1);
+    (mb && p_mb == 0 && mx>=hf_x && mx<hf_x+80 && my>=ctrl_y && my<ctrl_y+box_h) ? ( mem[half_speed_ov_base+t_e] = !mem[half_speed_ov_base+t_e]; );
+    !hf_act ? ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(hf_x, ctrl_y, 40, box_h); ); 
+    hf_act  ? ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(hf_x+40, ctrl_y, 40, box_h); ); 
+    !hf_act ? gfx_set(0,0,0,1) : gfx_set(0.5,0.5,0.5,1); draw_text(hf_x+10, ctrl_y+5, "1x", 0,0,0);
+    hf_act ? gfx_set(0,0,0,1) : gfx_set(0.5,0.5,0.5,1); draw_text(hf_x+47, ctrl_y+5, "1/2", 0,0,0);
+    gfx_set(0,0,0,1); gfx_line(hf_x+40, ctrl_y, hf_x+40, ctrl_y+box_h);
+
+    // --- A -> AA BUTTON (WITH SHIFT STRETCH) ---
+    aa_x = hf_x + 90;
+    is_shift_now = (mouse_cap & 8);
+    
+    // FIX: ADDED MISSING HEIGHT ARGUMENT (20)
+    btn(aa_x, ctrl_y, 84, 20, is_shift_now ? "AB > A_B_" : " A -> AA") ? (
+        
+        st_cnt = eff_bars(t_e) * curr_sub_val;
+        half_pt = floor(st_cnt / 2);
+        
+        // Pointers
+        basev = vel_base + t_e*vel_stride_tab;
+        baseg = grid_base + t_e*vel_stride_tab;
+        basel = step_len_base + t_e*vel_stride_tab;
+
+        (half_pt > 0) ? (
+            
+            is_shift_now ? (
+                // --- STRETCH MODE (AB > A_B_) ---
+                memcpy(copy_tab_v_buf, basev, vel_stride_tab);
+                memcpy(copy_tab_g_buf, baseg, vel_stride_tab);
+                memcpy(copy_tab_l_buf, basel, vel_stride_tab);
+                
+                memset(baseg, 0, vel_stride_tab);
+                
+                r_idx = 0; loop(MAX_ROWS,
+                    row_off = r_idx * vel_stride_row;
+                    s_idx = 0; loop(half_pt,
+                        mem[basev + row_off + (s_idx*2)] = mem[copy_tab_v_buf + row_off + s_idx];
+                        mem[baseg + row_off + (s_idx*2)] = mem[copy_tab_g_buf + row_off + s_idx];
+                        mem[basel + row_off + (s_idx*2)] = mem[copy_tab_l_buf + row_off + s_idx];
+                        s_idx += 1;
+                    );
+                    r_idx += 1;
+                );
+            ) : (
+                // --- DUPLICATE MODE (A -> AA) ---
+                r_idx = 0; loop(MAX_ROWS,
+                    row_off = r_idx * vel_stride_row;
+                    s_idx = 0; loop(half_pt,
+                        mem[basev + row_off + half_pt + s_idx] = mem[basev + row_off + s_idx];
+                        mem[baseg + row_off + half_pt + s_idx] = mem[baseg + row_off + s_idx];
+                        mem[basel + row_off + half_pt + s_idx] = mem[basel + row_off + s_idx];
+                        s_idx += 1;
+                    );
+                    r_idx += 1;
+                );
+            );
+        );
+    );
+);
+
+lane_y = ctrl_y + 35; sel_r = mem[ui_selected_row]; sel_r < 0 ? sel_r = 0; sel_r >= MAX_ROWS ? (sel_r=MAX_ROWS-1; mem[ui_selected_row]=sel_r;);
+rect(10, lane_y, gfx_w-330, 25, 0.1, 0.1, 0.1, 1);
+lx = 20; 
+
+oct_drop = floor(sel_r / 9); oct_num = 6 - oct_drop; role_idx = sel_r % 9;
+role_idx == 0 ? strcpy(#r_str, "H +") : role_idx == 1 ? strcpy(#r_str, "H") : role_idx == 2 ? strcpy(#r_str, "H -") :
+role_idx == 3 ? strcpy(#r_str, "M +") : role_idx == 4 ? strcpy(#r_str, "M") : role_idx == 5 ? strcpy(#r_str, "M -") :
+role_idx == 6 ? strcpy(#r_str, "L +") : role_idx == 7 ? strcpy(#r_str, "L") : strcpy(#r_str, "L -");
+sprintf(#ln, "%d %s", oct_num, #r_str); draw_text(lx, lane_y+5, #ln, 1,1,1); lx += 80;
+
+function dr_ph(x, y, lab, ptr, min_v, max_v, def) ( 
+    draw_text(x, y+5, lab, 0.7,0.7,0.7); val = mem[ptr]; val < 0 ? val = def; sprintf(#ps, "%d", val); draw_text(x+45, y+5, #ps, 1,1,1);
+    (mb && p_mb==0 && mx>=x && mx<x+65 && my>=y && my<y+20) ? ( capture_id = 80000 + ptr; capture_min = min_v; capture_max = max_v; capture_start_x = mx; capture_start_val = val; drag_accum_gen = 0; ); x + 80;
+);
+lx = dr_ph(lx, lane_y, "LEN:", row_len_base+sel_r, 0, 127, 20); lx = dr_ph(lx, lane_y, "LVL:", row_level_base+sel_r, 0, 100, 100); lx = dr_ph(lx, lane_y, "HUM:", row_human_base+sel_r, -1, 100, slider2);
+
+// NEW INPUT FILTER
+draw_text(lx, lane_y+5, "IN:", 0.7,0.7,0.7); 
+set_cnt=0; bit_i=0; loop(16, (input_filter_mask & (1<<bit_i)) ? set_cnt+=1; bit_i+=1;); set_cnt == 0 ? strcpy(#cs, "None") : set_cnt == 16 ? strcpy(#cs, "All") : sprintf(#cs, "%d Set", set_cnt); draw_text(lx+30, lane_y+5, #cs, 1,1,1);
+(mb && p_mb==0 && mx>=lx && mx<lx+100 && my>=lane_y && my<lane_y+20 && popup_cooldown == 0) ? ( chan_popup_active = 1; chan_popup_row = -99; popup_cooldown = 10; );
+lx += 100;
+
+mask = mem[row_chan_base+sel_r]; draw_text(lx, lane_y+5, "CH:", 0.7,0.7,0.7); set_cnt=0; bit_i=0; loop(16, (mask & (1<<bit_i)) ? set_cnt+=1; bit_i+=1;); set_cnt == 0 ? strcpy(#cs, "None") : set_cnt == 16 ? strcpy(#cs, "All") : sprintf(#cs, "%d Set", set_cnt); draw_text(lx+30, lane_y+5, #cs, 1,1,1);
+(mb && p_mb==0 && mx>=lx && mx<lx+100 && my>=lane_y && my<lane_y+20 && popup_cooldown == 0) ? ( chan_popup_active = 1; chan_popup_row = sel_r; popup_cooldown = 10; );
+popup_cooldown > 0 ? popup_cooldown -= 1;
+
+// --- GROOVE DEBUG INDICATOR ---
+gr_max = mem[LOCAL_GROOVE_DB + 32];
+gr_x = lx + 120; gr_y = lane_y + 10;
+gfx_set(0.6, 0.6, 0.6, 1);
+gfx_x = gr_x - 30; gfx_y = gr_y - 6; gfx_drawstr("GRV:");
+gr_max == 0 ? gfx_set(0.3, 0.3, 0.3, 1) : (gr_max > 1.0 ? gfx_set(1, 0, 0, 1) : gfx_set(0, 1, 0, 1));
+gfx_circle(gr_x+7, gr_y-3, 4, 1);
+
+edit_y = lane_y + 35; btn_w = 90; btn_h = 18;
+btn(10, edit_y, btn_w, btn_h, "COPY LN") ? ( memcpy(copy_row_v_buf, curr_pat_v_ptr + sel_r*vel_stride_row, MAX_STEPS); memcpy(copy_row_g_buf, curr_pat_g_ptr + sel_r*vel_stride_row, MAX_STEPS); memcpy(copy_row_l_buf, curr_pat_l_ptr + sel_r*vel_stride_row, MAX_STEPS); );
+btn(10, edit_y + 20, btn_w, btn_h, "PASTE LN") ? ( memcpy(curr_pat_v_ptr + sel_r*vel_stride_row, copy_row_v_buf, MAX_STEPS); memcpy(curr_pat_g_ptr + sel_r*vel_stride_row, copy_row_g_buf, MAX_STEPS); memcpy(curr_pat_l_ptr + sel_r*vel_stride_row, copy_row_l_buf, MAX_STEPS); );
+
+// --- NEW "ALL" ROWS BUTTON (MOVED TO LEFT SIDEBAR) ---
+all_mode = mem[ui_vel_edit_all];
+btn(110, edit_y + 20, 30, 18, "ALL") ? ( mem[ui_vel_edit_all] = !mem[ui_vel_edit_all]; );
+all_mode ? ( gfx_set(1, 0.8, 0.2, 1); gfx_rect(110, edit_y+20, 30, 18); gfx_set(0,0,0,1); gfx_x=115; gfx_y=edit_y+25; gfx_drawstr("ALL"); );
+
+btn(10, edit_y + 40, btn_w, btn_h, "CLEAR LN") ? ( memset(curr_pat_g_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); memset(curr_pat_v_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); memset(curr_pat_l_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); );
+
+grid_y = edit_y + 60 + 10;
+scroll_val = slider8; visible_rows = slider7; max_scroll = MAX_ROWS - visible_rows; max_scroll < 0 ? max_scroll = 0;
+sb_w = 16; sb_x = gfx_w - sb_w; sb_y = grid_y; sb_h = visible_rows * ROW_HEIGHT; (sb_h > gfx_h - grid_y) ? sb_h = gfx_h - grid_y;
+handle_h = (visible_rows / MAX_ROWS) * sb_h; handle_h < 20 ? handle_h = 20; avail_track = sb_h - handle_h;
+scroll_pct = max_scroll > 0 ? scroll_val / max_scroll : 0; handle_y = sb_y + scroll_pct * avail_track;
+
+vel_x = 10 + lhs_width; 
+
+def_w = 28; def_x = vel_x - def_w - 4; def_h = 60;
+rect(def_x, edit_y, def_w, def_h, 0.2, 0.2, 0.2, 1);
+gfx_set(LOCK_R, LOCK_G, LOCK_B, 1);
+val_h = floor((slider1 / 127) * (def_h - 2)); val_h < 2 ? val_h = 2;
+gfx_rect(def_x + 1, edit_y + def_h - val_h - 1, def_w - 2, val_h);
+gfx_set(1, 1, 1, 0.8); gfx_x = def_x + 3; gfx_y = edit_y + 5; gfx_drawstr("DEF");
+sprintf(#dv, "%d", slider1); gfx_x = def_x + 3; gfx_y = edit_y + def_h - 15; gfx_drawstr(#dv);
+(mb && mx >= def_x && mx < def_x + def_w && my >= edit_y && my < edit_y + def_h && capture_id == 0) ? ( capture_id = 11211; );
+(capture_id == 11211) ? (
+    new_val = 127 - floor( ( (my - edit_y) / def_h ) * 127 );
+    new_val = clamp(new_val, 1, 127); slider1 = new_val; slider_automate(1);
+    i_rst = 0; loop(MAX_ROWS * MAX_STEPS, mem[curr_pat_g_ptr + i_rst] == 0 ? mem[curr_pat_v_ptr + i_rst] = 0; i_rst += 1; );
+);
+
+vel_w = (gfx_w - sb_w) - vel_x; vel_h = 60; rect(vel_x, edit_y, vel_w, vel_h, 0.1, 0.1, 0.1, 1);
+st_v = eff_bars(t_e) * eff_sub(t_e); steps_per_bar = eff_sub(t_e); cw = vel_w / st_v;
+
+v_i=0; loop(st_v, 
+    idx_v = sel_r*vel_stride_row + v_i; vx = vel_x + v_i*cw; 
+    g_on = mem[curr_pat_g_ptr+idx_v]; v_val = mem[curr_pat_v_ptr+idx_v]; 
+    v_disp = (v_val > 0) ? v_val : slider1;
+    bar_h = floor((v_disp/127) * (vel_h-2)); bar_h < 2 ? bar_h = 2; 
+    
+    // FIX: Active Velocity Bars use Selected Row Color
+    c_idx = mem[row_color_base+sel_r]; get_palette_values(c_idx);
+    
+    g_on ? ( 
+        min_b = (c_idx == 0) ? 0.60 : 0.50; v_scale = min_b + ((1-min_b) * (v_disp / 127)); 
+        gfx_set(cr * v_scale, cg * v_scale, cb * v_scale, 1); 
+        gfx_rect(vx, edit_y + vel_h - bar_h, cw-1, bar_h); 
+    ) : ( 
+        rect(vx, edit_y, cw-1, vel_h, 0.15, 0.15, 0.15, 1); 
+        rect(vx, edit_y + vel_h - bar_h, cw-1, bar_h, 0.35, 0.35, 0.35, 1); 
+    );
+    (mb && mx>=vx && mx<vx+cw && my>=edit_y && my<edit_y+vel_h && capture_id == 0) ? ( capture_id=77777; );
+    (capture_id==77777 && mb && mx>=vx && mx<vx+cw) ? ( 
+        new_v = floor((1 - (my-edit_y)/vel_h) * 127); new_v = clamp(new_v, 1, 127); 
+        
+        target_step = v_i; 
+        
+        // --- MODIFIER LOGIC (Matches Grid) ---
+        target_bar = floor(target_step / steps_per_bar);
+        
+        all_mode = mem[ui_vel_edit_all];
+        
+        // Loop through steps (Horizontal)
+        loop_s = 0; loop(st_v,
+            loop_bar = floor(loop_s / steps_per_bar);
+            step_in_beat_loop = loop_s % (steps_per_bar/4);
+            target_in_beat = target_step % (steps_per_bar/4);
+            step_in_bar_loop = loop_s % steps_per_bar;
+            target_in_bar = target_step % steps_per_bar;
+
+            should_apply = 0;
+            
+            (ctrl_dn && shift_dn) ? (loop_s % (steps_per_bar/4) == target_in_beat ? should_apply=1) : // S+C = All Bars
+            ctrl_dn ? (loop_s % steps_per_bar == target_in_bar ? should_apply=1) : // Ctrl = All Bars
+            shift_dn ? ((loop_bar == target_bar) && (loop_s % (steps_per_bar/4) == target_in_beat) ? should_apply=1) : // Shift = Current Bar
+            (loop_s == target_step ? should_apply = 1); // None = Single Step
+
+            should_apply ? ( 
+                all_mode ? (
+                    // Apply to ALL rows (vertical)
+                    r_iter = 0; loop(MAX_ROWS,
+                        // Simplified: Apply to all rows for editing convenience
+                        mem[curr_pat_v_ptr + r_iter*vel_stride_row + loop_s] = new_v;
+                        r_iter += 1;
+                    );
+                ) : (
+                    // Apply to Selected Row only
+                    mem[curr_pat_v_ptr + idx_v - target_step + loop_s] = new_v; 
+                );
+            );
+            loop_s += 1;
+        );
+    ); 
+    v_i+=1;
+);
+
+rect(sb_x, sb_y, sb_w, sb_h, 0.1,0.1,0.1,1); rect(sb_x+2, handle_y, sb_w-4, handle_h, 0.6,0.6,0.6,1);
+(mb && p_mb==0 && mx>=sb_x && mx<sb_x+sb_w && my>=sb_y && my<sb_y+sb_h) ? ( capture_id=10000; capture_ptr=my-handle_y; );
+(capture_id==10000) ? ( target_y = my - capture_ptr; rel = target_y - sb_y; pct = rel / avail_track; val = floor(pct * max_scroll); val = clamp(val, 0, max_scroll); slider8 = val; );
+
+grid_x = 10 + lhs_width; grid_w = vel_w; 
+(rmb && capture_id == 0 && mx >= grid_x && mx < grid_x + grid_w && my >= grid_y && my < grid_y + sb_h && !chan_popup_active) ? (
+    rel_x = mx - grid_x; rel_y = my - grid_y; hov_col = floor(rel_x / cw); hov_vis_row = floor(rel_y / ROW_HEIGHT); hov_row = hov_vis_row + scroll_val;
+    (hov_col >= 0 && hov_col < st_v && hov_row >= 0 && hov_row < MAX_ROWS) ? (
+        idx = hov_row * vel_stride_row + hov_col;
+        found_head = -1; scan_k = 0; 
+        loop(32, check_col = hov_col - scan_k; (check_col >= 0) ? ( chk_idx = hov_row * vel_stride_row + check_col; (mem[curr_pat_g_ptr + chk_idx] == 1) ? ( len = mem[curr_pat_l_ptr + chk_idx]; (check_col + len > hov_col) ? ( found_head = chk_idx; scan_k = 32; ); ); ); scan_k += 1; );
+        found_head != -1 ? ( len_drag_start_idx = found_head; ) : ( mem[curr_pat_g_ptr+idx] = 1; mem[curr_pat_l_ptr+idx] = 1; mem[curr_pat_v_ptr+idx] = slider1; len_drag_start_idx = idx; );
+        capture_id = 88888; 
+    );
+);
+(rmb && capture_id == 88888) ? ( 
+    rel_x = mx - grid_x; curr_col = floor(rel_x / cw); 
+    head_col = (len_drag_start_idx % vel_stride_row); clicked_row = floor(len_drag_start_idx / vel_stride_row);
+    new_len = (curr_col - head_col) + 1; new_len < 1 ? new_len = 1; (head_col + new_len > st_v) ? new_len = st_v - head_col; 
+    step_in_bar = head_col % steps_per_bar; step_in_beat = head_col % (steps_per_bar/4);
+    loop_s = 0; loop(st_v, should_apply = 0;
+        (ctrl_dn && shift_dn) ? should_apply = 1 : ctrl_dn ? (loop_s % steps_per_bar == step_in_bar ? should_apply=1) : shift_dn ? (loop_s % (steps_per_bar/4) == step_in_beat ? should_apply=1) : (loop_s == head_col ? should_apply = 1);
+        idx_target = clicked_row * vel_stride_row + loop_s;
+        mem[curr_pat_g_ptr + idx_target] == 1 ? (
+            should_apply ? ( 
+                safe_len = new_len; (loop_s + safe_len > st_v) ? safe_len = st_v - loop_s;
+                mem[curr_pat_l_ptr + idx_target] = safe_len; 
+                tail_scan = 1; loop(safe_len - 1, tail_idx = idx_target + tail_scan; (tail_scan + loop_s < st_v) ? ( mem[curr_pat_g_ptr + tail_idx] = 0; mem[curr_pat_v_ptr + tail_idx] = 0; ); tail_scan += 1; );
+            );
+        ); loop_s += 1;
+    );
+);
+
+// FIX: Sticky Click - Ensure first click always paints by handling p_mb check carefully
+(mb && capture_id == 0 && mx >= grid_x && mx < grid_x + grid_w && my >= grid_y && my < grid_y + sb_h && !chan_popup_active && !color_popup_active) ? (
+    // If this is a new press (p_mb == 0), force reset last_paint_idx to allow toggle
+    p_mb == 0 ? last_paint_idx = -1;
+    
+    rel_x = mx - grid_x; rel_y = my - grid_y;
+    hov_col = floor(rel_x / cw);
+    hov_vis_row = floor(rel_y / ROW_HEIGHT);
+    hov_row = hov_vis_row + scroll_val;
+    (hov_col >= 0 && hov_col < st_v && hov_row >= 0 && hov_row < MAX_ROWS) ? (
+        target_idx = hov_row * vel_stride_row + hov_col;
+        capture_id = 11111; 
+        paint_state = !mem[curr_pat_g_ptr+target_idx]; 
+        
+        // Immediate paint on first click
+        step_in_bar = hov_col % steps_per_bar; step_in_beat = hov_col % (steps_per_bar/4);
+        loop_s = 0; loop(st_v, should_apply = 0;
+            // FIX: Correct Modifier Logic
+            // Ctrl: Same Step in Every Bar
+            // Shift: Same Beat Subdivision in CURRENT Bar
+            // Ctrl+Shift: Same Beat Subdivision in ALL Bars
+            
+            target_bar = floor(hov_col / steps_per_bar);
+            loop_bar = floor(loop_s / steps_per_bar);
+
+            (ctrl_dn && shift_dn) ? (loop_s % (steps_per_bar/4) == step_in_beat ? should_apply=1) : 
+            ctrl_dn ? (loop_s % steps_per_bar == step_in_bar ? should_apply=1) : 
+            shift_dn ? ((loop_bar == target_bar) && (loop_s % (steps_per_bar/4) == step_in_beat) ? should_apply=1) : 
+            (loop_s == hov_col ? should_apply = 1);
+            
+            should_apply ? ( loop_idx = hov_row * vel_stride_row + loop_s; mem[curr_pat_g_ptr+loop_idx] = paint_state; paint_state ? (mem[curr_pat_l_ptr+loop_idx]=1; mem[curr_pat_v_ptr+loop_idx]<=0 ? mem[curr_pat_v_ptr+loop_idx]=slider1;) : (mem[curr_pat_l_ptr+loop_idx]=0; mem[curr_pat_v_ptr+loop_idx]=0;); ); loop_s += 1;
+        );
+        last_paint_idx = target_idx; 
+    );
+);
+(mb && capture_id == 11111 && mx >= grid_x && mx < grid_x + grid_w && my >= grid_y && my < grid_y + sb_h) ? (
+    rel_x = mx - grid_x; rel_y = my - grid_y; hov_col = floor(rel_x / cw); hov_vis_row = floor(rel_y / ROW_HEIGHT); hov_row = hov_vis_row + scroll_val;
+    (hov_col >= 0 && hov_col < st_v && hov_row >= 0 && hov_row < MAX_ROWS) ? (
+        target_idx = hov_row * vel_stride_row + hov_col;
+        (target_idx != last_paint_idx) ? (
+            step_in_bar = hov_col % steps_per_bar; step_in_beat = hov_col % (steps_per_bar/4);
+            loop_s = 0; loop(st_v, should_apply = 0;
+                
+                target_bar = floor(hov_col / steps_per_bar);
+                loop_bar = floor(loop_s / steps_per_bar);
+
+                (ctrl_dn && shift_dn) ? (loop_s % (steps_per_bar/4) == step_in_beat ? should_apply=1) : 
+                ctrl_dn ? (loop_s % steps_per_bar == step_in_bar ? should_apply=1) : 
+                shift_dn ? ((loop_bar == target_bar) && (loop_s % (steps_per_bar/4) == step_in_beat) ? should_apply=1) : 
+                (loop_s == hov_col ? should_apply = 1);
+                
+                should_apply ? ( loop_idx = hov_row * vel_stride_row + loop_s; mem[curr_pat_g_ptr+loop_idx] = paint_state; paint_state ? (mem[curr_pat_l_ptr+loop_idx]=1; mem[curr_pat_v_ptr+loop_idx]<=0 ? mem[curr_pat_v_ptr+loop_idx]=slider1;) : (mem[curr_pat_l_ptr+loop_idx]=0; mem[curr_pat_v_ptr+loop_idx]=0;); ); loop_s += 1;
+            );
+            last_paint_idx = target_idx;
+        );
+    );
+);
+
+gx_r = 0; loop(visible_rows, 
+    r_idx = gx_r + scroll_val; ry = grid_y + gx_r*ROW_HEIGHT;
+    (ry + ROW_HEIGHT < gfx_h) ? (
+        role_idx = r_idx % 9; oct_drop = floor(r_idx / 9); oct_num = 6 - oct_drop; is_main_row = (role_idx == 1 || role_idx == 4 || role_idx == 7); is_separator = (role_idx == 8); 
+        is_sel = (r_idx == sel_r); 
+        
+        is_root_oct = (oct_num == 0);
+        
+        is_main_row ? ( 
+            role_idx == 1 ? (r=COL_H_R; g=COL_H_G; b=COL_H_B;) : role_idx == 4 ? (r=COL_M_R; g=COL_M_G; b=COL_M_B;) : (r=COL_L_R; g=COL_L_G; b=COL_L_B;); 
+            r*=LANE_BG_DIM; g*=LANE_BG_DIM; b*=LANE_BG_DIM; is_sel ? (r+=0.1; g+=0.1; b+=0.1;); 
+            is_root_oct ? ( r+=0.08; g+=0.08; b+=0.08; ); // Highlight 0-Octave
+            rect(grid_x, ry, grid_w, ROW_HEIGHT, r, g, b, 1); 
+        ) : ( 
+            bg = is_sel ? 0.25 : 0.18; 
+            is_root_oct ? ( bg += 0.15; ); // Highlight 0-Octave
+            rect(grid_x, ry, grid_w, ROW_HEIGHT, bg, bg, bg, 1); 
+        );
+        
+        // GRID LABELS
+        is_main_row ? ( 
+            role_idx == 1 ? (lr=COL_H_R; lg=COL_H_G; lb=COL_H_B;) : role_idx == 4 ? (lr=COL_M_R; lg=COL_M_G; lb=COL_M_B;) : (lr=COL_L_R; lg=COL_L_G; lb=COL_L_B;); 
+            lr*=LABEL_BRIGHTNESS; lg*=LABEL_BRIGHTNESS; lb*=LABEL_BRIGHTNESS; lr>1?lr=1; lg>1?lg=1; lb>1?lb=1;
+            
+            // Octave Number: Standard Row Color
+            gfx_set(lr, lg, lb, 1); 
+            sprintf(#oct_s, "%d", oct_num); 
+            gfx_x = 4; gfx_y = ry + 2; gfx_drawstr(#oct_s);
+            
+            // Letter
+            gfx_set(lr, lg, lb, 1);
+            role_idx == 1 ? strcpy(#r_str, "H") : role_idx == 4 ? strcpy(#r_str, "M") : strcpy(#r_str, "L");
+            gfx_x = 28; gfx_y = ry + 2; gfx_drawstr(#r_str);
+        );
+
+        // MUTE/SOLO (Extra Bright)
+        a_dim = (is_sel || is_main_row) ? 1.0 : 0.85; 
+        mem[row_mute_base+r_idx] ? draw_text(10+35, ry+2, "M", 1,0,0) : draw_text(10+35, ry+2, "M", 0.7*a_dim, 0.7*a_dim, 0.7*a_dim);
+        mem[row_solo_base+r_idx] ? draw_text(10+50, ry+2, "S", 0,1,1) : draw_text(10+50, ry+2, "S", 0.7*a_dim, 0.7*a_dim, 0.7*a_dim);
+        
+        (mb && p_mb==0 && capture_id==0 && !chan_popup_active && my>=ry && my<ry+ROW_HEIGHT && mx < grid_x) ? ( 
+            mx >= 10+35 && mx < 10+48 ? mem[row_mute_base+r_idx] = !mem[row_mute_base+r_idx] : 
+            mx >= 10+50 && mx < 10+63 ? mem[row_solo_base+r_idx] = !mem[row_solo_base+r_idx] : 
+            mem[ui_selected_row] = r_idx; 
+        );
+        
+        // --- NEW COLUMNS LOGIC (With N2N Velocity Decoding) ---
+        pA = mem[lane_pitch_a + role_idx]; 
+        pA != -1 ? ( 
+            
+            // 1. Chord Step (Lookup from pitch_role_db)
+            pc = pA % 12;
+            lbl_idx = mem[pitch_role_db + pc];
+            
+            (lbl_idx > 0) ? (
+                // Draw Label
+                get_n2n_label_str(lbl_idx, #c_int);
+                set_n2n_label_color(lbl_idx);
+                draw_text(10+85, ry+2, #c_int, r, g, b);
+
+                // Draw Root Arrow
+                (lbl_idx == 1) ? (
+                   gfx_set(LOCK_R, LOCK_G, LOCK_B, 1); 
+                   gfx_x = 10+72; gfx_y = ry+2; gfx_drawstr("->");
+                );
+            );
+
+            // 2. Note Name (Context Aware)
+            get_note_name_str_context(pA, scale_tonic, #nn);
+            
+            // DIAGNOSTIC: Show Input Velocity if Selected
+            is_sel ? (
+                // Find velocity for this note in the input buffer
+                d_vel = 0; k=0; loop(5, mem[chord_notes+k] == pA ? d_vel=mem[chord_vels+k]; k+=1; );
+                (d_vel > 0) ? (
+                    sprintf(#nn, "%s (v%d)", #nn, d_vel);
+                );
+            );
+
+            is_main_row ? ( 
+                role_idx == 1 ? (nr=COL_H_R; ng=COL_H_G; nb=COL_H_B;) : role_idx == 4 ? (nr=COL_M_R; ng=COL_M_G; nb=COL_M_B;) : (nr=COL_L_R; ng=COL_L_G; nb=COL_L_B;); 
+                nr*=1.5; ng*=1.5; nb*=1.5; nr>1?nr=1; ng>1?ng=1; nb>1?nb=1; 
+            ) : ( nr=0.4; ng=0.4; nb=0.4; ); 
+            draw_text(10+115, ry+2, #nn, nr, ng, nb); 
+
+            // 3. Scale Step (Rainbow) - USES STANDARD INTERVAL INFO
+            (scale_tonic != -1) ? (
+                s_diff = (pA - scale_tonic) % 12; 
+                while(s_diff < 0) ( s_diff += 12; ); 
+                get_interval_info(s_diff, #s_int);
+                gfx_set(r,g,b,1);
+                gfx_x=10+150; gfx_y=ry+2; gfx_drawstr(#s_int); 
+            ) : ( draw_text(10+150, ry+2, "-", 0.4, 0.4, 0.4); );
+        ); 
+
+        memset(ownership_map, -1, st_v); gx_s=0; loop(st_v, idx = r_idx*vel_stride_row + gx_s; mem[curr_pat_g_ptr+idx] ? ( l = mem[curr_pat_l_ptr+idx]; l<1?l=1; k=0; loop(l, (gx_s+k<st_v)?mem[ownership_map+gx_s+k]=idx; k+=1; ); ); gx_s+=1; );
+        gx_s=0; loop(st_v, cx = grid_x + gx_s*cw; idx = r_idx*vel_stride_row + gx_s; owner = mem[ownership_map+gx_s]; is_head = (owner == idx); is_tail = (owner != -1 && !is_head);
+            is_head ? ( 
+                l = mem[curr_pat_l_ptr+idx]; w_px = (l<1?1:l) * cw; v_disp = mem[curr_pat_v_ptr+idx]; v_disp <= 0 ? v_disp = slider1;
+                
+                // FIX: Active Cells Match Row Color
+                c_idx = mem[row_color_base+r_idx];
+                
+                // If Custom Palette not set (0), use H/M/L Row Defaults
+                (c_idx == 0) ? (
+                    is_main_row ? ( 
+                        role_idx == 1 ? (cr=COL_H_R; cg=COL_H_G; cb=COL_H_B;) : role_idx == 4 ? (cr=COL_M_R; cg=COL_M_G; cb=COL_M_B;) : (cr=COL_L_R; cg=COL_L_G; cb=COL_L_B;); 
+                        cr += 0.3; cg += 0.3; cb += 0.3; cr>1?cr=1; cg>1?cg=1; cb>1?cb=1;
+                    ) : ( 
+                        cr=0.8; cg=0.8; cb=0.8; 
+                    );
+                ) : (
+                    get_palette_values(c_idx);
+                );
+                
+                min_b = (c_idx == 0) ? 0.60 : 0.50; 
+                v_scale = min_b + ((1-min_b) * (v_disp / 127)); 
+                
+                // FIX: Playback Highlight Logic (Bright White)
+                ((play_state & 1) && gx_s == mem[ui_last_step]) ? ( 
+                    gfx_set(1,1,1,0.95); // Bright White Flash
+                ) : (
+                    gfx_set(cr * v_scale, cg * v_scale, cb * v_scale, 1); 
+                );
+                
+                gfx_rect(cx, ry+1, w_px-1, ROW_HEIGHT-2); 
+            ) : (!is_tail) ? ( 
+                (gx_s % steps_per_bar == 0) ? rect(cx, ry, cw, ROW_HEIGHT, 1, 1, 1, 0.20) : // Boosted to 0.20 (Start of Bar)
+                (gx_s % (steps_per_bar/4) == 0) ? rect(cx, ry, cw, ROW_HEIGHT, 1, 1, 1, 0.04) : 0; 
+                gfx_set(0.3, 0.3, 0.3, 0.4); gfx_rect(cx, ry, 1, ROW_HEIGHT); 
+            );
+            (mb && capture_id == 0 && mx>=cx && mx<cx+cw && my>=ry && my<ry+ROW_HEIGHT && !chan_popup_active && !color_popup_active) ? (
+                drag_lock_row == -1 ? drag_lock_row = r_idx;
+                (r_idx == drag_lock_row && !is_tail) ? (
+                    cell_id = r_idx*1000 + gx_s;
+                    p_mb == 0 ? ( drag_mode = mem[curr_pat_g_ptr+idx] ? 2 : 1; );
+                    (cell_id != last_drag_idx) ? (
+                        step_in_bar = gx_s % steps_per_bar; step_in_beat = gx_s % (steps_per_bar/4);
+                        loop_s = 0; loop(st_v, 
+                            should_apply = 0;
+                            
+                            target_bar = floor(gx_s / steps_per_bar);
+                            loop_bar = floor(loop_s / steps_per_bar);
+
+                            (ctrl_dn && shift_dn) ? (loop_s % (steps_per_bar/4) == step_in_beat ? should_apply=1) : 
+                            ctrl_dn ? (loop_s % steps_per_bar == step_in_bar ? should_apply=1) : 
+                            shift_dn ? ((loop_bar == target_bar) && (loop_s % (steps_per_bar/4) == step_in_beat) ? should_apply=1) : 
+                            (loop_s == gx_s ? should_apply = 1);
+
+                            should_apply ? ( 
+                                loop_idx = r_idx * vel_stride_row + loop_s; mem[curr_pat_g_ptr+loop_idx] = (drag_mode == 1); 
+                                (drag_mode == 1) ? ( mem[curr_pat_l_ptr+loop_idx]=1; mem[curr_pat_v_ptr+loop_idx]<=0 ? mem[curr_pat_v_ptr+loop_idx]=slider1; ) : ( mem[curr_pat_l_ptr+loop_idx]=0; mem[curr_pat_v_ptr+loop_idx]=0; ); 
+                            ); loop_s += 1;
+                        ); mem[ui_selected_row] = r_idx; last_drag_idx = cell_id;
+                    );
+                );
+            ); gx_s+=1;
+        ); 
+        gfx_set(0,0,0,1); gfx_line(grid_x, ry, grid_x+grid_w, ry); gfx_line(grid_x, ry+ROW_HEIGHT, grid_x+grid_w, ry+ROW_HEIGHT);
+    ); 
+    gx_r += 1;
+);
+
+// =========================================================
+// DEBUG FOOTER DISPLAY
+// =========================================================
+footer_y = grid_y + visible_rows * ROW_HEIGHT + 10;
+(footer_y < gfx_h - 100) ? (
+    
+    // Background for Debug Area
+    gfx_set(0.1, 0.1, 0.1, 0.9);
+    gfx_rect(10, footer_y, gfx_w - 20, 90); // Reduced Height
+    
+    // Columns
+    col_w = (gfx_w - 40) / 7;
+    
+    i = 1; // Slots 1-7
+    loop(7,
+        dx = 20 + (i-1) * col_w;
+        dy = footer_y + 10;
+        
+        // Slot Header
+        (i==1) ? strcpy(#sl, "Root (89)") : 
+        (i==2) ? strcpy(#sl, "2nd (88)") :
+        (i==3) ? strcpy(#sl, "3rd (87)") :
+        (i==4) ? strcpy(#sl, "4th (86)") :
+        (i==5) ? strcpy(#sl, "5th (85)") :
+        (i==6) ? strcpy(#sl, "6th (84)") : strcpy(#sl, "7th (83)");
+        
+        gfx_set(0.5, 0.5, 0.5, 1);
+        gfx_x = dx; gfx_y = dy; gfx_drawstr(#sl);
+        
+        // Data
+        p = mem[debug_slot_pitch + i];
+        v = mem[debug_slot_vel + i];
+        lbl_idx = mem[debug_slot_lbl + i];
+        
+        dy += 20;
+        
+        (p != -1) ? (
+            // Note Name
+            get_note_name_str_context(p, scale_tonic, #dn);
+            sprintf(#dinfo, "%s (v%d)", #dn, v);
+            
+            // Color based on velocity match
+            (v == (90-i)) ? gfx_set(0.2, 1, 0.2, 1) : gfx_set(1, 0.2, 0.2, 1);
+            gfx_x = dx; gfx_y = dy; gfx_drawstr(#dinfo);
+            
+            dy += 20;
+            
+            // Interval Label
+            get_n2n_label_str(lbl_idx, #dlbl);
+            (lbl_idx > 0) ? (
+                set_n2n_label_color(lbl_idx);
+                gfx_x = dx; gfx_y = dy; gfx_drawstr(#dlbl);
+            ) : (
+                gfx_set(0.4, 0.4, 0.4, 1);
+                gfx_x = dx; gfx_y = dy; gfx_drawstr("--");
+            );
+            
+            dy += 20;
+            
+            // Assigned Lane (Check lane_pitch_a)
+            found_lane = -1;
+            k = 0;
+            loop(9,
+                (mem[lane_pitch_a+k] == p) ? found_lane = k;
+                k += 1;
+            );
+            
+            gfx_set(0.7, 0.7, 0.7, 1);
+            gfx_x = dx; gfx_y = dy;
+            (found_lane != -1) ? (
+                (found_lane == 1) ? gfx_drawstr("Lane: High") :
+                (found_lane == 4) ? gfx_drawstr("Lane: Mid") :
+                (found_lane == 7) ? gfx_drawstr("Lane: Low") :
+                (
+                    sprintf(#dl, "Lane: %d", found_lane);
+                    gfx_drawstr(#dl);
+                );
+            ) : (
+                gfx_drawstr("Lane: None");
+            );
+            
+        ) : (
+            gfx_set(0.3, 0.3, 0.3, 1);
+            gfx_x = dx; gfx_y = dy; gfx_drawstr("---");
+        );
+        
+        i += 1;
+    );
+);
+
+
+// --- MOUSE INPUT HANDLING (SLIDERS & DRAG) ---
+(mb && capture_id > 0 && capture_id < 9000) ? ( 
+    d = mx - p_mx; 
+    val = mem[capture_ptr]; 
+    val = clamp(val + d, capture_min, capture_max); 
+    capture_is_signed && val == 0 && d > 0 ? val = 1; 
+    mem[capture_ptr] = val; 
+);
+
+(mb && capture_id >= 9000 && capture_id < 80000) ? ( 
+    drag_accum_gen += (mx - p_mx); 
+    drag_sens = 5.0; 
+    abs(drag_accum_gen) >= drag_sens ? (
+        inc = floor(drag_accum_gen / drag_sens); 
+        drag_accum_gen -= (inc * drag_sens); 
+        idx = capture_slider_idx;
+        
+        capture_ptr != 0 ? ( 
+            mem[capture_ptr] = clamp(mem[capture_ptr] + inc, capture_min, capture_max); 
+        ) : ( 
+            slider(idx) = clamp(slider(idx) + inc, capture_min, capture_max); 
+            slider_automate(idx); 
+            idx == 1 ? ( 
+                i_rst = 0; 
+                loop(MAX_ROWS * MAX_STEPS, 
+                    mem[curr_pat_g_ptr + i_rst] == 0 ? mem[curr_pat_v_ptr + i_rst] = 0; 
+                    i_rst += 1; 
+                ); 
+            );
+        );
+    );
+);
+
+(mb && capture_id >= 80000) ? ( 
+    dist = mx - capture_start_x; 
+    val = capture_start_val + floor(dist * 0.5); 
+    val = clamp(val, capture_min, capture_max); 
+    ptr = capture_id - 80000; 
+    mem[ptr] = val; 
+);
+
+chan_popup_active ? draw_chan_popup(30, 200, chan_popup_row); 
+(mouse_wheel != 0) ? ( slider8 = clamp(slider8 - (mouse_wheel/120), 0, max_scroll); mouse_wheel = 0; );
+
+// DRAW PLAYHEAD LAST (Top Layer)
+(play_state & 1) ? ( 
+    t_pl = (mem[ui_locked_tab] >= 0) ? mem[ui_locked_tab] : mem[ui_play_prog_tab]; 
+    vis_beat = calc_vis_beat(t_pl); 
+    
+    p_l = eff_bars(t_pl) * 4; 
+    
+    p_l > 0 ? (
+        ph_x = grid_x + (vis_beat/p_l)*vel_w; 
+        grid_h = visible_rows * ROW_HEIGHT; 
+        
+        (grid_y + grid_h > gfx_h) ? grid_h = gfx_h - grid_y; 
+        
+        gfx_set(0, 1, 0, 0.9); // Green Line
+        gfx_rect(ph_x-1, grid_y, 2, grid_h); 
+    );
+);

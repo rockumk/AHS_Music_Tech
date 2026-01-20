@@ -1,29 +1,27 @@
-version: 1.0.1
-desc: ReaCenterMIDIpitch
+version: 1.0.6
+desc: ReaCenterMIDIpitch (with Open Voicings)
 // Transposes MIDI notes to octaves nearest user defined center pitch.
+// Includes intelligent voicing spreading for cinematic/open chords.
 author: Rock Kennedy
 about:
   # ReaCenterMIDIpitch
 changelog:
-  - Name Change
-
-
-
-
+  - Updated Slider 4 logic to specific "Center Up 1, Top Up 2" behavior.
 
 /*
  * JSFX Name: MIDI notes octave tranpose shift
  * Author: Rockum (Rock Kennedy)
- * Author URI: http://www.rockkennedy.com
  * Using code from X-Raym as a starting point
- * Donation: http://www.extremraym.com/en/donation
  * Licence: GPL v3
  */
-desc:Recenters the pitches of chords around a selected note's pitch.
+
+desc:ReaCenter: Pitch Centering & Voicing
 slider1:1<0,16,1{Any,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}>-Input Channel
 slider2:60<20,110,1>Center Pitch
 slider3:100<0,127,1>Off / On
+slider4:0<0,2,1{Tight (Standard),Wide (Center Up 1 Oct),Wider (Center Up 1 / Top Up 2)}>Voicing Spread
 slider50:0<0,1,1>-Toggle
+
 ////////////////////////////////////////////////////////////////////////////////
 @init
 statNoteOn = $x90;
@@ -36,9 +34,12 @@ allOff3   = 0x00;
 holdOff1  = 0xB0;
 holdOff2  = 0x40;
 holdOff3  = 0x00;
+
 last_chan = slider1;
 lastslider2 = slider2;
 lastslider3 = slider3;
+lastslider4 = slider4;
+
 function SendAllNotesOff() (
   slider50 = 1;
   outChannel = 0;
@@ -61,7 +62,6 @@ function SendAllNotesOff() (
   );
 );
 
-
 ////////////////////////////////////////////////////////////////////////////////
 @slider
 inChannel = slider1 - 1;
@@ -70,41 +70,55 @@ inChannel = slider1 - 1;
 @block
 while
 (
-  // Not Off if Slider Change
   midirecv(offset,msg1,note,vel) ?
   (
-  last_chan != slider1 || lastslider2 != slider2 || lastslider3 != slider3 ? (
-    SendAllNotesOff()
-  );
-    // Extract message type and channel
+    // Reset if sliders change
+    last_chan != slider1 || lastslider2 != slider2 || lastslider3 != slider3 || lastslider4 != slider4 ? (
+      SendAllNotesOff()
+    );
+
     status = msg1 & $xF0;
     channel = msg1 & $x0F;
-    // Is it on our channel?
+
     channel == inChannel || inChannel == -1 ?
     (
-      // Is it a note event?
       status == statNoteOn || status == statNoteOff || status == afterTouch ?
       (
-  loop (9,
-    note - slider(2) > 7 ?
-    (
-    note = note - 12;
+        // 1. CENTER: Pull everything tight around Slider 2
+        loop (9, note - slider(2) > 7 ? ( note = note - 12; ); );
+        loop (9, slider(2) - note > 7 ? ( note = note + 12; ); );
+
+        // Calculate distance from Center
+        // We assume:
+        // dist ~ 0-2  = Root (Bottom)
+        // dist ~ 3-4  = 3rd (Center)
+        // dist ~ 7+   = 5th (Top)
+        dist = note - slider(2);
+
+        // 2. VOICING SPREAD LOGIC
+        
+        slider4 == 1 ? ( 
+           // WIDE: Center Note (3rds) Up 1 Octave
+           (dist >= 3 && dist <= 4) ? note += 12;
+        );
+
+        slider4 == 2 ? (
+           // WIDER: Center Note Up 1 Octave, Top Note Up 2 Octaves
+           (dist >= 3 && dist <= 4) ? note += 12; // The 3rd
+           (dist >= 5) ? note += 24;              // The 5th/7th
+        );
+      );
     );
-    );
-  loop (9,
-    slider(2) - note > 7 ?
-    (
-    note = note + 12;
-    );
-    );
-    );
-    );
+
     status != statNoteOn || slider(3) > 63  ? (
-    midisend(offset, msg1, note, vel);
+      midisend(offset, msg1, note, vel);
     );
+
     last_chan = slider(1); 
     lastslider2 = slider(2);
     lastslider3 = slider(3);
-    1; // Force loop to continue until all messages have been processed
+    lastslider4 = slider(4);
+    
+    1; 
   );
 );

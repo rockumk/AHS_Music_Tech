@@ -1,0 +1,119 @@
+desc:N2N Scale Drone
+author:Rock Kennedy
+version:1.1
+
+// Slider selects tonic within the octave starting on Middle C (C4=60).
+slider1:0<0,11,1{C,C#/Db,D,D#/Eb,E,F,F#/Gb,G,G#/Ab,A,A#/Bb,B}>Tonic (C4..B4)
+
+@init
+BASE = 60;          // Middle C (C4)
+CHAN = 14;          // channel 15 (0-based)
+NOTEON  = 0x90 | CHAN;
+NOTEOFF = 0x80 | CHAN;
+
+last_play = -1;
+last_tonic = -999;
+notes_on = 0;
+
+// store last-sent notes (7 max)
+n0=n1=n2=n3=n4=n5=n6 = -1;
+
+function store_note(idx, nn)
+(
+  idx==0 ? n0=nn :
+  idx==1 ? n1=nn :
+  idx==2 ? n2=nn :
+  idx==3 ? n3=nn :
+  idx==4 ? n4=nn :
+  idx==5 ? n5=nn :
+           n6=nn;
+);
+
+function get_note(idx)
+(
+  idx==0 ? n0 :
+  idx==1 ? n1 :
+  idx==2 ? n2 :
+  idx==3 ? n3 :
+  idx==4 ? n4 :
+  idx==5 ? n5 :
+           n6;
+);
+
+function clear_notes()
+(
+  n0=n1=n2=n3=n4=n5=n6 = -1;
+);
+
+function send_scale_off()
+(
+  i=0;
+  loop(7,
+    nn = get_note(i);
+    (nn >= 0) ? midisend(0, NOTEOFF, nn, 0);
+    i += 1;
+  );
+  notes_on = 0;
+  clear_notes();
+);
+
+function send_scale_on(tonic)
+(
+  // Major scale semitone steps from tonic:
+  // 0,2,4,5,7,9,11
+  i=0;
+  loop(7,
+    step =
+      i==0 ? 0  :
+      i==1 ? 2  :
+      i==2 ? 4  :
+      i==3 ? 5  :
+      i==4 ? 7  :
+      i==5 ? 9  : 11;
+
+    nn = tonic + step;
+
+    // For this octave-based tool, keep within MIDI range (always true here)
+    vel = (i==0) ? 2 : 1;   // tonic=2, other tones=1
+    midisend(0, NOTEON, nn, vel);
+    store_note(i, nn);
+
+    i += 1;
+  );
+  notes_on = 1;
+);
+
+@block
+// pass-through all incoming MIDI unchanged
+while (midirecv(ofs, msg1, msg2, msg3)) (
+  midisend(ofs, msg1, msg2, msg3);
+);
+
+// REAPER provides play_state: 0=stopped, >0=playing/recording
+playing = play_state > 0;
+
+// slider -> tonic MIDI note (C4..B4)
+tonic = BASE + floor(slider1 + 0.5);
+
+// start playback: send scale
+(playing && last_play <= 0) ? (
+  notes_on ? send_scale_off();
+  send_scale_on(tonic);
+  last_tonic = tonic;
+);
+
+// stop playback: turn everything off
+(!playing && last_play > 0) ? (
+  notes_on ? send_scale_off();
+);
+
+// slider change while playing: replace the held notes immediately
+(playing && notes_on && tonic != last_tonic) ? (
+  send_scale_off();
+  send_scale_on(tonic);
+  last_tonic = tonic;
+);
+
+// keep last states updated
+last_play = playing;
+(!playing) ? last_tonic = tonic;
