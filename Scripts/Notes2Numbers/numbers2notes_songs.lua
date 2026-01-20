@@ -1,12 +1,12 @@
 -- @description numbers2notes_songs
--- @version 1.0.3
+-- @version 1.1
 -- @author Rock Kennedy
 -- @noindex
 -- @about
 --   # numbers2notes_songs
 --   Numbers2Notes Support File containing sample song data.
 -- @changelog
---   + Removed indexing
+--   + Small Changes
 
 
 local songs = 
