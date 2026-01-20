@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="15467eb316f71916f5a48b6de95a1bd3910f0fe9">
+<index version="1" name="AHS_Music_Tech" commit="fdbc4fe7331730ee75d88afd960973f012a48879">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -103,13 +103,13 @@
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/41cdf8228650d43f01b4a7d393e57f1a641ae9a0/Effects/N2N_Chooser.jsfx</source>
       </version>
     </reapack>
-    <reapack name="ReaCenterMIDIpitch.jsfx" type="effect" desc="ReaCenterMIDIpitch">
+    <reapack name="ReaCenterMIDIpitch.jsfx" type="effect" desc="ReaCenterMIDIpitch (with Open Voicings)">
       <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 ReaCenterMIDIpitch\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 ReaCenterMIDIpitch\par}
 }
 ]]></description>
       </metadata>
@@ -120,6 +120,10 @@
       <version name="1.0.1" author="Rock Kennedy" time="2022-11-28T02:12:29Z">
         <changelog><![CDATA[- Name Change]]></changelog>
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/9ae6b81625aa9cadc8eeb96f4ad1925a2372710e/Effects/ReaCenterMIDIpitch.jsfx</source>
+      </version>
+      <version name="1.0.6" author="Rock Kennedy" time="2026-01-20T05:11:32Z">
+        <changelog><![CDATA[- Updated Slider 4 logic to specific "Center Up 1, Top Up 2" behavior.]]></changelog>
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/fdbc4fe7331730ee75d88afd960973f012a48879/Effects/ReaCenterMIDIpitch.jsfx</source>
       </version>
     </reapack>
     <reapack name="ReaPulsive-16ths.jsfx" type="effect" desc="ReaPulsive-16ths">
