@@ -1,5 +1,5 @@
 -- @description numbers2notes_config
--- @version 1.2
+-- @version 1.4
 -- @author Rock Kennedy
 -- @about
 --   Configuration file for Numbers2Notes.
@@ -92,7 +92,7 @@ config.track_table = {
 
     [8] = {"N2N Chord 3", false, nil, 0, {
         {"JS: N2N Arp", true, nil, 3},
-        {"CLAP:Surge XT", true, "N2N_Pie", 8},
+        {"CLAP:Surge XT", true, "N2N_Plucks", 8},
         {"STFU", false, nil, 11},
         {"JS:Guitar Amp", false, nil, 7},
         {"Tube", false, nil, 9},  
@@ -206,5 +206,6 @@ config.track_table = {
 
 
 return config
+
 
 
