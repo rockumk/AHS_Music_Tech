@@ -1,4 +1,5 @@
-//  @description Clear All.data
-//  @version 1.0.1
+//  @description Clear All
+//  @version 1.0.2
 //  @author Rock Kennedy
+
 
