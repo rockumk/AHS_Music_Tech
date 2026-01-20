@@ -1,0 +1,90 @@
+// 1
+
+35	Acoustic Bass Drum  // Blue
+38	Snare Drum  // Red
+37	Side Stick  // Mint
+39	Hand Clap  // Purple
+
+46	Open Hi-Hat  // White
+42	Closed Hi-Hat  // White
+44	Pedal Hi-Hat  // White
+
+50	High Tom  // Orange
+43	High Floor Tom  // Amber
+
+49	Crash Cymbal 1  // Red
+57	Crash Cymbal 2  // Red
+52	Chinese Cymbal  // Deep Orange
+51	Ride Cymbal 1  // Amber
+53	Ride Bell  // Amber
+55	Splash Cymbal  // Cyan
+
+54	Tambourine  // Indigo
+56	Cowbell  // Lime
+70	Maraca  // Mint
+81	Open Triangle  // Sky
+80	Mute Triangle  // Sky
+
+// 2
+11	.
+43	8  // Yellow
+42	7  // Yellow
+41	6  // Sky
+40	5  // Sky
+39	4  // Green
+38	3  // Green
+37	2  // Red
+36	1  // Red
+
+// 3
+12	.
+60	C      4  // Red
+59	B  // Magenta
+58	A#/Bb  // Grey
+57	A  // Purple
+56	G#/Ab  // Grey
+55	G  // Sky
+54	F#/Gb  // Grey
+53	F  // Green
+52	E  // Yellow
+51	D#/Eb  // Grey
+50	D  // Orange
+49	C#/Db  // Grey
+48	C      3  // Red
+47	B  // Magenta
+46	A#/Bb  // Grey
+45	A  // Purple
+44	G#/Ab  // Grey
+43	G  // Sky
+42	F#/Gb  // Grey
+41	F  // Green
+40	E  // Yellow
+39	D#/Eb  // Grey
+38	D  // Orange
+37	C#/Db  // Grey
+36	C      2  // Red
+
+
+
+
+
+
+
+  // White
+  // Red
+  // Deep Orange
+  // Orange
+  // Amber
+  // Yellow
+  // Lime
+  // Green
+  // Mint
+  // Cyan
+  // Sky
+  // Blue
+  // Indigo
+  // Purple
+  // Violet
+  // Magenta
+  // Rose
+  // Grey

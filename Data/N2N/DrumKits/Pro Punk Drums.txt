@@ -1,0 +1,46 @@
+// 1
+
+35	Acoustic Bass Drum  // Blue
+38	Snare Drum  // Red
+37	Side Stick  // Mint
+39	Hand Clap  // Purple
+
+46	Open Hi-Hat  // White
+42	Closed Hi-Hat  // White
+44	Pedal Hi-Hat  // White
+
+50	High Tom  // Orange
+43	High Floor Tom  // Amber
+
+49	Crash Cymbal 1  // Red
+57	Crash Cymbal 2  // Red
+52	Chinese Cymbal  // Deep Orange
+51	Ride Cymbal 1  // Amber
+53	Ride Bell  // Amber
+55	Splash Cymbal  // Cyan
+
+54	Tambourine  // Indigo
+56	Cowbell  // Lime
+70	Maraca  // Mint
+81	Open Triangle  // Sky
+80	Mute Triangle  // Sky
+
+
+  // White
+  // Red
+  // Deep Orange
+  // Orange
+  // Amber
+  // Yellow
+  // Lime
+  // Green
+  // Mint
+  // Cyan
+  // Sky
+  // Blue
+  // Indigo
+  // Purple
+  // Violet
+  // Magenta
+  // Rose
+  // Grey
