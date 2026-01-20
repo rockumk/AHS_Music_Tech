@@ -1,8 +1,18 @@
--- @description Numbers2Notes GMEM Exporter v1.9
--- @author Rock Kennedy + AI
--- v1.9 Logic: Precision Timing. 
--- Scale (-0.09375) precedes Chord (-0.0625).
--- Both occur after the last 32nd note of the previous bar (-0.125).
+-- @description numbers2notes_gmem
+-- @version 1.0
+-- @author Rock Kennedy
+-- @noindex
+-- @about
+--   # numbers2notes_gmem
+--   Numbers2Notes Support File.
+-- @changelog
+--   + First version
+
+
+
+
+
+
 
 local export = {}
 
