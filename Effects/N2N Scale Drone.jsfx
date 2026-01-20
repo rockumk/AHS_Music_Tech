@@ -1,6 +1,6 @@
 desc:N2N Scale Drone
 author:Rock Kennedy
-version:1.1
+version:1.11
 
 // Slider selects tonic within the octave starting on Middle C (C4=60).
 slider1:0<0,11,1{C,C#/Db,D,D#/Eb,E,F,F#/Gb,G,G#/Ab,A,A#/Bb,B}>Tonic (C4..B4)
