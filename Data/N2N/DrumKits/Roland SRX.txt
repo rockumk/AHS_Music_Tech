@@ -1,4 +1,7 @@
-28	Kick 6
+//  @description Roland SRX
+//  @version 1.0.1
+//  @author Rock Kennedy28	Kick 6
+
 29	Kick 5
 30	Snare Roll
 31	Kick 4
