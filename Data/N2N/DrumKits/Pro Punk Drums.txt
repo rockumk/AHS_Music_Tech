@@ -1,3 +1,7 @@
+//  @description Pro Punk Drums
+//  @version 1.0.1
+//  @author Rock Kennedy
+
 // 1
 
 35	Acoustic Bass Drum  // Blue
