@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="108184e0591ba3cbfe1adc2952748c0b4ea025cd">
+<index version="1" name="AHS_Music_Tech" commit="48d1c54657fe13370bcca57237304cce7b6cfac6">
   <category name="Data/N2N/DrumKits">
     <reapack name="Clear All.txt" type="midinotenames" desc="Clear All">
       <version name="1.0.0" author="Rock Kennedy" time="2026-01-20T12:54:49Z">
@@ -762,6 +762,23 @@ Auto Reload of Last Numbers2Notes Session]]></changelog>
       <version name="1.1" author="Rock Kennedy" time="2026-01-20T14:14:44Z">
         <changelog><![CDATA[+ First version]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/93ee84043f26379cf4c47323db1bd37a534f78e1/Scripts/Notes2Numbers/numbers2notes_gmem.lua</source>
+      </version>
+    </reapack>
+    <reapack name="numbers2notes_help.lua" type="script" desc="numbers2notes_help">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 numbers2notes_help\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Numbers2Notes Support File.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.5" author="Rock Kennedy" time="2026-01-20T15:15:12Z">
+        <changelog><![CDATA[+ Removed indexing
++ Forced Update]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/48d1c54657fe13370bcca57237304cce7b6cfac6/Scripts/Notes2Numbers/numbers2notes_help.lua</source>
       </version>
     </reapack>
   </category>
