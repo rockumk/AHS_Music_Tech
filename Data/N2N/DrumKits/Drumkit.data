@@ -1,0 +1,28 @@
+@description DrumKit.data
+@version 1.0.0
+@author Rock Kennedy
+@metapackage
+@provides
+  Drum8.txt
+  Drumtastic.txt
+  EZdrummer 2 Americana.txt
+  Ezdrummer 2 Classic.txt
+  EZDrummer Default Kit.txt
+  EZDrummer Nashville.txt
+  EZDrummer.txt
+  EzDrummer2.txt
+  EZDrummer2_Hip-Hop.txt
+  Funkbass.txt
+  LilKit.txt
+  MT-PowerDrumKit.txt
+  MultiKit.txt
+  Nashville Copy.txt
+  Note Names.txt
+  One Based MIDI.txt
+  Pro Punk Drums.txt
+  Read_Me_For_Kit_Info.txt
+  Roland SRX.txt
+  Spitfire-LABS.txt
+  SSD5 Frees.txt
+  Zero Based MIDI.txt
+  Clear All.txt
