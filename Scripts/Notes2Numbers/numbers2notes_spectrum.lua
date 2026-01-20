@@ -1,31 +1,34 @@
 -- @description numbers2notes_spectrum
--- @version 1.0.3
+-- @version 1.0.7
 -- @noindex
 -- @author Rock Kennedy
--- @about
---   # numbers2notes_spectrum
---   Numbers2Notes Support File for generating full-spectrum chord grids.
+-- @about Numbers2Notes Support File for generating full-spectrum chord grids.
 -- @changelog
---   # Fixes
---   + CRITICAL: Removed recursive logic that caused Stack Overflow crashes on long tracks.
---   + Optimization: Added MIDI_DisableSort for significantly faster generation.
---   + Localized variables to prevent global leaks.
+--   + SPEED FIX: Re-enabled MIDI_DisableSort during generation to fix "Script running too long".
+--   + RELIABILITY: Reverted to CountEvts (post-sort) to ensure all notes are captured.
 
 local spectrum = {
     make_full_spectrum = function(grid_track)
         
-        -- 1. Setup Local Variables
+        -- SAFETY CHECK
+        if not grid_track or not reaper.ValidatePtr(grid_track, "MediaItem_Take*") then 
+            return "spectrum_skipped"
+        end
+
         local theWholeTable = {}
         local focusedtake = grid_track
         
-        -- 2. Count how many notes are in the item currently
+        -- 1. SORT & COUNT (Crucial Step)
+        -- We must sort first because the main script inserted Groove notes out of order.
+        reaper.MIDI_Sort(focusedtake)
         local _, noteCount, _, _ = reaper.MIDI_CountEvts(focusedtake)
 
-        -- 3. Collect all notes (Using a Loop, not Recursion)
+        -- 2. READ NOTES
+        -- We use a standard for-loop based on Count. 
+        -- Since we sorted, indices 0 to count-1 are guaranteed to exist.
         for i = 0, noteCount - 1 do
             local retval, selected, muted, startppq, endppq, chan, pitch, vel = reaper.MIDI_GetNote(focusedtake, i)
             if retval then
-                -- Store note data in a table
                 table.insert(theWholeTable, {
                     selected = selected,
                     muted = muted,
@@ -38,20 +41,19 @@ local spectrum = {
             end
         end
 
-        -- 4. Delete all original notes
-        -- We do this backwards so deleting note #0 doesn't change the index of note #1
+        -- 3. DELETE ORIGINALS
+        -- Delete backwards to maintain index integrity
         for i = noteCount - 1, 0, -1 do
             reaper.MIDI_DeleteNote(focusedtake, i)
         end
 
-        -- 5. Generate the Spectrum (Insert copies across octaves)
-        reaper.MIDI_DisableSort(focusedtake) -- Disable sorting for speed while inserting
+        -- 4. GENERATE SPECTRUM (Fast Mode)
+        -- Disable sorting so Reaper doesn't recalculate the list 5,000 times
+        reaper.MIDI_DisableSort(focusedtake) 
         
         for _, noteData in ipairs(theWholeTable) do
-            -- Calculate the note class (0-11, e.g., C=0, C#=1)
             local base_pitch_class = noteData.pitch % 12
             
-            -- Loop through MIDI range (0 to 127) to fill octaves
             local current_pitch = base_pitch_class
             while current_pitch <= 127 do
                 reaper.MIDI_InsertNote(
@@ -63,13 +65,16 @@ local spectrum = {
                     noteData.chan, 
                     current_pitch, 
                     noteData.vel, 
-                    false -- noSort (we sort at the very end)
+                    false -- noSort=false (We disabled it globally above)
                 )
-                current_pitch = current_pitch + 12 -- Jump up one octave
+                current_pitch = current_pitch + 12 
             end
         end
 
-        reaper.MIDI_Sort(focusedtake) -- Re-sort once at the end
+        -- 5. FINAL SORT
+        -- Re-enable sorting and clean up
+        reaper.MIDI_Sort(focusedtake) 
+        
         return "spectrumdone"
     end
 }
