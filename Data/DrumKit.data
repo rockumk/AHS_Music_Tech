@@ -1,0 +1,28 @@
+@description DrumKit.data
+@version 1.0.0
+@author Rock Kennedy
+@metapackage
+@provides
+  [data] N2N/DrumKits/Drum8.txt
+  [data] N2N/DrumKits/Drumtastic.txt
+  [data] N2N/DrumKits/EZdrummer 2 Americana.txt
+  [data] N2N/DrumKits/Ezdrummer 2 Classic.txt
+  [data] N2N/DrumKits/EZDrummer Default Kit.txt
+  [data] N2N/DrumKits/EZDrummer Nashville.txt
+  [data] N2N/DrumKits/EZDrummer.txt
+  [data] N2N/DrumKits/EzDrummer2.txt
+  [data] N2N/DrumKits/EZDrummer2_Hip-Hop.txt
+  [data] N2N/DrumKits/Funkbass.txt
+  [data] N2N/DrumKits/LilKit.txt
+  [data] N2N/DrumKits/MT-PowerDrumKit.txt
+  [data] N2N/DrumKits/MultiKit.txt
+  [data] N2N/DrumKits/Nashville Copy.txt
+  [data] N2N/DrumKits/Note Names.txt
+  [data] N2N/DrumKits/One Based MIDI.txt
+  [data] N2N/DrumKits/Pro Punk Drums.txt
+  [data] N2N/DrumKits/Read_Me_For_Kit_Info.txt
+  [data] N2N/DrumKits/Roland SRX.txt
+  [data] N2N/DrumKits/Spitfire-LABS.txt
+  [data] N2N/DrumKits/SSD5 Frees.txt
+  [data] N2N/DrumKits/Zero Based MIDI.txt
+  [data] N2N/DrumKits/Clear All.txt
