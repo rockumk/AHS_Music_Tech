@@ -1,7 +1,6 @@
 -- @description numbers2notes_help
--- @version 1.0.3
+-- @version 1.0.4
 -- @author Rock Kennedy
--- @noindex
 -- @about
 --   # numbers2notes_help
 --   Numbers2Notes Support File.
