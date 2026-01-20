@@ -1,5 +1,6 @@
 -- @description numbers2notes_gmem
--- @version 1.1
+-- @version 1.2
+-- @noindex
 -- @author Rock Kennedy
 -- @about
 --   # numbers2notes_gmem
