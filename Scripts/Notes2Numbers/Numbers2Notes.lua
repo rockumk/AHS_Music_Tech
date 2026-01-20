@@ -1,17 +1,11 @@
 -- @description Numbers2Notes
--- @version 1.4.1
+-- @version 1.4.2
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 1.4
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
---   numbers2notes_config.lua
---   numbers2notes_form.lua
---   numbers2notes_help.lua
---   numbers2notes_musictheory.lua
---   numbers2notes_songs.lua
---   numbers2notes_spectrum.lua
 -- @changelog
 --   # Major Update 1.4
 --   + Added Groove
