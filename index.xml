@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="834a99a1f472a38aa1a866879c9783e740e3cc3c">
+<index version="1" name="AHS_Music_Tech" commit="4aff611c9c37e04b635774bc326c710ba6e50100">
   <category name="Data/N2N/DrumKits">
     <reapack name="Clear All.txt" type="midinotenames" desc="Clear All">
       <version name="1.0.0" author="Rock Kennedy" time="2026-01-20T12:54:49Z">
@@ -664,6 +664,17 @@ Auto Reload of Last Numbers2Notes Session]]></changelog>
         <source file="numbers2notes_musictheory.lua">https://github.com/rockumk/AHS_Music_Tech/raw/b4de3c3f7a333d839b25507decfb126e796503f7/Scripts/Notes2Numbers/numbers2notes_musictheory.lua</source>
         <source file="numbers2notes_songs.lua">https://github.com/rockumk/AHS_Music_Tech/raw/b4de3c3f7a333d839b25507decfb126e796503f7/Scripts/Notes2Numbers/numbers2notes_songs.lua</source>
         <source file="numbers2notes_spectrum.lua">https://github.com/rockumk/AHS_Music_Tech/raw/b4de3c3f7a333d839b25507decfb126e796503f7/Scripts/Notes2Numbers/numbers2notes_spectrum.lua</source>
+      </version>
+      <version name="1.4.1" author="Rock Kennedy" time="2026-01-20T14:00:27Z">
+        <changelog><![CDATA[# Major Update 1.4
++ Added Groove]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/4aff611c9c37e04b635774bc326c710ba6e50100/Scripts/Notes2Numbers/Numbers2Notes.lua</source>
+        <source file="numbers2notes_config.lua">https://github.com/rockumk/AHS_Music_Tech/raw/4aff611c9c37e04b635774bc326c710ba6e50100/Scripts/Notes2Numbers/numbers2notes_config.lua</source>
+        <source file="numbers2notes_form.lua">https://github.com/rockumk/AHS_Music_Tech/raw/4aff611c9c37e04b635774bc326c710ba6e50100/Scripts/Notes2Numbers/numbers2notes_form.lua</source>
+        <source file="numbers2notes_help.lua">https://github.com/rockumk/AHS_Music_Tech/raw/4aff611c9c37e04b635774bc326c710ba6e50100/Scripts/Notes2Numbers/numbers2notes_help.lua</source>
+        <source file="numbers2notes_musictheory.lua">https://github.com/rockumk/AHS_Music_Tech/raw/4aff611c9c37e04b635774bc326c710ba6e50100/Scripts/Notes2Numbers/numbers2notes_musictheory.lua</source>
+        <source file="numbers2notes_songs.lua">https://github.com/rockumk/AHS_Music_Tech/raw/4aff611c9c37e04b635774bc326c710ba6e50100/Scripts/Notes2Numbers/numbers2notes_songs.lua</source>
+        <source file="numbers2notes_spectrum.lua">https://github.com/rockumk/AHS_Music_Tech/raw/4aff611c9c37e04b635774bc326c710ba6e50100/Scripts/Notes2Numbers/numbers2notes_spectrum.lua</source>
       </version>
     </reapack>
     <reapack name="Numbers2Notes1.2.2.lua" type="script" desc="Numbers2Notes1.2.2">
