@@ -1,7 +1,6 @@
 -- @description numbers2notes_songs
--- @version 1.1
+-- @version 1.2
 -- @author Rock Kennedy
--- @noindex
 -- @about
 --   # numbers2notes_songs
 --   Numbers2Notes Support File containing sample song data.
