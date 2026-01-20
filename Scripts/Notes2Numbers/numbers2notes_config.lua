@@ -1,5 +1,5 @@
 -- @description numbers2notes_config
--- @version 1.0.4
+-- @version 1.1
 -- @noindex
 -- @author Rock Kennedy
 -- @about
@@ -207,3 +207,4 @@ config.track_table = {
 
 
 return config
+
