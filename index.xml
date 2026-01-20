@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="93ee84043f26379cf4c47323db1bd37a534f78e1">
+<index version="1" name="AHS_Music_Tech" commit="1519a708d3c7c220ca6a5686729da56ef53f43e3">
   <category name="Data/N2N/DrumKits">
     <reapack name="Clear All.txt" type="midinotenames" desc="Clear All">
       <version name="1.0.0" author="Rock Kennedy" time="2026-01-20T12:54:49Z">
@@ -560,7 +560,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 Numbers2Notes 1.4\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 Numbers2Notes 1.4.3\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 Nashville Number System Style Chord Charting for Reaper. Now includes automated setup wizard and non-destructive track handling.\par}
 }
 ]]></description>
@@ -680,6 +680,11 @@ Auto Reload of Last Numbers2Notes Session]]></changelog>
         <source file="numbers2notes_musictheory.lua">https://github.com/rockumk/AHS_Music_Tech/raw/4aff611c9c37e04b635774bc326c710ba6e50100/Scripts/Notes2Numbers/numbers2notes_musictheory.lua</source>
         <source file="numbers2notes_songs.lua">https://github.com/rockumk/AHS_Music_Tech/raw/4aff611c9c37e04b635774bc326c710ba6e50100/Scripts/Notes2Numbers/numbers2notes_songs.lua</source>
         <source file="numbers2notes_spectrum.lua">https://github.com/rockumk/AHS_Music_Tech/raw/4aff611c9c37e04b635774bc326c710ba6e50100/Scripts/Notes2Numbers/numbers2notes_spectrum.lua</source>
+      </version>
+      <version name="1.4.3" author="Rock Kennedy" time="2026-01-20T14:51:58Z">
+        <changelog><![CDATA[# Major Update 1.4.3
++ Added Groove]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/1519a708d3c7c220ca6a5686729da56ef53f43e3/Scripts/Notes2Numbers/Numbers2Notes.lua</source>
       </version>
     </reapack>
     <reapack name="Numbers2Notes1.2.2.lua" type="script" desc="Numbers2Notes1.2.2">
