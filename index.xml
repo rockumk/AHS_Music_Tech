@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="23a2c0f875923511f6fc20877bf8f96a817633ca">
+<index version="1" name="AHS_Music_Tech" commit="108184e0591ba3cbfe1adc2952748c0b4ea025cd">
   <category name="Data/N2N/DrumKits">
     <reapack name="Clear All.txt" type="midinotenames" desc="Clear All">
       <version name="1.0.0" author="Rock Kennedy" time="2026-01-20T12:54:49Z">
@@ -714,6 +714,38 @@ Auto Reload of Last Numbers2Notes Session]]></changelog>
 Fixed bug where no open project caused error
 Auto Reload of Last Numbers2Notes Session]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/69066568ee82c1b04e3298990a8feb45c0035c02/Scripts/Notes2Numbers/Numbers2Notes1.2.3.lua</source>
+      </version>
+    </reapack>
+    <reapack name="numbers2notes_config.lua" type="script" desc="numbers2notes_config">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Configuration file for Numbers2Notes. Contains Plugin Source URLs and the Master Track Layout.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.4" author="Rock Kennedy" time="2026-01-20T15:03:50Z">
+        <changelog><![CDATA[+ Links Updated]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/bb4c3c7a5020fced7610e54583f61f45ebcc6db4/Scripts/Notes2Numbers/numbers2notes_config.lua</source>
+      </version>
+    </reapack>
+    <reapack name="numbers2notes_form.lua" type="script" desc="numbers2notes_form">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 numbers2notes_form\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Numbers2Notes Support File.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.5" author="Rock Kennedy" time="2026-01-20T15:04:51Z">
+        <changelog><![CDATA[+ Removed indexing
++ Updated version for forced update]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/108184e0591ba3cbfe1adc2952748c0b4ea025cd/Scripts/Notes2Numbers/numbers2notes_form.lua</source>
       </version>
     </reapack>
     <reapack name="numbers2notes_gmem.lua" type="script" desc="numbers2notes_gmem">
