@@ -1,3 +1,7 @@
+//  @description EZDrummer 2 Classic
+//  @version 1.0.1
+//  @author Rock Kennedy
+
 # MIDI note name map
 121 [Hats] V Open Loose
 120 Open Pedal
@@ -66,3 +70,4 @@
 3 [Tambourine Pad]
 2 [Shaker Pad]
 1 [One Shot Pad]
+
