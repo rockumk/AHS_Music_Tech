@@ -1,5 +1,5 @@
 -- @description numbers2notes_musictheory
--- @version 1.0.4
+-- @version 1.0.5
 -- @author Rock Kennedy
 -- @about
 --   # numbers2notes_musictheory
