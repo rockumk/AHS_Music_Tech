@@ -1,7 +1,6 @@
 -- @description numbers2notes_form
 -- @version 1.0.3
 -- @author Rock Kennedy
--- @noindex
 -- @about
 --   # numbers2notes_form
 --   Numbers2Notes Support File.
@@ -232,4 +231,5 @@ local form = {
         return updated_text_to_process, errormessage
     end
 }
+
 return form
