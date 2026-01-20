@@ -1,14 +1,12 @@
 -- @description numbers2notes_help
--- @version 1.0.4
+-- @version 1.0.5
 -- @author Rock Kennedy
 -- @about
 --   # numbers2notes_help
 --   Numbers2Notes Support File.
 -- @changelog
 --   + Removed indexing
-
-
-
+--   + Forced Update
 
 
 
