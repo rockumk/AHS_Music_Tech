@@ -1,3 +1,7 @@
+//  @description Zero Based MIDI
+//  @version 1.0.2
+//  @author Rock Kennedy
+
 0	0
 1	1
 2	2
