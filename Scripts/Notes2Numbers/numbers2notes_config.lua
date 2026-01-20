@@ -1,5 +1,6 @@
 -- @description numbers2notes_config
--- @version 1.4
+-- @version 1.5
+-- @noindex
 -- @author Rock Kennedy
 -- @about
 --   Configuration file for Numbers2Notes.
@@ -206,6 +207,7 @@ config.track_table = {
 
 
 return config
+
 
 
 
