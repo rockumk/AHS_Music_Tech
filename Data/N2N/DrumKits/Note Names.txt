@@ -1,3 +1,7 @@
+//  @description Note Names
+//  @version 1.0.1
+//  @author Rock Kennedy
+
 0	C     -1
 1	C#/Db
 2	D
