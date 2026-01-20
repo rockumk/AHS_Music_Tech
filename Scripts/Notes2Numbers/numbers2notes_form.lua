@@ -1,11 +1,12 @@
 -- @description numbers2notes_form
--- @version 1.0.4
+-- @version 1.0.5
 -- @author Rock Kennedy
 -- @about
 --   # numbers2notes_form
 --   Numbers2Notes Support File.
 -- @changelog
 --   + Removed indexing
+--   + Updated version for forced update
 
 
 local form = {
@@ -233,4 +234,5 @@ local form = {
 }
 
 return form
+
 
