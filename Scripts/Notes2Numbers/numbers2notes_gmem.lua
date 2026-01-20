@@ -1,7 +1,6 @@
 -- @description numbers2notes_gmem
--- @version 1.0
+-- @version 1.1
 -- @author Rock Kennedy
--- @noindex
 -- @about
 --   # numbers2notes_gmem
 --   Numbers2Notes Support File.
