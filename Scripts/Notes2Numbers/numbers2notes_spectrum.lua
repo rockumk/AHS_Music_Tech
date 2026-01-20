@@ -1,10 +1,9 @@
 -- @description numbers2notes_spectrum
--- @version 1.0.8
+-- @version 1.1
 -- @author Rock Kennedy
 -- @about Numbers2Notes Support File for generating full-spectrum chord grids.
 -- @changelog
---   + SPEED FIX: Re-enabled MIDI_DisableSort during generation to fix "Script running too long".
---   + RELIABILITY: Reverted to CountEvts (post-sort) to ensure all notes are captured.
+--   + Forced Update
 
 local spectrum = {
     make_full_spectrum = function(grid_track)
