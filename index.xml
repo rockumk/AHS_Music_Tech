@@ -1,34 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="10813b0f14c3f3a540f0b37efd855f732915bc54">
-  <category name="Data">
-    <reapack name="DrumKit.data" type="data" desc="DrumKit.data">
-      <version name="1.0.0" author="Rock Kennedy" time="2026-01-20T05:39:10Z">
-        <source type="data" file="N2N/DrumKits/Drum8.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/Drum8.txt</source>
-        <source type="data" file="N2N/DrumKits/Drumtastic.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/Drumtastic.txt</source>
-        <source type="data" file="N2N/DrumKits/EZdrummer 2 Americana.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/EZdrummer%202%20Americana.txt</source>
-        <source type="data" file="N2N/DrumKits/Ezdrummer 2 Classic.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/Ezdrummer%202%20Classic.txt</source>
-        <source type="data" file="N2N/DrumKits/EZDrummer Default Kit.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/EZDrummer%20Default%20Kit.txt</source>
-        <source type="data" file="N2N/DrumKits/EZDrummer Nashville.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/EZDrummer%20Nashville.txt</source>
-        <source type="data" file="N2N/DrumKits/EZDrummer.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/EZDrummer.txt</source>
-        <source type="data" file="N2N/DrumKits/EzDrummer2.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/EzDrummer2.txt</source>
-        <source type="data" file="N2N/DrumKits/EZDrummer2_Hip-Hop.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/EZDrummer2_Hip-Hop.txt</source>
-        <source type="data" file="N2N/DrumKits/Funkbass.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/Funkbass.txt</source>
-        <source type="data" file="N2N/DrumKits/LilKit.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/LilKit.txt</source>
-        <source type="data" file="N2N/DrumKits/MT-PowerDrumKit.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/MT-PowerDrumKit.txt</source>
-        <source type="data" file="N2N/DrumKits/MultiKit.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/MultiKit.txt</source>
-        <source type="data" file="N2N/DrumKits/Nashville Copy.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/Nashville%20Copy.txt</source>
-        <source type="data" file="N2N/DrumKits/Note Names.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/Note%20Names.txt</source>
-        <source type="data" file="N2N/DrumKits/One Based MIDI.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/One%20Based%20MIDI.txt</source>
-        <source type="data" file="N2N/DrumKits/Pro Punk Drums.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/Pro%20Punk%20Drums.txt</source>
-        <source type="data" file="N2N/DrumKits/Read_Me_For_Kit_Info.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/Read_Me_For_Kit_Info.txt</source>
-        <source type="data" file="N2N/DrumKits/Roland SRX.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/Roland%20SRX.txt</source>
-        <source type="data" file="N2N/DrumKits/Spitfire-LABS.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/Spitfire-LABS.txt</source>
-        <source type="data" file="N2N/DrumKits/SSD5 Frees.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/SSD5%20Frees.txt</source>
-        <source type="data" file="N2N/DrumKits/Zero Based MIDI.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/Zero%20Based%20MIDI.txt</source>
-        <source type="data" file="N2N/DrumKits/Clear All.txt">https://github.com/rockumk/AHS_Music_Tech/raw/10813b0f14c3f3a540f0b37efd855f732915bc54/Data/N2N/DrumKits/Clear%20All.txt</source>
-      </version>
-    </reapack>
-  </category>
+<index version="1" name="AHS_Music_Tech" commit="764fdedf4b58a952f4c4158a43a344cbf35db681">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
