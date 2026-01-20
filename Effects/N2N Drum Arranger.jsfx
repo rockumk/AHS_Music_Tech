@@ -1,8 +1,8 @@
 desc:N2N Drum Arranger
-version: 4.9.1
+version: 4.9.2
 author: Rock Kennedy + ChatGPT + Gemini + Grok
 about:
-  # N2N Drum Arranger v4.9.1
+  # N2N Drum Arranger v4.9.2
   - RESTORED: Fixed missing code (Tabs, Grid, Scrollbar) dropped in previous updates.
   - LAYOUT: Restored spacing (Gap=70) for Pattern Settings.
   - VISUAL: Grid Cells flash white when played.
