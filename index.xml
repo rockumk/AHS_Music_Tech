@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="4aff611c9c37e04b635774bc326c710ba6e50100">
+<index version="1" name="AHS_Music_Tech" commit="8e211e2187847c8186b27325ebbf1ca0272a8a7e">
   <category name="Data/N2N/DrumKits">
     <reapack name="Clear All.txt" type="midinotenames" desc="Clear All">
       <version name="1.0.0" author="Rock Kennedy" time="2026-01-20T12:54:49Z">
@@ -25,6 +25,11 @@
     <reapack name="EZdrummer 2 Americana.txt" type="midinotenames" desc="EZDrummer 2 Americana">
       <version name="1.0.1" author="Rock Kennedy" time="2026-01-20T12:59:23Z">
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/5813d8a27967b5c760dab4f8333eb9b5531efa03/Data/N2N/DrumKits/EZdrummer%202%20Americana.txt</source>
+      </version>
+    </reapack>
+    <reapack name="Ezdrummer 2 Classic.txt" type="midinotenames" desc="EZDrummer 2 Classic">
+      <version name="1.0.1" author="Rock Kennedy" time="2026-01-20T14:07:30Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/8e211e2187847c8186b27325ebbf1ca0272a8a7e/Data/N2N/DrumKits/Ezdrummer%202%20Classic.txt</source>
       </version>
     </reapack>
     <reapack name="EZDrummer Default Kit.txt" type="midinotenames" desc="EZDrummer Default Kit">
