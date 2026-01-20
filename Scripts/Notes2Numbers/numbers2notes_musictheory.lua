@@ -1,7 +1,6 @@
 -- @description numbers2notes_musictheory
--- @version 1.0.3
+-- @version 1.0.4
 -- @author Rock Kennedy
--- @noindex
 -- @about
 --   # numbers2notes_musictheory
 --   Numbers2Notes Support File containing chord definitions and logic tables.
