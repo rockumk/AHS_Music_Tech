@@ -1,5 +1,5 @@
 -- @description numbers2notes_musictheory
--- @version 1.0.5
+-- @version 1.0.6
 -- @author Rock Kennedy
 -- @about
 --   # numbers2notes_musictheory
@@ -7,6 +7,7 @@
 -- @changelog
 --   # Fixes
 --   + Removed indexing
+--   + Forced Update
 
 
 
