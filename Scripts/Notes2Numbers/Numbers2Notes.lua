@@ -1,13 +1,21 @@
 -- @description Numbers2Notes
--- @version 1.4.4
+-- @version  1.4.5
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.4.4
+--   # Numbers2Notes 1.4.5
 --   Nashville Number System Style Chord Charting for Reaper.
---   Now includes automated setup wizard and non-destructive track handling.
+-- @provides
+--   numbers2notes_config.lua
+--   numbers2notes_form.lua
+--   numbers2notes_gmem.lua
+--   numbers2notes_help.lua
+--   numbers2notes_musictheory.lua
+--   numbers2notes_songs.lua
+--   numbers2notes_spectrum.lua
 -- @changelog
---   # Major Update 1.4.4
+--   # Major Update 1.4.5
 --   + Added Groove
+--   + Changed Drum Arranger to Drum Arranger.jsfx
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require "imgui" "0.8.6" -- Version of IMGUI used during development.
@@ -1254,7 +1262,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.3.2")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.4.5")
             reaper.ImGui_Text(ctx, "https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
 
@@ -3703,7 +3711,7 @@ end
 -- HELPER: Find track containing a specific FX name
 function Find_Track_With_Drum_FX()
     local r = reaper
-    local target_fx = "N2N Drum Arranger" -- Search string (matches "N2N Drum Arranger")
+    local target_fx = "N2N Drum Arranger.jsfx" -- Search string (matches "N2N Drum Arranger.jsfx")
 
     local track_count = r.CountTracks(0)
 
