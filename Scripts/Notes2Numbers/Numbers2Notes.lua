@@ -1,9 +1,10 @@
 -- @description Numbers2Notes
--- @version  1.4.5
+-- @version  1.4.6
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.4.5
+--   # Numbers2Notes 1.4.6
 --   Nashville Number System Style Chord Charting for Reaper.
+--   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
 --   numbers2notes_config.lua
 --   numbers2notes_form.lua
@@ -13,9 +14,8 @@
 --   numbers2notes_songs.lua
 --   numbers2notes_spectrum.lua
 -- @changelog
---   # Major Update 1.4.5
---   + Added Groove
---   + Changed Drum Arranger to Drum Arranger.jsfx
+--   + Fixed color dupe bug.
+--   + Used region colors which matched Drum Arranger.
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require "imgui" "0.8.6" -- Version of IMGUI used during development.
@@ -1262,7 +1262,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.4.5")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.4.6")
             reaper.ImGui_Text(ctx, "https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
 
@@ -2384,6 +2384,45 @@ function Setup_Tracks()
 
     return nil, track_table
 end
+
+function Sync_Chart_Colors()
+    -- Helper function to find track by name
+    local function GetTrackByName(name)
+        local count = reaper.CountTracks(0)
+        for i = 0, count - 1 do
+            local tr = reaper.GetTrack(0, i)
+            local _, tr_name = reaper.GetSetMediaTrackInfo_String(tr, "P_NAME", "", false)
+            if tr_name == name then
+                return tr
+            end
+        end
+        return nil
+    end
+
+    -- 1. Find the specific tracks by name
+    local track_src = GetTrackByName("N2N # Chart")      -- Source (Numbers)
+    local track_dst = GetTrackByName("N2N Letter Chart") -- Dest (Letters)
+
+    -- 2. Only proceed if both tracks exist
+    if track_src and track_dst then
+        local item_count = reaper.CountTrackMediaItems(track_src)
+        
+        -- 3. Loop through items and sync colors
+        for i = 0, item_count - 1 do
+            local item_s = reaper.GetTrackMediaItem(track_src, i)
+            if item_s then
+                local color = reaper.GetMediaItemInfo_Value(item_s, "I_CUSTOMCOLOR")
+                
+                -- We assume items are generated in sync, so index matching works here
+                local item_d = reaper.GetTrackMediaItem(track_dst, i)
+                if item_d then
+                    reaper.SetMediaItemInfo_Value(item_d, "I_CUSTOMCOLOR", color)
+                end
+            end
+        end
+    end
+end
+
 
 function Initialize_Track_Setup() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
     reaper.PreventUIRefresh(1)
@@ -3734,27 +3773,7 @@ end
 
 -- Count the items in Track 1
 
-----------------------------------
---COPY COLORS IN THE NUMBER CHART AND PUT IT IN THE LETTER CHART
 
-trackWhoseColorsWeNeed = reaper.GetTrack(0, 0)
-trackWhoseColorsWellSet = reaper.GetTrack(0, 1)
-
-local precoloritemCount = reaper.CountTrackMediaItems(trackWhoseColorsWeNeed)
-
-for i = 0, precoloritemCount - 1 do
-    -- Get the item in Track 1
-    local preitem = reaper.GetTrackMediaItem(trackWhoseColorsWeNeed, i)
-    -- Get the color of the item in Track 1
-    local dacolor = reaper.GetMediaItemInfo_Value(preitem, "I_CUSTOMCOLOR")
-
-    -- Assuming corresponding item in Track 2 is at the same index
-    local postitem = reaper.GetTrackMediaItem(trackWhoseColorsWellSet, i)
-    if postitem then
-        -- Apply the color to the item in Track 2
-        reaper.SetMediaItemInfo_Value(postitem, "I_CUSTOMCOLOR", dacolor)
-    end
-end
 
 function place_special()
     num_regions = reaper.CountProjectMarkers(0)
@@ -4052,7 +4071,9 @@ function render_all()
     if G_lead_item_first_take and reaper.ValidatePtr(G_lead_item_first_take, "MediaItem_Take*") then
         notneeded = spectrum.make_full_spectrum(G_lead_item_first_take)
     end
-
+	
+	Sync_Chart_Colors()
+	
     close_all_fx_windows = reaper.NamedCommandLookup("_S&M_WNCLS3") 
     reaper.Main_OnCommand(close_all_fx_windows, 0)
     
