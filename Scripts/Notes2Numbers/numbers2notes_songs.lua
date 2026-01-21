@@ -1,5 +1,6 @@
 -- @description numbers2notes_songs
--- @version 1.3.1
+-- @version 1.3.2
+-- @noindex
 -- @author Rock Kennedy
 -- @about
 --   # numbers2notes_songs
