@@ -1,5 +1,6 @@
 -- @description numbers2notes_help
--- @version 1.0.5
+-- @version 1.0.6
+-- @noindex
 -- @author Rock Kennedy
 -- @about
 --   # numbers2notes_help
