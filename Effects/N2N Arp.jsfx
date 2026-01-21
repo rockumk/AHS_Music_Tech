@@ -1,12 +1,13 @@
 desc:N2N Arp
-version: 11.4
+version: 11.5
 author: Rock Kennedy
 about:
-  # N2N Arp v11.4
-  - FIX: Tabs and Lock buttons are now fully clickable (Unified coordinates).
-  - FIX: Playback switching on Lock/Double-click works immediately.
-  - UI: Decorative Color Bands maintained.
-  - UI: "ALL" button maintained in left sidebar.
+  # N2N Arp v11.5
+  - FIX: Right-Click Drag Shift modifier strictly limited to Current Bar.
+  - FIX: Right-Click Drag Ctrl+Shift affects similar beats in All Bars (not all steps).
+  - UI: Tab Indices are 0-based (0-127).
+  - FIX: Tab Click = View Only. Lock Click = Hear Only. Double-Click = Both.
+  - FIX: "ALL" button and Row Selection are mutually exclusive.
 provides:
   [main] .
 
@@ -81,15 +82,6 @@ ui_vel_edit_all  = ui_base + 9;
 mem[ui_oct_transpose] < -3 || mem[ui_oct_transpose] > 3 ? mem[ui_oct_transpose] = 0;
 mem[ui_locked_tab] < -1 ? mem[ui_locked_tab] = -1; 
 
-// TAB DASHBOARD MEMORY
-MAX_TABS = 22; TOTAL_TABS = 64; 
-tab_w_base = mem_pos; mem_pos += TOTAL_TABS;
-tab_ui_row_base = mem_pos; mem_pos += TOTAL_TABS; 
-tab_col_r = mem_pos; mem_pos += TOTAL_TABS;
-tab_col_g = mem_pos; mem_pos += TOTAL_TABS;
-tab_col_b = mem_pos; mem_pos += TOTAL_TABS;
-tab_name_str_base = 2000; 
-
 input_state_base = mem_pos; mem_pos += 128; 
 input_chan_base  = mem_pos; mem_pos += 128; 
 scale_state_base = mem_pos; mem_pos += 12; 
@@ -142,18 +134,6 @@ vel_base      = mem_pos; mem_pos += (TOTAL_TABS * MAX_ROWS * MAX_STEPS);
 grid_base     = mem_pos; mem_pos += (TOTAL_TABS * MAX_ROWS * MAX_STEPS);
 step_len_base = mem_pos; mem_pos += (TOTAL_TABS * MAX_ROWS * MAX_STEPS);
 
-// EXTENSIONS
-EXT_COUNT = TOTAL_TABS - MAX_TABS;
-ext_bars_ov_base = mem_pos; mem_pos += EXT_COUNT; 
-ext_subdiv_ov_base = mem_pos; mem_pos += EXT_COUNT; 
-ext_hum_ov_base = mem_pos; mem_pos += EXT_COUNT; 
-ext_swing_ov_base = mem_pos; mem_pos += EXT_COUNT;
-ext_half_speed_ov_base = mem_pos; mem_pos += EXT_COUNT;
-
-ext_vel_base = vel_base + MAX_TABS * vel_stride_tab;
-ext_grid_base = grid_base + MAX_TABS * vel_stride_tab;
-ext_step_len_base = step_len_base + MAX_TABS * vel_stride_tab;
-
 copy_row_v_buf = mem_pos; mem_pos += MAX_STEPS;
 copy_row_g_buf = mem_pos; mem_pos += MAX_STEPS;
 copy_row_l_buf = mem_pos; mem_pos += MAX_STEPS;
@@ -188,102 +168,6 @@ parent_tonic = 0;
 scale_entry_count = 0;
 current_mask = 2741; 
 prev_mask = -1; 
-
-// =========================================================
-// TAB CONFIGURATION (0-BASED INDEXES)
-// =========================================================
-function t(id, r_ui, name, w, cr, cg, cb) (
-  mem[tab_ui_row_base + id] = r_ui;
-  strcpy(tab_name_str_base + id, name);
-  mem[tab_w_base + id] = w;
-  mem[tab_col_r + id] = cr;
-  mem[tab_col_g + id] = cg;
-  mem[tab_col_b + id] = cb;
-);
-
-sectw = 90; ttabw = 45; hw = 58;
-
-t(0,   1,   "Off",       55,    0.7,  0.7,  0.7); 
-t(1,   1,   "Intro",  sectw,    0.2,  1.0,  1.0); 
-t(2,   1,   "0",      ttabw,    0.2,  1.0,  1.0); 
-t(3,   1,   "1",      ttabw,    0.2,  1.0,  1.0); 
-t(4,   1,   "Verse",  sectw,    0.4,  0.6,  1.0); 
-t(5,   1,   "0",      ttabw,    0.4,  0.6,  1.0); 
-t(6,   1,   "1",      ttabw,    0.4,  0.6,  1.0); 
-t(7,   1,   "Pre",    sectw,    0.7,  0.4,  1.0); 
-t(8,   1,   "0",      ttabw,    0.7,  0.4,  1.0); 
-t(9,   1,   "1",      ttabw,    0.7,  0.4,  1.0); 
-t(10,  1,   "Chorus", sectw,    1.0,  0.4,  0.4); 
-t(11,  1,   "0",      ttabw,    1.0,  0.4,  0.4); 
-t(12,  1,   "1",      ttabw,    1.0,  0.4,  0.4); 
-t(13,  1,   "Bridge", sectw,    1.0,  0.9,  0.2); 
-t(14,  1,   "0",      ttabw,    1.0,  0.9,  0.2); 
-t(15,  1,   "1",      ttabw,    1.0,  0.9,  0.2); 
-t(16,  1,   "Outro",  sectw,    0.5,  0.8,  0.7); 
-t(17,  1,   "0",      ttabw,    0.5,  0.8,  0.7); 
-t(18,  1,   "1",      ttabw,    0.5,  0.8,  0.7); 
-
-t(19,  1,   "H 1",    hw,    0.8,  0.8,  0.8); 
-t(20,  1,   "H 2",    hw,    0.8,  0.8,  0.8);
-
-t(21,  1,   "1<",  44,    0.7,  0.4,  1.0); 
-t(22,  1,   "1=",  44,    0.7,  0.4,  1.0); 
-t(23,  1,   "1>",  44,    0.7,  0.4,  1.0); 
-
-t(24,  1,   "0",   44,    0.8,  0.8,  0.8); 
-t(25,  1,   "1",   44,    0.8,  0.8,  0.8); 
-t(26,  1,   "2",   44,    0.8,  0.8,  0.8); 
-t(27,  1,   "3",   44,    0.8,  0.8,  0.8); 
-t(28,  1,   "4",   44,    0.8,  0.8,  0.8); 
-
-t(29,  2,   "Def",       55,    0.8,  0.8,  0.8); 
-
-t(30,  2,   "2",   ttabw,   0.2,  1.0,  1.0); 
-t(31,  2,   "3",   ttabw,   0.2,  1.0,  1.0); 
-t(32,  2,   "4",   ttabw,   0.2,  1.0,  1.0); 
-t(33,  2,   "5",   ttabw,   0.2,  1.0,  1.0); 
-
-t(34,  2,   "2",   ttabw,   0.4,  0.6,  1.0); 
-t(35,  2,   "3",   ttabw,   0.4,  0.6,  1.0); 
-t(36,  2,   "4",   ttabw,   0.4,  0.6,  1.0); 
-t(37,  2,   "5",   ttabw,   0.4,  0.6,  1.0); 
-
-t(38,  2,   "2",   ttabw,   0.7,  0.4,  1.0); 
-t(39,  2,   "3",   ttabw,   0.7,  0.4,  1.0); 
-t(40,  2,   "4",   ttabw,   0.7,  0.4,  1.0); 
-t(41,  2,   "5",   ttabw,   0.7,  0.4,  1.0); 
-
-t(42,  2,   "2",   ttabw,   1.0,  0.4,  0.4); 
-t(43,  2,   "3",   ttabw,   1.0,  0.4,  0.4); 
-t(44,  2,   "4",   ttabw,   1.0,  0.4,  0.4); 
-t(45,  2,   "5",   ttabw,   1.0,  0.4,  0.4); 
-
-t(46,  2,   "2",   ttabw,   1.0,  0.9,  0.2); 
-t(47,  2,   "3",   ttabw,   1.0,  0.9,  0.2); 
-t(48,  2,   "4",   ttabw,   1.0,  0.9,  0.2); 
-t(49,  2,   "5",   ttabw,   1.0,  0.9,  0.2); 
-
-t(50,  2,   "2",   ttabw,   0.5,  0.8,  0.7); 
-t(51,  2,   "3",   ttabw,   0.5,  0.8,  0.7); 
-t(52,  2,   "4",   ttabw,   0.5,  0.8,  0.7); 
-t(53,  2,   "5",   ttabw,   0.5,  0.8,  0.7); 
-
-t(54,  2,   "H 3",    hw,    0.8,  0.8,  0.8); 
-t(55,  2,   "H 4",    hw,    0.8,  0.8,  0.8); 
-
-t(56,  2,   "2<",   44,     0.8,  0.3,  0.9); 
-t(57,  2,   "2=",   44,     0.8,  0.3,  0.9); 
-t(58,  2,   "2>",   44,     0.8,  0.3,  0.9); 
-
-t(59,  2,   "5",   44,    0.8,  0.8,  0.8); 
-t(60,  2,   "6",   44,    0.8,  0.8,  0.8); 
-t(61,  2,   "7",   44,    0.8,  0.8,  0.8); 
-t(62,  2,   "8",   44,    0.8,  0.8,  0.8); 
-t(63,  2,   "9",   44,    0.8,  0.8,  0.8); 
-
-function get_t_name(idx, out) (
-    strcpy(out, tab_name_str_base + idx);
-);
 
 i=0; loop(MAX_ROWS, 
     mem[row_chan_base+i] == 0 ? mem[row_chan_base+i] = 1; 
@@ -406,7 +290,6 @@ local(count, k, pc)
     count; 
 );
 
-// --- HELPER: Find next scale note UP ---
 function next_scale_up(n) local(k, nn, pc)(
   nn = n + 1;
   scale_tonic != -1 ? (
@@ -419,7 +302,6 @@ function next_scale_up(n) local(k, nn, pc)(
   nn > 127 ? 127 : nn;
 );
 
-// --- HELPER: Find next scale note DOWN ---
 function next_scale_dn(n) local(k, nn, pc)(
   nn = n - 1;
   scale_tonic != -1 ? (
@@ -432,47 +314,48 @@ function next_scale_dn(n) local(k, nn, pc)(
   nn < 0 ? 0 : nn;
 );
 
+
+
 function assign_lanes()
 local(i, k, swapped, n0, n1, n2, n3, n4, n5, dn1, root,
       cnt, p_low, p_mid, p_high, gap_count, fill_buf)
 (
     i=0; loop(LANE_COUNT, mem[lane_pitch_a+i] = -1; mem[lane_pitch_b+i] = -1; i+=1; );
 
-    (chord_count == 1) ? (
-      // --- SINGLE NOTE MODE (FILL SCALE) ---
-      root = mem[chord_notes+0];
-    
-      n1 = next_scale_up(root);
-      n2 = next_scale_up(n1);
-      n3 = next_scale_up(n2);
-      n4 = next_scale_up(n3);
-      n5 = next_scale_up(n4);
-    
-      dn1 = next_scale_dn(root);
-    
-      // Map to Lanes
-      mem[lane_pitch_a+7] = root; // Low
-      
-      mem[lane_pitch_a+6] = n1;   
-      mem[lane_pitch_a+5] = n1;   
-      
-      mem[lane_pitch_a+4] = n2;   // Mid
-      
-      mem[lane_pitch_a+3] = n3;   
-      mem[lane_pitch_a+2] = n3;   
-      
-      mem[lane_pitch_a+1] = n4;   // High
-      mem[lane_pitch_a+0] = n5;   
-      
-      mem[lane_pitch_a+8] = dn1;  // Bass
-    
-    ) : chord_count > 0 ? (
-        // --- CHORD MODE ---
-        mem[lane_pitch_a+0] = mem[chord_notes+0]; 
-        mem[lane_pitch_a+1] = (chord_count > 1) ? mem[chord_notes+1] : -1; 
-        mem[lane_pitch_a+2] = (chord_count > 2) ? mem[chord_notes+2] : -1; 
-        
-        cnt = (chord_count > 3) ? 3 : chord_count;
+i=0; loop(LANE_COUNT,
+  mem[lane_pitch_a+i] = -1;
+  mem[lane_pitch_b+i] = -1;
+  i+=1;
+);
+
+(chord_count == 1) ? (
+  root = mem[chord_notes+0];
+
+  n1 = next_scale_up(root);
+  n2 = next_scale_up(n1);
+  n3 = next_scale_up(n2);
+  n4 = next_scale_up(n3);
+  n5 = next_scale_up(n4);
+
+  dn1 = next_scale_dn(root);
+
+  mem[lane_pitch_a+7] = root;
+  mem[lane_pitch_a+6] = n1;
+  mem[lane_pitch_a+5] = n1;
+  mem[lane_pitch_a+4] = n2;
+  mem[lane_pitch_a+3] = n3;
+  mem[lane_pitch_a+2] = n3;
+  mem[lane_pitch_a+1] = n4;
+  mem[lane_pitch_a+0] = n5;
+  mem[lane_pitch_a+8] = dn1;
+
+) : chord_count > 0 ? (
+  // your existing chord code starts here, unchanged
+  mem[lane_pitch_a+0] = mem[chord_notes+0];
+  mem[lane_pitch_a+1] = (chord_count > 1) ? mem[chord_notes+1] : -1;
+  mem[lane_pitch_a+2] = (chord_count > 2) ? mem[chord_notes+2] : -1;
+
+  cnt = (chord_count > 3) ? 3 : chord_count; 
 
         swapped = 1;
         while (swapped) (
@@ -1043,7 +926,7 @@ local(bw, bh, i, r, c, bx, by, bit, is_set)
 
 mx=mouse_x; my=mouse_y; mb=mouse_cap&1; rmb=mouse_cap&2; p_mb=l_mb; l_mb=mb; gfx_clear = 0.05; p_mx=l_mx; l_mx=mx; 
 UI_TOP_X=10; UI_TOP_Y=10; HDR_X=UI_TOP_X; HDR_Y=UI_TOP_Y;
-gfx_setfont(1, "Arial", 22, 'b'); draw_text(HDR_X, HDR_Y, "N2N ARP v11.4", COL_H_R*1.9, COL_H_G*1.9, COL_H_B*1.9); gfx_setfont(0);
+gfx_setfont(1, "Arial", 22, 'b'); draw_text(HDR_X, HDR_Y, "N2N ARP v11.1", COL_H_R*1.9, COL_H_G*1.9, COL_H_B*1.9); gfx_setfont(0);
 row1_y = UI_TOP_Y; x1 = HDR_X + 150; 
 
 function dr_glob(x, y, w, lab, val_in, min_v, max_v, is_signed, slider_idx, override_id) (
@@ -1069,102 +952,43 @@ scale_tonic == -1 ? ( draw_text(x1+80, row1_y+5, "---", 1, 0.2, 0.2); ) : (
 );
 
 pat_y = row1_y + 30; pat_w = gfx_w / 64; pat_h = 30; 
-
-// --- DECORATIVE BANDS (4px) ---
-/*
-band_w = pat_w * 8;
-k_band = 0;
-loop(8,
-    // Set Color
-// Set Color (Dimmed by ~50%)
-    k_band == 0 ? gfx_set(0.4, 0.4, 0.4, 1) :
-    k_band == 1 ? gfx_set(0.1, 0.5, 0.5, 1) : // Cyan dimmed
-    k_band == 2 ? gfx_set(0.2, 0.3, 0.5, 1) : // Blue dimmed
-    k_band == 3 ? gfx_set(0.35, 0.2, 0.5, 1) : // Violet dimmed
-    k_band == 4 ? gfx_set(0.5, 0.2, 0.2, 1) : // Red dimmed
-    k_band == 5 ? gfx_set(0.5, 0.45, 0.1, 1) : // Yellow dimmed
-    k_band == 6 ? gfx_set(0.25, 0.4, 0.35, 1) : // Green dimmed
-                  gfx_set(0.4, 0.4, 0.4, 1);
-
-    bx = k_band * band_w;
-    gfx_rect(bx, pat_y - 7, band_w, 7);  // Top Band
-    //gfx_rect(bx, pat_y + 33, band_w, 7); // Bottom Band
-    gfx_rect(bx, pat_y + 73, band_w, 7); // Bottom Band
-    k_band += 1;
-);
-*/
-// --- UNIFIED GRID & CLICK LOGIC ---
-i=0; 
-loop(128, 
-    // Calculate Grid Position
-    row_idx = floor(i/64); 
-    col_idx = i % 64; 
-    px = col_idx * pat_w; 
-    py = pat_y + (row_idx * 40); // 40px spacing for rows
-
-    is_curr = (mem[ui_edit_tab] == i); 
-    is_play = (mem[ui_play_prog_tab] == i); 
-    is_lock = (mem[ui_locked_tab] == i);
-
-    // Draw Tab Background
-    is_curr ? (r=.0; g=.25; b=.45;) : (r=0.35; g=0.35; b=0.35;); 
-    rect(px+1, py, pat_w, 33, r, g, b, 1);
-
-    // Draw Lock Indicator (Green/Blue Bar)
-    is_lock ? (lr=.2; lg=.6; lb=.2;) : (lr=COL_H_R*1.5; lg=COL_H_G*1.5; lb=COL_H_B*1.5;); 
-    rect(px+2, py+20, pat_w-4, 10, lr, lg, lb, 1);
-
-    // Draw Playback Indicator (Circle)
+i=0; loop(128, row_idx = floor(i/64); col_idx = i % 64; px = col_idx * pat_w; py = pat_y + (row_idx * 40);
+    is_curr = (mem[ui_edit_tab] == i); is_play = (mem[ui_play_prog_tab] == i); is_lock = (mem[ui_locked_tab] == i);
+    is_curr ? (r=.0; g=.25; b=.45;) : (r=0.35; g=0.35; b=0.35;); rect(px+1, py, pat_w, 33, r, g, b, 1);
+    is_lock ? (lr=.2; lg=.6; lb=.2;) : (lr=COL_H_R*1.5; lg=COL_H_G*1.5; lb=COL_H_B*1.5;); rect(px+2, py+20, pat_w-4, 10, lr, lg, lb, 1);
     is_play ? ( gfx_set(COL_M_R*1.7, COL_M_G*1.7, COL_M_B*1.7, 1); gfx_circle(px+pat_w/2, py+25, 3, 1); );
-
-    // Draw Tab Label
-    (i+1) >= 100 ? ( sprintf(#lbl, "%d", floor(((i+1)%100)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i+1)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : 
-    (i+1) >= 10 ? ( sprintf(#lbl, "%d", floor((i+1)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i+1)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : 
-    ( sprintf(#lbl, "%d", i+1); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); );
     
-    // --- CLICK HANDLING ---
+    // 0-Based Labels
+    (i) >= 100 ? ( sprintf(#lbl, "%d", floor(((i)%100)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : (i) >= 10 ? ( sprintf(#lbl, "%d", floor((i)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : ( sprintf(#lbl, "%d", i); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); );
     
-    // Check if mouse is over this Tab's area
-    // Full Tab Area: px to px+pat_w, py to py+33
-    is_hover_tab = (mx >= px && mx < px + pat_w && my >= py && my < py + 33);
-    
-    // Check if mouse is specifically over the Lock Bar area
-    // Lock Bar Area: px+2 to px+pat_w-2, py+20 to py+30
-    is_hover_lock = (mx >= px+2 && mx < px + pat_w - 2 && my >= py + 20 && my < py + 30);
-    
-    (mb && p_mb == 0 && is_hover_tab && capture_id == 0) ? (
-        
-        // 1. DOUBLE CLICK CHECK (VIEW + HEAR)
-        (time_precise() - last_tab_clk < 0.3 && last_tab_idx == i) ? (
-             mem[ui_locked_tab] = i; 
-             mem[ui_edit_tab] = i;
-             gmem[GM_BASE+1] = i; 
-             mem[ui_play_offset] = 0; 
-             playback_shift = 0;
-             last_tab_clk = 0; 
-             mem[ui_follow_mode] = 0;
-        ) 
-        // 2. LOCK CLICK CHECK (HEAR ONLY)
-        : (is_hover_lock) ? (
-             mem[ui_locked_tab] = i; 
-             gmem[GM_BASE+1] = i; 
-             mem[ui_play_offset] = 0; 
-             playback_shift = 0; 
-             mem[ui_follow_mode] = 0;
-             last_tab_clk = time_precise(); // Still update click timer to prevent accidental double triggering
-             last_tab_idx = i;
-        )
-        // 3. TAB CLICK CHECK (VIEW ONLY)
-        : (
-             mem[ui_edit_tab] = i;
-             last_tab_clk = time_precise(); 
-             last_tab_idx = i; 
+    // TAB CLICKING LOGIC
+    (mb && p_mb==0 && mx>=px && mx<px+pat_w && capture_id == 0) ? (
+        (my >= py && my < py + 33) ? (
+            
+             // Double Click Logic: View + Lock
+             (time_precise() - last_tab_clk < 0.3 && last_tab_idx == i) ? ( 
+                 mem[ui_locked_tab] = i; 
+                 gmem[GM_BASE+1] = i; 
+                 mem[ui_follow_mode] = 0; 
+                 last_tab_clk = 0; 
+                 mem[ui_edit_tab] = i; 
+             ) : ( 
+                 // Single Click Separation
+                 (my > py + 20) ? (
+                    // Lock Click (Bottom Rect)
+                    mem[ui_locked_tab] = i;
+                    gmem[GM_BASE+1] = i;
+                    mem[ui_follow_mode] = 0; // Disable follow on manual lock
+                 ) : (
+                    // View Click (Top Body)
+                    mem[ui_edit_tab] = i;
+                 );
+                 last_tab_clk = time_precise(); 
+                 last_tab_idx = i; 
+             ); 
+             capture_id = -2; 
         );
-        
-        capture_id = -2; // Lock input to prevent drag
-    );
-    
-    i+=1;
+    ); i+=1;
 );
 
 ctrl_y = pat_y + 90; x2 = UI_TOP_X; mem[ui_locked_tab] == 0 ? mem[ui_edit_tab] = mem[ui_play_prog_tab]; is_follow = mem[ui_follow_mode];
@@ -1176,17 +1000,6 @@ t_e = mem[ui_edit_tab]; curr_pat_v_ptr = vel_base + t_e*vel_stride_tab; curr_pat
 
 btn(x2, ctrl_y, 70, 18, "COPY") ? ( memcpy(copy_tab_v_buf, curr_pat_v_ptr, vel_stride_tab); memcpy(copy_tab_g_buf, curr_pat_g_ptr, vel_stride_tab); memcpy(copy_tab_l_buf, curr_pat_l_ptr, vel_stride_tab); ); x2+=75;
 btn(x2, ctrl_y, 70, 18, "PASTE") ? ( memcpy(curr_pat_v_ptr, copy_tab_v_buf, vel_stride_tab); memcpy(curr_pat_g_ptr, copy_tab_g_buf, vel_stride_tab); memcpy(curr_pat_l_ptr, copy_tab_l_buf, vel_stride_tab); ); x2+=75;
-
-// --- "ALL" ROWS BUTTON (MOVED TO LEFT SIDEBAR) ---
-all_mode = mem[ui_vel_edit_all];
-btn(110, edit_y + 20, 30, 18, "ALL") ? ( 
-    mem[ui_vel_edit_all] = !mem[ui_vel_edit_all]; 
-    mem[ui_vel_edit_all] ? mem[ui_selected_row] = -1; 
-);
-all_mode ? ( gfx_set(1, 0.8, 0.2, 1); gfx_rect(110, edit_y+20, 30, 18); gfx_set(0,0,0,1); gfx_x=115; gfx_y=edit_y+25; gfx_drawstr("ALL"); );
-
-btn(10, edit_y + 40, btn_w, btn_h, "CLEAR LN") ? ( memset(curr_pat_g_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); memset(curr_pat_v_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); memset(curr_pat_l_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); );
-
 btn(x2, ctrl_y, 70, 18, "CLEAR") ? ( memset(curr_pat_g_ptr, 0, vel_stride_tab); memset(curr_pat_v_ptr, 0, vel_stride_tab); memset(curr_pat_l_ptr, 0, vel_stride_tab); ); x2+=85;
 
 dr_glob(x2, ctrl_y, 80, "BARS:", eff_bars(t_e), 1, 4, 0, 4, 9999); (capture_id == 9999) ? ( ov_addr = bars_ov_base + t_e; dist=mx-capture_start_x; val=capture_start_val+floor(dist*0.3); val=clamp(val,1,4); mem[ov_addr]=val; ); x2 += 90;
@@ -1311,6 +1124,13 @@ gfx_circle(gr_x+7, gr_y-3, 4, 1);
 edit_y = lane_y + 35; btn_w = 90; btn_h = 18;
 btn(10, edit_y, btn_w, btn_h, "COPY LN") ? ( memcpy(copy_row_v_buf, curr_pat_v_ptr + sel_r*vel_stride_row, MAX_STEPS); memcpy(copy_row_g_buf, curr_pat_g_ptr + sel_r*vel_stride_row, MAX_STEPS); memcpy(copy_row_l_buf, curr_pat_l_ptr + sel_r*vel_stride_row, MAX_STEPS); );
 btn(10, edit_y + 20, btn_w, btn_h, "PASTE LN") ? ( memcpy(curr_pat_v_ptr + sel_r*vel_stride_row, copy_row_v_buf, MAX_STEPS); memcpy(curr_pat_g_ptr + sel_r*vel_stride_row, copy_row_g_buf, MAX_STEPS); memcpy(curr_pat_l_ptr + sel_r*vel_stride_row, copy_row_l_buf, MAX_STEPS); );
+
+// --- NEW "ALL" ROWS BUTTON (MOVED TO LEFT SIDEBAR) ---
+all_mode = mem[ui_vel_edit_all];
+// FIXED: MUTUALLY EXCLUSIVE LOGIC
+btn(110, edit_y + 20, 30, 18, "ALL") ? ( mem[ui_vel_edit_all] = !mem[ui_vel_edit_all]; mem[ui_vel_edit_all] ? mem[ui_selected_row] = -1; );
+all_mode ? ( gfx_set(1, 0.8, 0.2, 1); gfx_rect(110, edit_y+20, 30, 18); gfx_set(0,0,0,1); gfx_x=115; gfx_y=edit_y+25; gfx_drawstr("ALL"); );
+
 btn(10, edit_y + 40, btn_w, btn_h, "CLEAR LN") ? ( memset(curr_pat_g_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); memset(curr_pat_v_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); memset(curr_pat_l_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); );
 
 grid_y = edit_y + 60 + 10;
@@ -1419,21 +1239,24 @@ grid_x = 10 + lhs_width; grid_w = vel_w;
     rel_x = mx - grid_x; curr_col = floor(rel_x / cw); 
     head_col = (len_drag_start_idx % vel_stride_row); clicked_row = floor(len_drag_start_idx / vel_stride_row);
     new_len = (curr_col - head_col) + 1; new_len < 1 ? new_len = 1; (head_col + new_len > st_v) ? new_len = st_v - head_col; 
+    
     step_in_bar = head_col % steps_per_bar; step_in_beat = head_col % (steps_per_bar/4);
+    
+    // Define Target Bar
+    target_bar = floor(head_col / steps_per_bar);
+
     loop_s = 0; loop(st_v, should_apply = 0;
-        (ctrl_dn && shift_dn) ? should_apply = 1 : ctrl_dn ? (loop_s % steps_per_bar == step_in_bar ? should_apply=1) : shift_dn ? (loop_s % (steps_per_bar/4) == step_in_beat ? should_apply=1) : (loop_s == head_col ? should_apply = 1);
-        idx_target = clicked_row * vel_stride_row + loop_s;
         
-        // FIX: Match Right-Click Modifiers to Left-Click Logic
-        // Shift=Current Bar, Ctrl=All Bars, S+C=All
-        target_bar = floor(head_col / steps_per_bar);
+        // Define Loop Bar
         loop_bar = floor(loop_s / steps_per_bar);
 
-        (ctrl_dn && shift_dn) ? (loop_s % (steps_per_bar/4) == step_in_beat ? should_apply=1) : 
-        ctrl_dn ? (loop_s % steps_per_bar == step_in_bar ? should_apply=1) : 
-        shift_dn ? ((loop_bar == target_bar) && (loop_s % (steps_per_bar/4) == step_in_beat) ? should_apply=1) : 
-        (loop_s == head_col ? should_apply = 1);
-        
+        // LOGIC FIX:
+        (ctrl_dn && shift_dn) ? (loop_s % (steps_per_bar/4) == step_in_beat ? should_apply=1) : // All Bars, Similar Beats
+        ctrl_dn ? (loop_s % steps_per_bar == step_in_bar ? should_apply=1) : // All Bars, Same Position
+        shift_dn ? ((loop_bar == target_bar) && (loop_s % (steps_per_bar/4) == step_in_beat) ? should_apply=1) : // Current Bar, Similar Beats
+        (loop_s == head_col ? should_apply = 1); // Single Note
+
+        idx_target = clicked_row * vel_stride_row + loop_s;
         mem[curr_pat_g_ptr + idx_target] == 1 ? (
             should_apply ? ( 
                 safe_len = new_len; (loop_s + safe_len > st_v) ? safe_len = st_v - loop_s;
@@ -1545,8 +1368,8 @@ gx_r = 0; loop(visible_rows,
         (mb && p_mb==0 && capture_id==0 && !chan_popup_active && my>=ry && my<ry+ROW_HEIGHT && mx < grid_x) ? ( 
             mx >= 10+35 && mx < 10+48 ? mem[row_mute_base+r_idx] = !mem[row_mute_base+r_idx] : 
             mx >= 10+50 && mx < 10+63 ? mem[row_solo_base+r_idx] = !mem[row_solo_base+r_idx] : 
-            // FIX: Selecting row resets ALL mode
-            ( mem[ui_selected_row] = r_idx; mem[ui_vel_edit_all] = 0; )
+            // FIXED: ROW SELECTION DISABLES "ALL" MODE
+            ( mem[ui_selected_row] = r_idx; mem[ui_vel_edit_all] = 0; );
         );
         
         // --- NEW COLUMNS LOGIC (With N2N Velocity Decoding) ---
