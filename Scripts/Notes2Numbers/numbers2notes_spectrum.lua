@@ -1,5 +1,6 @@
 -- @description numbers2notes_spectrum
--- @version 1.1
+-- @version 1.1.2
+-- @noindex
 -- @author Rock Kennedy
 -- @about Numbers2Notes Support File for generating full-spectrum chord grids.
 -- @changelog
