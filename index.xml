@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="1e7cfb73858923fe4095698a6a03689bf6acdd11">
+<index version="1" name="AHS_Music_Tech" commit="a6b3ea7a419a78a16aa05aa76f5a46091750b99c">
   <category name="Data/N2N/DrumKits">
     <reapack name="Clear All.txt" type="midinotenames" desc="Clear All">
       <version name="1.0.0" author="Rock Kennedy" time="2026-01-20T12:54:49Z">
@@ -212,16 +212,19 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Arp v10.95\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab LAYOUT: Moved "ALL" button to the left sidebar (next to PASTE LN).\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab LAYOUT: Restored original spacing for Top Pattern Settings row.\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FEATURE: "ALL" Mode applies velocity edits to all active rows.\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FIX: Playhead (Green Line) and White Cell Flash are active.\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Arp v11.4\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FIX: Tabs and Lock buttons are now fully clickable (Unified coordinates).\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FIX: Playback switching on Lock/Double-click works immediately.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab UI: Decorative Color Bands maintained.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab UI: "ALL" button maintained in left sidebar.\sa180\par}
 }
 ]]></description>
       </metadata>
       <version name="10.96" author="Rock Kennedy" time="2026-01-20T13:17:14Z">
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/4df8186ee1c8c092adeac982729767fbedfcf383/Effects/N2N%20Arp.jsfx</source>
+      </version>
+      <version name="11.4" author="Rock Kennedy" time="2026-01-21T04:12:49Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/a6b3ea7a419a78a16aa05aa76f5a46091750b99c/Effects/N2N%20Arp.jsfx</source>
       </version>
     </reapack>
     <reapack name="N2N Drum Arranger.jsfx" type="effect" desc="N2N Drum Arranger">
