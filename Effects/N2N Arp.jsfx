@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 11.8
-author: Rock Kennedy + AI
+version: 11.9
+author: Rock Kennedy
 about:
-  # N2N Arp v11.8
+  # N2N Arp v11.9
   - CLEANUP: Removed all Drum Arranger tabs/buttons. Back to 0-127 Grid.
   - FIX: Slider Ghosting (Pattern settings no longer affect Top Row sliders).
   - FIX: Row Hum now correctly allows -1 (displays "Glb").
