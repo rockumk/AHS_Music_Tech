@@ -1,14 +1,16 @@
 desc:N2N Drum Arranger
-version: 4.9.2
-author: Rock Kennedy + ChatGPT + Gemini + Grok
+version: 4.9.5
+author: Rock Kennedy
 about:
-  # N2N Drum Arranger v4.9.2
+  # N2N Drum Arranger v4.9.5
   - RESTORED: Fixed missing code (Tabs, Grid, Scrollbar) dropped in previous updates.
   - LAYOUT: Restored spacing (Gap=70) for Pattern Settings.
   - VISUAL: Grid Cells flash white when played.
   - CONTROL: "PUSH/PULL" slider (-50 to +60).
-  - NEW: "AB > A_B_" (Shift+Click on A->AA) stretches pattern.
+  - NEW: Stretch modes.
   - ENGINE: Windowed Lookahead Engine active.
+  - BAR MAKERS with copy paste.
+  - ALL Button to make overall velocity changes.
 provides:
   [main] .
 
@@ -136,6 +138,10 @@ copy_tab_v_buf = mem_pos; mem_pos += MAX_ROWS * MAX_STEPS; copy_tab_g_buf = mem_
 mem_pos += 50000;
 ownership_map = mem_pos; mem_pos += MAX_STEPS;
 kill_note = mem_pos; mem_pos += 128; kill_chan = mem_pos; mem_pos += 128;
+
+// --- NEW: BAR CLIPBOARD (Safe Zone) ---
+bar_copy_base = 600000; 
+// --------------------------------------
 
 // Extensions
 EXT_COUNT = TOTAL_TABS - MAX_TABS;
@@ -843,9 +849,10 @@ playing && t_pl != 0 && t_pl != -1 ? (
         last_play_tab = curr_tab; last_play_offset = curr_off; pc_triggered = 0;
     );
 
-    // --- WINDOWED LOOKAHEAD PLAYBACK ENGINE ---
+// --- WINDOWED LOOKAHEAD PLAYBACK ENGINE (FIXED FOR 1/2 SPEED) GROOVE AND SYNC---
     // Calculates trigger times for current and next steps, applies offsets, 
     // and fires if the timestamp falls within the current audio block.
+    
     
     samps_per_beat = (srate * 60) / tempo;
     block_dur_beats = samplesblock / samps_per_beat;
@@ -853,13 +860,17 @@ playing && t_pl != 0 && t_pl != -1 ? (
     start_b = beat_position + playback_shift;
     end_b = start_b + block_dur_beats;
     
+    // 1. Define Scan Rate (0.5 for Half Speed)
+    scan_rate = is_half ? 0.5 : 1.0;
+    
     // Determine which grid steps are relevant for this block
     steps_per_beat_grid = sub_v / 4;
     
-    // Look 1 beat ahead and 1 beat behind to catch pushed/pulled notes
-    look_margin = steps_per_beat_grid * 1.0; 
-    start_step_idx = floor(start_b * steps_per_beat_grid) - look_margin;
-    end_step_idx = ceil(end_b * steps_per_beat_grid) + look_margin;
+    // Look 1.5 beats ahead/behind (Scaled by Scan Rate)
+    look_margin = steps_per_beat_grid * 1.5; 
+    
+    start_step_idx = floor(start_b * scan_rate * steps_per_beat_grid) - look_margin;
+    end_step_idx = ceil(end_b * scan_rate * steps_per_beat_grid) + look_margin;
     
     // Safety Pointers
     h_solo = 0; s_solo_chk=0; loop(MAX_ROWS, mem[row_solo_base+s_solo_chk]?h_solo=1; s_solo_chk+=1;);
@@ -873,48 +884,39 @@ playing && t_pl != 0 && t_pl != -1 ? (
         cur_len_ptr = ext_step_len_base + (t_pl-22)*vel_stride_tab;
     );
 
-    // Loop through potentially active steps (Current + Next)
-    // We adjust loop range slightly to catch pushed notes from next step
+    // Loop through potentially active steps
     s_idx_iter = start_step_idx;
     loop((end_step_idx - start_step_idx) + 1,
         
-        // Calculate nominal beat time of this grid step
-        step_beat_time = s_idx_iter / steps_per_beat_grid;
-        
-        // Handle Half-Speed stretching for pattern lookup
-        grid_lookup_idx = s_idx_iter; 
+        // 2. Calculate nominal beat time (Reverse the Scan Rate)
+        step_grid_time = s_idx_iter / steps_per_beat_grid;
+        step_beat_time = step_grid_time / scan_rate;
         
         // Handle Bar wrapping for pattern lookup
+        grid_lookup_idx = s_idx_iter; 
         lookup_mod = st_v;
         p_step = grid_lookup_idx % lookup_mod;
         while(p_step < 0) ( p_step += lookup_mod; );
         
-        // --- Calculate Swing for this step ---
-        // We calculate swing offset in beats
+        // --- Calculate Swing (Pattern Grid Based) ---
         sw_amt = (swing_v / 100) * 0.33; 
-        pair_len = 1.0; // 1 beat
-        
-        // Where is this step within a beat?
         step_in_beat = (grid_lookup_idx % steps_per_beat_grid) / steps_per_beat_grid; 
         
         swing_offset_beats = 0;
-        // Simple Swing Logic: Affects the middle of the beat (approx 8th note offbeat)
-        // If 16th notes (sub=4), steps are 0, 0.25, 0.5, 0.75. 
-        // We swing 0.5 (and bit of 0.25/0.75 if strict).
-        // Using simplified swing consistent with previous engine:
         (step_in_beat >= 0.5 && step_in_beat < 1.0) ? (
-             swing_offset_beats = sw_amt; // Lag the offbeat
+             swing_offset_beats = sw_amt; 
         );
 
-        // --- Calculate Groove Offset for this step ---
-        // Map current step to 32nd note grid (32 slots per bar)
-        // Global Groove assumes 1 Bar Loop of 32nd notes.
-        // We need step position within the bar.
-        step_in_bar = p_step % sub_v;
-        groove_slot = floor(step_in_bar * (32 / sub_v));
-        groove_val = mem[LOCAL_GROOVE_DB + groove_slot]; // -1.0 to 1.0
-        // Assume Groove Val 1.0 = 100% of a 32nd note duration = 0.125 beats
-        groove_offset_beats = groove_val * 0.125;
+        // --- Calculate Groove Offset (Project Time Based) ---
+        // FIX: Map groove to Musical Time (step_beat_time) so it repeats every bar.
+        cycle_beat = step_beat_time % 4.0; 
+        groove_slot = floor(cycle_beat * 8); 
+        groove_slot = clamp(groove_slot, 0, 31);
+        groove_val = mem[LOCAL_GROOVE_DB + groove_slot]; 
+        
+        // Pre-multiply by scan_rate because the final formula divides by scan_rate.
+        // This ensures the absolute time offset of the groove remains constant.
+        groove_offset_beats = (groove_val * 0.125) * scan_rate;
 
         // Iterate Rows
         r_p = 0;
@@ -924,38 +926,24 @@ playing && t_pl != 0 && t_pl != -1 ? (
             p_me ? (
                row_data_idx = r_p*vel_stride_row + p_step;
                
-               // Check Masking (Standard Logic)
-               is_masked = 0; 
-               // (Masking logic omitted for speed in Lookahead, assume minor overlap ok or 
-               // implement full lookback if critical. For now, strict grid check).
-               
                mem[cur_grid_ptr + row_data_idx] ? (
                    // --- Calculate Total Timing ---
                    row_offs_pct = mem[row_offs_base + r_p];
-                   row_offset_beats = row_offs_pct / 100.0; // -0.5 to 0.5 beats
+                   row_offset_beats = row_offs_pct / 100.0; 
                    
-                   total_time_beats = step_beat_time + swing_offset_beats + groove_offset_beats + row_offset_beats;
+                   // 3. Apply offsets 
+                   // Swing/Row are stretched by scan_rate (relative feel).
+                   // Groove was pre-compensated to be absolute.
+                   final_offset = (swing_offset_beats + groove_offset_beats + row_offset_beats) / scan_rate;
                    
-                   // Apply Half Speed stretching to the final time? 
-                   // Ideally, the GRID is stretched. So step_beat_time is * 2.
-                   is_half ? ( total_time_beats = (s_idx_iter / steps_per_beat_grid) * 2.0 
-                               + (swing_offset_beats + groove_offset_beats + row_offset_beats)*2.0; );
+                   total_time_beats = step_beat_time + final_offset;
 
                    // --- Check if this time falls in current block ---
-                   // Window: [beat_position, beat_position + block_len)
-                   // But we must subtract playback_shift from the total_time to compare with raw beat_position
-                   // Or add playback_shift to window. We used start_b which includes shift.
-                   
                    diff_beats = total_time_beats - start_b;
-                   
-                   // Convert to samples
                    diff_samples = floor(diff_beats * samps_per_beat);
                    
                    (diff_samples >= 0 && diff_samples < samplesblock) ? (
                         // FIRE NOTE
-                        // Ensure we don't fire Beat 1 early (negative push wrapping)
-                        // If s_idx_iter == 0 and diff_samples < 0... handled by bounds check.
-                        
                         v_p = mem[cur_vel_ptr+row_data_idx]; v_p <= 0 ? v_p = slider1;
                         eff_h = eff_hum(t_pl); h_p = (mem[row_human_base+r_p]>=0 ? mem[row_human_base+r_p] : eff_h);
                         v_p = clamp(v_p + (rand(h_p*2)-h_p), 1, 127);
@@ -970,12 +958,13 @@ playing && t_pl != 0 && t_pl != -1 ? (
                         // Calc Length
                         step_len_val = mem[cur_len_ptr+row_data_idx]; 
                         ms_per_step_x = (60000 / tempo) * (4 / sub_v);
+                        
+                        // 4. Length scaling for 1/2 speed
                         is_half ? ms_per_step_x *= 2;
+                        
                         l_ms = (step_len_val == 0) ? (mem[row_len_base+r_p]*10) : (step_len_val * ms_per_step_x * 0.98);
                         
-                        // Add delay to kill timer
-                        delay_ms = (diff_samples / srate) * 1000;
-                        mem[kill_note + note_to_play] = (srate * (l_ms + delay_ms) * 0.001);
+                        mem[kill_note + note_to_play] = (srate * (l_ms + (diff_samples / srate) * 1000) * 0.001);
                         mem[kill_chan + note_to_play] = chan_to_play;
                    );
                );
@@ -984,7 +973,9 @@ playing && t_pl != 0 && t_pl != -1 ? (
         );
         s_idx_iter += 1;
     );
-);
+    
+ );   
+    
 
 i_k=0; loop(128,
     mem[kill_note+i_k]>0 ? (
@@ -1253,7 +1244,7 @@ function btn(x,y,w,txt) (
 tx = UI_TOP_X; ty = UI_TOP_Y;
 gfx_setfont(1, "Arial", 22, 'b');
 bri = .9;
-draw_text(HDR_X+4, HDR_Y+3, "N2N Drum Arranger v4.9.1", 0.2*bri,  1.0*bri,  1.0*bri); // Cyan
+draw_text(HDR_X+4, HDR_Y+3, "N2N Drum Arranger", 0.2*bri,  1.0*bri,  1.0*bri); // Cyan
 gfx_setfont(0);
 
 row1_y = UI_TOP_Y + 5; x1 = HDR_X + HDR_W + UI_GAP_X - 10;
@@ -1433,16 +1424,18 @@ t_e = mem[ui_edit_tab];
 
     hum_x = sw_x + box_w + gap_w; dr_glob(11, hum_x+9, pat_y, box_w+7, "HUMANIZE:", slider2, 0, 25, 0, 0, hum_ov_base, 1, 2);
     
-    // --- NEW HALF SPEED CONTROLS ---
+// --- 1/2 SPEED TOGGLE (Conditional: Only for 24/32 Subdiv) ---
     curr_sub_val = eff_sub(mem[ui_edit_tab]);
+    
+    // Define X position for Stretch button (defaults to next to Humanize)
+    st_x = hum_x + box_w + gap_w; 
+    
     (curr_sub_val == 24 || curr_sub_val == 32) ? (
         
-        // --- HALF SPEED TOGGLE ---
-        hf_x = hum_x + box_w + 45;
-        hf_act = eff_half(mem[ui_edit_tab]);
+        hf_x = st_x-30; // Place 1/2 speed here
+        st_x = hf_x + 14 + gap_w; // Push Stretch button to the right
         
-        // Background
-        rect(hf_x, pat_y, 80, box_h, 0.2, 0.2, 0.2, 1);
+        hf_act = eff_half(mem[ui_edit_tab]);
         
         // Hit Logic
         (mb && p_mb == 0 && mx>=hf_x && mx<hf_x+80 && my>=pat_y && my<pat_y+box_h) ? (
@@ -1451,86 +1444,100 @@ t_e = mem[ui_edit_tab];
         );
         
         // Visuals [ 1x | 1/2 ]
-        !hf_act ? ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(hf_x, pat_y, 40, box_h); ); // Highlight 1x
-        hf_act  ? ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(hf_x+40, pat_y, 40, box_h); ); // Highlight 1/2
+        rect(hf_x, pat_y, 80, box_h, 0.2, 0.2, 0.2, 1);
+        !hf_act ? ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(hf_x, pat_y, 40, box_h); ); 
+        hf_act  ? ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(hf_x+40, pat_y, 40, box_h); ); 
 
         !hf_act ? gfx_set(0,0,0,1) : gfx_set(0.5,0.5,0.5,1);
-        draw_text(hf_x+10, pat_y+5, "1x", 0,0,0); // Colors auto-handled by draw_text resets, forcing manual
-        !hf_act ? gfx_set(0,0,0,1) : gfx_set(0.5,0.5,0.5,1);
-        gfx_x=hf_x+10; gfx_y=pat_y+5; gfx_drawstr("1x");
+        draw_text(hf_x+10, pat_y+5, "1x", 0,0,0); 
 
         hf_act ? gfx_set(0,0,0,1) : gfx_set(0.5,0.5,0.5,1);
-        gfx_x=hf_x+47; gfx_y=pat_y+5; gfx_drawstr("1/2");
+        draw_text(hf_x+47, pat_y+5, "1/2", 0,0,0);
         
-        // Middle Separator
         gfx_set(0,0,0,1); gfx_line(hf_x+40, pat_y, hf_x+40, pat_y+box_h);
+    );
 
-
-        // --- A -> AA BUTTON (WITH SHIFT MODIFIER) ---
-        aa_x = hf_x + 107;
-        
-        // Determine Label
-        is_shift_now = (mouse_cap & 8);
-        
-        btn(aa_x, pat_y, 84, is_shift_now ? "AB > A_B_" : " A -> AA") ? (
+    // --- SMART STRETCH MENU (Always Visible) ---
+    // --- SMART STRETCH MENU (Always Visible) ---
+        btn(st_x, pat_y+1, 84, " STRETCH") ? ( 
+            gfx_x = st_x; gfx_y = pat_y + 20;
+            sel_stretch = gfx_showmenu("Stretch Pattern 2x (Short)|Stretch Pattern 2x (Long)|Stretch Pattern 4x (Short)|Stretch Pattern 4x (Long)||Stretch Selected Row 2x (Short)|Stretch Selected Row 2x (Long)|Stretch Selected Row 4x (Short)|Stretch Selected Row 4x (Long)");
             
-            st_cnt = eff_bars(mem[ui_edit_tab]) * curr_sub_val;
-            half_pt = floor(st_cnt / 2);
-            
-            // Determine Pointers for current tab
-            (mem[ui_edit_tab] < 22) ? (
-                basev = vel_base + mem[ui_edit_tab]*vel_stride_tab;
-                baseg = grid_base + mem[ui_edit_tab]*vel_stride_tab;
-                basel = step_len_base + mem[ui_edit_tab]*vel_stride_tab;
-            ) : (
-                basev = ext_vel_base + (mem[ui_edit_tab]-22)*vel_stride_tab;
-                baseg = ext_grid_base + (mem[ui_edit_tab]-22)*vel_stride_tab;
-                basel = ext_step_len_base + (mem[ui_edit_tab]-22)*vel_stride_tab;
-            );
-
-            (half_pt > 0) ? (
+            sel_stretch > 0 ? (
+                // 1. Determine Scope and Type
+                (sel_stretch <= 4) ? ( is_pattern = 1; base_s = sel_stretch; ) : ( is_pattern = 0; base_s = sel_stretch - 4; );
                 
-                is_shift_now ? (
-                    // --- STRETCH MODE (AB > A_B_) ---
-                    // Copy current to buffer
-                    memcpy(copy_tab_v_buf, basev, vel_stride_tab);
-                    memcpy(copy_tab_g_buf, baseg, vel_stride_tab);
-                    memcpy(copy_tab_l_buf, basel, vel_stride_tab);
-                    
-                    // Clear Grid (to avoid ghosts)
-                    memset(baseg, 0, vel_stride_tab);
-                    
-                    r_idx = 0;
-                    loop(MAX_ROWS,
-                        row_off = r_idx * vel_stride_row;
-                        s_idx = 0;
-                        loop(half_pt,
-                            // Map Source s_idx to Dest s_idx * 2
-                            mem[basev + row_off + (s_idx*2)] = mem[copy_tab_v_buf + row_off + s_idx];
-                            mem[baseg + row_off + (s_idx*2)] = mem[copy_tab_g_buf + row_off + s_idx];
-                            mem[basel + row_off + (s_idx*2)] = mem[copy_tab_l_buf + row_off + s_idx];
-                            s_idx += 1;
-                        );
-                        r_idx += 1;
-                    );
+                // 2. Determine Factor (2x or 4x)
+                factor = (base_s <= 2) ? 2 : 4;
+                
+                // 3. Determine Length Mode (Short vs Long)
+                // Evens (2, 4) are Long. Odds (1, 3) are Short.
+                is_long = (base_s == 2 || base_s == 4);
+                
+                st_cnt = eff_bars(mem[ui_edit_tab]) * curr_sub_val;
+                
+                // 4. Determine Row Range
+                r_start = is_pattern ? 0 : mem[ui_selected_row];
+                r_end = is_pattern ? MAX_ROWS : mem[ui_selected_row] + 1;
+                
+                // Pointers setup
+                (mem[ui_edit_tab] < 22) ? (
+                    basev = vel_base + mem[ui_edit_tab]*vel_stride_tab;
+                    baseg = grid_base + mem[ui_edit_tab]*vel_stride_tab;
+                    basel = step_len_base + mem[ui_edit_tab]*vel_stride_tab;
                 ) : (
-                    // --- DUPLICATE MODE (A -> AA) ---
-                    r_idx = 0;
-                    loop(MAX_ROWS,
-                        row_off = r_idx * vel_stride_row;
-                        s_idx = 0;
-                        loop(half_pt,
-                            mem[basev + row_off + half_pt + s_idx] = mem[basev + row_off + s_idx];
-                            mem[baseg + row_off + half_pt + s_idx] = mem[baseg + row_off + s_idx];
-                            mem[basel + row_off + half_pt + s_idx] = mem[basel + row_off + s_idx];
-                            s_idx += 1;
+                    basev = ext_vel_base + (mem[ui_edit_tab]-22)*vel_stride_tab;
+                    baseg = ext_grid_base + (mem[ui_edit_tab]-22)*vel_stride_tab;
+                    basel = ext_step_len_base + (mem[ui_edit_tab]-22)*vel_stride_tab;
+                );
+    
+                // 5. Execute Stretch
+                r_iter = r_start;
+                loop(r_end - r_start,
+                    row_offset = r_iter * vel_stride_row;
+                    
+                    // Copy current row to buffer
+                    memcpy(copy_row_v_buf, basev + row_offset, st_cnt);
+                    memcpy(copy_row_g_buf, baseg + row_offset, st_cnt);
+                    memcpy(copy_row_l_buf, basel + row_offset, st_cnt);
+                    
+                    // Clear original row
+                    memset(basev + row_offset, 0, st_cnt);
+                    memset(baseg + row_offset, 0, st_cnt);
+                    memset(basel + row_offset, 0, st_cnt);
+                    
+                    // Distribute steps
+                    s_idx = 0; 
+                    // Only process the first portion that fits into the new length
+                    loop_limit = ceil(st_cnt / factor);
+                    
+                    loop(loop_limit,
+                        target_idx = s_idx * factor;
+                        
+                        (target_idx < st_cnt) ? (
+                            mem[basev + row_offset + target_idx] = mem[copy_row_v_buf + s_idx];
+                            mem[baseg + row_offset + target_idx] = mem[copy_row_g_buf + s_idx];
+                            
+                            raw_len = mem[copy_row_l_buf + s_idx];
+                            
+                            // FIX: Logic for Length Stretching
+                            // If Long: treat 0 (default) as 1, then multiply by factor.
+                            // If Short: Keep original length.
+                            
+                            new_len = raw_len;
+                            
+                            is_long ? (
+                                new_len = (raw_len < 1 ? 1 : raw_len) * factor;
+                            );
+                            
+                            mem[basel + row_offset + target_idx] = new_len;
                         );
-                        r_idx += 1;
+                        s_idx += 1;
                     );
+                    r_iter += 1;
                 );
             );
         );
-    );
 
     rect(0, 74, gfx_w, 1, 0.25, 0.25, 0.25, 1);
 );
@@ -1717,7 +1724,7 @@ loop(TOTAL_TABS,
     gfx_x = gr_x - 30; gfx_y = gr_y - 4; gfx_drawstr("GRV:");
 
     gr_max == 0 ? gfx_set(0.3, 0.3, 0.3, 1) : (gr_max > 1.0 ? gfx_set(1, 0, 0, 1) : gfx_set(0, 1, 0, 1));
-    gfx_circle(gr_x, gr_y, 4, 1);
+    gfx_circle(gr_x, gr_y-1, 4, 1);
 
     ty+=12; s_v=eff_sub(t_e); st_v=eff_bars(t_e)*s_v;
     
@@ -1731,6 +1738,18 @@ loop(TOTAL_TABS,
 
     btn(10, ty+8, 95, " Copy Row") ? ( memcpy(copy_row_v_buf, curr_pat_v_ptr + sel_r*vel_stride_row, MAX_STEPS); memcpy(copy_row_g_buf, curr_pat_g_ptr + sel_r*vel_stride_row, MAX_STEPS); memcpy(copy_row_l_buf, curr_pat_l_ptr + sel_r*vel_stride_row, MAX_STEPS); );
     btn(10, ty+28, 95, " Paste Row") ? ( memcpy(curr_pat_v_ptr + sel_r*vel_stride_row, copy_row_v_buf, MAX_STEPS); memcpy(curr_pat_g_ptr + sel_r*vel_stride_row, copy_row_g_buf, MAX_STEPS); memcpy(curr_pat_l_ptr + sel_r*vel_stride_row, copy_row_l_buf, MAX_STEPS); );
+    
+    // --- ALL BUTTON ---
+    all_mode = mem[ui_vel_edit_all];
+    
+    // Toggle: Enable/Disable Global Velocity Edit
+        btn(115, ty+28, 35, "ALL") ? ( mem[ui_vel_edit_all] = !mem[ui_vel_edit_all]; );
+    
+    
+    // Visual State (Orange when active)
+    all_mode ? ( gfx_set(1, 0.8, 0.2, 1); gfx_rect(115, ty+28, 35, 18); gfx_set(0,0,0,1); gfx_x=120; gfx_y=ty+33; gfx_drawstr("ALL"); );
+    
+    
     btn(10, ty+48, 95, " Clear Row") ? ( memset(curr_pat_g_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); memset(curr_pat_v_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); memset(curr_pat_l_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); );
 
     gx_s=220; sb_w = 20; gx_w = gfx_w - gx_s - sb_w - 5; cw_v=gx_w/st_v;
@@ -1846,6 +1865,9 @@ loop(TOTAL_TABS,
          );
     );
 
+    all_mode = mem[ui_vel_edit_all];
+    all_preview_v = clamp(floor((1-(my-ty)/70)*127), 1, 127);
+
     skip_vel_draw = 0;
     active_note_idx = -1; 
 
@@ -1854,42 +1876,54 @@ loop(TOTAL_TABS,
         idx_v = sel_r*vel_stride_row + s_i;
         
         
-        skip_vel_draw > 0 ? ( skip_vel_draw -= 1; ) : (
-            g_on = mem[curr_pat_g_ptr+idx_v];
-            step_len = mem[curr_pat_l_ptr+idx_v];
-            draw_w = cw_v;
-            step_len > 1 ? ( draw_w = cw_v * step_len; skip_vel_draw = step_len - 1; );
-            
-            v_store = mem[curr_pat_v_ptr+idx_v];
-            
-            
-            
-            
-            v_disp = (v_store > 0) ? v_store : slider1;
-            
-            bar_h = floor((v_disp/127) * 68); bar_h < 2 ? bar_h = 2; 
-            c_idx = mem[row_color_base+sel_r]; get_palette_values(c_idx);
-            
-            g_on ? ( 
-                
-                min_b = (c_idx == 0) ? 0.60 : 0.50; rng_b = 1.0 - min_b; 
-                v_scale = min_b + (rng_b * (v_disp / 127)); 
-                
-                // FLASH LOGIC FOR VELOCITY BARS
-                (play_step_idx == s_i) ? (
-                    gfx_set(1, 1, 1, 0.95); // Bright White Flash
-                ) : (
-                    gfx_set(cr * v_scale, cg * v_scale, cb * v_scale, 1); 
-                );
-                
-                gfx_rect(gx_s+s_i*cw_v, ty+70-bar_h, draw_w-1, bar_h); 
-            ) 
-            : ( 
-                
-                rect(gx_s+s_i*cw_v, ty+70-bar_h, cw_v-1, bar_h, 0.3, 0.3, 0.3, 1); 
-            );
-    );
+all_mode = mem[ui_vel_edit_all];
 
+all_mode ? (
+    vx_L = gx_s + s_i*cw_v;
+    is_col_hover = (mx >= vx_L && mx < vx_L + cw_v);
+    is_in_vel_box = (my >= ty && my < ty+70);
+
+    v_store = mem[curr_pat_v_ptr + idx_v];
+    def_v = (v_store > 0) ? v_store : slider1;
+
+    v_disp = (mb && capture_id == 77777 && is_col_hover && is_in_vel_box)
+             ? all_preview_v
+             : def_v;
+
+    bar_h = floor((v_disp/127) * 68); bar_h < 2 ? bar_h = 2;
+
+    rect(vx_L, ty+70-bar_h, cw_v-1, bar_h, 0.3, 0.3, 0.3, 1);
+) : (
+    // Normal mode (your existing behavior)
+    skip_vel_draw > 0 ? ( skip_vel_draw -= 1; ) : (
+        g_on = mem[curr_pat_g_ptr+idx_v];
+        step_len = mem[curr_pat_l_ptr+idx_v];
+        draw_w = cw_v;
+        step_len > 1 ? ( draw_w = cw_v * step_len; skip_vel_draw = step_len - 1; );
+
+        v_store = mem[curr_pat_v_ptr+idx_v];
+        v_disp = (v_store > 0) ? v_store : slider1;
+
+        bar_h = floor((v_disp/127) * 68); bar_h < 2 ? bar_h = 2;
+        c_idx = mem[row_color_base+sel_r]; get_palette_values(c_idx);
+
+        g_on ? (
+            min_b = (c_idx == 0) ? 0.60 : 0.50; rng_b = 1.0 - min_b;
+            v_scale = min_b + (rng_b * (v_disp / 127));
+
+            (play_step_idx == s_i) ? (
+                gfx_set(1, 1, 1, 0.95);
+            ) : (
+                gfx_set(cr * v_scale, cg * v_scale, cb * v_scale, 1);
+            );
+
+            gfx_rect(gx_s+s_i*cw_v, ty+70-bar_h, draw_w-1, bar_h);
+        )
+        : (
+            rect(gx_s+s_i*cw_v, ty+70-bar_h, cw_v-1, bar_h, 0.3, 0.3, 0.3, 1);
+        );
+    );
+);
     
     vx_L = gx_s+s_i*cw_v; vx_R = vx_L+cw_v;
     is_col_hover = (mx >= vx_L && mx < vx_R);
@@ -1913,9 +1947,21 @@ loop(TOTAL_TABS,
         bar_idx = floor(step_idx / s_v);
 
         
+        
         vel_drag_mods == 0 ? ( 
-            mem[curr_pat_v_ptr + idx_v] = new_v; 
-        )
+                    mem[ui_vel_edit_all] ? (
+                        // Apply to ALL rows
+                        r_it = 0; loop(MAX_ROWS,
+                            mem[curr_pat_v_ptr + r_it*vel_stride_row + s_i] = new_v;
+                            r_it+=1;
+                        );
+                    ) : (
+                        // Apply to selected row only
+                        mem[curr_pat_v_ptr + idx_v] = new_v; 
+                    );
+                )
+        
+        
         : (vel_drag_mods == 1) ? ( 
             bb=0; loop(total_bars, 
                 tgt = bb*s_v + step_in_bar; 
@@ -1944,8 +1990,87 @@ loop(TOTAL_TABS,
     s_i+=1;
 );
 
-    grid_y=ty+72; row_h=grid_height;
+
+// --- BAR RULER & CONTEXT MENU ---
+    ruler_h = 15; gap_h = 2;
+    ruler_y = ty + 72;
+    grid_y = ruler_y + ruler_h + gap_h; // Push Main Grid Down
+    row_h = grid_height;
+
+    // --- 1/2 Speed Calculation ---
+    is_half = eff_half(t_e);
+    
+    // How many grid steps exist in one logical pattern bar?
+    raw_steps_per_bar = st_v / eff_bars(t_e);
+    
+    // If 1/2 speed, a visual bar is only HALF those steps (music is slower)
+    vis_steps_per_bar = is_half ? (raw_steps_per_bar / 2) : raw_steps_per_bar;
+    
+    // Calculate pixel width of one visual bar
+    vis_bar_w = cw_v * vis_steps_per_bar;
+    
+    // If 1/2 speed, we show double the amount of bars (1 Bar Pattern = 2 Bars Time)
+    bar_count = eff_bars(t_e) * (is_half ? 2 : 1);
+    
+    b_idx = 0;
+    loop(bar_count,
+        bx = gx_s + b_idx * vis_bar_w;
+        
+        // Draw Ruler Background
+        rect(bx, ruler_y, vis_bar_w-1, ruler_h, 0.5, 0.5, 0.5, 1);
+        sprintf(#bnum, "%d", b_idx + 1);
+        draw_text(bx + 1, ruler_y + 2, #bnum, 1.0, 1.0, 1.0);
+        
+        // Interaction: Left Click for Context Menu
+        (mb && p_mb == 0 && mx >= bx && mx < bx + vis_bar_w && my >= ruler_y && my < ruler_y + ruler_h) ? (
+            gfx_x = mx; gfx_y = my;
+            sel_menu = gfx_showmenu("Copy Bar|Paste Bar|Clear Bar");
+            
+            op_len = vis_steps_per_bar;
+            op_start = b_idx * op_len;
+            
+            // 1. Copy Bar to Buffer
+            sel_menu == 1 ? ( 
+                r_it = 0; loop(MAX_ROWS,
+                    src_offset = r_it * vel_stride_row + op_start;
+                    dst_offset = r_it * 96; // Buffer Stride (Max 32 steps * 3 layers)
+                    memcpy(bar_copy_base + dst_offset, curr_pat_v_ptr + src_offset, op_len);
+                    memcpy(bar_copy_base + dst_offset + 32, curr_pat_g_ptr + src_offset, op_len);
+                    memcpy(bar_copy_base + dst_offset + 64, curr_pat_l_ptr + src_offset, op_len);
+                    r_it += 1;
+                );
+            );
+            
+            // 2. Paste Bar from Buffer
+            sel_menu == 2 ? ( 
+                r_it = 0; loop(MAX_ROWS,
+                    src_offset = r_it * 96;
+                    dst_offset = r_it * vel_stride_row + op_start;
+                    memcpy(curr_pat_v_ptr + dst_offset, bar_copy_base + src_offset, op_len);
+                    memcpy(curr_pat_g_ptr + dst_offset, bar_copy_base + src_offset + 32, op_len);
+                    memcpy(curr_pat_l_ptr + dst_offset, bar_copy_base + src_offset + 64, op_len);
+                    r_it += 1;
+                );
+            );
+            
+            // 3. Clear Bar
+            sel_menu == 3 ? ( 
+                r_it = 0; loop(MAX_ROWS,
+                    dst_offset = r_it * vel_stride_row + op_start;
+                    memset(curr_pat_v_ptr + dst_offset, 0, op_len);
+                    memset(curr_pat_g_ptr + dst_offset, 0, op_len);
+                    memset(curr_pat_l_ptr + dst_offset, 0, op_len);
+                    r_it += 1;
+                );
+            );
+        );
+        b_idx += 1;
+    );
+
     !mb ? ( last_drag_idx = -1; drag_mods = 0; vel_drag_mods = 0; drag_mode = 0; row_drag_active = 0; row_drag_last_y = 0; row_drag_anchor = -1; );
+
+
+
 
     scroll_val = slider8; visible_rows = slider7; max_scroll = MAX_ROWS - visible_rows; max_scroll < 0 ? max_scroll = 0;
     scroll_val > max_scroll ? (scroll_val = max_scroll; slider8 = max_scroll;);
@@ -1970,15 +2095,27 @@ loop(TOTAL_TABS,
         STRING_SLOT_ID = row_name_str_base + r_g; 
         strlen(STRING_SLOT_ID) > 0 ? ( strcpy(#gn_row, STRING_SLOT_ID); ) : ( get_d_name(mem[row_name_idx+r_g], #gn_row); );
         set_ui_color(mem[row_color_base+r_g]); gfx_x=53; gfx_y=ry+6; gfx_circle(gfx_x, gfx_y, 4, 1); gfx_x=65; gfx_y=ry+3; gfx_drawstr(#gn_row);
-        (mb && p_mb==0 && mx>=65 && mx<165 && my>=ry+3 && my<ry+18) ? ( preview_note = mem[row_note_base+r_g]; preview_chan = mem[row_chan_base+r_g]; preview_vel = 100; preview_trig = 1; mem[ui_selected_row] = r_g; );
+        (mb && p_mb==0 && mx>=65 && mx<165 && my>=ry+3 && my<ry+18) ? ( preview_note = mem[row_note_base+r_g]; preview_chan = mem[row_chan_base+r_g]; preview_vel = 100; preview_trig = 1; mem[ui_selected_row] = r_g; mem[ui_vel_edit_all] = 0; ); 
         (mb && p_mb==0 && mx>=48 && mx<58 && my>=ry+1 && my<ry+11) ? ( color_popup_active = 1; color_popup_x = mx; color_popup_y = my; color_popup_row = r_g; );
         (rmb && mx>=60 && mx<gx_s && my>=ry && my<ry+row_h) ? ( c_sel = gfx_showmenu(#name_menu); c_sel > 0 ? ( mem[row_name_idx+r_g] = c_sel-1; strcpy(STRING_SLOT_ID, ""); ); );
-        (mb && p_mb == 0 && capture_id == 0 && !color_popup_active && mx<gx_s && my>=ry && my<ry+row_h && !rmb && !(mx>=48 && mx<58) && !(mx>=65 && mx<165)) ? ( mx<28 ? mem[row_mute_base+r_g] = !mem[row_mute_base+r_g] : mx<45 ? mem[row_solo_base+r_g] = !mem[row_solo_base+r_g] : mem[ui_selected_row] = r_g; );
+        
+(mb && p_mb == 0 && capture_id == 0 && !color_popup_active && mx<gx_s && my>=ry && my<ry+row_h && !rmb && !(mx>=48 && mx<58) && !(mx>=65 && mx<165)) ? ( 
+            mx<28 ? mem[row_mute_base+r_g] = !mem[row_mute_base+r_g] : 
+            mx<45 ? mem[row_solo_base+r_g] = !mem[row_solo_base+r_g] : 
+            ( 
+                mem[ui_selected_row] = r_g; 
+                mem[ui_vel_edit_all] = 0; // <--- FORCE OFF
+            ); 
+        );
+        
+        
         (mb && p_mb==0 && !ui_lock && mx>=row_drag_x0 && mx<row_drag_x1 && my>=ry && my<ry+row_h && !rmb && (mouse_cap & 16)) ? ( row_drag_active = 1; row_drag_last_y = my; row_drag_anchor = r_g; capture_id = 42424; );
         (mb && capture_id == 42424 && row_drag_active) ? ( dy = my - row_drag_last_y; abs(dy) >= (row_h*0.5) ? ( dir = dy > 0 ? 1 : -1; tgt = row_drag_anchor + dir; (tgt >= 0 && tgt < MAX_ROWS) ? ( swap_rows(row_drag_anchor, tgt); row_drag_anchor = tgt; row_drag_last_y = my; ) : ( row_drag_last_y = my; ); ); );
 
         get_palette_values(mem[row_color_base+r_g]); memset(ownership_map, -1, MAX_STEPS); 
         s_i = 0; loop(st_v, idx_v = r_g*vel_stride_row + s_i; mem[curr_pat_g_ptr+idx_v] ? ( l = mem[curr_pat_l_ptr+idx_v]; l < 1 ? l = 1; k = 0; loop(l, (s_i + k < st_v) ? ( mem[ownership_map + s_i + k] = idx_v; ); k+=1; ); ); s_i+=1; );
+
+
 
         s_i=0; loop(st_v,
             idx_v = r_g*vel_stride_row + s_i; cx_g = gx_s + s_i*cw_v; owner_idx = mem[ownership_map + s_i];
@@ -2007,7 +2144,7 @@ loop(TOTAL_TABS,
                 
                 gfx_rect(cx_g, ry+1, draw_w-1, row_h-3);
                 
-                step_len > 1 ? ( gfx_set(1,1,1,0.5); l_k = 1; loop(step_len-1, lx = cx_g + l_k*cw_v; gfx_line(lx, ry+2, lx, ry+row_h-2); l_k += 1; ); );
+                
             ) : is_empty ? (
                 q_div = s_v/4; e_div = s_v/8;
                 one_brite = .5;
@@ -2023,12 +2160,27 @@ loop(TOTAL_TABS,
                         drag_lock_row == -1 ? drag_lock_row = r_g;
             
                         
-                        (r_g == drag_lock_row && !is_tail) ? (
+                        // Grid painting is ALWAYS single row, regardless of ALL button
+                                                (r_g == drag_lock_row && !is_tail) ? (
                             cell_id = r_g*1000 + s_i;
                             p_mb == 0 ? ( drag_mode = mem[curr_pat_g_ptr+idx_v] ? 2 : 1; drag_mods = 0; ctrl_dn ? drag_mods |= 1; shift_dn ? drag_mods |= 2; );
                             (cell_id != last_drag_idx) ? (
                                 beat_steps = s_v/4; total_bars = st_v / s_v; step_idx = s_i; step_in_bar = step_idx % s_v; step_in_beat = (beat_steps > 0) ? (step_idx % beat_steps) : 0; bar_idx = floor(step_idx / s_v);
-                                drag_mods == 0 ? ( drag_mode == 1 ? ( mem[curr_pat_g_ptr+idx_v] = 1; mem[curr_pat_v_ptr+idx_v] <= 0 ? mem[curr_pat_v_ptr+idx_v] = slider1; ) : ( mem[curr_pat_g_ptr+idx_v] = 0; mem[curr_pat_v_ptr+idx_v] = 0; mem[curr_pat_l_ptr+idx_v] = 0; ); )
+                                
+                                
+drag_mods == 0 ? ( 
+                                    drag_mode == 1 ? ( 
+                                        mem[curr_pat_g_ptr+idx_v] = 1; 
+                                        mem[curr_pat_l_ptr+idx_v] = 0; // Reset Length
+                                        mem[curr_pat_v_ptr+idx_v] <= 0 ? mem[curr_pat_v_ptr+idx_v] = slider1; 
+                                    ) : ( 
+                                        mem[curr_pat_g_ptr+idx_v] = 0; 
+                                        mem[curr_pat_v_ptr+idx_v] = 0; 
+                                        mem[curr_pat_l_ptr+idx_v] = 0; 
+                                    ); 
+                                )
+                                
+                                
                                                     : (drag_mods == 1) ? ( bb=0; loop(total_bars, tgt = bb*s_v + step_in_bar; tgt < st_v ? ( ii = r_g*vel_stride_row + tgt; drag_mode == 1 ? ( mem[curr_pat_g_ptr+ii] = 1; mem[curr_pat_v_ptr+ii] <= 0 ? mem[curr_pat_v_ptr+ii] = slider1; ) : ( mem[curr_pat_g_ptr+ii] = 0; mem[curr_pat_v_ptr+ii] = 0; mem[curr_pat_l_ptr+ii] = 0; ); ); bb+=1; ); )
                                                     : (drag_mods == 2) ? ( bt=0; loop(4, tgt = bar_idx*s_v + bt*beat_steps + step_in_beat; (tgt >= bar_idx*s_v && tgt < (bar_idx+1)*s_v && tgt < st_v) ? ( ii = r_g*vel_stride_row + tgt; drag_mode == 1 ? ( mem[curr_pat_g_ptr+ii] = 1; mem[curr_pat_v_ptr+ii] <= 0 ? mem[curr_pat_v_ptr+ii] = slider1; ) : ( mem[curr_pat_g_ptr+ii] = 0; mem[curr_pat_v_ptr+ii] = 0; mem[curr_pat_l_ptr+ii] = 0; ); ); bt+=1; ); )
                                                     : ( bb=0; loop(total_bars, bt=0; loop(4, tgt = bb*s_v + bt*beat_steps + step_in_beat; tgt < st_v ? ( ii = r_g*vel_stride_row + tgt; drag_mode == 1 ? ( mem[curr_pat_g_ptr+ii] = 1; mem[curr_pat_v_ptr+ii] <= 0 ? mem[curr_pat_v_ptr+ii] = slider1; ) : ( mem[curr_pat_g_ptr+ii] = 0; mem[curr_pat_v_ptr+ii] = 0; mem[curr_pat_l_ptr+ii] = 0; ); ); bt+=1; ); bb+=1; ); );
