@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="d445e8c9a77527ff1af5fb3d88274019310590f1">
+<index version="1" name="AHS_Music_Tech" commit="df3e51a48683de64fdca985a5d141d10d0e6751a">
   <category name="Data/N2N/DrumKits">
     <reapack name="Clear All.txt" type="midinotenames" desc="Clear All">
       <version name="1.0.0" author="Rock Kennedy" time="2026-01-20T12:54:49Z">
@@ -245,18 +245,23 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Drum Arranger v4.9.2\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Drum Arranger v4.9.5\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab RESTORED: Fixed missing code (Tabs, Grid, Scrollbar) dropped in previous updates.\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab LAYOUT: Restored spacing (Gap=70) for Pattern Settings.\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab VISUAL: Grid Cells flash white when played.\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab CONTROL: "PUSH/PULL" slider (-50 to +60).\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab NEW: "AB > A_B_" (Shift+Click on A->AA) stretches pattern.\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab ENGINE: Windowed Lookahead Engine active.\sa180\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab NEW: Stretch modes.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab ENGINE: Windowed Lookahead Engine active.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab BAR MAKERS with copy paste.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab ALL Button to make overall velocity changes.\sa180\par}
 }
 ]]></description>
       </metadata>
       <version name="4.9.2" author="Rock Kennedy + ChatGPT + Gemini + Grok" time="2026-01-20T13:18:03Z">
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/69accc8fe79afcf017ebf751aa5f94b5fae8e777/Effects/N2N%20Drum%20Arranger.jsfx</source>
+      </version>
+      <version name="4.9.5" author="Rock Kennedy" time="2026-01-23T03:57:44Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/df3e51a48683de64fdca985a5d141d10d0e6751a/Effects/N2N%20Drum%20Arranger.jsfx</source>
       </version>
     </reapack>
     <reapack name="N2N Scale Drone.jsfx" type="effect" desc="N2N Scale Drone">
