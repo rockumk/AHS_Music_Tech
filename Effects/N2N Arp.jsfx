@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 11.7
+version: 11.8
 author: Rock Kennedy + AI
 about:
-  # N2N Arp v11.7
+  # N2N Arp v11.8
   - CLEANUP: Removed all Drum Arranger tabs/buttons. Back to 0-127 Grid.
   - FIX: Slider Ghosting (Pattern settings no longer affect Top Row sliders).
   - FIX: Row Hum now correctly allows -1 (displays "Glb").
@@ -10,6 +10,7 @@ about:
   - UI: "STRETCH" button always visible. "1/2 Speed" only in 24/32 subdiv.
   - UI: Bar Ruler menu is Left-Click.
   - FIX: Groove now correctly calculated for 1/2 speed.
+  - Removed version number from title.
 provides:
   [main] .
 
@@ -986,7 +987,7 @@ local(bw, bh, i, r, c, bx, by, bit, is_set)
 
 mx=mouse_x; my=mouse_y; mb=mouse_cap&1; rmb=mouse_cap&2; p_mb=l_mb; l_mb=mb; gfx_clear = 0.05; p_mx=l_mx; l_mx=mx; 
 UI_TOP_X=10; UI_TOP_Y=10; HDR_X=UI_TOP_X; HDR_Y=UI_TOP_Y;
-gfx_setfont(1, "Arial", 22, 'b'); draw_text(HDR_X, HDR_Y, "N2N ARP v11.6", COL_H_R*1.9, COL_H_G*1.9, COL_H_B*1.9); gfx_setfont(0);
+gfx_setfont(1, "Arial", 22, 'b'); draw_text(HDR_X, HDR_Y, "N2N ARP", COL_H_R*1.9, COL_H_G*1.9, COL_H_B*1.9); gfx_setfont(0);
 row1_y = UI_TOP_Y; x1 = HDR_X + 150; 
 
 // 9000-9999: JSFX Slider Automation
