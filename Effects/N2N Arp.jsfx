@@ -1,14 +1,15 @@
 desc:N2N Arp
-version: 11.6
+version: 11.7
 author: Rock Kennedy + AI
 about:
-  # N2N Arp v11.6
+  # N2N Arp v11.7
   - CLEANUP: Removed all Drum Arranger tabs/buttons. Back to 0-127 Grid.
   - FIX: Slider Ghosting (Pattern settings no longer affect Top Row sliders).
   - FIX: Row Hum now correctly allows -1 (displays "Glb").
   - FIX: Row Hum editing separated from Pattern Hum.
   - UI: "STRETCH" button always visible. "1/2 Speed" only in 24/32 subdiv.
   - UI: Bar Ruler menu is Left-Click.
+  - FIX: Groove now correctly calculated for 1/2 speed.
 provides:
   [main] .
 
@@ -821,15 +822,36 @@ play_state & 1 ? (
         
         (start_b >= step_beat_time && start_b < step_beat_time + (1.0/(steps_per_beat_grid*scan_rate))) ? mem[ui_last_step] = p_step;
 
+
+
+
+
+
+// --- Calculate Swing (Pattern Grid Based) ---
         sw_amt = (bk_swing_v / 100) * 0.33; 
         step_in_beat = (grid_lookup_idx % steps_per_beat_grid) / steps_per_beat_grid; 
-        swing_offset_beats = 0;
-        (step_in_beat >= 0.5 && step_in_beat < 1.0) ? ( swing_offset_beats = sw_amt; );
         
-        step_in_bar_gr = p_step % bk_sub_v;
-        groove_slot = floor(step_in_bar_gr * (32 / bk_sub_v));
-        groove_val = mem[LOCAL_GROOVE_DB + groove_slot];
-        groove_offset_beats = groove_val * 0.125;
+        swing_offset_beats = 0;
+        (step_in_beat >= 0.5 && step_in_beat < 1.0) ? ( 
+            swing_offset_beats = sw_amt; 
+        );
+        
+        // --- Calculate Groove Offset (Project Time Based) ---
+        // FIX: Map groove to Musical Time so it repeats every bar, even in 1/2 speed.
+        cycle_beat = step_beat_time % 4.0; 
+        groove_slot = floor(cycle_beat * 8); 
+        groove_slot = clamp(groove_slot, 0, 31);
+        groove_val = mem[LOCAL_GROOVE_DB + groove_slot]; 
+        
+        // Pre-multiply by scan_rate because the final formula divides by scan_rate.
+        groove_offset_beats = (groove_val * 0.125) * scan_rate;
+        
+        
+        
+        
+        
+        
+        
         
         r_p_blk = 0;
         ROW_CENTER_OFFSET = 6;
