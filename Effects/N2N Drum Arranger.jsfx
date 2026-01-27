@@ -1,8 +1,8 @@
 desc:N2N Drum Arranger
-version: 4.9.5
+version: 4.9.7
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v4.9.5
+  # N2N Drum Arranger v4.9.6
   - RESTORED: Fixed missing code (Tabs, Grid, Scrollbar) dropped in previous updates.
   - LAYOUT: Restored spacing (Gap=70) for Pattern Settings.
   - VISUAL: Grid Cells flash white when played.
@@ -11,6 +11,8 @@ about:
   - ENGINE: Windowed Lookahead Engine active.
   - BAR MAKERS with copy paste.
   - ALL Button to make overall velocity changes.
+  - Window Size Optimized.
+  - Table scroll bar fixed.
 provides:
   [main] .
 
@@ -1020,7 +1022,7 @@ i_k=0; loop(128,
 
 
 
-@gfx 1470 740
+@gfx 1618 740
 grid_height = slider11; 
 ext_noinit = 1.0;
 ext_noundo = 1; 
@@ -2197,6 +2199,26 @@ drag_mods == 0 ? (
 
         r_v+=1;
     );
+    // ===============================================
+    // PASTE THIS HERE (After the loop finishes)
+    // ===============================================
+    
+    // --- DRAW SCROLLBAR ---
+    // 1. Draw Track (Background)
+    gfx_set(0.15, 0.15, 0.15, 1);
+    gfx_rect(sb_x, sb_y, sb_w, sb_h);
+    
+    // 2. Draw Handle
+    // Highlight if dragging or hovering
+    is_sb_drag || is_sb_hover ? gfx_set(0.6, 0.6, 0.6, 1) : gfx_set(0.35, 0.35, 0.35, 1);
+    
+    // Ensure handle has minimum size and fits strictly within track
+    draw_h = handle_h; draw_y = handle_y;
+    draw_y < sb_y ? draw_y = sb_y; 
+    draw_y + draw_h > sb_y + sb_h ? draw_y = sb_y + sb_h - draw_h;
+    
+    gfx_rect(sb_x + 2, draw_y, sb_w - 4, draw_h);
+    
 
     playing ? (
         t_n = mem[ui_locked_tab] == 0 ? mem[ui_play_prog_tab] : (mem[ui_locked_tab] > 0 ? mem[ui_locked_tab] : mem[ui_play_prog_tab]);
