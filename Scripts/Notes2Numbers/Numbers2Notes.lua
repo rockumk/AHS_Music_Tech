@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.4.6
+-- @version  1.4.7
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.4.6
+--   # Numbers2Notes 1.4.7
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -13,9 +13,12 @@
 --   numbers2notes_musictheory.lua
 --   numbers2notes_songs.lua
 --   numbers2notes_spectrum.lua
+
 -- @changelog
---   + Fixed color dupe bug.
---   + Used region colors which matched Drum Arranger.
+--   # Major Update 1.4.7
+--   + Added Groove
+--   + Changed N2N Drum Arranger to N2N Drum Arranger.jsfx
+--   + Changed gmem name
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require "imgui" "0.8.6" -- Version of IMGUI used during development.
@@ -213,7 +216,7 @@ end
 -- Save to GMEM (Offset 5,000,000)
 function Export_Groove_To_GMEM()
     -- Ensure we are attached to the right namespace
-    reaper.gmem_attach("ProjectSwing")
+    reaper.gmem_attach("N2N_Ecosystem_RSKennedy")
 
     for i = 1, 32 do
         -- Lua arrays are 1-based, GMEM is 0-based offset
@@ -2753,7 +2756,7 @@ function set_the_swing(stk_progression)
                     starting_swing = project_swing
                 else
                     starting_swing = number_from_string
-                    reaper.gmem_attach("ProjectSwing")
+                    reaper.gmem_attach("N2N_Ecosystem_RSKennedy")
                     reaper.gmem_write(2, starting_swing)
 
                     render_feedback = render_feedback .. "Swing set to " .. number_from_string .. string.char(10)
@@ -3377,7 +3380,7 @@ function place_MIDI_data(
                 
                 -- >>> GROOVE + VELOCITY LOGIC <<<
                 
-				
+        
 -- 1. Calculate START Shift (Attack)
                 local start_qn_project = reaper.MIDI_GetProjQNFromPPQPos(grid_item_first_take, pmd_running_ppqpos_total)
                 local start_bar_pos_qn = start_qn_project % 4
@@ -3410,10 +3413,10 @@ function place_MIDI_data(
                 -- Safety Clamps
                 if final_start < 0 then final_start = 0 end
                 if final_end <= final_start then final_end = final_start + 10 end
-				
-				
-				
-				
+        
+        
+        
+        
 
                 for _, v in pairs(tiny_table_of_chord_tones) do
                     local chan = 1
@@ -4071,9 +4074,9 @@ function render_all()
     if G_lead_item_first_take and reaper.ValidatePtr(G_lead_item_first_take, "MediaItem_Take*") then
         notneeded = spectrum.make_full_spectrum(G_lead_item_first_take)
     end
-	
-	Sync_Chart_Colors()
-	
+  
+  Sync_Chart_Colors()
+  
     close_all_fx_windows = reaper.NamedCommandLookup("_S&M_WNCLS3") 
     reaper.Main_OnCommand(close_all_fx_windows, 0)
     
