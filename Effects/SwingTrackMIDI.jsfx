@@ -1,4 +1,4 @@
-version: 1.0.1
+version: 1.0.2
 desc: SwingTrackMIDI
 // Sets MIDI swing on track from 0 to 100%
 author: Rock Kennedy
@@ -11,7 +11,7 @@ changelog:
 
 
 
-options:gmem=ProjectSwing
+options:gmem=N2N_Ecosystem_RSKennedy
 
 slider1:0<0,1,1{ProjectSwing, Manual Swing}>ProjectSwing Mode | Manual Swing Settting Mode
 slider2:0<0,100,.1>Manual Swing Setting Amount
@@ -164,4 +164,5 @@ buf_l >= buf_r ? (
     buf_l=0; 
   );
 );
+
 
