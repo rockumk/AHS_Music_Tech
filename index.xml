@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="fd352b1b270f020e7f1f81eed00c9172fb056d31">
+<index version="1" name="AHS_Music_Tech" commit="d2ffc02646df40ce68ffccf83103d5112277c17f">
   <category name="Data/N2N/DrumKits">
     <reapack name="Clear All.txt" type="midinotenames" desc="Clear All">
       <version name="1.0.0" author="Rock Kennedy" time="2026-01-20T12:54:49Z">
@@ -252,17 +252,11 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Drum Arranger v4.9.6\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab RESTORED: Fixed missing code (Tabs, Grid, Scrollbar) dropped in previous updates.\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab LAYOUT: Restored spacing (Gap=70) for Pattern Settings.\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab VISUAL: Grid Cells flash white when played.\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab CONTROL: "PUSH/PULL" slider (-50 to +60).\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab NEW: Stretch modes.\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab ENGINE: Windowed Lookahead Engine active.\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab BAR MAKERS with copy paste.\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab ALL Button to make overall velocity changes.\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Window Size Optimized.\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Table scroll bar fixed.\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Drum Arranger v5.2\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Fixed GMEM cue system with proper hierarchy and anti-loop protection\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab 64th-note lookahead, 8th-note clear window\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab MIDI Note > GMEM Global > GMEM Type > GMEM Inst > MIDI PC priority\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Many, many small new features.\sa180\par}
 }
 ]]></description>
       </metadata>
@@ -274,6 +268,9 @@
       </version>
       <version name="4.9.7" author="Rock Kennedy" time="2026-01-27T18:13:50Z">
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/fd352b1b270f020e7f1f81eed00c9172fb056d31/Effects/N2N%20Drum%20Arranger.jsfx</source>
+      </version>
+      <version name="5.2" author="Rock Kennedy" time="2026-02-03T05:15:14Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/d2ffc02646df40ce68ffccf83103d5112277c17f/Effects/N2N%20Drum%20Arranger.jsfx</source>
       </version>
     </reapack>
     <reapack name="N2N Scale Drone.jsfx" type="effect" desc="N2N Scale Drone">
