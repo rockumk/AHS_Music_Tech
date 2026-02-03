@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="d2ffc02646df40ce68ffccf83103d5112277c17f">
+<index version="1" name="AHS_Music_Tech" commit="2be8bb0ef1ced2e997013c6f7369145a55738f9c">
   <category name="Data/N2N/DrumKits">
     <reapack name="Clear All.txt" type="midinotenames" desc="Clear All">
       <version name="1.0.0" author="Rock Kennedy" time="2026-01-20T12:54:49Z">
@@ -526,6 +526,21 @@
     <reapack name="N2N Drum Layout Tool.lua" type="script" desc="N2N Drum Layout Tool">
       <version name="2.4" author="Rock Kennedy + ChatGPT" time="2026-01-20T04:56:27Z">
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/8d7b6f0256fc9a96bbf7a73625cf9505a3b1af86/Scripts/N2N%20Drum%20Layout%20Tool.lua</source>
+      </version>
+    </reapack>
+    <reapack name="N2NCue.lua" type="script" desc="N2NCue">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2NCue\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Live and layout cuing of N2N drum and arp patterns\sa180\par}
+}
+]]></description>
+      </metadata>
+      <version name="3.4" author="Rock Kennedy" time="2026-02-03T05:30:23Z">
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/2be8bb0ef1ced2e997013c6f7369145a55738f9c/Scripts/N2NCue.lua</source>
       </version>
     </reapack>
     <reapack name="RSK - Full Spectrum.lua" type="script" desc="RSK_Full_Spectrum">
