@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.2
+-- @version 1.21
 -- @noindex
 -- @author Rock Kennedy
 -- @about
@@ -7,6 +7,7 @@
 --   Numbers2Notes Support File.
 -- @changelog
 --   + First version
+--   + new gmem space
 
 
 
@@ -77,7 +78,7 @@ function export.SendToGMEM(take, rel_tonic, modal_center)
     local r = reaper
     if not take or not r.ValidatePtr(take, "MediaItem_Take*") then return end
 
-    r.gmem_attach('ProjectSwing')
+    r.gmem_attach('N2N_Ecosystem_RSKennedy')
     local OFFSET = 3000000
     
     local _, notecnt, _, _ = r.MIDI_CountEvts(take)
@@ -121,7 +122,7 @@ function export.SendScaleToGMEM(take, rel_tonic)
     local r = reaper
     if not take or not r.ValidatePtr(take, "MediaItem_Take*") then return end
 
-    r.gmem_attach('ProjectSwing')
+    r.gmem_attach('N2N_Ecosystem_RSKennedy')
     local OFFSET = 3100000 
     
     local _, notecnt, _, _ = r.MIDI_CountEvts(take)
