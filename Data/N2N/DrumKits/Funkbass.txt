@@ -1,7 +1,3 @@
-//  @description Funkbass
-//  @version 1.0.1
-//  @author Rock Kennedy
-
 60	C      4  // Red
 59	B  // Magenta
 58	A#/Bb  // Grey

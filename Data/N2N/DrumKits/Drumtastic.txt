@@ -1,7 +1,3 @@
-//  @description Drumtastic
-//  @version 1.0.1
-//  @author Rock Kennedy
-
 43	8  // Sky
 42	7  // Sky
 41	6  // Yellow

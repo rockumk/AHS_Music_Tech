@@ -1,8 +1,4 @@
-//  @description SSD5 Frees
-//  @version 1.0.1
-//  @author Rock Kennedy
-
-/ 1
+/ MIDI note name map
 93 China Tip
 92 R Crash Tip
 91 L Crash Tip
@@ -55,5 +51,4 @@
 19 Rack Tom 1 Rimclick
 17 Rack Tom 2 Rimclick
 14 Floor Tom 3 Rimclick
-
 12 Floor Tom 4 Rimclick

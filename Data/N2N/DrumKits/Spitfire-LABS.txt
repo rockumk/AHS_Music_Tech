@@ -1,7 +1,3 @@
-//  @description Spitfire-LABS
-//  @version 1.0.2
-//  @author Rock Kennedy
-
 36	BD
 37	BDAlt
 38	Snare

@@ -1,5 +1,0 @@
-//  @description Clear All
-//  @version 1.0.2
-//  @author Rock Kennedy
-
-
