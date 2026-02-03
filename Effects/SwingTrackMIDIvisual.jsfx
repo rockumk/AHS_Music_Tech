@@ -1,4 +1,4 @@
-version: 1.0.1
+version: 1.0.2
 desc: SwingTrackMIDIvisual
 // Sets MIDI swing on track from 0 to 100%
 author: Rock Kennedy
@@ -6,8 +6,9 @@ about:
   # SwingTrackMIDIvisual
 changelog:
   - Name Change
+  - gmem space change
 
-options:gmem=ProjectSwing
+options:gmem=N2N_Ecosystem_RSKennedy
 
 
 slider1:0<0,1,1{ProjectSwing, Manual Swing}>ProjectSwing Mode | Manual Swing Settting Mode
@@ -164,3 +165,4 @@ buf_l >= buf_r ? (
     buf_l=0; 
   );
 );
+
