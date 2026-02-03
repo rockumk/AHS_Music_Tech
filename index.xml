@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="05390286391c62f4a112c630c35542c2a82e3d17">
+<index version="1" name="AHS_Music_Tech" commit="6a10dfb3c4978dc72ca1d53a355695429b2433c3">
   <category name="Data/N2N/DrumKits">
     <reapack name="Clear All.txt" type="midinotenames" desc="Clear All">
       <version name="1.0.0" author="Rock Kennedy" time="2026-01-20T12:54:49Z">
@@ -440,11 +440,11 @@
     </reapack>
     <reapack name="SwingProjectMIDI.jsfx" type="effect" desc="SwingProjectMIDI">
       <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 SwingProjectMIDI\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 SwingProjectMIDI\par}
 }
 ]]></description>
       </metadata>
@@ -456,14 +456,19 @@
         <changelog><![CDATA[- Name Change]]></changelog>
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/9ae6b81625aa9cadc8eeb96f4ad1925a2372710e/Effects/SwingProjectMIDI.jsfx</source>
       </version>
+      <version name="1.0.2" author="Rock Kennedy" time="2026-02-03T05:41:34Z">
+        <changelog><![CDATA[- Name Change
+- gmem space change]]></changelog>
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/73eca4fe1030acc8bfa12e0eede96c436faf89a5/Effects/SwingProjectMIDI.jsfx</source>
+      </version>
     </reapack>
     <reapack name="SwingTrackMIDI.jsfx" type="effect" desc="SwingTrackMIDI">
       <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 SwingTrackMIDI\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 SwingTrackMIDI\par}
 }
 ]]></description>
       </metadata>
@@ -475,20 +480,29 @@
         <changelog><![CDATA[- Name Change]]></changelog>
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/9ae6b81625aa9cadc8eeb96f4ad1925a2372710e/Effects/SwingTrackMIDI.jsfx</source>
       </version>
+      <version name="1.0.2" author="Rock Kennedy" time="2026-02-03T05:40:48Z">
+        <changelog><![CDATA[- Name Change]]></changelog>
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/7ae44be57a03b9d50eb55ca7418cdd9ba8b49dde/Effects/SwingTrackMIDI.jsfx</source>
+      </version>
     </reapack>
     <reapack name="SwingTrackMIDIvisual.jsfx" type="effect" desc="SwingTrackMIDIvisual">
       <metadata>
-        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \b \fs36 SwingTrackMIDIvisual\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 SwingTrackMIDIvisual\par}
 }
 ]]></description>
       </metadata>
       <version name="1.0.1" author="Rock Kennedy" time="2022-11-28T02:12:29Z">
         <changelog><![CDATA[- Name Change]]></changelog>
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/9ae6b81625aa9cadc8eeb96f4ad1925a2372710e/Effects/SwingTrackMIDIvisual.jsfx</source>
+      </version>
+      <version name="1.0.2" author="Rock Kennedy" time="2026-02-03T05:42:05Z">
+        <changelog><![CDATA[- Name Change
+- gmem space change]]></changelog>
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/6a10dfb3c4978dc72ca1d53a355695429b2433c3/Effects/SwingTrackMIDIvisual.jsfx</source>
       </version>
     </reapack>
     <reapack name="ThisTriggersThat.jsfx" type="effect" desc="ThisTriggersThat">
