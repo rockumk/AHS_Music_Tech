@@ -1,4 +1,4 @@
-version: 1.0.1
+version: 1.0.2
 desc: SwingProjectMIDI
 // Sets MIDI swing across all tracks with synced SwingTrackMIDI
 author: Rock Kennedy
@@ -6,11 +6,11 @@ about:
   # SwingProjectMIDI
 changelog:
   - Name Change
+  - gmem space change
 
 
 
-
-options:gmem=ProjectSwing
+options:gmem=N2N_Ecosystem_RSKennedy
 
 
 slider1:0<0,1,1{Numbers2Notes, The Manual Override Below}>What sets the Project Swing?
@@ -71,3 +71,4 @@ slider3 = rulingvalue;
 
 
 @sample
+
