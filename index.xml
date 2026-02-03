@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="cbfa50964f0e651a7d07eea2852a9c1d23eebf47">
+<index version="1" name="AHS_Music_Tech" commit="05390286391c62f4a112c630c35542c2a82e3d17">
   <category name="Data/N2N/DrumKits">
     <reapack name="Clear All.txt" type="midinotenames" desc="Clear All">
       <version name="1.0.0" author="Rock Kennedy" time="2026-01-20T12:54:49Z">
@@ -212,7 +212,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Arp v11.9\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Arp v11.9.1\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab CLEANUP: Removed all Drum Arranger tabs/buttons. Back to 0-127 Grid.\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FIX: Slider Ghosting (Pattern settings no longer affect Top Row sliders).\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FIX: Row Hum now correctly allows -1 (displays "Glb").\par}
@@ -220,7 +220,8 @@
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab UI: "STRETCH" button always visible. "1/2 Speed" only in 24/32 subdiv.\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab UI: Bar Ruler menu is Left-Click.\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FIX: Groove now correctly calculated for 1/2 speed.\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Removed version number from title.\sa180\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Removed version number from title.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab New gmem space.\sa180\par}
 }
 ]]></description>
       </metadata>
@@ -244,6 +245,9 @@
       </version>
       <version name="11.9" author="Rock Kennedy" time="2026-01-23T04:16:21Z">
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/bf460227db5a6787d688992402344d2a4b29d8ae/Effects/N2N%20Arp.jsfx</source>
+      </version>
+      <version name="11.9.1" author="Rock Kennedy + AI" time="2026-02-03T05:37:46Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/05390286391c62f4a112c630c35542c2a82e3d17/Effects/N2N%20Arp.jsfx</source>
       </version>
     </reapack>
     <reapack name="N2N Drum Arranger.jsfx" type="effect" desc="N2N Drum Arranger">
