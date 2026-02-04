@@ -1,3 +1,4 @@
+// @noindex
 28	Kick 6
 29	Kick 5
 30	Snare Roll
