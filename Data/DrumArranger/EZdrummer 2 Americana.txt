@@ -1,3 +1,4 @@
+// @noindex
 16	[Snare] snareCtrl
 4	[Hats] hatsCtrl
 1	[Hats] hatsCtrl
@@ -127,4 +128,5 @@
 4	[Snare] Sidestick Right
 3	Tambourine
 2	Shaker
+
 1	Obe-Shot / Claps
