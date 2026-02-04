@@ -1,3 +1,4 @@
+// @noindex
 127	127     G	// Red
 126	126     F#   Gb	// Magenta
 125	125     F	// Purple.pianoblack
