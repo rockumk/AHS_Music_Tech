@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="6a10dfb3c4978dc72ca1d53a355695429b2433c3">
+<index version="1" name="AHS_Music_Tech" commit="beed6ca01e758705037b90c10385e887f1d1f76d">
   <category name="Data/N2N/DrumKits">
     <reapack name="Clear All.txt" type="midinotenames" desc="Clear All">
       <version name="1.0.0" author="Rock Kennedy" time="2026-01-20T12:54:49Z">
@@ -204,6 +204,16 @@
         <source type="data" file="../Data/Mood2Mode/rating4.jpg">https://github.com/rockumk/AHS_Music_Tech/raw/e9e172771cbf1afe8a7ee624ce308d5914dc4b92/Data/Mood2Mode/rating4.jpg</source>
         <source type="data" file="../Data/Mood2Mode/on.png">https://github.com/rockumk/AHS_Music_Tech/raw/e9e172771cbf1afe8a7ee624ce308d5914dc4b92/Data/Mood2Mode/on.png</source>
         <source type="data" file="../Data/Mood2Mode/off.png">https://github.com/rockumk/AHS_Music_Tech/raw/e9e172771cbf1afe8a7ee624ce308d5914dc4b92/Data/Mood2Mode/off.png</source>
+      </version>
+      <version name="1.1.0" time="2026-02-04T00:35:18Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/beed6ca01e758705037b90c10385e887f1d1f76d/Effects/Mood2Mode.jsfx</source>
+        <source type="data" file="AHS_Music_Tech/Mood2Mode/Mood2ModeBackground.png">https://github.com/rockumk/AHS_Music_Tech/raw/beed6ca01e758705037b90c10385e887f1d1f76d/Data/Mood2Mode/Mood2ModeBackground.png</source>
+        <source type="data" file="AHS_Music_Tech/Mood2Mode/rating1.jpg">https://github.com/rockumk/AHS_Music_Tech/raw/beed6ca01e758705037b90c10385e887f1d1f76d/Data/Mood2Mode/rating1.jpg</source>
+        <source type="data" file="AHS_Music_Tech/Mood2Mode/rating2.jpg">https://github.com/rockumk/AHS_Music_Tech/raw/beed6ca01e758705037b90c10385e887f1d1f76d/Data/Mood2Mode/rating2.jpg</source>
+        <source type="data" file="AHS_Music_Tech/Mood2Mode/rating3.jpg">https://github.com/rockumk/AHS_Music_Tech/raw/beed6ca01e758705037b90c10385e887f1d1f76d/Data/Mood2Mode/rating3.jpg</source>
+        <source type="data" file="AHS_Music_Tech/Mood2Mode/rating4.jpg">https://github.com/rockumk/AHS_Music_Tech/raw/beed6ca01e758705037b90c10385e887f1d1f76d/Data/Mood2Mode/rating4.jpg</source>
+        <source type="data" file="AHS_Music_Tech/Mood2Mode/on.png">https://github.com/rockumk/AHS_Music_Tech/raw/beed6ca01e758705037b90c10385e887f1d1f76d/Data/Mood2Mode/on.png</source>
+        <source type="data" file="AHS_Music_Tech/Mood2Mode/off.png">https://github.com/rockumk/AHS_Music_Tech/raw/beed6ca01e758705037b90c10385e887f1d1f76d/Data/Mood2Mode/off.png</source>
       </version>
     </reapack>
     <reapack name="N2N Arp.jsfx" type="effect" desc="N2N Arp">
