@@ -1,15 +1,15 @@
 desc:N2N Drum Arranger
-version: 5.4.9
+version: 5.5.0
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v5.4.9
+  # N2N Drum Arranger v5.5.0
   - Fixed GMEM cue system with proper hierarchy and anti-loop protection
   - 64th-note lookahead, 8th-note clear window
   - MIDI Note > GMEM Global > GMEM Type > GMEM Inst > MIDI PC priority
   - Many, many small new features.
   - Updated provides
 provides
-  [data] ../Data/DrumArranger/*.txt > AHS_Music_Tech/DrumArranger/*.txt
+  [data] ../Data/DrumArranger/Drum8.txt > AHS_Music_Tech/DrumArranger/Drum8.txt
 
 options:gmem=N2N_Ecosystem_RSKennedy
 
