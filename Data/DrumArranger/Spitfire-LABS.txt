@@ -1,3 +1,4 @@
+// @noindex
 36	BD
 37	BDAlt
 38	Snare
