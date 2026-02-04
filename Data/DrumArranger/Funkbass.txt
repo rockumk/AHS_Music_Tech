@@ -1,3 +1,4 @@
+// @noindex
 60	C      4  // Red
 59	B  // Magenta
 58	A#/Bb  // Grey
