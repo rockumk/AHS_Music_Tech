@@ -9,7 +9,7 @@ about:
   - Many, many small new features.
   - Updated provides
 provides:
-  [data] ../Data/DrumArranger/Drum8.N2Ndrumkit > AHS_Music_Tech/DrumArranger/Drum8.N2Ndrumkit
+  [data] ../Data/DrumArranger/Drumtastic.txt > AHS_Music_Tech/DrumArranger/Drumtastic.txt
 
 options:gmem=N2N_Ecosystem_RSKennedy
 
