@@ -1,7 +1,0 @@
-desc:aaa.data
-version: 1
-author: Rock Kennedy
-about:
-  # indexes data to be delivered to user
-@provides
-    Data/DrumArranger/*.txt > AHS_Music_Tech/DrumArranger/
