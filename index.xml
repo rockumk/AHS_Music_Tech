@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="9ad70294ef0793763e70248784ef2a75efc38133">
+<index version="1" name="AHS_Music_Tech" commit="d51f09e3a425115994a80a0a865445133bc55ae1">
+  <category name="Data/DrumArranger">
+    <reapack name="Drum8.txt" type="midinotenames">
+      <version name="1.0" time="2026-02-04T03:42:53Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/d51f09e3a425115994a80a0a865445133bc55ae1/Data/DrumArranger/Drum8.txt</source>
+      </version>
+    </reapack>
+  </category>
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
