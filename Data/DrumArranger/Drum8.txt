@@ -1,0 +1,28 @@
+36	1  // Red
+37	2  // Deep Orange
+38	3  // Green
+39	4  // Lime
+40	5  // Blue
+41	6  // Sky
+42	7  // Yellow
+43	8  // Amber
+
+
+  // White
+  // Red
+  // Deep Orange
+  // Orange
+  // Amber
+  // Yellow
+  // Lime
+  // Green
+  // Mint
+  // Cyan
+  // Sky
+  // Blue
+  // Indigo
+  // Purple
+  // Violet
+  // Magenta
+  // Rose
+  // Grey

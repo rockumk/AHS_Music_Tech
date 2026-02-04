@@ -1,0 +1,30 @@
+43	8  // Sky
+42	7  // Sky
+41	6  // Yellow
+40	5  // Yellow
+39	4  // Magenta
+38	3  // Magenta
+37	2  // Mint
+36	1  // Mint
+
+
+
+
+  // White
+  // Red
+  // Deep Orange
+  // Orange
+  // Amber
+  // Yellow
+  // Lime
+  // Green
+  // Mint
+  // Cyan
+  // Sky
+  // Blue
+  // Indigo
+  // Purple
+  // Violet
+  // Magenta
+  // Rose
+  // Grey

@@ -1,0 +1,68 @@
+# MIDI note name map
+121 [Hats] V Open Loose
+120 Open Pedal
+119 Open Min
+118 [Ride] V Mute
+117 Bell tip
+116 Ride Shank
+83 [Cymbal 1] Mute
+82 [RackT 1] V Rimshot
+81 Head
+80 [RackT 2] V Rimshot
+79 Head
+78 [RackT 3] V Rimshot
+77 Head
+76 [Snare ] Rim Only
+75 [FloorT 1] V Rimshot
+74 Head
+73 Rimshot
+72 Head
+71 [Snare] Rim Only
+65 [Hats] V Sequence
+64 Open min
+63 Tight Tip
+62 Tight
+61 Closed Tip
+60 Open max
+59 [Ride] Edge
+58 [Cymbal 2] V Crash
+57 Crash
+56 [Ride] Bell Tip
+55 [Cymbal 2] Crash
+54 Mute
+53 [Ride] V Bell Shank
+52 Ride Shank
+51 Ride tip
+50 [RackT 1] Head
+49 [Cymbal 1] Crash
+48 [RackT 1] Head
+47 [RackT 2] Head
+46 [GM] Open HH
+45 [RackT 3] Head
+44 [GM] HH Pedal
+43 [FloorT] Head
+42 [GM] Closed HH
+41 [FloorT] Center
+40 [Snare] V Rimshot
+39 Ruff
+38 Right
+37 Sidestick
+36 [Kick] V Right 
+35 alias
+34 alias
+33 [Snare] Left
+32 [Cymbal 3] V alias
+31 alias
+30 [Cymbal 2] V alias
+29 alias
+28 [Cymbal 1] V alias
+27 alias
+26 [Hats] V Open 3
+25 Open 2
+24 Open 1
+23 Foot Splash
+22 Closed Edge
+21 Pedal Chick
+3 [Tambourine Pad]
+2 [Shaker Pad]
+1 [One Shot Pad]

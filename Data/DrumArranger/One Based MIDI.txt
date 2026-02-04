@@ -1,0 +1,128 @@
+127	128     G	// White
+126	127     F#   Gb	// Purple
+125	126     F	// White
+124	125     E	// White
+123	124     D#   Eb	// Purple
+122	123     D	// White
+121	122     C#   Db	// Purple
+120	121     C	// White
+119	120     B	// White
+118	119     A#   Bb	// Purple
+117	118     A	// White
+116	117     G#   Ab	// Purple
+115	116     G	// White
+114	115     F#   Gb	// Purple
+113	114     F	// White
+112	113     E	// White
+111	112     D#   Eb	// Purple
+110	111     D	// White
+109	110     C#   Db	// Purple
+108	109     C	// White
+107	108     B	// White
+106	107     A#   Bb	// Purple
+105	106     A	// White
+104	105     G#   Ab	// Purple
+103	104     G	// White
+102	103     F#   Gb	// Purple
+101	102     F	// White
+100	101     E	// White
+99	100     D#   Eb	// Purple
+98	099     D	// White
+97	098     C#   Db	// Purple
+96	097     C	// White
+95	096     B	// White
+94	095     A#   Bb	// Purple
+93	094     A	// White
+92	093     G#   Ab	// Purple
+91	092     G	// White
+90	091     F#   Gb	// Purple
+89	090     F	// White
+88	089     E	// White
+87	088     D#   Eb	// Purple
+86	087     D	// White
+85	086     C#   Db	// Purple
+84	085     C	// White
+83	084     B	// White
+82	083     A#   Bb	// Purple
+81	082     A	// White
+80	081     G#   Ab	// Purple
+79	080     G	// White
+78	079     F#   Gb	// Purple
+77	078     F	// White
+76	077     E	// White
+75	076     D#   Eb	// Purple
+74	075     D	// White
+73	074     C#   Db	// Purple
+72	073     C	// White
+71	072     B	// White
+70	071     A#   Bb	// Purple
+69	070     A	// White
+68	069     G#   Ab	// Purple
+67	068     G	// White
+66	067     F#   Gb	// Purple
+65	066     F	// White
+64	065     E	// White
+63	064     D#   Eb	// Purple
+62	063     D	// White
+61	062     C#   Db	// Purple
+60	061     C	// White
+59	060     B	// White
+58	059     A#   Bb	// Purple
+57	058     A	// White
+56	057     G#   Ab	// Purple
+55	056     G	// White
+54	055     F#   Gb	// Purple
+53	054     F	// White
+52	053     E	// White
+51	052     D#   Eb	// Purple
+50	051     D	// White
+49	050     C#   Db	// Purple
+48	049     C	// White
+47	048     B	// White
+46	047     A#   Bb	// Purple
+45	046     A	// White
+44	045     G#   Ab	// Purple
+43	044     G	// White
+42	043     F#   Gb	// Purple
+41	042     F	// White
+40	041     E	// White
+39	040     D#   Eb	// Purple
+38	039     D	// White
+37	038     C#   Db	// Purple
+36	037     C	// White
+35	036     B	// White
+34	035     A#   Bb	// Purple
+33	034     A	// White
+32	033     G#   Ab	// Purple
+31	032     G	// White
+30	031     F#   Gb	// Purple
+29	030     F	// White
+28	029     E	// White
+27	028     D#   Eb	// Purple
+26	027     D	// White
+25	026     C#   Db	// Purple
+24	025     C	// White
+23	024     B	// White
+22	023     A#   Bb	// Purple
+21	022     A	// White
+20	021     G#   Ab	// Purple
+19	020     G	// White
+18	019     F#   Gb	// Purple
+17	018     F	// White
+16	017     E	// White
+15	016     D#   Eb	// Purple
+14	015     D	// White
+13	014     C#   Db	// Purple
+12	013     C	// White
+11	012     B	// White
+10	011     A#   Bb	// Purple
+9	010     A	// White
+8	009     G#   Ab	// Purple
+7	008     G	// White
+6	007     F#   Gb	// Purple
+5	006     F	// White
+4	005     E	// White
+3	004     D#   Eb	// Purple
+2	003     D	// White
+1	002     C#   Db	// Purple
+0	001     C	// White
