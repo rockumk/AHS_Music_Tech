@@ -1,12 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="c439e8d63b68825e06c959ae503d10a05cce9300">
-  <category name="Data/DrumArranger">
-    <reapack name="Drum8.txt" type="midinotenames">
-      <version name="1.0" time="2026-02-04T03:42:53Z">
-        <source>https://github.com/rockumk/AHS_Music_Tech/raw/d51f09e3a425115994a80a0a865445133bc55ae1/Data/DrumArranger/Drum8.txt</source>
-      </version>
-    </reapack>
-  </category>
+<index version="1" name="AHS_Music_Tech" commit="cd7aa1fb65b76401e12e06d4077c3b9d5ea4cdea">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -150,7 +143,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Drum Arranger v5.5.1\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Drum Arranger v5.5.2\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Fixed GMEM cue system with proper hierarchy and anti-loop protection\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab 64th-note lookahead, 8th-note clear window\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab MIDI Note > GMEM Global > GMEM Type > GMEM Inst > MIDI PC priority\par}
@@ -200,6 +193,9 @@
       </version>
       <version name="5.5.1" author="Rock Kennedy" time="2026-02-04T03:45:56Z">
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/c439e8d63b68825e06c959ae503d10a05cce9300/Effects/N2N%20Drum%20Arranger.jsfx</source>
+      </version>
+      <version name="5.5.2" author="Rock Kennedy" time="2026-02-04T03:55:03Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/f0bdd21c6690d58de42f57e5ce4b0db319dfe6c5/Effects/N2N%20Drum%20Arranger.jsfx</source>
       </version>
     </reapack>
     <reapack name="N2N Scale Drone.jsfx" type="effect" desc="N2N Scale Drone">
