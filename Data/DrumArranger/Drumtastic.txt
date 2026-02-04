@@ -1,3 +1,4 @@
+// @noindex
 43	8  // Sky
 42	7  // Sky
 41	6  // Yellow
