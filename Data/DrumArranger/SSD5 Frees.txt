@@ -1,4 +1,5 @@
-/ MIDI note name map
+// @noindex
+// MIDI note name map
 93 China Tip
 92 R Crash Tip
 91 L Crash Tip
@@ -51,4 +52,5 @@
 19 Rack Tom 1 Rimclick
 17 Rack Tom 2 Rimclick
 14 Floor Tom 3 Rimclick
+
 12 Floor Tom 4 Rimclick
