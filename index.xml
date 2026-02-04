@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="c93001c75e64da10f0e66c1a4afcff57d80babc2">
+<index version="1" name="AHS_Music_Tech" commit="02500bb9dd754d6c2450a3ffb2096d900ae6e529">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -143,7 +143,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Drum Arranger v5.4.4\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Drum Arranger v5.4.6\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Fixed GMEM cue system with proper hierarchy and anti-loop protection\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab 64th-note lookahead, 8th-note clear window\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab MIDI Note > GMEM Global > GMEM Type > GMEM Inst > MIDI PC priority\par}
@@ -175,6 +175,9 @@
       </version>
       <version name="5.4.4" author="Rock Kennedy" time="2026-02-04T02:51:51Z">
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/c93001c75e64da10f0e66c1a4afcff57d80babc2/Effects/N2N%20Drum%20Arranger.jsfx</source>
+      </version>
+      <version name="5.4.6" author="Rock Kennedy" time="2026-02-04T03:05:26Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02500bb9dd754d6c2450a3ffb2096d900ae6e529/Effects/N2N%20Drum%20Arranger.jsfx</source>
       </version>
     </reapack>
     <reapack name="N2N Scale Drone.jsfx" type="effect" desc="N2N Scale Drone">
