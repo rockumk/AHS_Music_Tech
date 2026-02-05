@@ -1,5 +1,5 @@
 --desc:N2NCue
---version: 3.4
+--version: 3.5
 --author: Rock Kennedy
 --about:
 -- # N2NCue
@@ -177,9 +177,12 @@ local function beats_to_qn_at_time(t, beats)
   local beat_qn = 4 / (den or 4)
   return (beats or 4) * beat_qn
 end
+ 
+local PC_PREROLL_64THS = 8  -- 4 = 1/16 note, 2 = 1/32, 1 = 1/64
 
 local function stamp_time_64_or_zero(cursor_time)
-  local qn = r.TimeMap2_timeToQN(0, cursor_time) - qn64()
+  local preroll_qn = (PC_PREROLL_64THS or 1) * qn64()
+  local qn = r.TimeMap2_timeToQN(0, cursor_time) - preroll_qn
   local t  = r.TimeMap2_QNToTime(0, qn)
   if t < 0 then t = 0 end
   return t
