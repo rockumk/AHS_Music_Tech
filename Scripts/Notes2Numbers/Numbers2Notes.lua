@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.4.7
+-- @version  1.4.8
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.4.7
+--   # Numbers2Notes 1.4.8
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -15,10 +15,11 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
---   # Major Update 1.4.7
+--   # Major Update 1.4.8
 --   + Added Groove
 --   + Changed N2N Drum Arranger to N2N Drum Arranger.jsfx
 --   + Changed gmem name
+--   + Made drum triggers earlier
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require "imgui" "0.8.6" -- Version of IMGUI used during development.
@@ -1265,7 +1266,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.4.6")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.4.8")
             reaper.ImGui_Text(ctx, "https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
 
@@ -3689,24 +3690,29 @@ end
 function Insert_Drum_Trigger(track, time_pos, pc_val)
     local r = reaper
 
-    -- A. INSERT MIDI TRIGGER (0.1 Sec MIDI Item)
-    local m_item = r.CreateNewMIDIItemInProj(track, time_pos, time_pos + 0.1, false)
+    -- MIDI EARLY ONLY (8th note early = 0.5 QN)
+    local midi_qn   = r.TimeMap2_timeToQN(0, time_pos) - 0.5
+    if midi_qn < 0 then midi_qn = 0 end
+
+    local midi_time = r.TimeMap2_QNToTime(0, midi_qn)
+
+    -- End MIDI exactly 1 quarter note after its start
+    local end_time  = r.TimeMap2_QNToTime(0, midi_qn + 1.0)
+
+    local m_item = r.CreateNewMIDIItemInProj(track, midi_time, end_time, false)
     local m_take = r.GetActiveTake(m_item)
     if m_take then
-        local ppq = r.MIDI_GetPPQPosFromProjTime(m_take, time_pos)
-        -- Channel 16 (Index 15)
+        local ppq = r.MIDI_GetPPQPosFromProjTime(m_take, midi_time)
         r.MIDI_InsertCC(m_take, false, false, ppq, 0xC0, 15, pc_val, 0)
+        r.MIDI_Sort(m_take)
     end
 
-    -- B. INSERT VISUAL TEXT LABEL
+    -- B. INSERT VISUAL TEXT LABEL  -- ON THE MEASURE (unchanged time_pos)
     local section_name, rr, gg, bb = Get_Drum_Visuals(pc_val)
-
-    -- >>> PREPEND "Drums " <<<
     local label = "Drums " .. section_name
 
-    -- Calculate Length (1 Bar / 4 Beats)
     local start_qn = r.TimeMap2_timeToQN(0, time_pos)
-    local end_qn = start_qn + 4
+    local end_qn   = start_qn + 4
     local end_time = r.TimeMap2_QNToTime(0, end_qn)
 
     local t_item = r.AddMediaItemToTrack(track)
@@ -3714,12 +3720,8 @@ function Insert_Drum_Trigger(track, time_pos, pc_val)
         r.SetMediaItemInfo_Value(t_item, "D_POSITION", time_pos)
         r.SetMediaItemInfo_Value(t_item, "D_LENGTH", end_time - time_pos)
 
-        -- Set Name (Label above) AND Notes (Big Text inside)
         r.GetSetMediaItemInfo_String(t_item, "P_NAME", label, true)
-        r.GetSetMediaItemInfo_String(t_item, "P_NOTES", label, true) -- <--- THIS IS THE FIX
-
-        -- Set Stretch to fit (Optional bitmask: 1=stretch)
-        -- r.SetMediaItemInfo_Value(t_item, "I_IMGITEM_TYPE", 1)
+        r.GetSetMediaItemInfo_String(t_item, "P_NOTES", label, true)
 
         local native_color =
             r.ColorToNative(math.floor(rr * 255), math.floor(gg * 255), math.floor(bb * 255)) | 0x1000000
