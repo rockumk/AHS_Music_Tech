@@ -1,5 +1,5 @@
 -- @description numbers2notes_config
--- @version 1.5
+-- @version 1.5.1
 -- @noindex
 -- @author Rock Kennedy
 -- @about
@@ -79,7 +79,7 @@ config.track_table = {
     }, {3, 4}, 0, {134, 172, 181}, 0.4},
 
     [7] = {"N2N Chord 2", false, nil, 0, {
-        {"JS: N2N Arp", true, nil, 3},
+        {"JS: N2N Arp.jsfx", true, nil, 3},
         {"CLAP:Surge XT", true, "N2N_Blips", 8},
         {"JS:Guitar Amp", false, nil, 7},
         {"Tube", false, nil, 9},  
@@ -92,7 +92,7 @@ config.track_table = {
     }, {3, 4}, 0, {134, 172, 181}, 0.2},
 
     [8] = {"N2N Chord 3", false, nil, 0, {
-        {"JS: N2N Arp", true, nil, 3},
+        {"JS: N2N Arp.jsfx", true, nil, 3},
         {"CLAP:Surge XT", true, "N2N_Plucks", 8},
         {"STFU", false, nil, 11},
         {"JS:Guitar Amp", false, nil, 7},
@@ -105,7 +105,7 @@ config.track_table = {
     }, {3, 4}, 0, {134, 172, 181}, 0.4},
 
     [9] = {"N2N Chord 4", false, nil, 0, {
-        {"JS: N2N Arp", true, nil, 3},
+        {"JS: N2N Arp.jsfx", true, nil, 3},
         {"CLAP:Surge XT", true, "N2N_Plucks", 8},
         {"STFU", false, nil, 11},
         {"JS:Guitar Amp", false, nil, 7},
@@ -118,7 +118,7 @@ config.track_table = {
     }, {3, 4}, 0, {134, 172, 181}, 0.4},
 
     [10] = {"N2N Chord 5", false, nil, 0, {
-        {"JS: N2N Arp", true, nil, 3},
+        {"JS: N2N Arp.jsfx", true, nil, 3},
         {"CLAP:Surge XT", true, "N2N_Plucks", 8},
         {"STFU", false, nil, 11},
         {"JS:Guitar Amp", false, nil, 7},
@@ -131,7 +131,7 @@ config.track_table = {
     }, {3, 4}, 0, {134, 172, 181}, 0.4},
 
     [11] = {"N2N Chord 6", false, nil, 0, {
-        {"JS: N2N Arp", true, nil, 3},
+        {"JS: N2N Arp.jsfx", true, nil, 3},
         {"CLAP:Surge XT", true, "N2N_Plucks", 8},
         {"STFU", false, nil, 11},
         {"JS:Guitar Amp", false, nil, 7},
@@ -144,7 +144,7 @@ config.track_table = {
     }, {3, 4}, 0, {134, 172, 181}, 0.4},
 
     [12] = {"N2N Chord 7", false, nil, 0, {
-        {"JS: N2N Arp", true, nil, 3},
+        {"JS: N2N Arp.jsfx", true, nil, 3},
         {"CLAP:Surge XT", true, "N2N_Plucks", 8},
         {"STFU", false, nil, 11},
         {"JS:Guitar Amp", false, nil, 7},
@@ -161,7 +161,7 @@ config.track_table = {
     [14] = {"N2N Chord-Bass", false, nil, 0, {
         {"HeadStart", true, nil, 13},
         {"ReaCenterMIDIpitch", false, nil, 13},
-        {"JS: N2N Arp", true, nil, 13},
+        {"JS: N2N Arp.jsfx", true, nil, 13},
         {"ReaPulsive-8ths", false, nil, 13},  
         {"SwingTrackMIDI", true, nil, 13},
         {"ThisTriggersThat", false, nil, 13},
@@ -179,7 +179,7 @@ config.track_table = {
     [15] = {"N2N Bass MIDI", false, nil, 1, {}, {16}, 1, {134, 153, 181}, 0},
 
     [16] = {"N2N Bass", false, nil, 0, {
-        {"JS: N2N Arp", true, nil, 3},
+        {"JS: N2N Arp.jsfx", true, nil, 3},
         {"CLAP:Surge XT", true, "N2N_Bass", 8},
         {"STFU", false, nil, 11},
         {"JS:Guitar Amp", false, nil, 7},
@@ -192,7 +192,7 @@ config.track_table = {
     }, {3, 4}, 0, {134, 153, 181}, 1.3},
 
     [17] = {"N2N Drums", false, nil, 0, {
-        {"JS:N2N Drum Arranger", true, "N2N Default", 13},
+        {"JS:N2N Drum Arranger.jsfx", true, nil, 13},
         {"Pro Punk Drums (Pro Punk DSP) (16 out)", true, nil, 13},
 		{"JS:ReEQ", true, nil, 2},
         {"JS:Violet Envelope Shaper S2", false, nil, 12},
@@ -207,6 +207,7 @@ config.track_table = {
 
 
 return config
+
 
 
 
