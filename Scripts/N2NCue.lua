@@ -1,5 +1,5 @@
 --desc:N2NCue
---version: 3.5
+--version: 3.5.1
 --author: Rock Kennedy
 --about:
 -- # N2NCue
@@ -699,7 +699,7 @@ local function tab_label_from_prog(prog)
   if prog >= 91 and prog <= 100 then
     return "Flex " .. tostring(prog - 90)
   end
-  return "Drums PC " .. tostring(prog)
+  return "Arp Pattern # " .. tostring(prog)
 end
 
 ----------------------------------------------------------------
@@ -1033,7 +1033,12 @@ local function process_regions_all(tracks_table, bank)
   r.Undo_BeginBlock()
   for _, tr_data in ipairs(tracks_table) do
     if r.ValidatePtr(tr_data.track, "MediaTrack*") then
-      process_regions_for_track(tr_data.track, bank)
+      if tr_data.type == "Drum" then
+        process_regions_for_track(tr_data.track, bank)
+      end
+      -- if tr_data.type == "Arp" then
+      --   (do nothing, or call an arp-specific region processor later)
+      -- end
     end
   end
   r.Undo_EndBlock("N2N Multi-Track: Process Regions", -1)
