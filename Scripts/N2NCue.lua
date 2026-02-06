@@ -1,5 +1,5 @@
 --desc:N2NCue
---version: 3.5.1
+--version: 3.5.2
 --author: Rock Kennedy
 --about:
 -- # N2NCue
@@ -384,8 +384,23 @@ local function scan_project_tracks()
     for fx = 0, fx_count - 1 do
       local retval, buf = r.TrackFX_GetFXName(tr, fx, "")
       if retval and buf then
+        -- Normalize the buffer: lowercase and extract just the filename if it's a path
+        local normalized = buf:lower()
+        
+        -- Check if it's a JSFX by looking for the name (with or without .jsfx extension)
         for fx_name, track_type in pairs(TARGET_FX_NAMES) do
-          if buf:find(fx_name, 1, true) then
+          -- Strip .jsfx for comparison if present
+          local name_without_ext = fx_name:gsub("%.jsfx$", ""):lower()
+          local name_with_ext = fx_name:lower()
+          
+          -- Check multiple patterns that might appear on different platforms
+          local matches = (
+            normalized:find(name_with_ext, 1, true) or           -- Full name with extension
+            normalized:find(name_without_ext, 1, true) or        -- Name without extension
+            normalized:find("js: " .. name_without_ext, 1, true) -- REAPER's JS: prefix
+          )
+          
+          if matches then
             local _, tr_name = r.GetTrackName(tr)
             local key = tostring(tr)
             
