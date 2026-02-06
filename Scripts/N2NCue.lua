@@ -1,5 +1,5 @@
 --desc:N2NCue
---version: 3.5.2
+--version: 3.5.3
 --author: Rock Kennedy
 --about:
 -- # N2NCue
@@ -435,13 +435,25 @@ local function validate_existing_tracks()
     local retval, buf = r.TrackFX_GetFXName(gt.track, gt.fx_idx, "")
     
     if not retval then
+      -- FX no longer at expected index, scan track to find it
       local found = false
       local fx_count = r.TrackFX_GetCount(gt.track)
       for fx = 0, fx_count - 1 do
         local rv, name = r.TrackFX_GetFXName(gt.track, fx, "")
         if rv and name then
+          local normalized = name:lower()
+          -- Use same matching logic as scan_project_tracks
           for fx_name, _ in pairs(TARGET_FX_NAMES) do
-            if name:find(fx_name, 1, true) then
+            local name_without_ext = fx_name:gsub("%.jsfx$", ""):lower()
+            local name_with_ext = fx_name:lower()
+            
+            local matches = (
+              normalized:find(name_with_ext, 1, true) or
+              normalized:find(name_without_ext, 1, true) or
+              normalized:find("js: " .. name_without_ext, 1, true)
+            )
+            
+            if matches then
               gt.fx_idx = fx
               found = true
               break
@@ -456,22 +468,45 @@ local function validate_existing_tracks()
         gt.inst_id = 0
       end
     else
+      -- FX still there, verify it's still the right type
       local correct_fx = false
+      local normalized = buf:lower()
+      
       for fx_name, _ in pairs(TARGET_FX_NAMES) do
-        if buf:find(fx_name, 1, true) then
+        local name_without_ext = fx_name:gsub("%.jsfx$", ""):lower()
+        local name_with_ext = fx_name:lower()
+        
+        local matches = (
+          normalized:find(name_with_ext, 1, true) or
+          normalized:find(name_without_ext, 1, true) or
+          normalized:find("js: " .. name_without_ext, 1, true)
+        )
+        
+        if matches then
           correct_fx = true
           break
         end
       end
       
       if not correct_fx then
+        -- Wrong FX type, try to find correct one elsewhere on track
         local found = false
         local fx_count = r.TrackFX_GetCount(gt.track)
         for fx = 0, fx_count - 1 do
           local rv, name = r.TrackFX_GetFXName(gt.track, fx, "")
           if rv and name then
+            local norm = name:lower()
             for fx_name, _ in pairs(TARGET_FX_NAMES) do
-              if name:find(fx_name, 1, true) then
+              local name_without_ext = fx_name:gsub("%.jsfx$", ""):lower()
+              local name_with_ext = fx_name:lower()
+              
+              local matches = (
+                norm:find(name_with_ext, 1, true) or
+                norm:find(name_without_ext, 1, true) or
+                norm:find("js: " .. name_without_ext, 1, true)
+              )
+              
+              if matches then
                 gt.fx_idx = fx
                 found = true
                 break
