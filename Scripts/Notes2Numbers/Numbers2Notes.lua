@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.4.8
+-- @version  1.4.9
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.4.8
+--   # Numbers2Notes 1.4.9
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -15,11 +15,11 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
---   # Major Update 1.4.8
+--   # Major Update 1.4.9
 --   + Added Groove
 --   + Changed N2N Drum Arranger to N2N Drum Arranger.jsfx
 --   + Changed gmem name
---   + Made drum triggers earlier
+--   + N2N Drum Arranger search fixed for Mac
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require "imgui" "0.8.6" -- Version of IMGUI used during development.
@@ -1266,7 +1266,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.4.8")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.4.9")
             reaper.ImGui_Text(ctx, "https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
 
@@ -3752,10 +3752,10 @@ function Generate_Drum_Conductor(drum_track)
     r.UpdateArrange()
 end
 
--- HELPER: Find track containing a specific FX name
+-- HELPER: Find track containing a specific FX name (Windows/Mac compatible)
 function Find_Track_With_Drum_FX()
     local r = reaper
-    local target_fx = "N2N Drum Arranger.jsfx" -- Search string (matches "N2N Drum Arranger.jsfx")
+    local target_fx = "N2N Drum Arranger" -- base name with original casing
 
     local track_count = r.CountTracks(0)
 
@@ -3767,16 +3767,28 @@ function Find_Track_With_Drum_FX()
             -- Get FX Name
             local retval, buf = r.TrackFX_GetFXName(tr, fx, "")
 
-            if retval and string.find(buf, target_fx) then
-                return tr
+            if retval and buf then
+                local normalized = buf:lower()
+                local target_lower = target_fx:lower()
+                
+                -- Check multiple patterns for cross-platform compatibility
+                local matches = (
+                    normalized:find(target_fx .. ".jsfx", 1, true) or  -- Windows: original case + ext
+                    normalized:find(target_lower .. ".jsfx", 1, true) or -- Windows: lowercase + ext
+                    normalized:find(target_fx, 1, true) or              -- Mac: original case no ext
+                    normalized:find(target_lower, 1, true) or           -- Mac: lowercase no ext
+                    normalized:find("js: " .. target_lower, 1, true)    -- REAPER's JS: prefix
+                )
+                
+                if matches then
+                    return tr
+                end
             end
         end
     end
 
     return nil -- Not found
 end
-
--- Count the items in Track 1
 
 
 
