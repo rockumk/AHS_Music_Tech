@@ -1,5 +1,5 @@
 --desc:N2NCue
---version: 3.5.5
+--version: 3.5.6
 --author: Rock Kennedy
 --about:
 -- # N2NCue
@@ -649,14 +649,22 @@ local function write_track_info_to_gmem()
       local native_col = r.GetTrackColor(tr_data.track)
       
       local col_r, col_g, col_b = 0.5, 0.5, 0.5
+      
       if native_col and native_col ~= 0 then
-        -- FIX: Mask out the custom color flag for cross-platform compatibility
-        native_col = native_col & 0xFFFFFF
+        -- FIX: Use ColorFromNative for cross-platform byte order
+        local ok, r_val, g_val, b_val = pcall(r.ColorFromNative, native_col)
         
-        local rr = (native_col % 256) / 255
-        local gg = (math.floor(native_col / 256) % 256) / 255
-        local bb = (math.floor(native_col / 65536) % 256) / 255
-        col_r, col_g, col_b = rr, gg, bb
+        if ok and r_val and g_val and b_val then
+          col_r = r_val / 255
+          col_g = g_val / 255
+          col_b = b_val / 255
+        else
+          -- Fallback to manual with mask (shouldn't happen)
+          native_col = native_col & 0xFFFFFF
+          col_r = (native_col % 256) / 255
+          col_g = (math.floor(native_col / 256) % 256) / 255
+          col_b = (math.floor(native_col / 65536) % 256) / 255
+        end
       end
       
       local base_addr = GMEM_INFO_BASE + ((tr_data.inst_id - 1) * 4)
