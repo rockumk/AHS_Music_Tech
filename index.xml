@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="4283e9e033f81e80a7336f0473214b71733922a8">
+<index version="1" name="AHS_Music_Tech" commit="c41a4a86241100d30b266262f2c2581575ee19cb">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -571,6 +571,9 @@
       </version>
       <version name="3.5.3" author="Rock Kennedy" time="2026-02-06T04:04:25Z">
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/4283e9e033f81e80a7336f0473214b71733922a8/Scripts/N2NCue.lua</source>
+      </version>
+      <version name="3.5.4" author="Rock Kennedy" time="2026-02-06T04:21:21Z">
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/c41a4a86241100d30b266262f2c2581575ee19cb/Scripts/N2NCue.lua</source>
       </version>
     </reapack>
     <reapack name="RSK - Full Spectrum.lua" type="script" desc="RSK_Full_Spectrum">
