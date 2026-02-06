@@ -1,5 +1,5 @@
 --desc:N2NCue
---version: 3.5.3
+--version: 3.5.4
 --author: Rock Kennedy
 --about:
 -- # N2NCue
@@ -123,10 +123,31 @@ local function get_track_color_data(track)
     return 0.4, 0.4, 0.4, 1, 1, 1
   end
   
+  -- Use REAPER's native function instead of manual bit math
+  local ok, r_val, g_val, b_val = pcall(r.ColorFromNative, native)
+  
+  if ok and r_val and g_val and b_val then
+    local rr = r_val / 255
+    local gg = g_val / 255
+    local bb = b_val / 255
+    
+    local lum = 0.299*rr + 0.587*gg + 0.114*bb
+    local tr, tg, tb = 1, 1, 1
+    if lum > 0.6 then
+      tr, tg, tb = 0, 0, 0
+    end
+    
+    return rr, gg, bb, tr, tg, tb
+  end
+  
+  -- Fallback to manual extraction if ColorFromNative fails
   native = tonumber(native) or 0
   if native == 0 then
     return 0.4, 0.4, 0.4, 1, 1, 1
   end
+  
+  -- Mask out the custom color flag if present
+  native = native & 0xFFFFFF
   
   local rr = (native % 256) / 255
   local gg = (math.floor(native / 256) % 256) / 255
