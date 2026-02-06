@@ -1,20 +1,22 @@
 desc:N2N Drum Arranger
-version: 5.5.7
+version: 5.5.9
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v5.5.7
+  # N2N Drum Arranger v5.5.9
   - Fixed GMEM cue system with proper hierarchy and anti-loop protection
   - 64th-note lookahead, 8th-note clear window
   - MIDI Note > GMEM Global > GMEM Type > GMEM Inst > MIDI PC priority
   - Many, many small new features.
-  - Updated provides
+  - Updated provides.
+  - fixed an undeclared varaible bug.
+  - limited Follow X activation to incoming gmem cues.
 provides:
   [data] ../Data/DrumArranger/*.txt > AHS_Music_Tech/DrumArranger/
 
 options:gmem=N2N_Ecosystem_RSKennedy
 
 // --- KIT SELECTOR SLIDER (READ ONLY) ---
-slider10:/AHS_Music_Tech/DrumArranger:none:File Selection - Drumkits and Pattern(s)
+slider10:/AHS_Music_Tech/DrumArranger::File Selection - Drumkits and Pattern(s)
 
 slider1:100<1,127,1>-Default Row Velocity
 slider2:0<0,25,1>-Global Humanize
@@ -28,6 +30,7 @@ slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
 slider11:14<10,30,1>-Grid Row Height
 
 @init
+version_display = "v5.5.9";
 
 // =========================================================
 // REGISTRATION & GROOVE MEMORY
@@ -50,6 +53,11 @@ midi_note_cue_val = 0;
 pc_cue_pending = 0;         
 pc_cue_val = 0;
 last_bar_checked = -1;   // MUST start at -1
+midi_cue_tab = -1;       // Initialize to -1 (No cue)
+midi_cue_source = -1;    // Initialize to -1 (No source)
+
+
+
 
 // --- Bar-Line Cue Queue Variables (Legacy cleanup) ---
 gmem_queued_tab = -1;      
@@ -851,7 +859,7 @@ scan_all_tabs();
 file_avail(0) > 0 ? (
     // LOADING - file exists and has data
     file_var(0, loaded_ver);
-    loaded_ver == NEW_MAGIC_VER ? (
+    (loaded_ver == NEW_MAGIC_VER || loaded_ver == 27022) ? (
         file_mem(0, 0, state_len);
         i=0; loop(MAX_ROWS, file_string(0, row_name_str_base + i * str_size); i+=1;);
         file_avail(0) >= 0 ? ( scan_all_tabs(); );
@@ -1081,7 +1089,7 @@ final_source_type = -1; // 0=Note, 1=GMEM, 2=PC
 
     // AUTO-FOLLOW: Unlock GUI if the cue is NEW
     // This allows you to see the change happening.
-    (cue_target_tab != mem[ui_play_prog_tab]) ? (
+    (cue_target_tab != mem[ui_play_prog_tab] && final_source_type == 1) ? (
          mem[ui_locked_tab] = -1; 
          gmem[GM_BASE+1] = -1; 
     );
@@ -1508,8 +1516,17 @@ tx = UI_TOP_X; ty = UI_TOP_Y;
 gfx_setfont(1, "Arial", 30, 'b');
 bri = .9;
 // HDR_Y-2 FIX APPLIED BELOW:
-draw_text(HDR_X+5, HDR_Y-2 + 8, "N2N Drum Arranger", 0.2*bri,  1.0*bri,  1.0*bri);
+draw_text(HDR_X+5, HDR_Y , "N2N Drum Arranger", 0.2*bri,  1.0*bri,  1.0*bri);
 gfx_setfont(0);
+
+tx = UI_TOP_X; ty = UI_TOP_Y;
+gfx_setfont(1, "Arial", 12  , 'b');
+bri = .9;
+// HDR_Y-2 FIX APPLIED BELOW:
+draw_text(HDR_X+244, HDR_Y + 15 , version_display, 0.2*bri,  1.0*bri,  1.0*bri);
+gfx_setfont(0);
+
+
 row1_y = UI_TOP_Y + 5; 
 x1 = HDR_X + HDR_W + UI_GAP_X - 10;
 gfx_set(0.8,0.8,0.8,1); 
