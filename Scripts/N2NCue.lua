@@ -1,5 +1,5 @@
 --desc:N2NCue
---version: 3.5.4
+--version: 3.5.5
 --author: Rock Kennedy
 --about:
 -- # N2NCue
@@ -650,6 +650,9 @@ local function write_track_info_to_gmem()
       
       local col_r, col_g, col_b = 0.5, 0.5, 0.5
       if native_col and native_col ~= 0 then
+        -- FIX: Mask out the custom color flag for cross-platform compatibility
+        native_col = native_col & 0xFFFFFF
+        
         local rr = (native_col % 256) / 255
         local gg = (math.floor(native_col / 256) % 256) / 255
         local bb = (math.floor(native_col / 65536) % 256) / 255
