@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 11.9.1
-author: Rock Kennedy + AI
+version: 11.92
+author: Rock Kennedy
 about:
-  # N2N Arp v11.9.1
+  # N2N Arp v11.92
   - CLEANUP: Removed all Drum Arranger tabs/buttons. Back to 0-127 Grid.
   - FIX: Slider Ghosting (Pattern settings no longer affect Top Row sliders).
   - FIX: Row Hum now correctly allows -1 (displays "Glb").
@@ -11,11 +11,10 @@ about:
   - UI: Bar Ruler menu is Left-Click.
   - FIX: Groove now correctly calculated for 1/2 speed.
   - Removed version number from title.
-  - New gmem space.
 provides:
   [main] .
 
-options:gmem=N2N_Ecosystem_RSKennedy
+options:gmem=ProjectSwing
 
 slider1:110<1,127,1>-Default Row Velocity
 slider2:0<0,25,1>-Global Humanize
@@ -30,7 +29,7 @@ slider10:0<0,1,1{N2N Script,Live MIDI}>-Chord Source
 slider11:12<10,30,1>-Grid Row Height
 
 @init
-
+thisversion = "v11.92";
 // =========================================================
 // VISUALS
 // =========================================================
@@ -82,6 +81,7 @@ ui_last_step     = ui_base + 6;
 ui_oct_transpose = ui_base + 7; 
 ui_follow_mode   = ui_base + 8;
 ui_vel_edit_all  = ui_base + 9;
+ui_init_done     = ui_base + 10;
 
 mem[ui_oct_transpose] < -3 || mem[ui_oct_transpose] > 3 ? mem[ui_oct_transpose] = 0;
 // If undefined (0 on first load), set to -1 (Unlocked)
@@ -91,7 +91,7 @@ mem[ui_locked_tab] < -1 ? mem[ui_locked_tab] = -1;
 input_state_base = mem_pos; mem_pos += 128; 
 input_chan_base  = mem_pos; mem_pos += 128; 
 scale_state_base = mem_pos; mem_pos += 12; 
-scale_tonic      = 0; 
+scale_tonic      = -1; 
 scale_note_vels  = mem_pos; mem_pos += 128; 
 
 chord_count = 0;
@@ -163,8 +163,9 @@ copy_tab_l_buf = mem_pos; mem_pos += MAX_ROWS * MAX_STEPS;
 bar_copy_base = mem_pos; mem_pos += (MAX_ROWS * 32 * 3); 
 
 ownership_map = mem_pos; mem_pos += MAX_STEPS;
-sort_tmp_n = mem_pos; mem_pos += 128;
-sort_tmp_v = mem_pos; mem_pos += 128;
+// Increased from 128 to 130 to prevent sorting overflows
+sort_tmp_n = mem_pos; mem_pos += 130; 
+sort_tmp_v = mem_pos; mem_pos += 130;
 kill_buf_size = 128 * 17;
 kill_buf = mem_pos; mem_pos += kill_buf_size;
 kill_chan = mem_pos; mem_pos += kill_buf_size; 
@@ -195,7 +196,7 @@ i=0; loop(MAX_ROWS,
     mem[row_chan_base+i] == 0 ? mem[row_chan_base+i] = 1; 
     mem[row_level_base+i] == 0 ? mem[row_level_base+i] = 100; 
     mem[row_len_base+i] == 0 ? mem[row_len_base+i] = 20; 
-    mem[row_human_base+i] = -1; i+=1; 
+    mem[row_human_base+i] == 0 ? mem[row_human_base+i] = -1;
 );
 
 function get_palette_values(idx) (
@@ -225,7 +226,13 @@ function clamp(x,a,b) ( x<a ? a : (x>b ? b : x); );
 function fmod_pos(x, m) ( m<=0 ? 0 : x - floor(x/m)*m; );
 function eff_bars(t) ( b=mem[bars_ov_base+t]; (b<1||b>4)?slider4:b; );
 function eff_sub(t) ( ov=mem[subdiv_ov_base+t]; (ov<0||ov>4)?(ov=slider3); ov==0?8:ov==1?12:ov==2?16:ov==3?24:32; );
-function eff_swing(t) ( base_swing = (slider9 == 0) ? gmem[1] : slider6; s = mem[swing_ov_base+t]; s < 0 ? base_swing : s; );
+function eff_swing(t) (
+    base_swing = (slider9 == 0) ? gmem[1] : slider6;
+    base_swing < 0 ? base_swing = 0;
+    base_swing > 100 ? base_swing = 100;
+    s = mem[swing_ov_base+t];
+    s < 0 ? base_swing : s;
+);
 function eff_hum(t) ( h=mem[hum_ov_base+t]; h<0 ? slider2 : h; );
 function eff_half(t) ( mem[half_speed_ov_base+t]; );
 
@@ -591,15 +598,14 @@ function recalc_scale() local(i, max_v, best_tonic) (
 // --- INITIALIZATION FIX ---
 // Sets all tabs to use Global Settings (-1) instead of defaulting to 0 (8th notes)
 // Uses a memory slot to ensure this only happens once per instance.
-init_check_slot = 6000000; 
-mem[init_check_slot] == 0 ? (
+mem[ui_init_done] == 0 ? (
     i=0; loop(TOTAL_TABS, 
         mem[subdiv_ov_base+i] = -1; 
         mem[hum_ov_base+i]    = -1; 
         mem[swing_ov_base+i]  = -1; 
         i+=1; 
     );
-    mem[init_check_slot] = 1;
+    mem[ui_init_done] = 1;
 );
 
 
@@ -1236,7 +1242,12 @@ sprintf(#dv, "%d", slider1); gfx_x = def_x + 3; gfx_y = edit_y + def_h - 15; gfx
     i_rst = 0; loop(MAX_ROWS * MAX_STEPS, mem[curr_pat_g_ptr + i_rst] == 0 ? mem[curr_pat_v_ptr + i_rst] = 0; i_rst += 1; );
 );
 
-vel_w = (gfx_w - sb_w) - vel_x; vel_h = 60; rect(vel_x, edit_y, vel_w, vel_h, 0.1, 0.1, 0.1, 1);
+vel_w = (gfx_w - sb_w) - vel_x; vel_h = 60; 
+grid_x = 10 + lhs_width; grid_w = vel_w;
+
+
+
+rect(vel_x, edit_y, vel_w, vel_h, 0.1, 0.1, 0.1, 1);
 st_v = eff_bars(t_e) * eff_sub(t_e); steps_per_bar = eff_sub(t_e); cw = vel_w / st_v;
 
 v_i=0; loop(st_v, 
@@ -1334,7 +1345,7 @@ rect(sb_x, sb_y, sb_w, sb_h, 0.1,0.1,0.1,1); rect(sb_x+2, handle_y, sb_w-4, hand
 (mb && p_mb==0 && mx>=sb_x && mx<sb_x+sb_w && my>=sb_y && my<sb_y+sb_h) ? ( capture_id=10000; capture_ptr=my-handle_y; );
 (capture_id==10000) ? ( target_y = my - capture_ptr; rel = target_y - sb_y; pct = rel / avail_track; val = floor(pct * max_scroll); val = clamp(val, 0, max_scroll); slider8 = val; );
 
-grid_x = 10 + lhs_width; grid_w = vel_w; 
+ 
 (rmb && capture_id == 0 && mx >= grid_x && mx < grid_x + grid_w && my >= grid_y && my < grid_y + sb_h && !chan_popup_active) ? (
     rel_x = mx - grid_x; rel_y = my - grid_y; hov_col = floor(rel_x / cw); hov_vis_row = floor(rel_y / ROW_HEIGHT); hov_row = hov_vis_row + scroll_val;
     (hov_col >= 0 && hov_col < st_v && hov_row >= 0 && hov_row < MAX_ROWS) ? (
@@ -1395,7 +1406,7 @@ grid_x = 10 + lhs_width; grid_w = vel_w;
 
 gx_r = 0; loop(visible_rows, 
     r_idx = gx_r + scroll_val; ry = grid_y + gx_r*ROW_HEIGHT;
-    (ry + ROW_HEIGHT < gfx_h) ? (
+    (ry + ROW_HEIGHT < gfx_h && r_idx < MAX_ROWS) ? (
         role_idx = r_idx % 9; oct_drop = floor(r_idx / 9); oct_num = 6 - oct_drop; is_main_row = (role_idx == 1 || role_idx == 4 || role_idx == 7); is_separator = (role_idx == 8); 
         is_sel = (r_idx == sel_r); is_root_oct = (oct_num == 0);
         is_main_row ? ( 
