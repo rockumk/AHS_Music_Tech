@@ -1,14 +1,12 @@
-desc:N2N Arp v11.95
-version: 11.95
+desc:N2N Arp v11.96
+version: 11.96
 author: Rock Kennedy
 about:
-  # N2N Arp v11.95
-  - FIX: Sort buffer allocation safety (130 slots).
-  - UI: Auto-adjust visible rows to fit window.
-  - UI: Tab 0 custom name/color.
-  - UI: Renamed IN/CH labels.
-  - FEAT: Global LEN/LVL sliders.
-  - FEAT: "Glb" (-1) option for Row LEN, LVL, CH IN, CH OUT.
+  # N2N Arp v11.96
+  - UI: Applied manual Tab styling (Gold/Off).
+  - FIX: Tab mouse click zones adapted to new height.
+  - FIX: Global Controls moved to Sidebar to fix visibility.
+  - FIX: Footer flicker/overlap prevented.
 provides:
   [main] .
 
@@ -29,7 +27,7 @@ slider12:20<1,127,1>-Global Note Len
 slider13:100<0,100,1>-Global Row Level
 
 @init
-thisversion = "v11.95";
+thisversion = "v11.96";
 // =========================================================
 // VISUALS
 // =========================================================
@@ -115,13 +113,13 @@ MAX_ROWS = 128; MAX_STEPS = 128; MAX_TABS = 128; TOTAL_TABS = 128;
 row_mute_base  = mem_pos; mem_pos += MAX_ROWS;
 row_solo_base  = mem_pos; mem_pos += MAX_ROWS;
 row_note_base  = mem_pos; mem_pos += MAX_ROWS; 
-row_chan_base  = mem_pos; mem_pos += MAX_ROWS; // Row Output Channel (or Mask)
+row_chan_base  = mem_pos; mem_pos += MAX_ROWS; 
 row_level_base = mem_pos; mem_pos += MAX_ROWS;
 row_human_base = mem_pos; mem_pos += MAX_ROWS;
 row_len_base   = mem_pos; mem_pos += MAX_ROWS;
 row_name_idx   = mem_pos; mem_pos += MAX_ROWS;
 row_color_base = mem_pos; mem_pos += MAX_ROWS;
-row_in_chan_base = mem_pos; mem_pos += MAX_ROWS; // Row Input Channel Mask
+row_in_chan_base = mem_pos; mem_pos += MAX_ROWS; 
 
 bars_ov_base   = mem_pos; mem_pos += MAX_TABS;
 subdiv_ov_base = mem_pos; mem_pos += MAX_TABS;
@@ -160,7 +158,6 @@ copy_tab_l_buf = mem_pos; mem_pos += MAX_ROWS * MAX_STEPS;
 bar_copy_base = mem_pos; mem_pos += (MAX_ROWS * 32 * 3); 
 
 ownership_map = mem_pos; mem_pos += MAX_STEPS;
-// FIX: Increased to 130 to prevent off-by-one errors during sort
 sort_tmp_n = mem_pos; mem_pos += 130;
 sort_tmp_v = mem_pos; mem_pos += 130;
 kill_buf_size = 128 * 17;
@@ -175,8 +172,8 @@ drag_lock_row = -1; drag_mode = 0; last_drag_idx = -1;
 
 playback_shift = 0; last_play_tab = -1; last_play_offset = -1; pc_triggered = 0;
 
-input_filter_mask = 32767; // Global Input Filter Mask (Default All)
-global_out_mask = 1;       // Global Output Channel Mask (Default Ch 1)
+input_filter_mask = 32767; 
+global_out_mask = 1;       
 
 // N2N CONSTANTS & BUFFER
 GMEM_CTX_OFFSET = 3000000; 
@@ -190,7 +187,7 @@ scale_entry_count = 0;
 current_mask = 2741; 
 prev_mask = -1; 
 
-// Initial Setup - Set to -1 for Global Fallback
+// Initial Setup
 i=0; loop(MAX_ROWS, 
     mem[row_chan_base+i] == 0 ? mem[row_chan_base+i] = -1; 
     mem[row_level_base+i] == 0 ? mem[row_level_base+i] = -1; 
@@ -237,11 +234,9 @@ function eff_swing(t) (
 function eff_hum(t) ( h=mem[hum_ov_base+t]; h<0 ? slider2 : h; );
 function eff_half(t) ( mem[half_speed_ov_base+t]; );
 
-// New Helper Functions for Row Lookups with Global Fallback
 function eff_len(r) ( v=mem[row_len_base+r]; v<0 ? slider12 : v; );
 function eff_lvl(r) ( v=mem[row_level_base+r]; v<0 ? slider13 : v; );
 function eff_chan_out(r) ( v=mem[row_chan_base+r]; v<0 ? global_out_mask : v; );
-// Note: Currently engine filters Input globally, but we store this for future expansion or complex routing
 function eff_chan_in(r) ( v=mem[row_in_chan_base+r]; v<0 ? input_filter_mask : v; ); 
 
 function get_menu_item(list_str, idx, out_str) local(str_len, char_idx, item_ctr, c) (
@@ -605,9 +600,9 @@ mem[ui_init_done] == 0 ? (
 @serialize
 file_mem(0, ui_base, 32);
 file_mem(0, row_mute_base, MAX_ROWS); file_mem(0, row_solo_base, MAX_ROWS); 
-file_mem(0, row_chan_base, MAX_ROWS); // Row Output Channel
+file_mem(0, row_chan_base, MAX_ROWS); 
 file_mem(0, row_level_base, MAX_ROWS); file_mem(0, row_human_base, MAX_ROWS); file_mem(0, row_len_base, MAX_ROWS); file_mem(0, row_color_base, MAX_ROWS);
-file_mem(0, row_in_chan_base, MAX_ROWS); // Row Input Channel
+file_mem(0, row_in_chan_base, MAX_ROWS); 
 file_mem(0, bars_ov_base, MAX_TABS); file_mem(0, subdiv_ov_base, MAX_TABS); file_mem(0, hum_ov_base, MAX_TABS); file_mem(0, swing_ov_base, MAX_TABS);
 file_mem(0, half_speed_ov_base, MAX_TABS); 
 file_mem(0, vel_base, TOTAL_TABS * MAX_ROWS * MAX_STEPS); file_mem(0, grid_base, TOTAL_TABS * MAX_ROWS * MAX_STEPS); file_mem(0, step_len_base, TOTAL_TABS * MAX_ROWS * MAX_STEPS);
@@ -648,7 +643,7 @@ loop(32,
     abs(val) > max_gr ? max_gr = abs(val);
     i_gr+=1; 
 );
-mem[LOCAL_GROOVE_DB + 32] = max_gr; // Store max for UI
+mem[LOCAL_GROOVE_DB + 32] = max_gr; 
 
 gmem[GMEM_CTX_OFFSET] == 1 ? (
     parent_tonic = gmem[GMEM_CTX_OFFSET + 2]; 
@@ -709,7 +704,6 @@ while (midirecv(off, m1, m23)) (
     
     pass_filter = 1;
     (status == 0x90 || status == 0x80) ? (
-        // Input Filter applies globally here
         (input_filter_mask & (1 << (ch-1))) == 0 ? pass_filter = 0;
     );
 
@@ -874,13 +868,11 @@ play_state & 1 ? (
                         h_p = (mem[row_human_base+r_p_blk]>=0 ? mem[row_human_base+r_p_blk] : eff_h); 
                         v_p = clamp(v_p + (rand(h_p*2)-h_p), 1, 127); 
 
-                        // Use Effective Level
                         row_lev = eff_lvl(r_p_blk);
                         final_vel = floor(v_p * (row_lev/100));
                         
                         step_len_val = mem[curr_len_ptr+row_offset]; 
                         
-                        // Use Effective Length
                         l_val = eff_len(r_p_blk);
                         
                         ms_per_step = (60000 / tempo) * (4 / bk_sub_v);
@@ -890,7 +882,6 @@ play_state & 1 ? (
                         
                         kill_samps = (srate * l_ms * 0.001); 
                         
-                        // Use Effective Channel Out
                         chan_mask = eff_chan_out(r_p_blk);
                         
                         pA != -1 ? ( 
@@ -958,23 +949,18 @@ function draw_text(x,y,s,r,g,b) ( gfx_set(r,g,b,1); gfx_x=x; gfx_y=y; gfx_drawst
 function rect(x,y,w,h,r,g,b,a) ( gfx_set(r,g,b,a); gfx_rect(x,y,w,h); );
 function btn(x,y,w,h,txt) ( rect(x,y,w,h, 0.3,0.3,0.3,1); draw_text(x+5,y+5,txt,1,1,1); (mb && p_mb == 0 && mx>=x && mx<x+w && my>=y && my<y+h); );
 
-// Updated Popup to handle Input or Output, and Global or Row, and -1 Logic
 function draw_chan_popup(px, py, row_idx, is_input) 
 local(bw, bh, i, r, c, bx, by, bit, is_set, current_mask, base_ptr) 
 (
-    // row_idx = -1 means Global setting edit (stored in variable)
-    // row_idx >= 0 means Row setting edit
     
     bw = 30; bh = 20; rect(px, py, bw*4 + 4, bh*4 + 4 + 22, 0.1, 0.1, 0.1, 1); rect(px+1, py+1, bw*4+2, bh*4+2+22, 0.2, 0.2, 0.2, 1);
     
-    // Determine pointer and mask
     is_input ? (
        row_idx == -1 ? current_mask = input_filter_mask : current_mask = mem[row_in_chan_base + row_idx];
     ) : (
        row_idx == -1 ? current_mask = global_out_mask : current_mask = mem[row_chan_base + row_idx];
     );
     
-    // Draw "Use Global" Button for Row mode
     (row_idx >= 0) ? (
         rect(px+2, py+2, bw*4, 18, 0.3, 0.3, 0.3, 1);
         current_mask == -1 ? ( gfx_set(0,1,1,1); ) : ( gfx_set(0.7,0.7,0.7,1); );
@@ -985,12 +971,11 @@ local(bw, bh, i, r, c, bx, by, bit, is_set, current_mask, base_ptr)
         py += 22;
     );
     
-    current_mask == -1 ? current_mask = 0; // Don't show bits if -1 (Global) is selected, or show empty
+    current_mask == -1 ? current_mask = 0; 
     
     i=0; loop(16, c = i % 4; r = floor(i/4); bx = px + 2 + c*bw; by = py + 2 + r*bh; bit = 1 << i; is_set = (current_mask & bit); is_set ? rect(bx, by, bw-1, bh-1, 0.2, 0.8, 0.4, 1) : rect(bx, by, bw-1, bh-1, 0.3, 0.3, 0.3, 1); sprintf(#cs, "%d", i+1); draw_text(bx+8, by+5, #cs, 1,1,1); 
     
     (mb && p_mb == 0 && mx>=bx && mx<bx+bw && my>=by && my<by+bh) ? ( 
-        // If it was -1, init to 0 then toggle
         (row_idx >= 0 && (is_input ? mem[row_in_chan_base+row_idx] : mem[row_chan_base+row_idx]) == -1) ? ( current_mask = 0; );
         
         current_mask = current_mask ~ bit; 
@@ -1042,8 +1027,8 @@ scale_tonic == -1 ? ( draw_text(x1+80, row1_y+5, "---", 1, 0.2, 0.2); ) : (
     note_x = x1 + 80; i=0; loop(13, pc = (scale_tonic + i) % 12; mem[scale_state_base + pc] ? ( t_n = pc; t_n==0?strcpy(#t,"C"):t_n==1?strcpy(#t,"C#"):t_n==2?strcpy(#t,"D"):t_n==3?strcpy(#t,"D#"):t_n==4?strcpy(#t,"E"):t_n==5?strcpy(#t,"F"):t_n==6?strcpy(#t,"F#"):t_n==7?strcpy(#t,"G"):t_n==8?strcpy(#t,"G#"):t_n==9?strcpy(#t,"A"):t_n==10?strcpy(#t,"A#"):strcpy(#t,"B"); pc == scale_tonic ? gfx_set(1, 0.2, 0.2, 1) : gfx_set(0.8, 0.8, 0.8, 1); gfx_x = note_x; gfx_y = row1_y+5; gfx_drawstr(#t); gfx_measurestr(#t, tw, th); note_x += tw + 8; ); i+=1; );
 );
 
-pat_y = row1_y + 30; pat_w = gfx_w / 64; 
-ui_tab_h = 30; // Manual Tab Height
+pat_y = row1_y + 26; pat_w = gfx_w / 64; 
+ui_tab_h = 38; // Manual Tab Height
 
 i=0; loop(128, row_idx = floor(i/64); col_idx = i % 64; px = col_idx * pat_w; py = pat_y + (row_idx * (ui_tab_h + 10));
     is_curr = (mem[ui_edit_tab] == i); is_play = (mem[ui_play_prog_tab] == i); is_lock = (mem[ui_locked_tab] == i);
@@ -1065,24 +1050,39 @@ i=0; loop(128, row_idx = floor(i/64); col_idx = i % 64; px = col_idx * pat_w; py
         rect(px+1, py-4, pat_w, 4, br, bg, bb, 1);
     );
 
-    is_lock ? (lr=.2; lg=.6; lb=.2;) : (lr=COL_H_R*1.5; lg=COL_H_G*1.5; lb=COL_H_B*1.5;); rect(px+2, py+20, pat_w-4, 10, lr, lg, lb, 1);
+    // FIXED Lock Rect (Matches Visuals)
+    is_lock ? (lr=.2; lg=.9; lb=.2;) : (lr=COL_H_R*1.5; lg=COL_H_G*1.5; lb=COL_H_B*1.5;); rect(px+2, py+20, pat_w-4, 15, lr, lg, lb, 1);
     is_play ? ( gfx_set(COL_M_R*1.7, COL_M_G*1.7, COL_M_B*1.7, 1); gfx_circle(px+pat_w/2, py+25, 3, 1); );
     
     // Custom Name for Tab 0, Numbers for rest
     (i == 0) ? (
-        draw_text(px+2, py+4, "MAIN", 1, 0.8, 0.2);
+        draw_text(px+2, py+4, "O\nf\nf", 1, 0.8, 0.2);
     ) : (
         (i) >= 100 ? ( sprintf(#lbl, "%d", floor(((i)%100)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : (i) >= 10 ? ( sprintf(#lbl, "%d", floor((i)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : ( sprintf(#lbl, "%d", i); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); );
     );
 
+    // FIXED MOUSE LOGIC for New Height
     (mb && p_mb==0 && mx>=px && mx<px+pat_w && capture_id == 0) ? (
-        (my >= py && my < py + 33) ? (
-             (time_precise() - last_tab_clk < 0.3 && last_tab_idx == i) ? ( mem[ui_locked_tab] = i; gmem[GM_BASE+1] = i; mem[ui_follow_mode] = 0; last_tab_clk = 0; mem[ui_edit_tab] = i; ) : ( (my > py + 20) ? (mem[ui_locked_tab] = i; gmem[GM_BASE+1] = i; mem[ui_follow_mode] = 0;) : (mem[ui_edit_tab] = i;); last_tab_clk = time_precise(); last_tab_idx = i; ); capture_id = -2; 
+        // Any click in vertical range
+        (my >= py && my < py + ui_tab_h) ? (
+             // LOCK CLICK (Bottom Zone)
+             (my > py + 20) ? (
+                 mem[ui_locked_tab] = i; gmem[GM_BASE+1] = i; mem[ui_follow_mode] = 0;
+             ) : (
+             // SELECT CLICK (Top Zone)
+                 (time_precise() - last_tab_clk < 0.3 && last_tab_idx == i) ? ( 
+                     // Double click top = Lock & Edit
+                     mem[ui_locked_tab] = i; gmem[GM_BASE+1] = i; mem[ui_follow_mode] = 0; last_tab_clk = 0; mem[ui_edit_tab] = i; 
+                 ) : (
+                     mem[ui_edit_tab] = i; last_tab_clk = time_precise(); last_tab_idx = i; 
+                 ); 
+             ); 
+             capture_id = -2; 
         );
     ); i+=1;
 );
 
-ctrl_y = pat_y + 90; x2 = UI_TOP_X; is_follow = mem[ui_follow_mode];
+ctrl_y = pat_y + 97; x2 = UI_TOP_X; is_follow = mem[ui_follow_mode];
 draw_text(x2, ctrl_y+5, "FOLLOW:", 0.8,0.8,0.8); x2+=60; 
 rect(x2, ctrl_y, 20, 18, 0.2, 0.2, 0.2, 1); is_follow ? ( rect(x2+2, ctrl_y+2, 16, 14, 0, 1, 0, 1); );
 (mb && p_mb==0 && mx>=x2 && mx<x2+20 && my>=ctrl_y && my<ctrl_y+20 && capture_id == 0) ? ( mem[ui_follow_mode] = !mem[ui_follow_mode]; mem[ui_follow_mode] ? ( mem[ui_locked_tab] = -1; gmem[GM_BASE+1] = -1; ); capture_id = -2; ); x2 += 30;
@@ -1169,7 +1169,6 @@ function dr_ph(x, y, lab, ptr, min_v, max_v, def) (
     draw_text(x+45, y+5, #ps, 1,1,1);
     (mb && p_mb==0 && mx>=x && mx<x+65 && my>=y && my<y+20) ? ( capture_id = 80000 + ptr; capture_min = min_v; capture_max = max_v; capture_start_x = mx; capture_start_val = val; drag_accum_gen = 0; ); x + 80;
 );
-// Updated min value to -1 for Global
 lx = dr_ph(lx, lane_y, "LEN:", row_len_base+sel_r, -1, 127, -1); 
 lx = dr_ph(lx, lane_y, "LVL:", row_level_base+sel_r, -1, 100, -1); 
 lx = dr_ph(lx, lane_y, "HUM:", row_human_base+sel_r, -1, 100, slider2);
@@ -1200,6 +1199,7 @@ gfx_x = gr_x - 30; gfx_y = gr_y - 6; gfx_drawstr("GRV:");
 gr_max == 0 ? gfx_set(0.3, 0.3, 0.3, 1) : (gr_max > 1.0 ? gfx_set(1, 0, 0, 1) : gfx_set(0, 1, 0, 1));
 gfx_circle(gr_x+7, gr_y-3, 4, 1);
 
+// --- SIDEBAR LEFT CONTROLS ---
 edit_y = lane_y + 35; btn_w = 90; btn_h = 18;
 btn(10, edit_y, btn_w, btn_h, "COPY LN") ? ( memcpy(copy_row_v_buf, curr_pat_v_ptr + sel_r*vel_stride_row, MAX_STEPS); memcpy(copy_row_g_buf, curr_pat_g_ptr + sel_r*vel_stride_row, MAX_STEPS); memcpy(copy_row_l_buf, curr_pat_l_ptr + sel_r*vel_stride_row, MAX_STEPS); );
 btn(10, edit_y + 20, btn_w, btn_h, "PASTE LN") ? ( memcpy(curr_pat_v_ptr + sel_r*vel_stride_row, copy_row_v_buf, MAX_STEPS); memcpy(curr_pat_g_ptr + sel_r*vel_stride_row, copy_row_g_buf, MAX_STEPS); memcpy(curr_pat_l_ptr + sel_r*vel_stride_row, copy_row_l_buf, MAX_STEPS); );
@@ -1210,8 +1210,9 @@ all_mode ? ( gfx_set(1, 0.8, 0.2, 1); gfx_rect(110, edit_y+20, 30, 18); gfx_set(
 
 btn(10, edit_y + 40, btn_w, btn_h, "CLEAR LN") ? ( memset(curr_pat_g_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); memset(curr_pat_v_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); memset(curr_pat_l_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); );
 
-// Global Slider Controls for new params
-sl_y = edit_y; sl_x = 160;
+// --- GLOBAL CONTROLS MOVED TO SIDEBAR ---
+// Stack them below the row buttons so they aren't hidden by the grid
+sl_y = edit_y + 65; sl_x = 10;
 dr_slider(sl_x, sl_y, 80, "Glb Len:", slider12, 1, 127, 0, 12, 0); 
 dr_slider(sl_x+90, sl_y, 80, "Glb Lvl:", slider13, 0, 100, 0, 13, 0); 
 
@@ -1231,9 +1232,10 @@ draw_text(sl_x+140, sl_y+30, #cs, 1,1,1);
 
 
 ruler_h = 15; gap_h = 2; 
-grid_y = edit_y + 60 + 10 + ruler_h + gap_h; 
+// Dynamic Grid Start based on sidebar height
+grid_y = sl_y + 55 + ruler_h + gap_h; 
 
-// --- AUTOMATIC ROW CALCULATION ---
+// --- AUTOMATIC ROW CALCULATION (Prevents Footer Overlap) ---
 footer_height = 100;
 avail_h = gfx_h - grid_y - footer_height;
 calc_rows = floor(avail_h / ROW_HEIGHT);
@@ -1410,7 +1412,8 @@ rect(sb_x, sb_y, sb_w, sb_h, 0.1,0.1,0.1,1); rect(sb_x+2, handle_y, sb_w-4, hand
     );
 );
 
-gx_r = 0; loop(visible_rows, 
+// FIX: Calc rows is enforced here
+gx_r = 0; loop(calc_rows, 
     r_idx = gx_r + scroll_val; ry = grid_y + gx_r*ROW_HEIGHT;
     (ry + ROW_HEIGHT < gfx_h && r_idx < MAX_ROWS) ? (
         role_idx = r_idx % 9; oct_drop = floor(r_idx / 9); oct_num = 6 - oct_drop; is_main_row = (role_idx == 1 || role_idx == 4 || role_idx == 7); is_separator = (role_idx == 8); 
@@ -1485,9 +1488,13 @@ gx_r = 0; loop(visible_rows,
     gx_r += 1;
 );
 
-footer_y = grid_y + visible_rows * ROW_HEIGHT + 10;
-(footer_y < gfx_h - 100) ? (
-    gfx_set(0.1, 0.1, 0.1, 0.9); gfx_rect(10, footer_y, gfx_w - 20, 90); col_w = (gfx_w - 40) / 7;
+footer_y = grid_y + calc_rows * ROW_HEIGHT + 10;
+(footer_y < gfx_h) ? (
+    // FIX: Solid background to prevent grid flicker
+    gfx_set(0.1, 0.1, 0.1, 1.0); 
+    gfx_rect(0, footer_y - 5, gfx_w, gfx_h - footer_y + 5);
+    
+    col_w = (gfx_w - 40) / 7;
     i = 1; loop(7,
         dx = 20 + (i-1) * col_w; dy = footer_y + 10;
         (i==1) ? strcpy(#sl, "Root (89)") : (i==2) ? strcpy(#sl, "2nd (88)") : (i==3) ? strcpy(#sl, "3rd (87)") : (i==4) ? strcpy(#sl, "4th (86)") : (i==5) ? strcpy(#sl, "5th (85)") : (i==6) ? strcpy(#sl, "6th (84)") : strcpy(#sl, "7th (83)");
