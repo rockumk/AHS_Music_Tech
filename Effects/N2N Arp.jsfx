@@ -1,16 +1,14 @@
-desc:N2N Arp
-version: 11.92
+desc:N2N Arp v11.95
+version: 11.95
 author: Rock Kennedy
 about:
-  # N2N Arp v11.92
-  - CLEANUP: Removed all Drum Arranger tabs/buttons. Back to 0-127 Grid.
-  - FIX: Slider Ghosting (Pattern settings no longer affect Top Row sliders).
-  - FIX: Row Hum now correctly allows -1 (displays "Glb").
-  - FIX: Row Hum editing separated from Pattern Hum.
-  - UI: "STRETCH" button always visible. "1/2 Speed" only in 24/32 subdiv.
-  - UI: Bar Ruler menu is Left-Click.
-  - FIX: Groove now correctly calculated for 1/2 speed.
-  - Removed version number from title.
+  # N2N Arp v11.95
+  - FIX: Sort buffer allocation safety (130 slots).
+  - UI: Auto-adjust visible rows to fit window.
+  - UI: Tab 0 custom name/color.
+  - UI: Renamed IN/CH labels.
+  - FEAT: Global LEN/LVL sliders.
+  - FEAT: "Glb" (-1) option for Row LEN, LVL, CH IN, CH OUT.
 provides:
   [main] .
 
@@ -23,13 +21,15 @@ slider4:4<1,4,1>-Global Bars
 slider5:1<1,512,1>-Instance ID
 slider6:0<0,100,1>-Global Swing
 slider7:36<1,128,1>-Visible Rows
-slider8:36<0,128,1>-View Scroll
+slider8:0<0,128,1>-View Scroll
 slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
 slider10:0<0,1,1{N2N Script,Live MIDI}>-Chord Source
 slider11:12<10,30,1>-Grid Row Height
+slider12:20<1,127,1>-Global Note Len
+slider13:100<0,100,1>-Global Row Level
 
 @init
-thisversion = "v11.92";
+thisversion = "v11.95";
 // =========================================================
 // VISUALS
 // =========================================================
@@ -44,8 +44,6 @@ LABEL_BRIGHTNESS = 4.0;
 grid_height = slider11; 
 ext_noinit = 1.0;
 ext_noundo = 1;
-
-slider7 < 4 ? slider7 = 36; 
 
 // =========================================================
 // REGISTRATION
@@ -84,7 +82,6 @@ ui_vel_edit_all  = ui_base + 9;
 ui_init_done     = ui_base + 10;
 
 mem[ui_oct_transpose] < -3 || mem[ui_oct_transpose] > 3 ? mem[ui_oct_transpose] = 0;
-// If undefined (0 on first load), set to -1 (Unlocked)
 ext_noinit == 0 && mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1;
 mem[ui_locked_tab] < -1 ? mem[ui_locked_tab] = -1;
 
@@ -118,12 +115,13 @@ MAX_ROWS = 128; MAX_STEPS = 128; MAX_TABS = 128; TOTAL_TABS = 128;
 row_mute_base  = mem_pos; mem_pos += MAX_ROWS;
 row_solo_base  = mem_pos; mem_pos += MAX_ROWS;
 row_note_base  = mem_pos; mem_pos += MAX_ROWS; 
-row_chan_base  = mem_pos; mem_pos += MAX_ROWS; 
+row_chan_base  = mem_pos; mem_pos += MAX_ROWS; // Row Output Channel (or Mask)
 row_level_base = mem_pos; mem_pos += MAX_ROWS;
 row_human_base = mem_pos; mem_pos += MAX_ROWS;
 row_len_base   = mem_pos; mem_pos += MAX_ROWS;
 row_name_idx   = mem_pos; mem_pos += MAX_ROWS;
 row_color_base = mem_pos; mem_pos += MAX_ROWS;
+row_in_chan_base = mem_pos; mem_pos += MAX_ROWS; // Row Input Channel Mask
 
 bars_ov_base   = mem_pos; mem_pos += MAX_TABS;
 subdiv_ov_base = mem_pos; mem_pos += MAX_TABS;
@@ -159,12 +157,11 @@ copy_tab_v_buf = mem_pos; mem_pos += MAX_ROWS * MAX_STEPS;
 copy_tab_g_buf = mem_pos; mem_pos += MAX_ROWS * MAX_STEPS;
 copy_tab_l_buf = mem_pos; mem_pos += MAX_ROWS * MAX_STEPS;
 
-// BAR COPY BUFFER (Max 32 steps * 128 rows * 3 data types)
 bar_copy_base = mem_pos; mem_pos += (MAX_ROWS * 32 * 3); 
 
 ownership_map = mem_pos; mem_pos += MAX_STEPS;
-// Increased from 128 to 130 to prevent sorting overflows
-sort_tmp_n = mem_pos; mem_pos += 130; 
+// FIX: Increased to 130 to prevent off-by-one errors during sort
+sort_tmp_n = mem_pos; mem_pos += 130;
 sort_tmp_v = mem_pos; mem_pos += 130;
 kill_buf_size = 128 * 17;
 kill_buf = mem_pos; mem_pos += kill_buf_size;
@@ -178,7 +175,8 @@ drag_lock_row = -1; drag_mode = 0; last_drag_idx = -1;
 
 playback_shift = 0; last_play_tab = -1; last_play_offset = -1; pc_triggered = 0;
 
-input_filter_mask = 32767; 
+input_filter_mask = 32767; // Global Input Filter Mask (Default All)
+global_out_mask = 1;       // Global Output Channel Mask (Default Ch 1)
 
 // N2N CONSTANTS & BUFFER
 GMEM_CTX_OFFSET = 3000000; 
@@ -192,11 +190,14 @@ scale_entry_count = 0;
 current_mask = 2741; 
 prev_mask = -1; 
 
+// Initial Setup - Set to -1 for Global Fallback
 i=0; loop(MAX_ROWS, 
-    mem[row_chan_base+i] == 0 ? mem[row_chan_base+i] = 1; 
-    mem[row_level_base+i] == 0 ? mem[row_level_base+i] = 100; 
-    mem[row_len_base+i] == 0 ? mem[row_len_base+i] = 20; 
+    mem[row_chan_base+i] == 0 ? mem[row_chan_base+i] = -1; 
+    mem[row_level_base+i] == 0 ? mem[row_level_base+i] = -1; 
+    mem[row_len_base+i] == 0 ? mem[row_len_base+i] = -1; 
     mem[row_human_base+i] == 0 ? mem[row_human_base+i] = -1;
+    mem[row_in_chan_base+i] == 0 ? mem[row_in_chan_base+i] = -1;
+    i+=1;
 );
 
 function get_palette_values(idx) (
@@ -236,6 +237,13 @@ function eff_swing(t) (
 function eff_hum(t) ( h=mem[hum_ov_base+t]; h<0 ? slider2 : h; );
 function eff_half(t) ( mem[half_speed_ov_base+t]; );
 
+// New Helper Functions for Row Lookups with Global Fallback
+function eff_len(r) ( v=mem[row_len_base+r]; v<0 ? slider12 : v; );
+function eff_lvl(r) ( v=mem[row_level_base+r]; v<0 ? slider13 : v; );
+function eff_chan_out(r) ( v=mem[row_chan_base+r]; v<0 ? global_out_mask : v; );
+// Note: Currently engine filters Input globally, but we store this for future expansion or complex routing
+function eff_chan_in(r) ( v=mem[row_in_chan_base+r]; v<0 ? input_filter_mask : v; ); 
+
 function get_menu_item(list_str, idx, out_str) local(str_len, char_idx, item_ctr, c) (
     strcpy(out_str, ""); str_len = strlen(list_str); char_idx = 0; item_ctr = 0;
     while (item_ctr < idx && char_idx < str_len) ( str_getchar(list_str, char_idx) == '|' ? item_ctr += 1; char_idx += 1; );
@@ -249,7 +257,6 @@ function get_note_name_str(n_in, out_str) local(pc) (
     pc==8?strcpy(out_str,"G#"):pc==9?strcpy(out_str,"A"):pc==10?strcpy(out_str,"A#"):strcpy(out_str,"B");
 );
 
-// --- CONTEXT AWARE SPELLING ---
 function get_note_name_str_context(n_in, root_ctx, out_str) local(pc, use_flat) (
     pc = n_in % 12;
     use_flat = (root_ctx==5 || root_ctx==10 || root_ctx==3 || root_ctx==8 || root_ctx==1 || root_ctx==6);
@@ -264,7 +271,6 @@ function get_note_name_str_context(n_in, root_ctx, out_str) local(pc, use_flat) 
     );
 );
 
-// --- N2N LABEL HELPER (Updated v10.3) ---
 function get_n2n_label_str(idx, out_str) (
     idx==1?strcpy(out_str, "1") : idx==2?strcpy(out_str, "m2") : idx==3?strcpy(out_str, "2") :
     idx==4?strcpy(out_str, "m3") : idx==5?strcpy(out_str, "3") : idx==6?strcpy(out_str, "4") :
@@ -274,7 +280,6 @@ function get_n2n_label_str(idx, out_str) (
     strcpy(out_str, "");
 );
 
-// --- N2N COLOR HELPER ---
 function set_n2n_label_color(idx) (
     idx==1 ? (r=1; g=0.2; b=0.2;) : // Root
     (idx==2||idx==3) ? (r=0.8; g=0.3; b=0;) : // 2nd
@@ -342,8 +347,6 @@ function next_scale_dn(n) local(k, nn, pc)(
   );
   nn < 0 ? 0 : nn;
 );
-
-
 
 function assign_lanes()
 local(i, k, swapped, n0, n1, n2, n3, n4, n5, dn1, root,
@@ -589,15 +592,6 @@ function recalc_scale() local(i, max_v, best_tonic) (
     scale_tonic = best_tonic;
 );
 
-
-
-
-
-
-
-// --- INITIALIZATION FIX ---
-// Sets all tabs to use Global Settings (-1) instead of defaulting to 0 (8th notes)
-// Uses a memory slot to ensure this only happens once per instance.
 mem[ui_init_done] == 0 ? (
     i=0; loop(TOTAL_TABS, 
         mem[subdiv_ov_base+i] = -1; 
@@ -608,15 +602,17 @@ mem[ui_init_done] == 0 ? (
     mem[ui_init_done] = 1;
 );
 
-
-
 @serialize
 file_mem(0, ui_base, 32);
-file_mem(0, row_mute_base, MAX_ROWS); file_mem(0, row_solo_base, MAX_ROWS); file_mem(0, row_chan_base, MAX_ROWS); file_mem(0, row_level_base, MAX_ROWS); file_mem(0, row_human_base, MAX_ROWS); file_mem(0, row_len_base, MAX_ROWS); file_mem(0, row_color_base, MAX_ROWS);
+file_mem(0, row_mute_base, MAX_ROWS); file_mem(0, row_solo_base, MAX_ROWS); 
+file_mem(0, row_chan_base, MAX_ROWS); // Row Output Channel
+file_mem(0, row_level_base, MAX_ROWS); file_mem(0, row_human_base, MAX_ROWS); file_mem(0, row_len_base, MAX_ROWS); file_mem(0, row_color_base, MAX_ROWS);
+file_mem(0, row_in_chan_base, MAX_ROWS); // Row Input Channel
 file_mem(0, bars_ov_base, MAX_TABS); file_mem(0, subdiv_ov_base, MAX_TABS); file_mem(0, hum_ov_base, MAX_TABS); file_mem(0, swing_ov_base, MAX_TABS);
 file_mem(0, half_speed_ov_base, MAX_TABS); 
 file_mem(0, vel_base, TOTAL_TABS * MAX_ROWS * MAX_STEPS); file_mem(0, grid_base, TOTAL_TABS * MAX_ROWS * MAX_STEPS); file_mem(0, step_len_base, TOTAL_TABS * MAX_ROWS * MAX_STEPS);
 file_var(0, input_filter_mask);
+file_var(0, global_out_mask);
 
 @block
 // =========================================================
@@ -713,6 +709,7 @@ while (midirecv(off, m1, m23)) (
     
     pass_filter = 1;
     (status == 0x90 || status == 0x80) ? (
+        // Input Filter applies globally here
         (input_filter_mask & (1 << (ch-1))) == 0 ? pass_filter = 0;
     );
 
@@ -830,12 +827,6 @@ play_state & 1 ? (
         
         (start_b >= step_beat_time && start_b < step_beat_time + (1.0/(steps_per_beat_grid*scan_rate))) ? mem[ui_last_step] = p_step;
 
-
-
-
-
-
-// --- Calculate Swing (Pattern Grid Based) ---
         sw_amt = (bk_swing_v / 100) * 0.33; 
         step_in_beat = (grid_lookup_idx % steps_per_beat_grid) / steps_per_beat_grid; 
         
@@ -844,22 +835,12 @@ play_state & 1 ? (
             swing_offset_beats = sw_amt; 
         );
         
-        // --- Calculate Groove Offset (Project Time Based) ---
-        // FIX: Map groove to Musical Time so it repeats every bar, even in 1/2 speed.
         cycle_beat = step_beat_time % 4.0; 
         groove_slot = floor(cycle_beat * 8); 
         groove_slot = clamp(groove_slot, 0, 31);
         groove_val = mem[LOCAL_GROOVE_DB + groove_slot]; 
         
-        // Pre-multiply by scan_rate because the final formula divides by scan_rate.
         groove_offset_beats = (groove_val * 0.125) * scan_rate;
-        
-        
-        
-        
-        
-        
-        
         
         r_p_blk = 0;
         ROW_CENTER_OFFSET = 6;
@@ -892,10 +873,15 @@ play_state & 1 ? (
                         eff_h = eff_hum(t_pl); 
                         h_p = (mem[row_human_base+r_p_blk]>=0 ? mem[row_human_base+r_p_blk] : eff_h); 
                         v_p = clamp(v_p + (rand(h_p*2)-h_p), 1, 127); 
-                        final_vel = floor(v_p * (mem[row_level_base+r_p_blk]/100));
+
+                        // Use Effective Level
+                        row_lev = eff_lvl(r_p_blk);
+                        final_vel = floor(v_p * (row_lev/100));
                         
                         step_len_val = mem[curr_len_ptr+row_offset]; 
-                        l_val = mem[row_len_base+r_p_blk]; 
+                        
+                        // Use Effective Length
+                        l_val = eff_len(r_p_blk);
                         
                         ms_per_step = (60000 / tempo) * (4 / bk_sub_v);
                         ms_per_step = ms_per_step / scan_rate; 
@@ -903,7 +889,9 @@ play_state & 1 ? (
                         l_ms = (step_len_val > 0) ? (step_len_val * ms_per_step * 0.95) : ((l_val < 64) ? (10 + l_val * 3.75) : (250 + (l_val-64)*11.9)); 
                         
                         kill_samps = (srate * l_ms * 0.001); 
-                        chan_mask = mem[row_chan_base + r_p_blk];
+                        
+                        // Use Effective Channel Out
+                        chan_mask = eff_chan_out(r_p_blk);
                         
                         pA != -1 ? ( 
                             final_note = pA + (oct_shift * 12) + (global_trans * 12); 
@@ -970,26 +958,52 @@ function draw_text(x,y,s,r,g,b) ( gfx_set(r,g,b,1); gfx_x=x; gfx_y=y; gfx_drawst
 function rect(x,y,w,h,r,g,b,a) ( gfx_set(r,g,b,a); gfx_rect(x,y,w,h); );
 function btn(x,y,w,h,txt) ( rect(x,y,w,h, 0.3,0.3,0.3,1); draw_text(x+5,y+5,txt,1,1,1); (mb && p_mb == 0 && mx>=x && mx<x+w && my>=y && my<y+h); );
 
-function draw_chan_popup(px, py, row_idx) 
-local(bw, bh, i, r, c, bx, by, bit, is_set) 
+// Updated Popup to handle Input or Output, and Global or Row, and -1 Logic
+function draw_chan_popup(px, py, row_idx, is_input) 
+local(bw, bh, i, r, c, bx, by, bit, is_set, current_mask, base_ptr) 
 (
-    bw = 30; bh = 20; rect(px, py, bw*4 + 4, bh*4 + 4, 0.1, 0.1, 0.1, 1); rect(px+1, py+1, bw*4+2, bh*4+2, 0.2, 0.2, 0.2, 1);
-    mask = (row_idx == -99) ? input_filter_mask : mem[row_chan_base + row_idx]; 
-    i=0; loop(16, c = i % 4; r = floor(i/4); bx = px + 2 + c*bw; by = py + 2 + r*bh; bit = 1 << i; is_set = (mask & bit); is_set ? rect(bx, by, bw-1, bh-1, 0.2, 0.8, 0.4, 1) : rect(bx, by, bw-1, bh-1, 0.3, 0.3, 0.3, 1); sprintf(#cs, "%d", i+1); draw_text(bx+8, by+5, #cs, 1,1,1); 
+    // row_idx = -1 means Global setting edit (stored in variable)
+    // row_idx >= 0 means Row setting edit
+    
+    bw = 30; bh = 20; rect(px, py, bw*4 + 4, bh*4 + 4 + 22, 0.1, 0.1, 0.1, 1); rect(px+1, py+1, bw*4+2, bh*4+2+22, 0.2, 0.2, 0.2, 1);
+    
+    // Determine pointer and mask
+    is_input ? (
+       row_idx == -1 ? current_mask = input_filter_mask : current_mask = mem[row_in_chan_base + row_idx];
+    ) : (
+       row_idx == -1 ? current_mask = global_out_mask : current_mask = mem[row_chan_base + row_idx];
+    );
+    
+    // Draw "Use Global" Button for Row mode
+    (row_idx >= 0) ? (
+        rect(px+2, py+2, bw*4, 18, 0.3, 0.3, 0.3, 1);
+        current_mask == -1 ? ( gfx_set(0,1,1,1); ) : ( gfx_set(0.7,0.7,0.7,1); );
+        gfx_x = px+10; gfx_y = py+4; gfx_drawstr("Use Global");
+        (mb && p_mb == 0 && mx>=px+2 && mx<px+2+bw*4 && my>=py+2 && my<py+20) ? (
+            is_input ? mem[row_in_chan_base + row_idx] = -1 : mem[row_chan_base + row_idx] = -1;
+        );
+        py += 22;
+    );
+    
+    current_mask == -1 ? current_mask = 0; // Don't show bits if -1 (Global) is selected, or show empty
+    
+    i=0; loop(16, c = i % 4; r = floor(i/4); bx = px + 2 + c*bw; by = py + 2 + r*bh; bit = 1 << i; is_set = (current_mask & bit); is_set ? rect(bx, by, bw-1, bh-1, 0.2, 0.8, 0.4, 1) : rect(bx, by, bw-1, bh-1, 0.3, 0.3, 0.3, 1); sprintf(#cs, "%d", i+1); draw_text(bx+8, by+5, #cs, 1,1,1); 
     
     (mb && p_mb == 0 && mx>=bx && mx<bx+bw && my>=by && my<by+bh) ? ( 
-        mask = mask ~ bit; 
-        row_idx == -99 ? (
-            mask = mask & 32767;
-            input_filter_mask = mask;
+        // If it was -1, init to 0 then toggle
+        (row_idx >= 0 && (is_input ? mem[row_in_chan_base+row_idx] : mem[row_chan_base+row_idx]) == -1) ? ( current_mask = 0; );
+        
+        current_mask = current_mask ~ bit; 
+        
+        is_input ? (
+            row_idx == -1 ? ( current_mask = current_mask & 32767; input_filter_mask = current_mask; ) : ( mem[row_in_chan_base + row_idx] = current_mask; );
         ) : (
-            mask == 0 ? mask = bit;
-            mem[row_chan_base + row_idx] = mask;
+            row_idx == -1 ? ( current_mask = current_mask & 32767; global_out_mask = current_mask; ) : ( mem[row_chan_base + row_idx] = current_mask; );
         );
     ); 
     i+=1; 
 );
-    (mb && p_mb == 0 && !(mx>=px && mx<px+bw*4+4 && my>=py && my<py+bh*4+4) && popup_cooldown == 0) ? chan_popup_active = 0;
+    (mb && p_mb == 0 && !(mx>=px && mx<px+bw*4+4 && my>=py-22 && my<py+bh*4+4) && popup_cooldown == 0) ? chan_popup_active = 0;
 );
 
 mx=mouse_x; my=mouse_y; mb=mouse_cap&1; rmb=mouse_cap&2; p_mb=l_mb; l_mb=mb; gfx_clear = 0.05; p_mx=l_mx; l_mx=mx; 
@@ -1009,11 +1023,9 @@ function dr_pat_mem(x, y, w, lab, val_in, min_v, max_v, mem_ptr, id_offset) (
     (mb && p_mb == 0 && mx>=x && mx<x+w && my>=y && my<y+20) ? ( capture_id = 4000 + id_offset; capture_min = min_v; capture_max = max_v; capture_ptr = mem_ptr; capture_start_x = mx; capture_start_val = val_in; drag_accum_gen = 0; );
 );
 
-dr_slider(x1, row1_y, 80, "ROWS:", slider7, 1, 128, 0, 7, 0); x1 += 90;
 dr_slider(x1, row1_y, 80, "HGT:", slider11, 10, 30, 0, 11, 0); x1 += 90;
 dr_slider(x1, row1_y, 80, "ID:", slider5, 1, 64, 0, 5, 0); x1 += 90;
 
-// Manually handling Transpose as memory drag (ID 4999) to avoid slider confusion or just map to memory
 rect(x1, row1_y, 90, 20, 0.2, 0.2, 0.2, 1); draw_text(x1+5, row1_y+5, "TRANSP:", 0.7,0.7,0.7); sprintf(#s, "%d", mem[ui_oct_transpose]); draw_text(x1+65, row1_y+5, #s, 1,1,1);
 (mb && p_mb==0 && mx>=x1 && mx<x1+90 && my>=row1_y && my<row1_y+20) ? ( capture_id=4999; capture_min=-3; capture_max=3; capture_ptr=ui_oct_transpose; capture_start_x=mx; capture_start_val=mem[ui_oct_transpose]; );
 x1 += 100;
@@ -1030,28 +1042,17 @@ scale_tonic == -1 ? ( draw_text(x1+80, row1_y+5, "---", 1, 0.2, 0.2); ) : (
     note_x = x1 + 80; i=0; loop(13, pc = (scale_tonic + i) % 12; mem[scale_state_base + pc] ? ( t_n = pc; t_n==0?strcpy(#t,"C"):t_n==1?strcpy(#t,"C#"):t_n==2?strcpy(#t,"D"):t_n==3?strcpy(#t,"D#"):t_n==4?strcpy(#t,"E"):t_n==5?strcpy(#t,"F"):t_n==6?strcpy(#t,"F#"):t_n==7?strcpy(#t,"G"):t_n==8?strcpy(#t,"G#"):t_n==9?strcpy(#t,"A"):t_n==10?strcpy(#t,"A#"):strcpy(#t,"B"); pc == scale_tonic ? gfx_set(1, 0.2, 0.2, 1) : gfx_set(0.8, 0.8, 0.8, 1); gfx_x = note_x; gfx_y = row1_y+5; gfx_drawstr(#t); gfx_measurestr(#t, tw, th); note_x += tw + 8; ); i+=1; );
 );
 
-pat_y = row1_y + 30; pat_w = gfx_w / 64; pat_h = 30; 
-i=0; loop(128, row_idx = floor(i/64); col_idx = i % 64; px = col_idx * pat_w; py = pat_y + (row_idx * 40);
+pat_y = row1_y + 30; pat_w = gfx_w / 64; 
+ui_tab_h = 30; // Manual Tab Height
+
+i=0; loop(128, row_idx = floor(i/64); col_idx = i % 64; px = col_idx * pat_w; py = pat_y + (row_idx * (ui_tab_h + 10));
     is_curr = (mem[ui_edit_tab] == i); is_play = (mem[ui_play_prog_tab] == i); is_lock = (mem[ui_locked_tab] == i);
-    is_curr ? (r=.0; g=.25; b=.45;) : (r=0.35; g=0.35; b=0.35;); rect(px+1, py, pat_w, 33, r, g, b, 1);
+    is_curr ? (r=.0; g=.25; b=.45;) : (r=0.35; g=0.35; b=0.35;); rect(px+1, py, pat_w, ui_tab_h+3, r, g, b, 1);
     
-
-
-
-
-
-// --- INSERT: Decorative Color Band ---
-    // Check Shift via MouseCap OR Keyboard State (Fixes "Click required" issue)
+    // --- INSERT: Decorative Color Band ---
     (is_shift_now = (mouse_cap & 8);) ? (
-        
-        (i == 0) ? (  
-            // Tab 0: Neutral Grey
-            br=0.5; bg=0.5; bb=0.5; 
-        ) : ( 
-            // Groups of 8, cycling through 6 colors
+        (i == 0) ? ( br=1.0; bg=0.8; bb=0.2; ) : ( // Tab 0 Gold 
             c_grp = floor((i) / 8) % 8;
-
-            // Semi-Bright Palette
             c_grp == 0 ? (br=0.7; bg=0.7; bb=0.7;) : //  Orange
             c_grp == 1 ? (br=0.2; bg=0.8; bb=0.8;) : //  Cyan
             c_grp == 2 ? (br=0.3; bg=0.5; bb=0.9;) : //  Blue
@@ -1061,21 +1062,19 @@ i=0; loop(128, row_idx = floor(i/64); col_idx = i % 64; px = col_idx * pat_w; py
             c_grp == 6 ? (br=0.3; bg=0.8; bb=0.4;) : //  Green
             (br=0.7; bg=0.7; bb=0.7;);               //  Gray
         );
-
         rect(px+1, py-4, pat_w, 4, br, bg, bb, 1);
     );
 
-
-
-    
-    
     is_lock ? (lr=.2; lg=.6; lb=.2;) : (lr=COL_H_R*1.5; lg=COL_H_G*1.5; lb=COL_H_B*1.5;); rect(px+2, py+20, pat_w-4, 10, lr, lg, lb, 1);
     is_play ? ( gfx_set(COL_M_R*1.7, COL_M_G*1.7, COL_M_B*1.7, 1); gfx_circle(px+pat_w/2, py+25, 3, 1); );
     
-    // 0-Based Labels
-    (i) >= 100 ? ( sprintf(#lbl, "%d", floor(((i)%100)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : (i) >= 10 ? ( sprintf(#lbl, "%d", floor((i)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : ( sprintf(#lbl, "%d", i); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); );
-    
-    // TAB CLICKING LOGIC
+    // Custom Name for Tab 0, Numbers for rest
+    (i == 0) ? (
+        draw_text(px+2, py+4, "MAIN", 1, 0.8, 0.2);
+    ) : (
+        (i) >= 100 ? ( sprintf(#lbl, "%d", floor(((i)%100)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : (i) >= 10 ? ( sprintf(#lbl, "%d", floor((i)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : ( sprintf(#lbl, "%d", i); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); );
+    );
+
     (mb && p_mb==0 && mx>=px && mx<px+pat_w && capture_id == 0) ? (
         (my >= py && my < py + 33) ? (
              (time_precise() - last_tab_clk < 0.3 && last_tab_idx == i) ? ( mem[ui_locked_tab] = i; gmem[GM_BASE+1] = i; mem[ui_follow_mode] = 0; last_tab_clk = 0; mem[ui_edit_tab] = i; ) : ( (my > py + 20) ? (mem[ui_locked_tab] = i; gmem[GM_BASE+1] = i; mem[ui_follow_mode] = 0;) : (mem[ui_edit_tab] = i;); last_tab_clk = time_precise(); last_tab_idx = i; ); capture_id = -2; 
@@ -1083,7 +1082,6 @@ i=0; loop(128, row_idx = floor(i/64); col_idx = i % 64; px = col_idx * pat_w; py
     ); i+=1;
 );
 
-// FIX: Removed legacy "0 = Unlocked" check that prevented viewing other tabs while Tab 0 was locked.
 ctrl_y = pat_y + 90; x2 = UI_TOP_X; is_follow = mem[ui_follow_mode];
 draw_text(x2, ctrl_y+5, "FOLLOW:", 0.8,0.8,0.8); x2+=60; 
 rect(x2, ctrl_y, 20, 18, 0.2, 0.2, 0.2, 1); is_follow ? ( rect(x2+2, ctrl_y+2, 16, 14, 0, 1, 0, 1); );
@@ -1125,48 +1123,32 @@ curr_sub_val = eff_sub(t_e);
     gfx_set(0,0,0,1); gfx_line(hf_x+40, ctrl_y, hf_x+40, ctrl_y+box_h);
 );
 
-// --- STRETCH BUTTON & MENU (Always visible) ---
 st_x = x2 + 90;
 btn(st_x, ctrl_y, 84, 20, "STRETCH") ? ( 
     gfx_x = st_x; gfx_y = ctrl_y + 20;
     sel_stretch = gfx_showmenu("Stretch Pattern 2x (Short)|Stretch Pattern 2x (Long)|Stretch Pattern 4x (Short)|Stretch Pattern 4x (Long)||Stretch Selected Lane 2x (Short)|Stretch Selected Lane 2x (Long)|Stretch Selected Lane 4x (Short)|Stretch Selected Lane 4x (Long)");
     
     sel_stretch > 0 ? (
-        // Map menu index to factors
         (sel_stretch <= 4) ? ( is_pattern = 1; base_s = sel_stretch; ) : ( is_pattern = 0; base_s = sel_stretch - 4; );
-        
-        factor = (base_s <= 2) ? 2 : 4;
-        is_long = (base_s == 2 || base_s == 4);
-        
-        st_cnt = eff_bars(t_e) * curr_sub_val;
-        
-        r_start = is_pattern ? 0 : sel_r;
-        r_end = is_pattern ? MAX_ROWS : sel_r + 1;
-        
+        factor = (base_s <= 2) ? 2 : 4; is_long = (base_s == 2 || base_s == 4); st_cnt = eff_bars(t_e) * curr_sub_val;
+        r_start = is_pattern ? 0 : sel_r; r_end = is_pattern ? MAX_ROWS : sel_r + 1;
         r_iter = r_start;
         loop(r_end - r_start,
             row_offset = r_iter * vel_stride_row;
             memcpy(copy_row_v_buf, curr_pat_v_ptr + row_offset, st_cnt);
             memcpy(copy_row_g_buf, curr_pat_g_ptr + row_offset, st_cnt);
             memcpy(copy_row_l_buf, curr_pat_l_ptr + row_offset, st_cnt);
-            
-            memset(curr_pat_v_ptr + row_offset, 0, st_cnt);
-            memset(curr_pat_g_ptr + row_offset, 0, st_cnt);
-            memset(curr_pat_l_ptr + row_offset, 0, st_cnt);
-            
+            memset(curr_pat_v_ptr + row_offset, 0, st_cnt); memset(curr_pat_g_ptr + row_offset, 0, st_cnt); memset(curr_pat_l_ptr + row_offset, 0, st_cnt);
             s_idx = 0; 
             loop(ceil(st_cnt / factor),
                 target_idx = s_idx * factor;
                 (target_idx < st_cnt) ? (
                     mem[curr_pat_v_ptr + row_offset + target_idx] = mem[copy_row_v_buf + s_idx];
                     mem[curr_pat_g_ptr + row_offset + target_idx] = mem[copy_row_g_buf + s_idx];
-                    len = mem[copy_row_l_buf + s_idx];
-                    is_long ? len *= factor; 
+                    len = mem[copy_row_l_buf + s_idx]; is_long ? len *= factor; 
                     mem[curr_pat_l_ptr + row_offset + target_idx] = len;
-                );
-                s_idx += 1;
-            );
-            r_iter += 1;
+                ); s_idx += 1;
+            ); r_iter += 1;
         );
     );
 );
@@ -1187,19 +1169,30 @@ function dr_ph(x, y, lab, ptr, min_v, max_v, def) (
     draw_text(x+45, y+5, #ps, 1,1,1);
     (mb && p_mb==0 && mx>=x && mx<x+65 && my>=y && my<y+20) ? ( capture_id = 80000 + ptr; capture_min = min_v; capture_max = max_v; capture_start_x = mx; capture_start_val = val; drag_accum_gen = 0; ); x + 80;
 );
-lx = dr_ph(lx, lane_y, "LEN:", row_len_base+sel_r, 0, 127, 20); lx = dr_ph(lx, lane_y, "LVL:", row_level_base+sel_r, 0, 100, 100); lx = dr_ph(lx, lane_y, "HUM:", row_human_base+sel_r, -1, 100, slider2);
+// Updated min value to -1 for Global
+lx = dr_ph(lx, lane_y, "LEN:", row_len_base+sel_r, -1, 127, -1); 
+lx = dr_ph(lx, lane_y, "LVL:", row_level_base+sel_r, -1, 100, -1); 
+lx = dr_ph(lx, lane_y, "HUM:", row_human_base+sel_r, -1, 100, slider2);
 
-// NEW INPUT FILTER
-draw_text(lx, lane_y+5, "IN:", 0.7,0.7,0.7); 
-set_cnt=0; bit_i=0; loop(16, (input_filter_mask & (1<<bit_i)) ? set_cnt+=1; bit_i+=1;); set_cnt == 0 ? strcpy(#cs, "None") : set_cnt == 16 ? strcpy(#cs, "All") : sprintf(#cs, "%d Set", set_cnt); draw_text(lx+30, lane_y+5, #cs, 1,1,1);
-(mb && p_mb==0 && mx>=lx && mx<lx+100 && my>=lane_y && my<lane_y+20 && popup_cooldown == 0) ? ( chan_popup_active = 1; chan_popup_row = -99; popup_cooldown = 10; );
-lx += 100;
+// NEW CH IN: logic
+draw_text(lx, lane_y+5, "CH IN:", 0.7,0.7,0.7); 
+mask = mem[row_in_chan_base + sel_r];
+mask == -1 ? ( strcpy(#cs, "Glb"); ) : (
+    set_cnt=0; bit_i=0; loop(16, (mask & (1<<bit_i)) ? set_cnt+=1; bit_i+=1;); set_cnt == 0 ? strcpy(#cs, "None") : set_cnt == 16 ? strcpy(#cs, "All") : sprintf(#cs, "%d Set", set_cnt); 
+);
+draw_text(lx+45, lane_y+5, #cs, 1,1,1);
+(mb && p_mb==0 && mx>=lx && mx<lx+100 && my>=lane_y && my<lane_y+20 && popup_cooldown == 0) ? ( chan_popup_active = 1; chan_popup_row = sel_r; chan_popup_is_input = 1; popup_cooldown = 10; );
+lx += 120;
 
-mask = mem[row_chan_base+sel_r]; draw_text(lx, lane_y+5, "CH:", 0.7,0.7,0.7); set_cnt=0; bit_i=0; loop(16, (mask & (1<<bit_i)) ? set_cnt+=1; bit_i+=1;); set_cnt == 0 ? strcpy(#cs, "None") : set_cnt == 16 ? strcpy(#cs, "All") : sprintf(#cs, "%d Set", set_cnt); draw_text(lx+30, lane_y+5, #cs, 1,1,1);
-(mb && p_mb==0 && mx>=lx && mx<lx+100 && my>=lane_y && my<lane_y+20 && popup_cooldown == 0) ? ( chan_popup_active = 1; chan_popup_row = sel_r; popup_cooldown = 10; );
+// NEW CH OUT logic
+mask = mem[row_chan_base+sel_r]; draw_text(lx, lane_y+5, "CH OUT:", 0.7,0.7,0.7); 
+mask == -1 ? ( strcpy(#cs, "Glb"); ) : (
+    set_cnt=0; bit_i=0; loop(16, (mask & (1<<bit_i)) ? set_cnt+=1; bit_i+=1;); set_cnt == 0 ? strcpy(#cs, "None") : set_cnt == 16 ? strcpy(#cs, "All") : sprintf(#cs, "%d Set", set_cnt); 
+);
+draw_text(lx+55, lane_y+5, #cs, 1,1,1);
+(mb && p_mb==0 && mx>=lx && mx<lx+100 && my>=lane_y && my<lane_y+20 && popup_cooldown == 0) ? ( chan_popup_active = 1; chan_popup_row = sel_r; chan_popup_is_input = 0; popup_cooldown = 10; );
 popup_cooldown > 0 ? popup_cooldown -= 1;
 
-// --- GROOVE DEBUG INDICATOR ---
 gr_max = mem[LOCAL_GROOVE_DB + 32];
 gr_x = lx + 120; gr_y = lane_y + 10;
 gfx_set(0.6, 0.6, 0.6, 1);
@@ -1211,15 +1204,42 @@ edit_y = lane_y + 35; btn_w = 90; btn_h = 18;
 btn(10, edit_y, btn_w, btn_h, "COPY LN") ? ( memcpy(copy_row_v_buf, curr_pat_v_ptr + sel_r*vel_stride_row, MAX_STEPS); memcpy(copy_row_g_buf, curr_pat_g_ptr + sel_r*vel_stride_row, MAX_STEPS); memcpy(copy_row_l_buf, curr_pat_l_ptr + sel_r*vel_stride_row, MAX_STEPS); );
 btn(10, edit_y + 20, btn_w, btn_h, "PASTE LN") ? ( memcpy(curr_pat_v_ptr + sel_r*vel_stride_row, copy_row_v_buf, MAX_STEPS); memcpy(curr_pat_g_ptr + sel_r*vel_stride_row, copy_row_g_buf, MAX_STEPS); memcpy(curr_pat_l_ptr + sel_r*vel_stride_row, copy_row_l_buf, MAX_STEPS); );
 
-// --- NEW "ALL" ROWS BUTTON (MOVED TO LEFT SIDEBAR) ---
 all_mode = mem[ui_vel_edit_all];
 btn(110, edit_y + 20, 30, 18, "ALL") ? ( mem[ui_vel_edit_all] = !mem[ui_vel_edit_all]; mem[ui_vel_edit_all] ? mem[ui_selected_row] = -1; );
 all_mode ? ( gfx_set(1, 0.8, 0.2, 1); gfx_rect(110, edit_y+20, 30, 18); gfx_set(0,0,0,1); gfx_x=115; gfx_y=edit_y+25; gfx_drawstr("ALL"); );
 
 btn(10, edit_y + 40, btn_w, btn_h, "CLEAR LN") ? ( memset(curr_pat_g_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); memset(curr_pat_v_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); memset(curr_pat_l_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); );
 
-ruler_h = 15; gap_h = 2; // Adjustable Height Variables
-grid_y = edit_y + 60 + 10 + ruler_h + gap_h; // Pushed down
+// Global Slider Controls for new params
+sl_y = edit_y; sl_x = 160;
+dr_slider(sl_x, sl_y, 80, "Glb Len:", slider12, 1, 127, 0, 12, 0); 
+dr_slider(sl_x+90, sl_y, 80, "Glb Lvl:", slider13, 0, 100, 0, 13, 0); 
+
+// Global CH IN Button
+mask = input_filter_mask;
+rect(sl_x, sl_y+25, 80, 20, 0.2,0.2,0.2,1); draw_text(sl_x+5, sl_y+30, "Glb IN:", 0.7,0.7,0.7); 
+set_cnt=0; bit_i=0; loop(16, (mask & (1<<bit_i)) ? set_cnt+=1; bit_i+=1;); set_cnt == 0 ? strcpy(#cs, "None") : set_cnt == 16 ? strcpy(#cs, "All") : sprintf(#cs, "%d Set", set_cnt); 
+draw_text(sl_x+50, sl_y+30, #cs, 1,1,1);
+(mb && p_mb==0 && mx>=sl_x && mx<sl_x+80 && my>=sl_y+25 && my<sl_y+45 && popup_cooldown == 0) ? ( chan_popup_active = 1; chan_popup_row = -1; chan_popup_is_input = 1; popup_cooldown = 10; );
+
+// Global CH OUT Button
+mask = global_out_mask;
+rect(sl_x+90, sl_y+25, 80, 20, 0.2,0.2,0.2,1); draw_text(sl_x+95, sl_y+30, "Glb OUT:", 0.7,0.7,0.7); 
+set_cnt=0; bit_i=0; loop(16, (mask & (1<<bit_i)) ? set_cnt+=1; bit_i+=1;); set_cnt == 0 ? strcpy(#cs, "None") : set_cnt == 16 ? strcpy(#cs, "All") : sprintf(#cs, "%d Set", set_cnt); 
+draw_text(sl_x+140, sl_y+30, #cs, 1,1,1);
+(mb && p_mb==0 && mx>=sl_x+90 && mx<sl_x+170 && my>=sl_y+25 && my<sl_y+45 && popup_cooldown == 0) ? ( chan_popup_active = 1; chan_popup_row = -1; chan_popup_is_input = 0; popup_cooldown = 10; );
+
+
+ruler_h = 15; gap_h = 2; 
+grid_y = edit_y + 60 + 10 + ruler_h + gap_h; 
+
+// --- AUTOMATIC ROW CALCULATION ---
+footer_height = 100;
+avail_h = gfx_h - grid_y - footer_height;
+calc_rows = floor(avail_h / ROW_HEIGHT);
+calc_rows < 1 ? calc_rows = 1;
+calc_rows > MAX_ROWS ? calc_rows = MAX_ROWS;
+slider7 = calc_rows; // Auto-update Visible Rows slider
 
 scroll_val = slider8; visible_rows = slider7; max_scroll = MAX_ROWS - visible_rows; max_scroll < 0 ? max_scroll = 0;
 sb_w = 16; sb_x = gfx_w - sb_w; sb_y = grid_y; sb_h = visible_rows * ROW_HEIGHT; (sb_h > gfx_h - grid_y) ? sb_h = gfx_h - grid_y;
@@ -1245,8 +1265,6 @@ sprintf(#dv, "%d", slider1); gfx_x = def_x + 3; gfx_y = edit_y + def_h - 15; gfx
 vel_w = (gfx_w - sb_w) - vel_x; vel_h = 60; 
 grid_x = 10 + lhs_width; grid_w = vel_w;
 
-
-
 rect(vel_x, edit_y, vel_w, vel_h, 0.1, 0.1, 0.1, 1);
 st_v = eff_bars(t_e) * eff_sub(t_e); steps_per_bar = eff_sub(t_e); cw = vel_w / st_v;
 
@@ -1257,9 +1275,7 @@ v_i=0; loop(st_v,
     bar_h = floor((v_disp/127) * (vel_h-2)); bar_h < 2 ? bar_h = 2; 
     c_idx = mem[row_color_base+sel_r]; get_palette_values(c_idx);
     
-    // FIX: Active Velocity Bars use Selected Row Color
     g_on ? ( 
-        // Fallback for Color 0
         (c_idx == 0) ? ( 
             role_idx = sel_r % 9; is_main_row = (role_idx == 1 || role_idx == 4 || role_idx == 7);
             is_main_row ? ( 
@@ -1270,7 +1286,6 @@ v_i=0; loop(st_v,
         min_b = (c_idx == 0) ? 0.60 : 0.50; v_scale = min_b + ((1-min_b) * (v_disp / 127)); gfx_set(cr * v_scale, cg * v_scale, cb * v_scale, 1); gfx_rect(vx, edit_y + vel_h - bar_h, cw-1, bar_h); 
     ) : ( rect(vx, edit_y, cw-1, vel_h, 0.15, 0.15, 0.15, 1); rect(vx, edit_y + vel_h - bar_h, cw-1, bar_h, 0.35, 0.35, 0.35, 1); );
     
-    // SAFE CAPTURE ID FOR VELOCITY: 3000
     (mb && mx>=vx && mx<vx+cw && my>=edit_y && my<edit_y+vel_h && capture_id == 0) ? ( capture_id=3000; );
     (capture_id==3000 && mb && mx>=vx && mx<vx+cw) ? ( 
         new_v = floor((1 - (my-edit_y)/vel_h) * 127); new_v = clamp(new_v, 1, 127); 
@@ -1284,9 +1299,7 @@ v_i=0; loop(st_v,
     v_i+=1;
 );
 
-// --- NEW BAR RULER ---
 ruler_y = grid_y - ruler_h - gap_h;
-// Logic for 1/2 speed display
 is_half = eff_half(t_e);
 vis_steps_per_bar = is_half ? (steps_per_bar/2) : steps_per_bar;
 vis_bar_w = cw * vis_steps_per_bar; 
@@ -1295,19 +1308,14 @@ bar_count = eff_bars(t_e) * (is_half ? 2 : 1);
 b_idx = 0; 
 loop(bar_count,
     bx = grid_x + b_idx * vis_bar_w;
-    
     rect(bx, ruler_y, vis_bar_w-1, ruler_h, 0.3, 0.3, 0.3, 1);
     sprintf(#bnum, "%d", b_idx + 1);
     draw_text(bx + 5, ruler_y + 1, #bnum, 0.8, 0.8, 0.8);
-    
-    // Left Click Logic
     (mb && p_mb == 0 && mx >= bx && mx < bx + vis_bar_w && my >= ruler_y && my < ruler_y + ruler_h) ? (
         gfx_x = mx; gfx_y = my;
         sel_menu = gfx_showmenu("Copy Bar|Paste Bar|Clear Bar");
-        
         op_len = vis_steps_per_bar;
         op_start = b_idx * op_len;
-        
         sel_menu == 1 ? ( 
             r_it = 0; loop(MAX_ROWS,
                 src_offset = r_it * vel_stride_row + op_start;
@@ -1345,7 +1353,6 @@ rect(sb_x, sb_y, sb_w, sb_h, 0.1,0.1,0.1,1); rect(sb_x+2, handle_y, sb_w-4, hand
 (mb && p_mb==0 && mx>=sb_x && mx<sb_x+sb_w && my>=sb_y && my<sb_y+sb_h) ? ( capture_id=10000; capture_ptr=my-handle_y; );
 (capture_id==10000) ? ( target_y = my - capture_ptr; rel = target_y - sb_y; pct = rel / avail_track; val = floor(pct * max_scroll); val = clamp(val, 0, max_scroll); slider8 = val; );
 
- 
 (rmb && capture_id == 0 && mx >= grid_x && mx < grid_x + grid_w && my >= grid_y && my < grid_y + sb_h && !chan_popup_active) ? (
     rel_x = mx - grid_x; rel_y = my - grid_y; hov_col = floor(rel_x / cw); hov_vis_row = floor(rel_y / ROW_HEIGHT); hov_row = hov_vis_row + scroll_val;
     (hov_col >= 0 && hov_col < st_v && hov_row >= 0 && hov_row < MAX_ROWS) ? (
@@ -1380,7 +1387,6 @@ rect(sb_x, sb_y, sb_w, sb_h, 0.1,0.1,0.1,1); rect(sb_x+2, handle_y, sb_w-4, hand
     rel_x = mx - grid_x; rel_y = my - grid_y; hov_col = floor(rel_x / cw); hov_vis_row = floor(rel_y / ROW_HEIGHT); hov_row = hov_vis_row + scroll_val;
     (hov_col >= 0 && hov_col < st_v && hov_row >= 0 && hov_row < MAX_ROWS) ? (
         target_idx = hov_row * vel_stride_row + hov_col; 
-        // SAFE CAPTURE ID FOR GRID: 2000
         capture_id = 2000; 
         paint_state = !mem[curr_pat_g_ptr+target_idx]; 
         step_in_bar = hov_col % steps_per_bar; step_in_beat = hov_col % (steps_per_bar/4); loop_s = 0; loop(st_v, should_apply = 0;
@@ -1447,7 +1453,6 @@ gx_r = 0; loop(visible_rows,
             is_head ? ( 
                 l = mem[curr_pat_l_ptr+idx]; w_px = (l<1?1:l) * cw; v_disp = mem[curr_pat_v_ptr+idx]; v_disp <= 0 ? v_disp = slider1;
                 c_idx = mem[row_color_base+r_idx]; get_palette_values(c_idx);
-                // FIX: Fallback to Row Colors if 0
                 (c_idx == 0) ? (
                     is_main_row ? ( 
                         role_idx == 1 ? (cr=COL_H_R; cg=COL_H_G; cb=COL_H_B;) : role_idx == 4 ? (cr=COL_M_R; cg=COL_M_G; cb=COL_M_B;) : (cr=COL_L_R; cg=COL_L_G; cb=COL_L_B;); 
@@ -1516,14 +1521,14 @@ footer_y = grid_y + visible_rows * ROW_HEIGHT + 10;
 // MOUSE HANDLING - MEMORY VARS (4000-4999 & 80000+)
 (mb && ( (capture_id >= 4000 && capture_id < 5000) || capture_id >= 80000 )) ? ( 
     dist = mx - capture_start_x; 
-    scale_f = (capture_id >= 80000) ? 0.5 : 0.1; // Slower for pattern vars
+    scale_f = (capture_id >= 80000) ? 0.5 : 0.1; 
     val = capture_start_val + floor(dist * scale_f); 
     val = clamp(val, capture_min, capture_max); 
     ptr = (capture_id >= 80000) ? (capture_id - 80000) : capture_ptr; 
     mem[ptr] = val; 
 );
 
-chan_popup_active ? draw_chan_popup(30, 200, chan_popup_row); 
+chan_popup_active ? draw_chan_popup(30, 200, chan_popup_row, chan_popup_is_input); 
 (mouse_wheel != 0) ? ( slider8 = clamp(slider8 - (mouse_wheel/120), 0, max_scroll); mouse_wheel = 0; );
 
 (play_state & 1) ? ( 
