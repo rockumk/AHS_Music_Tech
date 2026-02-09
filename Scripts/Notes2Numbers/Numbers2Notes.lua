@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.4.9
+-- @version  1.5.0
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.4.9
+--   # Numbers2Notes 1.5.0
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -15,11 +15,12 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
---   # Major Update 1.4.9
+--   # Major Update 1.5.0
 --   + Added Groove
 --   + Changed N2N Drum Arranger to N2N Drum Arranger.jsfx
 --   + Changed gmem name
 --   + N2N Drum Arranger search fixed for Mac
+--   + Turned down the send volumes
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require "imgui" "0.8.6" -- Version of IMGUI used during development.
@@ -1266,7 +1267,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.4.9")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.5.0")
             reaper.ImGui_Text(ctx, "https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
 
@@ -2370,21 +2371,24 @@ function Setup_Tracks()
     end
 
     -- 4. SETUP SENDS
-    for i, v in pairs(track_table) do
-        -- Only set up sends if track was newly created (v[2] was false at start of loop, but logic creates it)
-        -- Actually, since we updated v[2] in step 2, we need a way to know if it's new.
-        -- Simplest way: Check if send exists? Or just recreate?
-        -- For now, let's just loop. If send exists, Reaper usually ignores duplicate create calls or adds another.
-        -- To be safe, we only add sends if the track has 0 sends currently?
-
-        if reaper.GetTrackNumSends(v[3], 0) == 0 then
-            for _, target_index in pairs(v[6]) do
-                if track_table[target_index] and track_table[target_index][3] then
-                    reaper.CreateTrackSend(v[3], track_table[target_index][3])
-                end
+for i, v in pairs(track_table) do
+    if reaper.GetTrackNumSends(v[3], 0) == 0 then
+        for _, target_index in pairs(v[6]) do
+            if track_table[target_index] and track_table[target_index][3] then
+                -- Create the send
+                reaper.CreateTrackSend(v[3], track_table[target_index][3])
             end
         end
+        
+        -- >>> SET VOLUME ON ALL SENDS WE JUST CREATED <<<
+        local num_sends = reaper.GetTrackNumSends(v[3], 0)
+        for send_idx = 0, num_sends - 1 do
+            local send_volume_db = -12.0
+            local send_volume_linear = 10^(send_volume_db/20)
+            reaper.SetTrackSendInfo_Value(v[3], 0, send_idx, "D_VOL", send_volume_linear)
+        end
     end
+end  
 
     return nil, track_table
 end
