@@ -1,16 +1,17 @@
-desc:N2N Arp v11.96
-version: 11.96
+desc:N2N Arp v11.97
+version: 11.97
 author: Rock Kennedy
 about:
-  # N2N Arp v11.96
-  - UI: Applied manual Tab styling (Gold/Off).
-  - FIX: Tab mouse click zones adapted to new height.
-  - FIX: Global Controls moved to Sidebar to fix visibility.
-  - FIX: Footer flicker/overlap prevented.
+  # N2N Arp v11.97
+  - FEATURE: Inventory Reporting to N2N Ecosystem.
+  - FEATURE: Populated Pattern Indicators on Tabs.
+  - FEATURE: Track Color/Name Header integration.
+  - FEATURE: Prioritized Cue System (Note > GMEM > PC).
+  - FIX: Channel 16 Notes are now Cues (not Chords).
 provides:
   [main] .
 
-options:gmem=ProjectSwing
+options:gmem=N2N_Ecosystem_RSKennedy
 
 slider1:110<1,127,1>-Default Row Velocity
 slider2:0<0,25,1>-Global Humanize
@@ -27,7 +28,7 @@ slider12:20<1,127,1>-Global Note Len
 slider13:100<0,100,1>-Global Row Level
 
 @init
-thisversion = "v11.96";
+thisversion = "v11.97";
 // =========================================================
 // VISUALS
 // =========================================================
@@ -40,6 +41,13 @@ LOCK_R = 0.3; LOCK_G = 0.6; LOCK_B = 0.7;
 LANE_BG_DIM = 0.6; 
 LABEL_BRIGHTNESS = 4.0;
 grid_height = slider11; 
+
+ext_noinit == 0 ? (
+    mem[ui_locked_tab] = -1; // Default to Follow Mode
+    need_view_center = 1;    // FLAG: Tell @gfx to center the view once it knows the height
+);
+
+
 ext_noinit = 1.0;
 ext_noundo = 1;
 
@@ -80,7 +88,9 @@ ui_vel_edit_all  = ui_base + 9;
 ui_init_done     = ui_base + 10;
 
 mem[ui_oct_transpose] < -3 || mem[ui_oct_transpose] > 3 ? mem[ui_oct_transpose] = 0;
-ext_noinit == 0 && mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1;
+
+
+
 mem[ui_locked_tab] < -1 ? mem[ui_locked_tab] = -1;
 
 input_state_base = mem_pos; mem_pos += 128; 
@@ -181,6 +191,28 @@ GMEM_SCALE_OFFSET = 3100000;
 GMEM_GROOVE_OFFSET = 5000000; 
 LOCAL_SCALE_DB = mem_pos; mem_pos += 10000;
 LOCAL_GROOVE_DB = mem_pos; mem_pos += 33; 
+
+// --- NEW FEATURES: CUE, INFO & INVENTORY ---
+LOC_TAB_POPULATED = mem_pos; mem_pos += TOTAL_TABS;
+GMEM_INFO_BASE = 8200000;
+GMEM_INV_BASE = 7500000; 
+GMEM_GLOBAL_ADDR = 7100200;
+GMEM_TYPE_BASE = 7100300;
+GMEM_INST_BASE = 7100500;
+GMEM_TYPE_REPORT = 8100000;
+MY_TYPE_ID = 2; // Arp ID (Drums are 1)
+
+// Cue State Machine
+cue_armed = 0;           
+cue_target_tab = -1;     
+cue_source_type = -1;    
+gmem_source_addr = -1;
+cue_clear_pending = 0;
+cue_clear_addr = -1;
+midi_cue_tab = -1;
+midi_cue_source = -1;
+last_bar_checked = -1;
+last_maint_time = 0; 
 
 parent_tonic = 0;
 scale_entry_count = 0;
@@ -433,6 +465,60 @@ i=0; loop(LANE_COUNT,
     );
 );
 
+// --- NEW INVENTORY REPORTING FUNCTIONS ---
+
+function flush_inventory_to_gmem()
+local(inst_offset, i, m0, m1, m2, m3, mask_idx, rem)
+(
+    // Calculate GMEM address for this instance (matches Drum Arranger logic)
+    inst_offset = GMEM_INV_BASE + (floor(slider5) - 1) * 4;
+    m0=0; m1=0; m2=0; m3=0;
+    
+    i=0; loop(TOTAL_TABS, 
+        mem[LOC_TAB_POPULATED + i] ? (
+            // Arp maps Tab Index directly to PC (0-127)
+            mask_idx = floor(i / 32);
+            rem = i % 32;
+            mask_idx == 0 ? m0 |= (1 << rem) :
+            mask_idx == 1 ? m1 |= (1 << rem) :
+            mask_idx == 2 ? m2 |= (1 << rem) :
+            mask_idx == 3 ? m3 |= (1 << rem);
+        );
+        i += 1;
+    );
+    
+    // Broadcast populated status to ecosystem
+    gmem[inst_offset+0] = m0;
+    gmem[inst_offset+1] = m1;
+    gmem[inst_offset+2] = m2;
+    gmem[inst_offset+3] = m3;
+);
+
+function check_tab_population(t_idx)
+local(ptr, k, has_d)
+(
+    has_d = 0;
+    ptr = grid_base + t_idx*vel_stride_tab;
+    
+    // Quick scan: if any step has velocity > 0, tab is populated
+    k = 0; 
+    while (k < vel_stride_tab && has_d == 0) (
+        mem[ptr + k] > 0 ? has_d = 1;
+        k += 1;
+    );
+    mem[LOC_TAB_POPULATED + t_idx] = has_d;
+);
+
+function scan_active_tab() (
+    check_tab_population(mem[ui_edit_tab]);
+    flush_inventory_to_gmem();
+);
+
+function scan_all_tabs() local(i) (
+    i = 0; loop(TOTAL_TABS, check_tab_population(i); i+=1; );
+    flush_inventory_to_gmem();
+);
+
 // =========================================================
 // ANALYZE INPUT
 // =========================================================
@@ -653,6 +739,25 @@ gmem[GMEM_CTX_OFFSET] == 1 ? (
     parent_tonic = gmem[GMEM_CTX_OFFSET + 2];
 );
 
+// TRACK IDENTITY & TYPE REPORT
+GM_BASE = 7000000 + (slider5-1)*16; 
+gmem[GM_BASE] != 0x44504531 ? ( gmem[GM_BASE] = 0x44504531; gmem[GM_BASE+1] = -1; gmem[GM_BASE+2] = 2; );
+mem[ui_locked_tab] = gmem[GM_BASE+1]; 
+
+// TRACK IDENTITY & TYPE REPORT
+// ... (GM_BASE logic) ...
+
+// This reads the Track Number and Color from the N2N Ecosystem
+
+
+my_info_idx = GMEM_INFO_BASE + ((slider5 - 1) * 4);
+track_num = gmem[my_info_idx];
+track_r = gmem[my_info_idx + 1];
+track_g = gmem[my_info_idx + 2];
+track_b = gmem[my_info_idx + 3];
+
+(slider5 > 0) ? ( gmem[GMEM_TYPE_REPORT + slider5 - 1] = MY_TYPE_ID; );
+
 // =========================================================
 // N2N SCALE LOGIC
 // =========================================================
@@ -692,11 +797,8 @@ input_source_mode == 0 ? (
 );
 
 // =========================================================
-// CORE BLOCK LOGIC (WINDOWED LOOKAHEAD ENGINE)
+// CUE SYSTEM (Prioritized) & INPUT HANDLING
 // =========================================================
-GM_BASE = 7000000 + (slider5-1)*16; gmem[GM_BASE] != 0x44504531 ? ( gmem[GM_BASE] = 0x44504531; gmem[GM_BASE+1] = -1; gmem[GM_BASE+2] = 2; );
-mem[ui_locked_tab] = gmem[GM_BASE+1]; 
-
 input_dirty = 0; 
 
 while (midirecv(off, m1, m23)) (
@@ -708,11 +810,19 @@ while (midirecv(off, m1, m23)) (
     );
 
     (pass_filter == 1) ? (
-        (ch == 16 && ((status == 0xC0) || (status == 0x90 && d2 > 0))) ? ( 
-            target = d1; (target >= 0 && target < 128) ? ( pending_pattern = target; ); 
-            sync_reset_req = 1; 
+        (ch == 16) ? ( 
+             // MIDI PC -> Queue Cue
+             (status == 0xC0) ? (
+                 target = d1; (target >= 0 && target < 128) ? ( midi_cue_tab = target; midi_cue_source = 2; ); 
+                 sync_reset_req = 1; 
+             ) :
+             // MIDI Note (Ch 16) -> Queue Cue (NEW)
+             (status == 0x90 && d2 > 0) ? (
+                 target = d1; (target >= 0 && target < 128) ? ( midi_cue_tab = target; midi_cue_source = 0; );
+             );
         ) :
         
+        // --- INPUT ANALYZER LOGIC ---
         (input_source_mode == 1 && ch == 15) ? ( 
             (status == 0x90 || status == 0x80) ? ( 
                 is_on = (status == 0x90 && d2 > 0); 
@@ -732,6 +842,89 @@ while (midirecv(off, m1, m23)) (
         );
     );
 );
+
+// --- GMEM INPUT ---
+gmem_cue_tab = -1;
+gmem_source_addr = -1;
+
+c_inst = gmem[GMEM_INST_BASE + slider5 - 1];
+c_type = gmem[GMEM_TYPE_BASE + MY_TYPE_ID];
+c_glob = gmem[GMEM_GLOBAL_ADDR];
+
+// Priority: Inst > Type > Global
+(c_inst > 0) ? ( raw_val = c_inst; gmem_source_addr = GMEM_INST_BASE + slider5 - 1; ) :
+(c_type > 0) ? ( raw_val = c_type; gmem_source_addr = GMEM_TYPE_BASE + MY_TYPE_ID; ) :
+(c_glob > 0) ? ( raw_val = c_glob; gmem_source_addr = GMEM_GLOBAL_ADDR; ) : ( raw_val = 0; );
+
+(raw_val > 0) ? (
+    // Map Logic: PC+1 -> Tab. 
+    t_cue = raw_val - 1;
+    (t_cue >= 0 && t_cue < 128) ? ( gmem_cue_tab = t_cue; );
+);
+
+// --- PRIORITY DECISION ---
+final_target_tab = -1;
+final_source_type = -1;
+
+// 1. MIDI Note (Now Enabled via Ch 16)
+(midi_cue_source == 0 && midi_cue_tab > -1) ? (
+    final_target_tab = midi_cue_tab; final_source_type = 0;
+) :
+// 2. GMEM
+(gmem_cue_tab > -1 && gmem_source_addr != cue_clear_addr) ? (
+    final_target_tab = gmem_cue_tab; final_source_type = 1;
+) :
+// 3. MIDI PC
+(midi_cue_source == 2 && midi_cue_tab > -1) ? (
+    final_target_tab = midi_cue_tab; final_source_type = 2;
+);
+
+(final_target_tab > -1) ? (
+    cue_armed = 1;
+    cue_target_tab = final_target_tab;
+    // Auto-follow unlock
+    (cue_target_tab != mem[ui_play_prog_tab] && final_source_type == 1) ? ( mem[ui_locked_tab] = -1; gmem[GM_BASE+1] = -1; );
+    (final_source_type == 1) ? ( cue_clear_addr = gmem_source_addr; ) : ( cue_clear_addr = -1; );
+);
+
+// --- EXECUTION (Bar Line) ---
+samps_per_beat = (srate * 60) / tempo;
+block_dur_beats = samplesblock / samps_per_beat;
+check_pos = beat_position + block_dur_beats;
+current_bar_num = floor(check_pos / 4);
+
+(play_state == 0 && cue_armed) ? ( current_bar_num = -999; last_bar_checked = -998; );
+
+(current_bar_num != last_bar_checked) ? (
+    last_bar_checked = current_bar_num;
+    (cue_armed) ? (
+        mem[ui_play_prog_tab] = cue_target_tab;
+        gmem[GM_BASE+2] = cue_target_tab;
+        
+        // Handle sync reset requests here if needed
+        sync_reset_req = 1;
+        
+        cue_armed = 0;
+        cue_clear_pending = 1;
+        midi_cue_tab = -1; midi_cue_source = -1;
+    );
+);
+
+// --- CLEANUP ---
+pos_in_bar = beat_position % 4.0; 
+(cue_clear_addr >= 0 && cue_clear_pending && pos_in_bar >= 0.1) ? (
+    gmem[cue_clear_addr] = 0;
+    cue_clear_addr = -1;
+    cue_clear_pending = 0;
+);
+
+// --- MAINTENANCE ---
+(time_precise() - last_maint_time > 3.0) ? (
+    scan_all_tabs();
+    last_maint_time = time_precise();
+);
+
+// =========================================================
 
 (scale_dirty && input_source_mode == 1) ? ( recalc_scale(); input_dirty = 1; ); 
 (scale_dirty && input_source_mode == 0) ? ( input_dirty = 1; scale_dirty = 0; ); 
@@ -768,7 +961,6 @@ play_state == 0 ? (
 );
 
 play_state & 1 ? (
-    (pending_pattern >= 0) ? ( cur_pos = beat_position; dist_to_beat = 1.0 - (cur_pos % 1.0); (play_state == 1 || beat_position < 0.1 || dist_to_beat < 0.1) ? ( mem[ui_play_prog_tab] = pending_pattern; gmem[GM_BASE+2] = pending_pattern; pending_pattern = -1; sync_reset_req = 1; ); );
     t_pl = (mem[ui_locked_tab] >= 0) ? mem[ui_locked_tab] : mem[ui_play_prog_tab]; mem[ui_follow_mode] ? ( mem[ui_edit_tab] = t_pl; );
     
     bk_sub_v = eff_sub(t_pl); bk_bar_v = eff_bars(t_pl); bk_swing_v = eff_swing(t_pl); 
@@ -993,7 +1185,22 @@ local(bw, bh, i, r, c, bx, by, bit, is_set, current_mask, base_ptr)
 
 mx=mouse_x; my=mouse_y; mb=mouse_cap&1; rmb=mouse_cap&2; p_mb=l_mb; l_mb=mb; gfx_clear = 0.05; p_mx=l_mx; l_mx=mx; 
 UI_TOP_X=10; UI_TOP_Y=10; HDR_X=UI_TOP_X; HDR_Y=UI_TOP_Y;
-gfx_setfont(1, "Arial", 22, 'b'); draw_text(HDR_X, HDR_Y, "N2N ARP", COL_H_R*1.9, COL_H_G*1.9, COL_H_B*1.9); gfx_setfont(0);
+
+// --- HEADER: TRACK COLOR BAR ---
+HDR_X = 60;
+track_num > 0 ? (
+    rect(1400, 0, 216, 29, track_r*0.7, track_g*0.7, track_b*0.7, 1);
+    lum = (track_r * 0.299) + (track_g * 0.587) + (track_b * 0.114);
+    lum > 0.5 ? gfx_set(0,0,0,1) : gfx_set(1,1,1,1);
+    
+    gfx_setfont(1, "Arial", 32, 'b');
+    sprintf(#trk_str, "Track: %d", track_num);
+    gfx_x = 1445; gfx_y = 0; gfx_drawstr(#trk_str);
+    gfx_setfont(0);
+    
+);
+
+gfx_setfont(1, "Arial", 30, 'b'); draw_text(HDR_X-10, HDR_Y-6, "N2N ARP", COL_H_R*1.9, COL_H_G*1.9, COL_H_B*1.9); gfx_setfont(0);
 row1_y = UI_TOP_Y; x1 = HDR_X + 150; 
 
 // 9000-9999: JSFX Slider Automation
@@ -1008,6 +1215,9 @@ function dr_pat_mem(x, y, w, lab, val_in, min_v, max_v, mem_ptr, id_offset) (
     (mb && p_mb == 0 && mx>=x && mx<x+w && my>=y && my<y+20) ? ( capture_id = 4000 + id_offset; capture_min = min_v; capture_max = max_v; capture_ptr = mem_ptr; capture_start_x = mx; capture_start_val = val_in; drag_accum_gen = 0; );
 );
 
+
+x1 = X1 +90;
+
 dr_slider(x1, row1_y, 80, "HGT:", slider11, 10, 30, 0, 11, 0); x1 += 90;
 dr_slider(x1, row1_y, 80, "ID:", slider5, 1, 64, 0, 5, 0); x1 += 90;
 
@@ -1015,16 +1225,17 @@ rect(x1, row1_y, 90, 20, 0.2, 0.2, 0.2, 1); draw_text(x1+5, row1_y+5, "TRANSP:",
 (mb && p_mb==0 && mx>=x1 && mx<x1+90 && my>=row1_y && my<row1_y+20) ? ( capture_id=4999; capture_min=-3; capture_max=3; capture_ptr=ui_oct_transpose; capture_start_x=mx; capture_start_val=mem[ui_oct_transpose]; );
 x1 += 100;
 
-src_x = x1; 
+src_x = x1-375; 
 draw_text(src_x, row1_y+5, "SRC:", 0.6,0.6,0.6);
 rect(src_x+40, row1_y, 45, 20, 0.2, 0.2, 0.2, 1);
 slider10 == 0 ? ( draw_text(src_x+45, row1_y+5, "N2N", 0,1,1); ) : ( draw_text(src_x+45, row1_y+5, "MIDI", 1,0.6,0); );
 (mb && p_mb == 0 && mx>=src_x+40 && mx<src_x+85 && my>=row1_y && my<row1_y+20) ? ( slider10 = !slider10; slider_automate(10); );
 x1 += 95;
 
-draw_text(x1, row1_y+5, "SCALE:", 0.6,0.6,0.6); 
-scale_tonic == -1 ? ( draw_text(x1+80, row1_y+5, "---", 1, 0.2, 0.2); ) : (
-    note_x = x1 + 80; i=0; loop(13, pc = (scale_tonic + i) % 12; mem[scale_state_base + pc] ? ( t_n = pc; t_n==0?strcpy(#t,"C"):t_n==1?strcpy(#t,"C#"):t_n==2?strcpy(#t,"D"):t_n==3?strcpy(#t,"D#"):t_n==4?strcpy(#t,"E"):t_n==5?strcpy(#t,"F"):t_n==6?strcpy(#t,"F#"):t_n==7?strcpy(#t,"G"):t_n==8?strcpy(#t,"G#"):t_n==9?strcpy(#t,"A"):t_n==10?strcpy(#t,"A#"):strcpy(#t,"B"); pc == scale_tonic ? gfx_set(1, 0.2, 0.2, 1) : gfx_set(0.8, 0.8, 0.8, 1); gfx_x = note_x; gfx_y = row1_y+5; gfx_drawstr(#t); gfx_measurestr(#t, tw, th); note_x += tw + 8; ); i+=1; );
+slidescaleright = 480;
+draw_text(x1+10 +slidescaleright, row1_y+5, "SCALE:", 0.6,0.6,0.6); 
+scale_tonic == -1 ? ( draw_text(x1+80 + slidescaleright, row1_y+5, "---", 1, 0.2, 0.2); ) : (
+    note_x = x1 + 80 + slidescaleright; i=0; loop(13, pc = (scale_tonic + i) % 12; mem[scale_state_base + pc] ? ( t_n = pc; t_n==0?strcpy(#t,"C"):t_n==1?strcpy(#t,"C#"):t_n==2?strcpy(#t,"D"):t_n==3?strcpy(#t,"D#"):t_n==4?strcpy(#t,"E"):t_n==5?strcpy(#t,"F"):t_n==6?strcpy(#t,"F#"):t_n==7?strcpy(#t,"G"):t_n==8?strcpy(#t,"G#"):t_n==9?strcpy(#t,"A"):t_n==10?strcpy(#t,"A#"):strcpy(#t,"B"); pc == scale_tonic ? gfx_set(1, 0.2, 0.2, 1) : gfx_set(0.8, 0.8, 0.8, 1); gfx_x = note_x; gfx_y = row1_y+5; gfx_drawstr(#t); gfx_measurestr(#t, tw, th); note_x += tw + 8; ); i+=1; );
 );
 
 pat_y = row1_y + 26; pat_w = gfx_w / 64; 
@@ -1052,13 +1263,23 @@ i=0; loop(128, row_idx = floor(i/64); col_idx = i % 64; px = col_idx * pat_w; py
 
     // FIXED Lock Rect (Matches Visuals)
     is_lock ? (lr=.2; lg=.9; lb=.2;) : (lr=COL_H_R*1.5; lg=COL_H_G*1.5; lb=COL_H_B*1.5;); rect(px+2, py+20, pat_w-4, 15, lr, lg, lb, 1);
-    is_play ? ( gfx_set(COL_M_R*1.7, COL_M_G*1.7, COL_M_B*1.7, 1); gfx_circle(px+pat_w/2, py+25, 3, 1); );
+    is_play ? ( gfx_set(COL_M_R*1.7, COL_M_G*1.7, COL_M_B*1.7, 1); 
+    
+    gfx_set(1, .4, 0, 1);
+    gfx_circle(px+pat_w/2, py+27, 5, 1); );
     
     // Custom Name for Tab 0, Numbers for rest
     (i == 0) ? (
-        draw_text(px+2, py+4, "O\nf\nf", 1, 0.8, 0.2);
+        draw_text(px+4, py+8, "0", 1, 1, 1);
     ) : (
         (i) >= 100 ? ( sprintf(#lbl, "%d", floor(((i)%100)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : (i) >= 10 ? ( sprintf(#lbl, "%d", floor((i)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : ( sprintf(#lbl, "%d", i); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); );
+    );
+
+    // --- POPULATED INDICATOR ---
+    mem[LOC_TAB_POPULATED + i] ? (
+        gfx_set(1, 1, 0, 1);
+        gfx_rect(px+2, py+17, pat_w-4, 3);
+        gfx_rect(px+2, py+35, pat_w-4, 3);
     );
 
     // FIXED MOUSE LOGIC for New Height
@@ -1090,9 +1311,9 @@ rect(x2, ctrl_y, 20, 18, 0.2, 0.2, 0.2, 1); is_follow ? ( rect(x2+2, ctrl_y+2, 1
 t_e = mem[ui_edit_tab]; curr_pat_v_ptr = vel_base + t_e*vel_stride_tab; curr_pat_g_ptr = grid_base + t_e*vel_stride_tab; curr_pat_l_ptr = step_len_base + t_e*vel_stride_tab;
 
 btn(x2, ctrl_y, 70, 18, "COPY") ? ( memcpy(copy_tab_v_buf, curr_pat_v_ptr, vel_stride_tab); memcpy(copy_tab_g_buf, curr_pat_g_ptr, vel_stride_tab); memcpy(copy_tab_l_buf, curr_pat_l_ptr, vel_stride_tab); ); x2+=75;
-btn(x2, ctrl_y, 70, 18, "PASTE") ? ( memcpy(curr_pat_v_ptr, copy_tab_v_buf, vel_stride_tab); memcpy(curr_pat_g_ptr, copy_tab_g_buf, vel_stride_tab); memcpy(curr_pat_l_ptr, copy_tab_l_buf, vel_stride_tab); ); x2+=75;
-btn(x2, ctrl_y, 70, 18, "CLEAR") ? ( memset(curr_pat_g_ptr, 0, vel_stride_tab); memset(curr_pat_v_ptr, 0, vel_stride_tab); memset(curr_pat_l_ptr, 0, vel_stride_tab); ); x2+=85;
-
+btn(x2, ctrl_y, 70, 18, "PASTE") ? ( memcpy(curr_pat_v_ptr, copy_tab_v_buf, vel_stride_tab); memcpy(curr_pat_g_ptr, copy_tab_g_buf, vel_stride_tab); memcpy(curr_pat_l_ptr, copy_tab_l_buf, vel_stride_tab); scan_all_tabs(); ); x2+=75;
+btn(x2, ctrl_y, 70, 18, "CLEAR") ? ( memset(curr_pat_g_ptr, 0, vel_stride_tab); memset(curr_pat_v_ptr, 0, vel_stride_tab); memset(curr_pat_l_ptr, 0, vel_stride_tab); scan_all_tabs(); ); x2+=85;
+x2 += 100;
 dr_pat_mem(x2, ctrl_y, 80, "BARS:", eff_bars(t_e), 1, 4, bars_ov_base + t_e, 1); x2 += 90;
 
 sub_v = eff_sub(t_e); curr_idx = (sub_v==8?0:sub_v==12?1:sub_v==16?2:sub_v==24?3:4);
@@ -1102,15 +1323,15 @@ draw_text(x2+50, ctrl_y+5, #s, 1,1,1);
 (mb && p_mb==0 && mx>=x2 && mx<x2+80 && my>=ctrl_y && my<ctrl_y+20) ? ( capture_id = 4002; capture_ptr = subdiv_ov_base + t_e; capture_min=0; capture_max=4; capture_start_x = mx; capture_start_val = curr_idx; drag_accum_gen = 0; );
 x2 += 90;
 
-dr_pat_mem(x2, ctrl_y, 80, "HUM:", eff_hum(t_e), 0, 25, hum_ov_base + t_e, 3); x2 += 110;
+dr_pat_mem(x2, ctrl_y, 100, "PAT HUM:", eff_hum(t_e), 0, 25, hum_ov_base + t_e, 3); x2 += 110;
 
-sw_x = x2; draw_text(sw_x, ctrl_y+5, "SWING:", 0.7,0.7,0.7); is_sw_local = (mem[swing_ov_base+t_e] >= 0);
+sw_x = x2 + 20; draw_text(sw_x, ctrl_y+5, "SWING:", 0.7,0.7,0.7); is_sw_local = (mem[swing_ov_base+t_e] >= 0);
 rect(sw_x+50, ctrl_y, 15, 18, 0.2,0.2,0.2,1); is_sw_local ? draw_text(sw_x+53, ctrl_y+5, "M", 1,0.5,0) : draw_text(sw_x+53, ctrl_y+5, "P", 0,1,1);
 rect(sw_x+70, ctrl_y, 40, 20, 0.2,0.2,0.2,1); curr_sw = eff_swing(t_e); sprintf(#s, "%d", curr_sw); draw_text(sw_x+75, ctrl_y+5, #s, 1,1,1);
 (mb && p_mb==0 && mx>=sw_x+50 && mx<sw_x+65 && my>=ctrl_y && my<ctrl_y+20) ? ( is_sw_local ? mem[swing_ov_base+t_e]=-1 : mem[swing_ov_base+t_e]=curr_sw; );
 (mb && p_mb==0 && mx>=sw_x+70 && mx<sw_x+110 && my>=ctrl_y && my<ctrl_y+20) ? ( capture_id = 4004; capture_min=0; capture_max=100; capture_ptr=swing_ov_base+t_e; capture_start_x = mx; capture_start_val = (is_sw_local ? mem[swing_ov_base+t_e] : slider6); drag_accum_gen = 0; );
 
-x2 += 120;
+x2 += 270;
 curr_sub_val = eff_sub(t_e);
 (curr_sub_val == 24 || curr_sub_val == 32) ? (
     hf_x = x2; box_h = 20; hf_act = eff_half(t_e);
@@ -1160,80 +1381,84 @@ lx = 20;
 oct_drop = floor(sel_r / 9); oct_num = 6 - oct_drop; role_idx = sel_r % 9;
 role_idx == 0 ? strcpy(#r_str, "H +") : role_idx == 1 ? strcpy(#r_str, "H") : role_idx == 2 ? strcpy(#r_str, "H -") :
 role_idx == 3 ? strcpy(#r_str, "M +") : role_idx == 4 ? strcpy(#r_str, "M") : role_idx == 5 ? strcpy(#r_str, "M -") :
-role_idx == 6 ? strcpy(#r_str, "L +") : role_idx == 7 ? strcpy(#r_str, "L") : strcpy(#r_str, "L -");
-sprintf(#ln, "%d %s", oct_num, #r_str); draw_text(lx, lane_y+5, #ln, 1,1,1); lx += 80;
+  role_idx == 6 ? strcpy(#r_str, "L +") : role_idx == 7 ? strcpy(#r_str, "L") : strcpy(#r_str, "L -");
+sprintf(#ln, "%d %s", oct_num, #r_str); draw_text(lx, lane_y+7, #ln, 1,1,1); lx += 80;
 
 function dr_ph(x, y, lab, ptr, min_v, max_v, def) ( 
-    draw_text(x, y+5, lab, 0.7,0.7,0.7); val = mem[ptr]; 
+    draw_text(x, y+7, lab, 0.7,0.7,0.7); val = mem[ptr]; 
     val == -1 ? strcpy(#ps, "Glb") : sprintf(#ps, "%d", val);
-    draw_text(x+45, y+5, #ps, 1,1,1);
-    (mb && p_mb==0 && mx>=x && mx<x+65 && my>=y && my<y+20) ? ( capture_id = 80000 + ptr; capture_min = min_v; capture_max = max_v; capture_start_x = mx; capture_start_val = val; drag_accum_gen = 0; ); x + 80;
+    draw_text(x+72, y+7, #ps, 1,1,1);
+    (mb && p_mb==0 && mx>=x && mx<x+100 && my>=y && my<y+20) ? ( capture_id = 80000 + ptr; capture_min = min_v; capture_max = max_v; capture_start_x = mx; capture_start_val = val; drag_accum_gen = 0; ); x + 80;
 );
-lx = dr_ph(lx, lane_y, "LEN:", row_len_base+sel_r, -1, 127, -1); 
-lx = dr_ph(lx, lane_y, "LVL:", row_level_base+sel_r, -1, 100, -1); 
-lx = dr_ph(lx, lane_y, "HUM:", row_human_base+sel_r, -1, 100, slider2);
+lx = dr_ph(lx, lane_y, "ROW LEN:", row_len_base+sel_r, -1, 127, -1); 
+lx = dr_ph(lx+50, lane_y, "ROW LVL:", row_level_base+sel_r, -1, 100, -1); 
+lx -= 50;
+lx = dr_ph(lx+100, lane_y, "ROW HUM:", row_human_base+sel_r, -1, 100, slider2);
+lx -= 100;
 
 // NEW CH IN: logic
-draw_text(lx, lane_y+5, "CH IN:", 0.7,0.7,0.7); 
+draw_text(lx + 150, lane_y+7, "ROW CH IN:", 0.7,0.7,0.7); 
 mask = mem[row_in_chan_base + sel_r];
 mask == -1 ? ( strcpy(#cs, "Glb"); ) : (
     set_cnt=0; bit_i=0; loop(16, (mask & (1<<bit_i)) ? set_cnt+=1; bit_i+=1;); set_cnt == 0 ? strcpy(#cs, "None") : set_cnt == 16 ? strcpy(#cs, "All") : sprintf(#cs, "%d Set", set_cnt); 
 );
-draw_text(lx+45, lane_y+5, #cs, 1,1,1);
-(mb && p_mb==0 && mx>=lx && mx<lx+100 && my>=lane_y && my<lane_y+20 && popup_cooldown == 0) ? ( chan_popup_active = 1; chan_popup_row = sel_r; chan_popup_is_input = 1; popup_cooldown = 10; );
-lx += 120;
+draw_text(lx+240, lane_y+7, #cs, 1,1,1);
+(mb && p_mb==0 && mx>=lx+230 && mx<lx+280 && my>=lane_y && my<lane_y+20 && popup_cooldown == 0) ? ( chan_popup_active = 1; chan_popup_row = sel_r; chan_popup_is_input = 1; popup_cooldown = 10; );
+lx += 320;
 
 // NEW CH OUT logic
-mask = mem[row_chan_base+sel_r]; draw_text(lx, lane_y+5, "CH OUT:", 0.7,0.7,0.7); 
+mask = mem[row_chan_base+sel_r]; draw_text(lx, lane_y+7, "ROW CH OUT:", 0.7,0.7,0.7); 
 mask == -1 ? ( strcpy(#cs, "Glb"); ) : (
     set_cnt=0; bit_i=0; loop(16, (mask & (1<<bit_i)) ? set_cnt+=1; bit_i+=1;); set_cnt == 0 ? strcpy(#cs, "None") : set_cnt == 16 ? strcpy(#cs, "All") : sprintf(#cs, "%d Set", set_cnt); 
 );
-draw_text(lx+55, lane_y+5, #cs, 1,1,1);
-(mb && p_mb==0 && mx>=lx && mx<lx+100 && my>=lane_y && my<lane_y+20 && popup_cooldown == 0) ? ( chan_popup_active = 1; chan_popup_row = sel_r; chan_popup_is_input = 0; popup_cooldown = 10; );
+draw_text(lx+95, lane_y+7, #cs, 1,1,1);
+(mb && p_mb==0 && mx>=lx+80 && mx<lx+130 && my>=lane_y && my<lane_y+20 && popup_cooldown == 0) ? ( chan_popup_active = 1; chan_popup_row = sel_r; chan_popup_is_input = 0; popup_cooldown = 10; );
 popup_cooldown > 0 ? popup_cooldown -= 1;
 
 gr_max = mem[LOCAL_GROOVE_DB + 32];
 gr_x = lx + 120; gr_y = lane_y + 10;
 gfx_set(0.6, 0.6, 0.6, 1);
-gfx_x = gr_x - 30; gfx_y = gr_y - 6; gfx_drawstr("GRV:");
+gfx_x = gr_x + 100; gfx_y = gr_y - 40; gfx_drawstr("GRV:");
 gr_max == 0 ? gfx_set(0.3, 0.3, 0.3, 1) : (gr_max > 1.0 ? gfx_set(1, 0, 0, 1) : gfx_set(0, 1, 0, 1));
-gfx_circle(gr_x+7, gr_y-3, 4, 1);
+gfx_circle(gr_x+142, gr_y-37, 4.5, 1);
 
 // --- SIDEBAR LEFT CONTROLS ---
 edit_y = lane_y + 35; btn_w = 90; btn_h = 18;
 btn(10, edit_y, btn_w, btn_h, "COPY LN") ? ( memcpy(copy_row_v_buf, curr_pat_v_ptr + sel_r*vel_stride_row, MAX_STEPS); memcpy(copy_row_g_buf, curr_pat_g_ptr + sel_r*vel_stride_row, MAX_STEPS); memcpy(copy_row_l_buf, curr_pat_l_ptr + sel_r*vel_stride_row, MAX_STEPS); );
-btn(10, edit_y + 20, btn_w, btn_h, "PASTE LN") ? ( memcpy(curr_pat_v_ptr + sel_r*vel_stride_row, copy_row_v_buf, MAX_STEPS); memcpy(curr_pat_g_ptr + sel_r*vel_stride_row, copy_row_g_buf, MAX_STEPS); memcpy(curr_pat_l_ptr + sel_r*vel_stride_row, copy_row_l_buf, MAX_STEPS); );
+btn(10, edit_y + 20, btn_w, btn_h, "PASTE LN") ? ( memcpy(curr_pat_v_ptr + sel_r*vel_stride_row, copy_row_v_buf, MAX_STEPS); memcpy(curr_pat_g_ptr + sel_r*vel_stride_row, copy_row_g_buf, MAX_STEPS); memcpy(curr_pat_l_ptr + sel_r*vel_stride_row, copy_row_l_buf, MAX_STEPS); scan_active_tab(); );
 
 all_mode = mem[ui_vel_edit_all];
 btn(110, edit_y + 20, 30, 18, "ALL") ? ( mem[ui_vel_edit_all] = !mem[ui_vel_edit_all]; mem[ui_vel_edit_all] ? mem[ui_selected_row] = -1; );
 all_mode ? ( gfx_set(1, 0.8, 0.2, 1); gfx_rect(110, edit_y+20, 30, 18); gfx_set(0,0,0,1); gfx_x=115; gfx_y=edit_y+25; gfx_drawstr("ALL"); );
 
-btn(10, edit_y + 40, btn_w, btn_h, "CLEAR LN") ? ( memset(curr_pat_g_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); memset(curr_pat_v_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); memset(curr_pat_l_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); );
+btn(10, edit_y + 40, btn_w, btn_h, "CLEAR LN") ? ( memset(curr_pat_g_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); memset(curr_pat_v_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); memset(curr_pat_l_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); scan_active_tab(); );
 
 // --- GLOBAL CONTROLS MOVED TO SIDEBAR ---
 // Stack them below the row buttons so they aren't hidden by the grid
-sl_y = edit_y + 65; sl_x = 10;
-dr_slider(sl_x, sl_y, 80, "Glb Len:", slider12, 1, 127, 0, 12, 0); 
-dr_slider(sl_x+90, sl_y, 80, "Glb Lvl:", slider13, 0, 100, 0, 13, 0); 
-
+sl_x = 580;
+sl_y = 10;
+dr_slider(sl_x, sl_y, 110, "GLB LEN:", slider12, 1, 127, 0, 12, 0); 
+dr_slider(sl_x+120, sl_y, 110, "GLB LEV:", slider13, 0, 100, 0, 13, 0); 
 // Global CH IN Button
 mask = input_filter_mask;
-rect(sl_x, sl_y+25, 80, 20, 0.2,0.2,0.2,1); draw_text(sl_x+5, sl_y+30, "Glb IN:", 0.7,0.7,0.7); 
+sl_x = 820;
+sl_y = -15;
+rect(sl_x, sl_y+25, 150, 20, 0.2,0.2,0.2,1); draw_text(sl_x+5, sl_y+30, "GLB CH IN:", 0.7,0.7,0.7); 
 set_cnt=0; bit_i=0; loop(16, (mask & (1<<bit_i)) ? set_cnt+=1; bit_i+=1;); set_cnt == 0 ? strcpy(#cs, "None") : set_cnt == 16 ? strcpy(#cs, "All") : sprintf(#cs, "%d Set", set_cnt); 
-draw_text(sl_x+50, sl_y+30, #cs, 1,1,1);
-(mb && p_mb==0 && mx>=sl_x && mx<sl_x+80 && my>=sl_y+25 && my<sl_y+45 && popup_cooldown == 0) ? ( chan_popup_active = 1; chan_popup_row = -1; chan_popup_is_input = 1; popup_cooldown = 10; );
+draw_text(sl_x+93, sl_y+30, #cs, 1,1,1);
+(mb && p_mb==0 && mx>=sl_x+93 && mx<sl_x+150 && my>=sl_y+25 && my<sl_y+45 && popup_cooldown == 0) ? ( chan_popup_active = 1; chan_popup_row = -1; chan_popup_is_input = 1; popup_cooldown = 10; );
 
 // Global CH OUT Button
 mask = global_out_mask;
-rect(sl_x+90, sl_y+25, 80, 20, 0.2,0.2,0.2,1); draw_text(sl_x+95, sl_y+30, "Glb OUT:", 0.7,0.7,0.7); 
+rect(sl_x+160, sl_y+25, 170, 20, 0.2,0.2,0.2,1); draw_text(sl_x+170, sl_y+30, "GLB CH OUT:", 0.7,0.7,0.7); 
 set_cnt=0; bit_i=0; loop(16, (mask & (1<<bit_i)) ? set_cnt+=1; bit_i+=1;); set_cnt == 0 ? strcpy(#cs, "None") : set_cnt == 16 ? strcpy(#cs, "All") : sprintf(#cs, "%d Set", set_cnt); 
-draw_text(sl_x+140, sl_y+30, #cs, 1,1,1);
-(mb && p_mb==0 && mx>=sl_x+90 && mx<sl_x+170 && my>=sl_y+25 && my<sl_y+45 && popup_cooldown == 0) ? ( chan_popup_active = 1; chan_popup_row = -1; chan_popup_is_input = 0; popup_cooldown = 10; );
+draw_text(sl_x+270, sl_y+30, #cs, 1,1,1);
+(mb && p_mb==0 && mx>=sl_x+270 && mx<sl_x+320 && my>=sl_y+25 && my<sl_y+45 && popup_cooldown == 0) ? ( chan_popup_active = 1; chan_popup_row = -1; chan_popup_is_input = 0; popup_cooldown = 10; );
 
-
+sl_y = edit_y + 65; sl_x = 10;
 ruler_h = 15; gap_h = 2; 
 // Dynamic Grid Start based on sidebar height
-grid_y = sl_y + 55 + ruler_h + gap_h; 
+grid_y = sl_y-3 + ruler_h + gap_h; 
 
 // --- AUTOMATIC ROW CALCULATION (Prevents Footer Overlap) ---
 footer_height = 100;
@@ -1242,6 +1467,26 @@ calc_rows = floor(avail_h / ROW_HEIGHT);
 calc_rows < 1 ? calc_rows = 1;
 calc_rows > MAX_ROWS ? calc_rows = MAX_ROWS;
 slider7 = calc_rows; // Auto-update Visible Rows slider
+
+
+need_view_center ? (
+    // Octave +1 starts at row 45. Octave 0 ends at row 62.
+    // Row 53 is the mathematical center of the active lanes.
+    target_center_row = 50;
+    
+    // Calculate scroll to put row 53 in the middle of the screen
+    new_scroll = target_center_row - floor(calc_rows / 2);
+    
+    // Safety Clamps
+    new_scroll < 0 ? new_scroll = 0;
+    max_scroll = MAX_ROWS - calc_rows;
+    new_scroll > max_scroll ? new_scroll = max_scroll;
+    
+    // Apply and Kill Flag
+    slider8 = new_scroll;
+    need_view_center = 0; 
+);
+
 
 scroll_val = slider8; visible_rows = slider7; max_scroll = MAX_ROWS - visible_rows; max_scroll < 0 ? max_scroll = 0;
 sb_w = 16; sb_x = gfx_w - sb_w; sb_y = grid_y; sb_h = visible_rows * ROW_HEIGHT; (sb_h > gfx_h - grid_y) ? sb_h = gfx_h - grid_y;
@@ -1361,7 +1606,7 @@ rect(sb_x, sb_y, sb_w, sb_h, 0.1,0.1,0.1,1); rect(sb_x+2, handle_y, sb_w-4, hand
         idx = hov_row * vel_stride_row + hov_col;
         found_head = -1; scan_k = 0; 
         loop(32, check_col = hov_col - scan_k; (check_col >= 0) ? ( chk_idx = hov_row * vel_stride_row + check_col; (mem[curr_pat_g_ptr + chk_idx] == 1) ? ( len = mem[curr_pat_l_ptr + chk_idx]; (check_col + len > hov_col) ? ( found_head = chk_idx; scan_k = 32; ); ); ); scan_k += 1; );
-        found_head != -1 ? ( len_drag_start_idx = found_head; ) : ( mem[curr_pat_g_ptr+idx] = 1; mem[curr_pat_l_ptr+idx] = 1; mem[curr_pat_v_ptr+idx] = slider1; len_drag_start_idx = idx; );
+        found_head != -1 ? ( len_drag_start_idx = found_head; ) : ( mem[curr_pat_g_ptr+idx] = 1; mem[curr_pat_l_ptr+idx] = 1; mem[curr_pat_v_ptr+idx] = slider1; len_drag_start_idx = idx; scan_active_tab(); );
         capture_id = 88888; 
     );
 );
@@ -1396,6 +1641,7 @@ rect(sb_x, sb_y, sb_w, sb_h, 0.1,0.1,0.1,1); rect(sb_x+2, handle_y, sb_w-4, hand
             (ctrl_dn && shift_dn) ? (loop_s % (steps_per_bar/4) == step_in_beat ? should_apply=1) : ctrl_dn ? (loop_s % steps_per_bar == step_in_bar ? should_apply=1) : shift_dn ? ((loop_bar == target_bar) && (loop_s % (steps_per_bar/4) == step_in_beat) ? should_apply=1) : (loop_s == hov_col ? should_apply = 1);
             should_apply ? ( loop_idx = hov_row * vel_stride_row + loop_s; mem[curr_pat_g_ptr+loop_idx] = paint_state; paint_state ? (mem[curr_pat_l_ptr+loop_idx]=1; mem[curr_pat_v_ptr+loop_idx]<=0 ? mem[curr_pat_v_ptr+loop_idx]=slider1;) : (mem[curr_pat_l_ptr+loop_idx]=0; mem[curr_pat_v_ptr+loop_idx]=0;); ); loop_s += 1;
         ); last_paint_idx = target_idx; 
+        scan_active_tab();
     );
 );
 (mb && capture_id == 2000 && mx >= grid_x && mx < grid_x + grid_w && my >= grid_y && my < grid_y + sb_h) ? (
@@ -1408,6 +1654,7 @@ rect(sb_x, sb_y, sb_w, sb_h, 0.1,0.1,0.1,1); rect(sb_x+2, handle_y, sb_w-4, hand
                 (ctrl_dn && shift_dn) ? (loop_s % (steps_per_bar/4) == step_in_beat ? should_apply=1) : ctrl_dn ? (loop_s % steps_per_bar == step_in_bar ? should_apply=1) : shift_dn ? ((loop_bar == target_bar) && (loop_s % (steps_per_bar/4) == step_in_beat) ? should_apply=1) : (loop_s == hov_col ? should_apply = 1);
                 should_apply ? ( loop_idx = hov_row * vel_stride_row + loop_s; mem[curr_pat_g_ptr+loop_idx] = paint_state; paint_state ? (mem[curr_pat_l_ptr+loop_idx]=1; mem[curr_pat_v_ptr+loop_idx]<=0 ? mem[curr_pat_v_ptr+loop_idx]=slider1;) : (mem[curr_pat_l_ptr+loop_idx]=0; mem[curr_pat_v_ptr+loop_idx]=0;); ); loop_s += 1;
             ); last_paint_idx = target_idx;
+            scan_active_tab();
         );
     );
 );
@@ -1479,6 +1726,7 @@ gx_r = 0; loop(calc_rows,
                             (ctrl_dn && shift_dn) ? (loop_s % (steps_per_bar/4) == step_in_beat ? should_apply=1) : ctrl_dn ? (loop_s % steps_per_bar == step_in_bar ? should_apply=1) : shift_dn ? ((loop_bar == target_bar) && (loop_s % (steps_per_bar/4) == step_in_beat) ? should_apply=1) : (loop_s == gx_s ? should_apply = 1);
                             should_apply ? ( loop_idx = r_idx * vel_stride_row + loop_s; mem[curr_pat_g_ptr+loop_idx] = (drag_mode == 1); (drag_mode == 1) ? ( mem[curr_pat_l_ptr+loop_idx]=1; mem[curr_pat_v_ptr+loop_idx]<=0 ? mem[curr_pat_v_ptr+loop_idx]=slider1; ) : ( mem[curr_pat_l_ptr+loop_idx]=0; mem[curr_pat_v_ptr+loop_idx]=0; ); ); loop_s += 1;
                         ); mem[ui_selected_row] = r_idx; last_drag_idx = cell_id;
+                        scan_active_tab();
                     );
                 );
             ); gx_s+=1;
