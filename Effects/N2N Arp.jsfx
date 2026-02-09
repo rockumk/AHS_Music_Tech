@@ -1,8 +1,8 @@
-desc:N2N Arp v11.97
-version: 11.97
+desc:N2N Arp
+version: 11.98
 author: Rock Kennedy
 about:
-  # N2N Arp v11.97
+  # N2N Arp v11.98
   - FEATURE: Inventory Reporting to N2N Ecosystem.
   - FEATURE: Populated Pattern Indicators on Tabs.
   - FEATURE: Track Color/Name Header integration.
@@ -28,7 +28,7 @@ slider12:20<1,127,1>-Global Note Len
 slider13:100<0,100,1>-Global Row Level
 
 @init
-thisversion = "v11.97";
+thisversion = "v11.98";
 // =========================================================
 // VISUALS
 // =========================================================
