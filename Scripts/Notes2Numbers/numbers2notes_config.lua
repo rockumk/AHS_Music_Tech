@@ -1,5 +1,5 @@
 -- @description numbers2notes_config
--- @version 1.5.1
+-- @version 1.5.2
 -- @noindex
 -- @author Rock Kennedy
 -- @about
@@ -159,12 +159,7 @@ config.track_table = {
     [13] = {"N2N Chord-Bass MIDI", false, nil, 1, {}, {14}, 1, {172, 134, 181}, 0}, 
 
     [14] = {"N2N Chord-Bass", false, nil, 0, {
-        {"HeadStart", true, nil, 13},
-        {"ReaCenterMIDIpitch", false, nil, 13},
-        {"JS: N2N Arp.jsfx", true, nil, 13},
-        {"ReaPulsive-8ths", false, nil, 13},  
-        {"SwingTrackMIDI", true, nil, 13},
-        {"ThisTriggersThat", false, nil, 13},
+        {"JS: N2N Arp.jsfx", true, nil, 13},  
         {"CLAP:Surge XT", true, nil, 5},
         {"STFU", false, nil, 9},
         {"JS:Guitar Amp", false, nil, 12}, 
@@ -207,6 +202,7 @@ config.track_table = {
 
 
 return config
+
 
 
 
