@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="e604de25edc0cf8265287b98dd24114f44ca8fb3">
+<index version="1" name="AHS_Music_Tech" commit="85f070e81c50d78302796f98aae0de04af63aac3">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -654,7 +654,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 Numbers2Notes 1.5.0\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 Numbers2Notes 1.5.1\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 Nashville Number System Style Chord Charting for Reaper. Now includes automated setup wizard and non-destructive track handling.\par}
 }
 ]]></description>
@@ -849,6 +849,16 @@ Auto Reload of Last Numbers2Notes Session]]></changelog>
         <source file="numbers2notes_musictheory.lua">https://github.com/rockumk/AHS_Music_Tech/raw/e97eac11e5490bcd5f30af330b9ecb3457a03526/Scripts/Notes2Numbers/numbers2notes_musictheory.lua</source>
         <source file="numbers2notes_songs.lua">https://github.com/rockumk/AHS_Music_Tech/raw/e97eac11e5490bcd5f30af330b9ecb3457a03526/Scripts/Notes2Numbers/numbers2notes_songs.lua</source>
         <source file="numbers2notes_spectrum.lua">https://github.com/rockumk/AHS_Music_Tech/raw/e97eac11e5490bcd5f30af330b9ecb3457a03526/Scripts/Notes2Numbers/numbers2notes_spectrum.lua</source>
+      </version>
+      <version name="1.5.1" author="Rock Kennedy" time="2026-02-10T06:02:17Z">
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/85f070e81c50d78302796f98aae0de04af63aac3/Scripts/Notes2Numbers/Numbers2Notes.lua</source>
+        <source file="numbers2notes_config.lua">https://github.com/rockumk/AHS_Music_Tech/raw/85f070e81c50d78302796f98aae0de04af63aac3/Scripts/Notes2Numbers/numbers2notes_config.lua</source>
+        <source file="numbers2notes_form.lua">https://github.com/rockumk/AHS_Music_Tech/raw/85f070e81c50d78302796f98aae0de04af63aac3/Scripts/Notes2Numbers/numbers2notes_form.lua</source>
+        <source file="numbers2notes_gmem.lua">https://github.com/rockumk/AHS_Music_Tech/raw/85f070e81c50d78302796f98aae0de04af63aac3/Scripts/Notes2Numbers/numbers2notes_gmem.lua</source>
+        <source file="numbers2notes_help.lua">https://github.com/rockumk/AHS_Music_Tech/raw/85f070e81c50d78302796f98aae0de04af63aac3/Scripts/Notes2Numbers/numbers2notes_help.lua</source>
+        <source file="numbers2notes_musictheory.lua">https://github.com/rockumk/AHS_Music_Tech/raw/85f070e81c50d78302796f98aae0de04af63aac3/Scripts/Notes2Numbers/numbers2notes_musictheory.lua</source>
+        <source file="numbers2notes_songs.lua">https://github.com/rockumk/AHS_Music_Tech/raw/85f070e81c50d78302796f98aae0de04af63aac3/Scripts/Notes2Numbers/numbers2notes_songs.lua</source>
+        <source file="numbers2notes_spectrum.lua">https://github.com/rockumk/AHS_Music_Tech/raw/85f070e81c50d78302796f98aae0de04af63aac3/Scripts/Notes2Numbers/numbers2notes_spectrum.lua</source>
       </version>
     </reapack>
   </category>
