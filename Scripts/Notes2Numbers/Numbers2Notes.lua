@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.5.0
+-- @version  1.5.1
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.5.0
+--   # Numbers2Notes 1.5.1
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -15,12 +15,11 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
---   # Major Update 1.5.0
+--   # Major Update 1.5.1
 --   + Added Groove
 --   + Changed N2N Drum Arranger to N2N Drum Arranger.jsfx
 --   + Changed gmem name
 --   + N2N Drum Arranger search fixed for Mac
---   + Turned down the send volumes
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require "imgui" "0.8.6" -- Version of IMGUI used during development.
@@ -1267,7 +1266,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.5.0")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.5.1")
             reaper.ImGui_Text(ctx, "https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
 
@@ -3670,6 +3669,15 @@ function Parse_Region_To_PC(name)
         ["Hit"] = 71,
         ["Fill"] = 81
     }
+    
+    arpmap = {
+        ["Intro"] = 8,
+        ["Verse"] = 16,
+        ["Pre"] = 24,
+        ["Chorus"] = 32,
+        ["Bridge"] = 40,
+        ["Outro"] = 48
+    }
     local base_pc = nil
     for key, pc in pairs(map) do
         if name:find(key) then
@@ -3795,6 +3803,202 @@ function Find_Track_With_Drum_FX()
 end
 
 
+-- 1. PARSE REGION TO ARP PC (using arpmap)
+function Parse_Region_To_Arp_PC(name)
+    if not name or name == "" then
+        return nil
+    end
+    
+    local base_pc = nil
+    for key, pc in pairs(arpmap) do
+        if name:find(key) then
+            base_pc = pc
+            break
+        end
+    end
+    
+    if not base_pc then
+        return nil
+    end
+    
+    -- Add variation number (1-7) based on number in region name
+    local var = tonumber(name:match("%d+")) or 1
+    if var < 1 then var = 1 end
+    if var > 7 then var = 7 end
+    
+    return base_pc + (var - 1)
+end
+
+-- 2. GET ARP VISUALS (colors/names for the Arp track)
+function Get_Arp_Visuals(pc)
+    local name = "Section"
+    local r, g, b = 0.7, 0.7, 0.7
+
+    if pc == 0 then
+        name = "Off"
+        r, g, b = 0.3, 0.3, 0.3
+    elseif pc >= 8 and pc <= 14 then      -- Intro (8-14): Cyan
+        name = (pc == 8) and "Intro" or "Intro " .. (pc - 7)
+        r, g, b = 0.2, 1.0, 1.0
+    elseif pc >= 16 and pc <= 22 then     -- Verse (16-22): Blue  
+        name = (pc == 16) and "Verse" or "Verse " .. (pc - 15)
+        r, g, b = 0.4, 0.6, 1.0
+    elseif pc >= 24 and pc <= 30 then     -- Pre (24-30): Purple
+        name = (pc == 24) and "Pre" or "Pre " .. (pc - 23)
+        r, g, b = 0.7, 0.4, 1.0
+    elseif pc >= 32 and pc <= 38 then     -- Chorus (32-38): Red
+        name = (pc == 32) and "Chorus" or "Chorus " .. (pc - 31)
+        r, g, b = 1.0, 0.4, 0.4
+    elseif pc >= 40 and pc <= 46 then     -- Bridge (40-46): Orange
+        name = (pc == 40) and "Bridge" or "Bridge " .. (pc - 39)
+        r, g, b = 1.0, 0.9, 0.2
+    elseif pc >= 48 and pc <= 54 then     -- Outro (48-54): Greenish
+        name = (pc == 48) and "Outro" or "Outro " .. (pc - 47)
+        r, g, b = 0.5, 0.8, 0.7
+    end
+
+    return name, r, g, b
+end
+
+-- 3. INSERT ARP TRIGGER (similar to drum trigger but with arp-specific visuals)
+function Insert_Arp_Trigger(track, time_pos, pc_val)
+    local r = reaper
+
+    -- MIDI timing (8th note early = 0.5 QN)
+    local midi_qn = r.TimeMap2_timeToQN(0, time_pos) - 0.5
+    if midi_qn < 0 then midi_qn = 0 end
+
+    local midi_time = r.TimeMap2_QNToTime(0, midi_qn)
+    local end_time = r.TimeMap2_QNToTime(0, midi_qn + 1.0)
+
+    -- Create MIDI item with Program Change
+    local m_item = r.CreateNewMIDIItemInProj(track, midi_time, end_time, false)
+    local m_take = r.GetActiveTake(m_item)
+    if m_take then
+        local ppq = r.MIDI_GetPPQPosFromProjTime(m_take, midi_time)
+        -- Program Change on channel 1 (0xC0), value pc_val
+        r.MIDI_InsertCC(m_take, false, false, ppq, 0xC0, 0, pc_val, 0)
+        r.MIDI_Sort(m_take)
+    end
+
+    -- INSERT VISUAL TEXT LABEL
+    local section_name, rr, gg, bb = Get_Arp_Visuals(pc_val)
+    local label = "Arp " .. section_name
+
+    local start_qn = r.TimeMap2_timeToQN(0, time_pos)
+    local end_qn = start_qn + 4
+    local end_time_label = r.TimeMap2_QNToTime(0, end_qn)
+
+    local t_item = r.AddMediaItemToTrack(track)
+    if t_item then
+        r.SetMediaItemInfo_Value(t_item, "D_POSITION", time_pos)
+        r.SetMediaItemInfo_Value(t_item, "D_LENGTH", end_time_label - time_pos)
+
+        r.GetSetMediaItemInfo_String(t_item, "P_NAME", label, true)
+        r.GetSetMediaItemInfo_String(t_item, "P_NOTES", label, true)
+
+        local native_color = r.ColorToNative(math.floor(rr * 255), math.floor(gg * 255), math.floor(bb * 255)) | 0x1000000
+        r.SetMediaItemInfo_Value(t_item, "I_CUSTOMCOLOR", native_color)
+    end
+end
+
+-- 4. CLEAN ARP TRACK (similar to Clean_Drum_Track)
+function Clean_Arp_Track(track)
+    if not track then return end
+    local r = reaper
+    local item_count = r.CountTrackMediaItems(track)
+
+    for i = item_count - 1, 0, -1 do
+        local item = r.GetTrackMediaItem(track, i)
+        local should_delete = false
+
+        -- Check for Arp text labels
+        local _, name = r.GetSetMediaItemInfo_String(item, "P_NAME", "", false)
+        local _, notes = r.GetSetMediaItemInfo_String(item, "P_NOTES", "", false)
+
+        if notes and string.find(notes, "Arp") then
+            should_delete = true
+        elseif name and (name:match("^Arp") or name:match("^Intro") or name:match("^Verse") or 
+                         name:match("^Pre") or name:match("^Chorus") or name:match("^Bridge") or 
+                         name:match("^Outro") or name:match("^Off")) then
+            should_delete = true
+        else
+            -- Check for MIDI PC messages
+            local take = r.GetActiveTake(item)
+            if take and r.TakeIsMIDI(take) then
+                local _, _, cccnt, _ = r.MIDI_CountEvts(take)
+                for j = 0, cccnt - 1 do
+                    local _, _, _, _, msgtype, _, msg2, _ = r.MIDI_GetCC(take, j)
+                    if (msgtype >= 0xC0 and msgtype <= 0xCF) then
+                        should_delete = true
+                        break
+                    end
+                end
+            end
+        end
+
+        if should_delete then
+            r.DeleteTrackMediaItem(track, item)
+        end
+    end
+end
+
+-- 5. GENERATE ARP CONDUCTOR (main function to populate the Arp track)
+function Generate_Arp_Conductor(arp_track)
+    local r = reaper
+    Clean_Arp_Track(arp_track)
+
+    -- Start with OFF (PC 0)
+    Insert_Arp_Trigger(arp_track, 0.0, 0)
+
+    local _, num_markers, num_regions = r.CountProjectMarkers(0)
+    local total = num_markers + num_regions
+
+    for i = 0, total - 1 do
+        local _, isrgn, pos, rgnend, name, idx = r.EnumProjectMarkers(i)
+        if isrgn then
+            local pc = Parse_Region_To_Arp_PC(name)
+            if pc then
+                Insert_Arp_Trigger(arp_track, pos, pc)
+            end
+        end
+    end
+    r.UpdateArrange()
+end
+
+
+
+
+-- Find ALL tracks containing N2N Arp FX
+function Find_All_Tracks_With_Arp_FX()
+    local r = reaper
+    local target_fx = "N2N Arp"
+    local arp_tracks = {}  -- Table to hold all matching tracks
+
+    local track_count = r.CountTracks(0)
+    for i = 0, track_count - 1 do
+        local tr = r.GetTrack(0, i)
+        local fx_count = r.TrackFX_GetCount(tr)
+
+        for fx = 0, fx_count - 1 do
+            local retval, buf = r.TrackFX_GetFXName(tr, fx, "")
+            if retval and buf then
+                local normalized = buf:lower()
+                local target_lower = target_fx:lower()
+                
+                if normalized:find(target_fx, 1, true) or 
+                   normalized:find(target_lower, 1, true) or
+                   normalized:find("js: " .. target_lower, 1, true) then
+                    -- Add to table instead of returning immediately
+                    table.insert(arp_tracks, tr)
+                    break  -- Found FX on this track, move to next track
+                end
+            end
+        end
+    end
+    
+    return arp_tracks  -- Return table of all matching tracks
+end
 
 function place_special()
     num_regions = reaper.CountProjectMarkers(0)
@@ -4073,13 +4277,26 @@ function render_all()
         end
     end
 
-    -- 4. PROCESS MARKERS & DRUMS
+    -- 4A. PROCESS MARKERS & DRUMS
     place_special()
     
     local drum_track = Find_Track_With_Drum_FX()
     if drum_track then
         Generate_Drum_Conductor(drum_track)
     end
+
+
+ 
+
+
+-- Process all Arp tracks
+local arp_tracks = Find_All_Tracks_With_Arp_FX()
+for _, arp_track in ipairs(arp_tracks) do
+    if arp_track then
+        Generate_Arp_Conductor(arp_track)
+    end
+end
+
 
     -- 5. GENERATE SPECTRUMS
     -- A. Absolute Grid (Key of Song)
