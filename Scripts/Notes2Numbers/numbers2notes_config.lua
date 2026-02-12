@@ -1,6 +1,6 @@
 
 -- @description numbers2notes_config
--- @version 1.5.4
+-- @version 1.5.5
 -- @noindex
 -- @author Rock Kennedy
 -- @about
@@ -8,7 +8,8 @@
 --   Contains Plugin Source URLs and the Master Track Layout.
 -- @changelog
 --   + Links Updated
---   + Uses 2 drumt tracks
+--   + Now has 3 aternatative drum tracks
+
 local config = {}
 
 -- 1. PLUGIN SOURCES (Instructions/Links)
@@ -225,3 +226,10 @@ config.track_table = {
 }
 
 return config
+
+
+
+
+
+
+
