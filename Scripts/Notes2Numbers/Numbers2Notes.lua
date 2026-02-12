@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.5.3
+-- @version  1.5.4
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.5.3
+--   # Numbers2Notes 1.5.4
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -15,11 +15,12 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
---   # Major Update 1.5.3
+--   # Major Update 1.5.4
 --   + Added Groove
 --   + Changed N2N Drum Arranger to N2N Drum Arranger.jsfx
 --   + Changed gmem name
 --   + N2N Drum Arranger search fixed for Mac
+--   + New config file
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require "imgui" "0.8.6" -- Version of IMGUI used during development.
@@ -1319,7 +1320,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.5.3")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.5.4")
             reaper.ImGui_Text(ctx, "https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
 
