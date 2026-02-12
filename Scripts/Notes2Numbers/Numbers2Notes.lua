@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.5.1
+-- @version  1.5.2
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.5.1
+--   # Numbers2Notes 1.5.2
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -15,7 +15,7 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
---   # Major Update 1.5.1
+--   # Major Update 1.5.2
 --   + Added Groove
 --   + Changed N2N Drum Arranger to N2N Drum Arranger.jsfx
 --   + Changed gmem name
@@ -299,20 +299,26 @@ function Load_Groove()
     end
 end
 -- ________________________________________________________ PLUGIN AUDIT SYSTEM
+-- ________________________________________________________ PLUGIN AUDIT SYSTEM
 function Check_Plugins_On_Startup()
     reaper.PreventUIRefresh(1)
 
     local missing_log = {}
-    local checked_cache = {}
+    local checked_cache = {} -- Cache to prevent checking the same plugin twice
     local missing_count = 0
 
-    -- 1. Create a temporary "Sandbox" track at the end of the project
+    -- 1. Create a temporary "Sandbox" track
     local track_idx = reaper.CountTracks(0)
     reaper.InsertTrackAtIndex(track_idx, false)
     local temp_track = reaper.GetTrack(0, track_idx)
 
     -- 2. Check the "Audition" Synth (Special Case)
-    local pad_check = reaper.TrackFX_AddByName(temp_track, "pad-synth", false, -1)
+    local pad_check = reaper.TrackFX_AddByName(temp_track, "pad-synth", false, 1)
+    if pad_check == -1 then
+         -- Fallback: try adding .jsfx extension
+        pad_check = reaper.TrackFX_AddByName(temp_track, "pad-synth.jsfx", false, 1)
+    end
+
     if pad_check == -1 then
         missing_count = missing_count + 1
         table.insert(
@@ -327,22 +333,69 @@ function Check_Plugins_On_Startup()
     for _, track_data in pairs(track_table) do
         if track_data[5] then -- If track has plugins defined
             for _, plug_data in pairs(track_data[5]) do
-                local name = plug_data[1]
+                local name = plug_data[1] -- The name from your config
                 local source_id = plug_data[4] or 99
 
-                -- Check cache so we don't check "ReaEQ" 10 times
                 if checked_cache[name] == nil then
-                    local index = reaper.TrackFX_AddByName(temp_track, name, false, -1)
+                    
+                    -- ====================================================
+                    -- STRATEGY: Try Exact -> Try Cleaned (Root)
+                    -- ====================================================
 
+                    -- Attempt 1: Try the name exactly as written in config
+                    -- If config is "CLAP: Bass Squeezer", this forces CLAP format.
+                    local index = reaper.TrackFX_AddByName(temp_track, name, false, 1)
+
+                    -- Attempt 2: If failed, strip parentheses/garbage but KEEP prefix
+                    -- Input:  "CLAP: Bass Squeezer (Stereo)"
+                    -- Output: "CLAP: Bass Squeezer"
                     if index == -1 then
-                        checked_cache[name] = false -- Mark as missing
+                        local clean_name = name:gsub("%s*%(.-%)", "") -- remove (...)
+                        clean_name = clean_name:gsub("%s*$", "")      -- remove trailing spaces
+                        
+                        if clean_name ~= name then
+                            index = reaper.TrackFX_AddByName(temp_track, clean_name, false, 1)
+                        end
+                    end
+
+                    -- Attempt 3: If failed, strip extensions (common in JSFX)
+                    -- Input:  "Utility/Volume.jsfx"
+                    -- Output: "Utility/Volume"
+                    if index == -1 then
+                        local no_ext = name:gsub("%.%w+$", "")
+                        if no_ext ~= name then
+                            index = reaper.TrackFX_AddByName(temp_track, no_ext, false, 1)
+                        end
+                    end
+
+                    -- ====================================================
+                    -- RESULTS PROCESSING
+                    -- ====================================================
+
+                    if index ~= -1 then
+                        -- SUCCESS
+                        checked_cache[name] = true 
+
+                        -- CRITICAL STEP: Get the ACTUAL name found by REAPER
+                        -- If we asked for "CLAP: Bass Squeezer" and found "CLAP: Bass Squeezer (Vendor)",
+                        -- we capture the long name.
+                        local retval, actual_name = reaper.TrackFX_GetFXName(temp_track, index, "")
+                        
+                        if retval and actual_name ~= "" then
+                            -- Update the script's memory so Setup_Tracks uses the working name
+                            plug_data[1] = actual_name
+                        end
+                        
+                        -- Remove the test instance
+                        reaper.TrackFX_Delete(temp_track, index) 
+
+                    else
+                        -- FAILURE
+                        checked_cache[name] = false 
                         missing_count = missing_count + 1
 
                         local source_msg = pluginsources[source_id] or "Unknown Source."
                         table.insert(missing_log, "Missing: " .. name .. "\n-> " .. source_msg)
-                    else
-                        checked_cache[name] = true -- Mark as found
-                        reaper.TrackFX_Delete(temp_track, index) -- Clean up immediately
                     end
                 end
             end
@@ -360,7 +413,7 @@ function Check_Plugins_On_Startup()
             missing_count ..
                 " PLUGINS MISSING\n\n" ..
                     "The script cannot build tracks correctly without these plugins.\n" ..
-                        "Please install them, OR edit 'numbers2notes_config.lua' to remove them.\n\n"
+                        "Please install them, OR edit 'numbers2notes_config.lua'.\n\n"
         for _, msg in pairs(missing_log) do
             G_startup_missing_report = G_startup_missing_report .. msg .. "\n\n"
         end
@@ -1266,7 +1319,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.5.1")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.5.2")
             reaper.ImGui_Text(ctx, "https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
 
@@ -3877,7 +3930,7 @@ function Insert_Arp_Trigger(track, time_pos, pc_val)
     if m_take then
         local ppq = r.MIDI_GetPPQPosFromProjTime(m_take, midi_time)
         -- Program Change on channel 1 (0xC0), value pc_val
-        r.MIDI_InsertCC(m_take, false, false, ppq, 0xC0, 0, pc_val, 0)
+        r.MIDI_InsertCC(m_take, false, false, ppq, 0xC0, 15, pc_val, 0)
         r.MIDI_Sort(m_take)
     end
 
