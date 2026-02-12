@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.5.2
+-- @version  1.5.3
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.5.2
+--   # Numbers2Notes 1.5.3
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -15,7 +15,7 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
---   # Major Update 1.5.2
+--   # Major Update 1.5.3
 --   + Added Groove
 --   + Changed N2N Drum Arranger to N2N Drum Arranger.jsfx
 --   + Changed gmem name
@@ -1319,7 +1319,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.5.2")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.5.3")
             reaper.ImGui_Text(ctx, "https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
 
@@ -4320,15 +4320,18 @@ function render_all()
     )
 
     -- 3. EXPORT TO GMEM (Using the "Light" Chord-Bass take for speed)
-    if gmem_export and G_chbass_midi_item_id then
-        local light_take = reaper.GetActiveTake(G_chbass_midi_item_id)
+if gmem_export and G_chbass_midi_item_id then
+    local light_take = reaper.GetActiveTake(G_chbass_midi_item_id)
+    
+    if light_take then
+        -- CRITICAL: Must attach before any gmem_write!
+        reaper.gmem_attach("N2N_Ecosystem_RSKennedy")
         
-        if light_take then
-            local r_tonic, m_center = gmem_export.Analyze(light_take, current_key)
-            gmem_export.SendToGMEM(light_take, r_tonic, m_center)
-            gmem_export.SendScaleToGMEM(light_take, r_tonic)
-        end
+        local r_tonic, m_center = gmem_export.Analyze(light_take, current_key)
+        gmem_export.SendToGMEM(light_take, r_tonic, m_center)
+        gmem_export.SendScaleToGMEM(light_take, r_tonic)
     end
+end
 
     -- 4A. PROCESS MARKERS & DRUMS
     place_special()
