@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 11.98
+version: 11.99.1
 author: Rock Kennedy
 about:
-  # N2N Arp v11.98
+  # N2N Arp v11.99.1
   - FEATURE: Inventory Reporting to N2N Ecosystem.
   - FEATURE: Populated Pattern Indicators on Tabs.
   - FEATURE: Track Color/Name Header integration.
@@ -28,13 +28,14 @@ slider12:20<1,127,1>-Global Note Len
 slider13:100<0,100,1>-Global Row Level
 
 @init
-thisversion = "v11.98";
+scale_dirty = 0;
+thisversion = "v11.99.1";
 // =========================================================
 // VISUALS
 // =========================================================
 COL_L_R = 0.557; COL_L_G = 0.110; COL_L_B = 0.086; 
 COL_M_R = 0.698; COL_M_G = 0.431; COL_M_B = 0.059; 
-COL_H_R = 0.141; COL_H_G = 0.365; COL_H_B = 0.443; 
+COL_H_R = 0.141; COL_H_G = 0.365; COL_H_B = 0.443;
 
 LOCK_R = 0.3; LOCK_G = 0.6; LOCK_B = 0.7; 
 
@@ -43,9 +44,9 @@ LABEL_BRIGHTNESS = 4.0;
 grid_height = slider11; 
 
 ext_noinit == 0 ? (
-    mem[ui_locked_tab] = -1; // Default to Follow Mode
-    need_view_center = 1;    // FLAG: Tell @gfx to center the view once it knows the height
-);
+    // Moved defaults to ui_init_done block below to ensure variables exist
+    need_view_center = 1;   
+);;
 
 
 ext_noinit = 1.0;
@@ -218,6 +219,7 @@ parent_tonic = 0;
 scale_entry_count = 0;
 current_mask = 2741; 
 prev_mask = -1; 
+prev_tonic = -1;
 
 // Initial Setup
 i=0; loop(MAX_ROWS, 
@@ -381,11 +383,6 @@ local(i, k, swapped, n0, n1, n2, n3, n4, n5, dn1, root,
 (
     i=0; loop(LANE_COUNT, mem[lane_pitch_a+i] = -1; mem[lane_pitch_b+i] = -1; i+=1; );
 
-i=0; loop(LANE_COUNT,
-  mem[lane_pitch_a+i] = -1;
-  mem[lane_pitch_b+i] = -1;
-  i+=1;
-);
 
 (chord_count == 1) ? (
   root = mem[chord_notes+0];
@@ -674,6 +671,11 @@ function recalc_scale() local(i, max_v, best_tonic) (
 );
 
 mem[ui_init_done] == 0 ? (
+    // --- FIX: SET DEFAULTS HERE ---
+    mem[ui_follow_mode] = 1; // Default Follow: ON
+    mem[ui_locked_tab] = -1; // Default Lock: OFF
+    // ------------------------------
+
     i=0; loop(TOTAL_TABS, 
         mem[subdiv_ov_base+i] = -1; 
         mem[hum_ov_base+i]    = -1; 
@@ -699,7 +701,6 @@ file_var(0, global_out_mask);
 // =========================================================
 // N2N DATA LOADING
 // =========================================================
-
 gmem[GMEM_SCALE_OFFSET] == 1 ? (
     scale_entry_count = gmem[GMEM_SCALE_OFFSET + 1];
     i_sc = 0; r_ptr = GMEM_SCALE_OFFSET + 2; w_ptr = LOCAL_SCALE_DB;
@@ -708,18 +709,31 @@ gmem[GMEM_SCALE_OFFSET] == 1 ? (
         mem[w_ptr+1] = gmem[r_ptr+1]; 
         r_ptr += 2; w_ptr += 2; i_sc += 1;
     );
-    gmem[GMEM_SCALE_OFFSET] = 0; 
+    gmem[GMEM_SCALE_OFFSET] = 0;
 );
 
-(scale_entry_count == 0 && gmem[GMEM_SCALE_OFFSET+1] > 0) ? (
+// Fallback: If we have no scale but gmem has data, load it once
+(scale_entry_count == 0 && gmem[GMEM_SCALE_OFFSET + 1] > 0) ? (
     scale_entry_count = gmem[GMEM_SCALE_OFFSET + 1];
     i_sc = 0; r_ptr = GMEM_SCALE_OFFSET + 2; w_ptr = LOCAL_SCALE_DB;
     loop(scale_entry_count,
         mem[w_ptr]   = gmem[r_ptr];   
         mem[w_ptr+1] = gmem[r_ptr+1]; 
-        r_ptr += 2; w_ptr += 2; i_sc += 1;
+        r_ptr += 2; w_ptr += 2; i_sc += 1;  // <-- Fixed: was i_scc
     );
 );
+
+// --- CONTEXT LOADING (TONIC/KEY) ---
+gmem[GMEM_CTX_OFFSET] == 1 ? (
+    parent_tonic = gmem[GMEM_CTX_OFFSET + 2]; 
+);
+
+// Fallback: If we have no tonic but gmem has context data, load it once
+(parent_tonic == 0 && gmem[GMEM_CTX_OFFSET+2] > 0) ? (
+    parent_tonic = gmem[GMEM_CTX_OFFSET + 2];
+);
+
+
 
 // SYNC GROOVE MEMORY
 i_gr = 0; max_gr = 0;
@@ -778,23 +792,49 @@ track_b = gmem[my_info_idx + 3];
    current_mask == 0 ? current_mask = 2741; 
 );
 
-(current_mask != prev_mask) ? (
+
+
+
+
+
+(current_mask != prev_mask || parent_tonic != prev_tonic) ? (
     prev_mask = current_mask;
+    prev_tonic = parent_tonic; 
     scale_dirty = 1; 
 );
 
 input_source_mode = slider10; 
-input_source_mode == 0 ? (
-    memset(scale_state_base, 0, 12);
-    i_sc = 0;
-    loop(12,
-       is_active = (current_mask & (1 << i_sc));
-       abs_pitch = (parent_tonic + i_sc) % 12;
-       mem[scale_state_base + abs_pitch] = is_active;
-       i_sc += 1;
+
+// Rebuild scale immediately when dirty (don't wait for next block)
+scale_dirty ? (
+    input_source_mode == 0 ? (
+        // N2N Script mode: build from gmem scale data
+        memset(scale_state_base, 0, 12);
+        i_sc = 0;
+        loop(12,
+           is_active = (current_mask & (1 << i_sc));
+           abs_pitch = (parent_tonic + i_sc) % 12;
+           mem[scale_state_base + abs_pitch] = is_active;
+           i_sc += 1;
+        );
+        scale_tonic = parent_tonic;
+    ) : (
+        // Live MIDI mode: build from played notes
+        recalc_scale();
     );
-    scale_tonic = parent_tonic;
+    scale_dirty = 0;  // Clear after rebuilding
+    input_dirty = 1;  // Trigger lane reassignment
 );
+
+
+
+
+
+
+
+
+
+
 
 // =========================================================
 // CUE SYSTEM (Prioritized) & INPUT HANDLING
@@ -926,8 +966,6 @@ pos_in_bar = beat_position % 4.0;
 
 // =========================================================
 
-(scale_dirty && input_source_mode == 1) ? ( recalc_scale(); input_dirty = 1; ); 
-(scale_dirty && input_source_mode == 0) ? ( input_dirty = 1; scale_dirty = 0; ); 
 
 input_dirty ? analyze_input();
 
@@ -1133,7 +1171,7 @@ function calc_vis_beat(t_in) local(sub_v, bar_v, p_l, playing_tab, offset_add, i
     buffer_beats = (samplesblock / srate) * (tempo / 60);
     visual_pos = beat_position - buffer_beats;
     
-    play_state & 1 ? fmod_pos(visual_pos + offset_add, p_l) * spd_m : 0;
+    play_state & 1 ? fmod_pos(visual_pos + offset_add + (p_l * 1000), p_l) * spd_m : 0;
 );
 lhs_width = 180; 
 btn_height = 18; grid_height = slider11; ROW_HEIGHT = grid_height; 
