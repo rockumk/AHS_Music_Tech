@@ -1,5 +1,5 @@
 -- @description numbers2notes_config
--- @version 1.5.2
+-- @version 1.5.3
 -- @noindex
 -- @author Rock Kennedy
 -- @about
@@ -188,20 +188,31 @@ config.track_table = {
 
     [17] = {"N2N Drums", false, nil, 0, {
         {"JS:N2N Drum Arranger.jsfx", true, nil, 13},
-        {"Pro Punk Drums (Pro Punk DSP) (16 out)", true, nil, 13},
+        {"Pro Punk Drums", true, nil, 13},
 		{"JS:ReEQ", true, nil, 2},
         {"JS:Violet Envelope Shaper S2", false, nil, 12},
         {"JS:VariBus Comp S2", true, nil, 12},
-		
+        {"JS:Tape Recorder S2", false, nil, 12},  
+        {"JS:Saike SEQS", false, nil, 4}, 
+        {"JS:Limiter 3", false, nil, 12} 
+    }, {3,4}, 0, {144, 144, 144}, 4},
+
+    [8] = {"N2N Drums", false, nil, 0, {
+        {"JS:N2N Drum Arranger.jsfx", true, nil, 13},
+        {"Drumtastic", true, nil, 13},
+		{"JS:ReEQ", true, nil, 2},
+        {"JS:Violet Envelope Shaper S2", false, nil, 12},
+        {"JS:VariBus Comp S2", true, nil, 12},
         {"JS:Tape Recorder S2", false, nil, 12},  
         {"JS:Saike SEQS", false, nil, 4}, 
         {"JS:Limiter 3", false, nil, 12} 
     }, {3,4}, 0, {144, 144, 144}, 4}
 
+	
 }
 
-
 return config
+
 
 
 
