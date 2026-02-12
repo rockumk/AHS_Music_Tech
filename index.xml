@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="86cfbe72c419d3cf3c1d4a48d80ee0b751b54c68">
+<index version="1" name="AHS_Music_Tech" commit="d54f7270e96fa05d25e77dc077f4d2e1bfa15bda">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -109,7 +109,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Arp v11.98\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Arp v11.99.1\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FEATURE: Inventory Reporting to N2N Ecosystem.\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FEATURE: Populated Pattern Indicators on Tabs.\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FEATURE: Track Color/Name Header integration.\par}
@@ -156,6 +156,9 @@
       </version>
       <version name="11.98" author="Rock Kennedy" time="2026-02-09T04:57:44Z">
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/e604de25edc0cf8265287b98dd24114f44ca8fb3/Effects/N2N%20Arp.jsfx</source>
+      </version>
+      <version name="11.99.1" author="Rock Kennedy" time="2026-02-12T06:40:00Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/d54f7270e96fa05d25e77dc077f4d2e1bfa15bda/Effects/N2N%20Arp.jsfx</source>
       </version>
     </reapack>
     <reapack name="N2N Drum Arranger.jsfx" type="effect" desc="N2N Drum Arranger">
