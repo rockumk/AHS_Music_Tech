@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="4da424ec1ff5fda1d9a1493583d3b1e56af9e1ea">
+<index version="1" name="AHS_Music_Tech" commit="4600b921ac40d8db706ceeb12d6cbcde5a23f9b4">
   <category name="Effects">
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
@@ -167,7 +167,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Drum Arranger v5.5.9\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Drum Arranger v5.6.0\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Fixed GMEM cue system with proper hierarchy and anti-loop protection\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab 64th-note lookahead, 8th-note clear window\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab MIDI Note > GMEM Global > GMEM Type > GMEM Inst > MIDI PC priority\par}
@@ -289,6 +289,33 @@
         <source type="data" file="AHS_Music_Tech/DrumArranger/SSD5 Frees.txt">https://github.com/rockumk/AHS_Music_Tech/raw/2b02a3bb2f976e392dd12f07616efc1961b75c70/Data/DrumArranger/SSD5%20Frees.txt</source>
         <source type="data" file="AHS_Music_Tech/DrumArranger/Spitfire-LABS.txt">https://github.com/rockumk/AHS_Music_Tech/raw/2b02a3bb2f976e392dd12f07616efc1961b75c70/Data/DrumArranger/Spitfire-LABS.txt</source>
         <source type="data" file="AHS_Music_Tech/DrumArranger/Zero Based MIDI.txt">https://github.com/rockumk/AHS_Music_Tech/raw/2b02a3bb2f976e392dd12f07616efc1961b75c70/Data/DrumArranger/Zero%20Based%20MIDI.txt</source>
+      </version>
+      <version name="5.6.0" author="Rock Kennedy" time="2026-02-16T04:24:50Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Effects/N2N%20Drum%20Arranger.jsfx</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/Clear All.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/Clear%20All.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/Drum8.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/Drum8.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/Drumtastic.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/Drumtastic.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/EZDrummer Default Kit.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/EZDrummer%20Default%20Kit.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/EZDrummer Nashville.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/EZDrummer%20Nashville.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/EZDrummer.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/EZDrummer.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/EZDrummer2_Hip-Hop.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/EZDrummer2_Hip-Hop.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/EZdrummer 2 Americana.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/EZdrummer%202%20Americana.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/EzDrummer2.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/EzDrummer2.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/Ezdrummer 2 Classic.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/Ezdrummer%202%20Classic.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/Funkbass.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/Funkbass.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/GMajor.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/GMajor.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/LilKit.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/LilKit.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/MT-PowerDrumKit.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/MT-PowerDrumKit.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/MultiKit.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/MultiKit.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/Nashville Copy.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/Nashville%20Copy.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/Note Names.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/Note%20Names.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/One Based MIDI.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/One%20Based%20MIDI.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/Pro Punk Drums.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/Pro%20Punk%20Drums.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/Read_Me_For_Kit_Info.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/Read_Me_For_Kit_Info.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/Roland SRX.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/Roland%20SRX.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/SSD5 Frees.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/SSD5%20Frees.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/Spitfire-LABS.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/Spitfire-LABS.txt</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/Zero Based MIDI.txt">https://github.com/rockumk/AHS_Music_Tech/raw/4600b921ac40d8db706ceeb12d6cbcde5a23f9b4/Data/DrumArranger/Zero%20Based%20MIDI.txt</source>
       </version>
     </reapack>
     <reapack name="N2N Scale Drone.jsfx" type="effect" desc="N2N Scale Drone">
