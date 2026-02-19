@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.5.4
+-- @version  1.5.5
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.5.4
+--   # Numbers2Notes 1.5.5
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -15,12 +15,11 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
---   # Major Update 1.5.4
+--   # Major Update 1.5.5
 --   + Added Groove
 --   + Changed N2N Drum Arranger to N2N Drum Arranger.jsfx
 --   + Changed gmem name
 --   + N2N Drum Arranger search fixed for Mac
---   + New config file
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require "imgui" "0.8.6" -- Version of IMGUI used during development.
@@ -1320,7 +1319,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.5.4")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.5.5")
             reaper.ImGui_Text(ctx, "https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
 
@@ -3562,140 +3561,146 @@ end
 
 
 -- =========================================================
--- DRUM CONDUCTOR HELPERS v3 (Fixed Labels)
+-- DRUM CONDUCTOR HELPERS v4 (Final Corrections)
 -- =========================================================
 
--- 1. VISUAL LOOKUP (Colors & Names)
+
+
+
+
+-- 1. VISUAL LOOKUP (Colors & Names for Text Items)
 function Get_Drum_Visuals(pc)
-    -- Default
     local name = "Section"
     local r, g, b = 0.7, 0.7, 0.7
 
-    -- PC 0 (Stop/Off)
-    if pc == 0 then
-        -- Intro (11-17): Cyan
-        name = "Off"
+    -- Count-In (24)
+    if pc == 24 then
+        name = "Count-In"
         r, g, b = 0.3, 0.3, 0.3
-    elseif pc >= 11 and pc <= 17 then
-        -- Verse (21-27): Blue
-        name = (pc == 11) and "Intro" or "Intro " .. (pc - 10)
+    
+    -- Intro (32-35)
+    elseif pc >= 32 and pc <= 35 then
+        local letter = string.char(64 + (pc - 31))
+        name = "Intro-" .. letter
         r, g, b = 0.2, 1.0, 1.0
-    elseif pc >= 21 and pc <= 27 then
-        -- Pre (31-37): Purple
-        name = (pc == 21) and "Verse" or "Verse " .. (pc - 20)
+    
+    -- Verse 1 (36-39)
+    elseif pc >= 36 and pc <= 39 then
+        local letter = string.char(64 + (pc - 35))
+        name = "Verse 1-" .. letter
         r, g, b = 0.4, 0.6, 1.0
-    elseif pc >= 31 and pc <= 37 then
-        -- Chorus (41-47): Red
-        name = (pc == 31) and "Pre" or "Pre " .. (pc - 30)
+    
+    -- Verse 2 (40-43)
+    elseif pc >= 40 and pc <= 43 then
+        local letter = string.char(64 + (pc - 39))
+        name = "Verse 2-" .. letter
+        r, g, b = 0.4, 0.6, 1.0
+    
+    -- Verse 3 (44-47)
+    elseif pc >= 44 and pc <= 47 then
+        local letter = string.char(64 + (pc - 43))
+        name = "Verse 3-" .. letter
+        r, g, b = 0.4, 0.6, 1.0
+    
+    -- Pre-Chorus 1 (48-51)
+    elseif pc >= 48 and pc <= 51 then
+        local letter = string.char(64 + (pc - 47))
+        name = "Pre 1-" .. letter
         r, g, b = 0.7, 0.4, 1.0
-    elseif pc >= 41 and pc <= 47 then
-        -- Bridge (51-57): Orange
-        name = (pc == 41) and "Chorus" or "Chorus " .. (pc - 40)
+    
+    -- Pre-Chorus 2 (52-55)
+    elseif pc >= 52 and pc <= 55 then
+        local letter = string.char(64 + (pc - 51))
+        name = "Pre 2-" .. letter
+        r, g, b = 0.7, 0.4, 1.0
+    
+    -- Pre-Chorus 3 (56-59)
+    elseif pc >= 56 and pc <= 59 then
+        local letter = string.char(64 + (pc - 55))
+        name = "Pre 3-" .. letter
+        r, g, b = 0.7, 0.4, 1.0
+    
+    -- Chorus 1 (60-63)
+    elseif pc >= 60 and pc <= 63 then
+        local letter = string.char(64 + (pc - 59))
+        name = "Chorus 1-" .. letter
         r, g, b = 1.0, 0.4, 0.4
-    elseif pc >= 51 and pc <= 57 then
-        -- Outro (61-67): Greenish
-        name = (pc == 51) and "Bridge" or "Bridge " .. (pc - 50)
+    
+    -- Chorus 2 (64-67)
+    elseif pc >= 64 and pc <= 67 then
+        local letter = string.char(64 + (pc - 63))
+        name = "Chorus 2-" .. letter
+        r, g, b = 1.0, 0.4, 0.4
+    
+    -- Chorus 3 (68-71)
+    elseif pc >= 68 and pc <= 71 then
+        local letter = string.char(64 + (pc - 67))
+        name = "Chorus 3-" .. letter
+        r, g, b = 1.0, 0.4, 0.4
+    
+    -- Bridge (72-75)
+    elseif pc >= 72 and pc <= 75 then
+        local letter = string.char(64 + (pc - 71))
+        name = "Bridge-" .. letter
         r, g, b = 1.0, 0.9, 0.2
-    elseif pc >= 61 and pc <= 67 then
-        name = (pc == 61) and "Outro" or "Outro " .. (pc - 60)
+    
+    -- Solo (76-79)
+    elseif pc >= 76 and pc <= 79 then
+        local letter = string.char(64 + (pc - 75))
+        name = "Solo-" .. letter
+        r, g, b = 0.8, 0.5, 0.9
+    
+    -- Outro (80-83)
+    elseif pc >= 80 and pc <= 83 then
+        local letter = string.char(64 + (pc - 79))
+        name = "Outro-" .. letter
         r, g, b = 0.5, 0.8, 0.7
     end
 
     return name, r, g, b
 end
 
--- 2. CLEAN DRUM TRACK
--- =========================================================
--- ROBUST CLEANUP (Ported from N2N Drum Layout Tool)
--- =========================================================
-
--- Helper to identify N2N items even if one field is empty
-function Is_N2N_Text_Item(item)
-    local r = reaper
-    local _, name = r.GetSetMediaItemInfo_String(item, "P_NAME", "", false)
-    local _, notes = r.GetSetMediaItemInfo_String(item, "P_NOTES", "", false)
-
-    -- 1. Check Notes field for the "Drum" tag
-    if notes and string.find(notes, "Drum") then
-        return true
-    end
-
-    -- 2. Aggressive Name Matching (If Notes are empty/changed)
-    name = name or ""
-    if name:match("^Drums") then
-        return true
-    end
-    if name:match("^Intro") then
-        return true
-    end
-    if name:match("^Verse") then
-        return true
-    end
-    if name:match("^Pre") then
-        return true
-    end
-    if name:match("^Chorus") then
-        return true
-    end
-    if name:match("^Bridge") then
-        return true
-    end
-    if name:match("^Outro") then
-        return true
-    end
-    if name:match("^Hit") then
-        return true
-    end
-    if name:match("^Fill") then
-        return true
-    end
-    if name:match("^Flex") then
-        return true
-    end
-    if name:match("^Off") then
-        return true
-    end -- Catch "Drums Off"
-
-    return false
-end
-
--- MAIN CLEANUP FUNCTION
+-- 2. SELECTIVE CLEANUP - Only remove our PC stamps (24-83)
+-- 2. SELECTIVE CLEANUP - Optimized
 function Clean_Drum_Track(track)
-    if not track then
-        return
-    end
+    if not track then return end
+    
     local r = reaper
     local item_count = r.CountTrackMediaItems(track)
+    if item_count == 0 then return end
 
-    -- Iterate backwards to safely delete
+    -- Valid PC range that we manage (24-83)
+    local valid_pcs = {}
+    for i = 24, 83 do valid_pcs[i] = true end
+
     for i = item_count - 1, 0, -1 do
         local item = r.GetTrackMediaItem(track, i)
         local should_delete = false
 
-        -- A. CHECK FOR TEXT LABELS
-        if Is_N2N_Text_Item(item) then
+        -- Check for text labels first (faster than MIDI parsing)
+        local _, notes = r.GetSetMediaItemInfo_String(item, "P_NOTES", "", false)
+        
+        if notes ~= "" and (
+            notes:match("^Drums Count%-In$") or
+            notes:match("^Drums Intro%-") or
+            notes:match("^Drums Verse %d+%-") or
+            notes:match("^Drums Pre %d+%-") or
+            notes:match("^Drums Chorus %d+%-") or
+            notes:match("^Drums Bridge%-") or
+            notes:match("^Drums Solo%-") or
+            notes:match("^Drums Outro%-")
+        ) then
             should_delete = true
         else
-            -- B. CHECK FOR MIDI CONDUCTOR CLIPS (Program Changes)
+            -- Only check MIDI if no text match
             local take = r.GetActiveTake(item)
             if take and r.TakeIsMIDI(take) then
-                -- Note: r.MIDI_CountEvts returns (retval, notecnt, cccnt, sysexcnt)
+                -- Check first CC only - assume PC is first event
                 local _, _, cccnt, _ = r.MIDI_CountEvts(take)
-
-                for j = 0, cccnt - 1 do
-                    -- Check CCs for Program Change (0xC0) or Bank Select (0xB0)
-                    local _, _, _, _, msgtype, _, msg2, _ = r.MIDI_GetCC(take, j)
-
-                    -- Program Change (0xC0 .. 0xCF)
-                    if (msgtype >= 0xC0 and msgtype <= 0xCF) then
+                if cccnt > 0 then
+                    local _, _, _, _, msgtype, _, msg2, _ = r.MIDI_GetCC(take, 0)
+                    if msgtype >= 0xC0 and msgtype <= 0xCF and valid_pcs[msg2] then
                         should_delete = true
-                        break
-                    end
-
-                    -- Bank Select MSB (0xB0, CC 0)
-                    if (msgtype >= 0xB0 and msgtype <= 0xBF) and (msg2 == 0) then
-                        should_delete = true
-                        break
                     end
                 end
             end
@@ -3706,6 +3711,9 @@ function Clean_Drum_Track(track)
         end
     end
 end
+
+
+
 
 -- 3. MAP REGION TO PC
 function Parse_Region_To_PC(name)
@@ -3752,18 +3760,60 @@ function Parse_Region_To_PC(name)
     return base_pc + (var - 1)
 end
 
--- 4. INSERT TRIGGER & TEXT
+
+
+
+
+-- 3. MAP REGION NAME TO BASE PC
+function Parse_Region_To_Base_PC(name)
+    if not name or name == "" then return nil end
+    
+    local upper = string.upper(name)
+    
+    -- Count-In / Off
+    if upper:find("COUNT IN") or upper:find("COUNT%-IN") or upper:find("OFF") then
+        return 24
+    elseif upper:find("INTRO") then
+        return 32
+    elseif upper:find("VERSE") then
+        local instance = tonumber(name:match("%d+")) or 1
+        if instance == 1 then return 36
+        elseif instance == 2 then return 40
+        else return 44 end
+    elseif upper:find("PRE") then
+        local instance = tonumber(name:match("%d+")) or 1
+        if instance == 1 then return 48
+        elseif instance == 2 then return 52
+        else return 56 end
+    elseif upper:find("CHORUS") then
+        local instance = tonumber(name:match("%d+")) or 1
+        if instance == 1 then return 60
+        elseif instance == 2 then return 64
+        else return 68 end
+    elseif upper:find("BRIDGE") then
+        return 72
+    elseif upper:find("SOLO") then
+        return 76
+    elseif upper:find("OUTRO") then
+        return 80
+    else
+        return nil
+    end
+end
+
+
+
+
+-- 4. INSERT TRIGGER & TEXT (Text = 1 bar, Pattern = 4 bars)
 function Insert_Drum_Trigger(track, time_pos, pc_val)
     local r = reaper
 
-    -- MIDI EARLY ONLY (8th note early = 0.5 QN)
-    local midi_qn   = r.TimeMap2_timeToQN(0, time_pos) - 0.5
+    -- MIDI EARLY (8th note early = 0.5 QN)
+    local midi_qn = r.TimeMap2_timeToQN(0, time_pos) - 0.5
     if midi_qn < 0 then midi_qn = 0 end
 
     local midi_time = r.TimeMap2_QNToTime(0, midi_qn)
-
-    -- End MIDI exactly 1 quarter note after its start
-    local end_time  = r.TimeMap2_QNToTime(0, midi_qn + 1.0)
+    local end_time = r.TimeMap2_QNToTime(0, midi_qn + 1.0)
 
     local m_item = r.CreateNewMIDIItemInProj(track, midi_time, end_time, false)
     local m_take = r.GetActiveTake(m_item)
@@ -3773,92 +3823,142 @@ function Insert_Drum_Trigger(track, time_pos, pc_val)
         r.MIDI_Sort(m_take)
     end
 
-    -- B. INSERT VISUAL TEXT LABEL  -- ON THE MEASURE (unchanged time_pos)
+    -- TEXT LABEL - Only 1 bar long
     local section_name, rr, gg, bb = Get_Drum_Visuals(pc_val)
     local label = "Drums " .. section_name
 
+    -- Text item spans 1 bar (changed from 4)
     local start_qn = r.TimeMap2_timeToQN(0, time_pos)
-    local end_qn   = start_qn + 4
-    local end_time = r.TimeMap2_QNToTime(0, end_qn)
+    local end_qn = start_qn + 4  -- 1 bar instead of 4
+    local end_time_text = r.TimeMap2_QNToTime(0, end_qn)
 
     local t_item = r.AddMediaItemToTrack(track)
     if t_item then
         r.SetMediaItemInfo_Value(t_item, "D_POSITION", time_pos)
-        r.SetMediaItemInfo_Value(t_item, "D_LENGTH", end_time - time_pos)
-
+        r.SetMediaItemInfo_Value(t_item, "D_LENGTH", end_time_text - time_pos)
         r.GetSetMediaItemInfo_String(t_item, "P_NAME", label, true)
         r.GetSetMediaItemInfo_String(t_item, "P_NOTES", label, true)
 
-        local native_color =
-            r.ColorToNative(math.floor(rr * 255), math.floor(gg * 255), math.floor(bb * 255)) | 0x1000000
+        local native_color = r.ColorToNative(
+            math.floor(rr * 255), 
+            math.floor(gg * 255), 
+            math.floor(bb * 255)
+        ) | 0x1000000
         r.SetMediaItemInfo_Value(t_item, "I_CUSTOMCOLOR", native_color)
     end
 end
 
--- 5. PROCESS REGIONS
-function Generate_Drum_Conductor(drum_track)
+-- 5. PROCESS REGIONS WITH 4-BAR PHRASE ROTATION (Single Track)
+-- 5. PROCESS REGIONS WITH 4-BAR PHRASE ROTATION (Single Track)
+function Generate_Drum_Conductor_For_Track(drum_track)
     local r = reaper
+    if not drum_track then return end
+    
     Clean_Drum_Track(drum_track)
 
-    -- Start with OFF
-    Insert_Drum_Trigger(drum_track, 0.0, 0)
+    -- Insert initial Count-In at time 0
+    Insert_Drum_Trigger(drum_track, 0.0, 24)
 
     local _, num_markers, num_regions = r.CountProjectMarkers(0)
     local total = num_markers + num_regions
+    
+    -- Track the end position of the last region
+    local last_region_end = 0
 
     for i = 0, total - 1 do
         local _, isrgn, pos, rgnend, name, idx = r.EnumProjectMarkers(i)
         if isrgn then
-            local pc = Parse_Region_To_PC(name)
-            if pc then
-                Insert_Drum_Trigger(drum_track, pos, pc)
+            -- Update last region end position
+            if rgnend > last_region_end then
+                last_region_end = rgnend
+            end
+            
+            local base_pc = Parse_Region_To_Base_PC(name)
+            
+            if base_pc then
+                local start_qn = r.TimeMap2_timeToQN(0, pos)
+                local end_qn = r.TimeMap2_timeToQN(0, rgnend)
+                local length_qn = end_qn - start_qn
+                
+                -- Calculate number of 4-bar phrases (16 QN per phrase)
+                local num_phrases = math.ceil(length_qn / 16)
+                
+                for phrase = 0, num_phrases - 1 do
+                    -- Each phrase is 16 QN (4 bars)
+                    local phrase_start_qn = start_qn + (phrase * 16)
+                    if phrase_start_qn >= end_qn then break end
+                    
+                    -- Pattern cycles every 4 phrases (A, B, C, D)
+                    local pattern_index = phrase % 4
+                    local pc_val = base_pc + pattern_index
+                    
+                    local phrase_time = r.TimeMap2_QNToTime(0, phrase_start_qn)
+                    Insert_Drum_Trigger(drum_track, phrase_time, pc_val)
+                end
             end
         end
     end
-    r.UpdateArrange()
+    
+    -- Insert OFF/Count-In (PC 24) at the end of the last region
+    if last_region_end > 0 then
+        Insert_Drum_Trigger(drum_track, last_region_end, 24)
+    end
 end
 
--- HELPER: Find track containing a specific FX name (Windows/Mac compatible)
-function Find_Track_With_Drum_FX()
+
+-- HELPER: Find ALL tracks with N2N Drum Arranger FX
+function Find_All_Tracks_With_Drum_FX()
     local r = reaper
-    local target_fx = "N2N Drum Arranger" -- base name with original casing
+    local target_fx = "N2N Drum Arranger"
+    local matching_tracks = {}
 
     local track_count = r.CountTracks(0)
-
     for i = 0, track_count - 1 do
         local tr = r.GetTrack(0, i)
         local fx_count = r.TrackFX_GetCount(tr)
 
         for fx = 0, fx_count - 1 do
-            -- Get FX Name
             local retval, buf = r.TrackFX_GetFXName(tr, fx, "")
-
             if retval and buf then
                 local normalized = buf:lower()
-                local target_lower = target_fx:lower()
-                
-                -- Check multiple patterns for cross-platform compatibility
-                local matches = (
-                    normalized:find(target_fx .. ".jsfx", 1, true) or  -- Windows: original case + ext
-                    normalized:find(target_lower .. ".jsfx", 1, true) or -- Windows: lowercase + ext
-                    normalized:find(target_fx, 1, true) or              -- Mac: original case no ext
-                    normalized:find(target_lower, 1, true) or           -- Mac: lowercase no ext
-                    normalized:find("js: " .. target_lower, 1, true)    -- REAPER's JS: prefix
-                )
-                
-                if matches then
-                    return tr
+                if normalized:find("n2n drum arranger") then
+                    table.insert(matching_tracks, tr)
+                    break -- Found it on this track, move to next track
                 end
             end
         end
     end
-
-    return nil -- Not found
+    return matching_tracks
 end
+
+
+-- 6. PROCESS ALL N2N DRUM ARRANGER TRACKS
+function Generate_Drum_Conductor_All()
+    local r = reaper
+    local tracks = Find_All_Tracks_With_Drum_FX()
+    
+    for _, track in ipairs(tracks) do
+        Generate_Drum_Conductor_For_Track(track)
+    end
+    
+    r.UpdateArrange()
+end
+
 
 
 -- 1. PARSE REGION TO ARP PC (using arpmap)
 function Parse_Region_To_Arp_PC(name)
+
+arpmap = {
+    ["Intro"] = 8,
+    ["Verse"] = 16,
+    ["Pre"] = 24,
+    ["Chorus"] = 32,
+    ["Bridge"] = 40,
+    ["Outro"] = 48
+}
+
+
     if not name or name == "" then
         return nil
     end
@@ -4060,7 +4160,8 @@ function place_special()
         reaper.DeleteProjectMarkerByIndex(0, i)
     end
 
-    --Show_To_Dev("markers deleted")
+    -- Track instance counts for each region type
+    local region_counts = {}
 
     for i, v in pairs(G_region_table) do
         if G_region_table[i + 1] == nil then
@@ -4071,29 +4172,54 @@ function place_special()
 
         the_regions_name = v[2]
 
+        -- Check if this region type should be numbered
+        local should_number = false
+        local region_type_upper = string.upper(the_regions_name)
+        
+        if region_type_upper == "VERSE" or 
+           region_type_upper == "PRE" or 
+           string.find(region_type_upper, "^PRE[- ]?") or  -- matches Pre, Pre-Chorus, Pre Chorus, PreChorus
+           region_type_upper == "CHORUS" then
+            should_number = true
+        end
+
+        local display_name = the_regions_name
+
+        if should_number then
+            -- Increment count for this region type
+            region_counts[the_regions_name] = (region_counts[the_regions_name] or 0) + 1
+            local instance_number = region_counts[the_regions_name]
+            
+            -- Append instance number to name
+            display_name = the_regions_name .. " " .. instance_number
+        end
+
         region_item_color = reaper.ColorToNative(80, 80, 100) | 0x1000000
         if form.sections_colors[the_regions_name] == nil then
             region_item_color = reaper.ColorToNative(80, 80, 100) | 0x1000000
         else
             the_color_values = form.sections_colors[the_regions_name]
-            --Show_To_Dev("  Color 1 " .. the_color_values[1] .. "  Color 2 " .. the_color_values[2] .. "  Color 3 " .. the_color_values[3] ..  string.char(10))
             region_item_color =
                 reaper.ColorToNative(the_color_values[1], the_color_values[2], the_color_values[3]) | 0x1000000
         end
 
         starts_position = reaper.TimeMap2_beatsToTime(0, v[1] / 960)
 
-        --Show_To_Dev("V1: " .. v[1] .. " V2: " .. the_regions_name .. " color int " .. region_item_color  .. string.char(10))
-        reaper.AddProjectMarker2(0, true, starts_position, region_end, the_regions_name, i - 1, region_item_color)
-        --reaper.AddProjectMarker2(ReaProject proj, boolean isrgn, number pos, number rgnend, string name, integer wantidx, integer color)
+        -- Use display_name (numbered or original)
+        reaper.AddProjectMarker2(0, true, starts_position, region_end, display_name, i - 1, region_item_color)
     end
+    
+    -- Cleanup
     num_regions = 0
     G_region_table = {}
     starts_position = 0
     region_item_color = reaper.ColorToNative(80, 80, 100) | 0x1000000
     the_regions_name = ""
     region_end = 0
+    region_counts = nil
 end
+
+
 goopy = 0
 
 function process_pushes()
@@ -4335,13 +4461,14 @@ if gmem_export and G_chbass_midi_item_id then
 end
 
     -- 4A. PROCESS MARKERS & DRUMS
-    place_special()
-    
-    local drum_track = Find_Track_With_Drum_FX()
-    if drum_track then
-        Generate_Drum_Conductor(drum_track)
-    end
+place_special()
 
+local drum_tracks = Find_All_Tracks_With_Drum_FX() 
+
+-- Iterate through all found tracks
+for _, drum_track in ipairs(drum_tracks) do
+    Generate_Drum_Conductor_For_Track(drum_track)
+end
 
  
 
