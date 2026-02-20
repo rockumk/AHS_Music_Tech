@@ -1,13 +1,14 @@
 desc:N2N Arp
-version: 11.99.2
+version: 11.99.3
 author: Rock Kennedy
 about:
-  # N2N Arp v11.99.2
+  # N2N Arp v11.99.3
   - FEATURE: Inventory Reporting to N2N Ecosystem.
   - FEATURE: Populated Pattern Indicators on Tabs.
   - FEATURE: Track Color/Name Header integration.
   - FEATURE: Prioritized Cue System (Note > GMEM > PC).
   - FIX: Channel 16 Notes are now Cues (not Chords).
+  - FIX: Scroll floor set
 provides:
   [main] .
 
@@ -29,7 +30,7 @@ slider13:100<0,100,1>-Global Row Level
 
 @init
 scale_dirty = 0;
-thisversion = "v11.99.2";
+thisversion = "v11.99.3";
 // =========================================================
 // VISUALS
 // =========================================================
@@ -1526,7 +1527,7 @@ need_view_center ? (
 );
 
 
-scroll_val = slider8; visible_rows = slider7; max_scroll = MAX_ROWS - visible_rows; max_scroll < 0 ? max_scroll = 0;
+scroll_val = floor(slider8); visible_rows = slider7; max_scroll = MAX_ROWS - visible_rows; max_scroll < 0 ? max_scroll = 0;
 sb_w = 16; sb_x = gfx_w - sb_w; sb_y = grid_y; sb_h = visible_rows * ROW_HEIGHT; (sb_h > gfx_h - grid_y) ? sb_h = gfx_h - grid_y;
 handle_h = (visible_rows / MAX_ROWS) * sb_h; handle_h < 20 ? handle_h = 20; avail_track = sb_h - handle_h;
 scroll_pct = max_scroll > 0 ? scroll_val / max_scroll : 0; handle_y = sb_y + scroll_pct * avail_track;
