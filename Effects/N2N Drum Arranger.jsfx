@@ -1,8 +1,8 @@
 desc:N2N Drum Arranger
-version: 5.8.7
+version: 5.8.8
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v5.8.7
+  # N2N Drum Arranger v5.8.8
   - FIXED: Pattern Settings (Bars, Subdiv, Swing) now load correctly from Legacy presets.
   - TECHNICAL: Corrected legacy memory read from Interleaved (Wrong) to Sequential Arrays (Right).
   - MAPPING: Uses the user-verified mapping table for both Grid Data and Pattern Settings.
@@ -25,7 +25,7 @@ slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
 slider11:14<10,30,1>-Grid Row Height
 
 @init
-version_display = "v5.8.7";
+version_display = "v5.8.8";
 
 // =========================================================
 // REGISTRATION & GROOVE MEMORY
@@ -1576,7 +1576,7 @@ x1 = HDR_X + HDR_W + UI_GAP_X - 10;
 gfx_set(0.8,0.8,0.8,1); 
 gfx_x = x1 + 44; 
 gfx_y = row1_y + 5 + GLOB_LBL_YOFF; 
-gfx_setfont(1, "Arial", 16, 'b');
+os == 0 ? gfx_setfont(1, "Arial", 16, 'b') : gfx_setfont(1, "Arial", 13, 'b'); 
 gfx_drawstr("GLOBAL SETTINGS:");
 gfx_setfont(0);         
         
@@ -1608,7 +1608,7 @@ gfx_drawstr(#trk_str2);
 gfx_setfont(0);
 );
 
-gfx_setfont(1, "Arial", 16, 'b');
+os == 0 ? gfx_setfont(1, "Arial", 16, 'b') : gfx_setfont(1, "Arial", 13, 'b'); 
 
 dr_glob(16, x1+39, row1_y+3, GW_ROWS_W+51, "  MAX ROWS TO SHOW:", slider7, 1, 128,  0, 0, -1, 0, 7);  
 x1 += GW_ROWS_W + 33;
@@ -1640,7 +1640,7 @@ row2_y = ROW2_Y;
 
 mem[ui_locked_tab] == -1 ? mem[ui_edit_tab] = mem[ui_play_prog_tab]; 
 is_follow = (mem[ui_locked_tab] == -1);
-gfx_setfont(1, "Arial", 16, 'b');
+os == 0 ? gfx_setfont(1, "Arial", 16, 'b') : gfx_setfont(1, "Arial", 13, 'b'); 
 draw_text(FOLLOW_LBL_X+5, row2_y+20, "FOLLOW\n   MIDI\n  CUES:", 0.8,0.8,0.8); 
 
 gfx_circle(FOLLOW_BOX_X+21, row2_y+36, 7, 0); // Outer
@@ -1652,7 +1652,7 @@ rect(FOLLOW_BOX_X+11, row2_y+37, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.5, 0.5, 0.5, 1)
 gfx_setfont(1, "Arial", 21, 'b');
 is_follow ? draw_text(FOLLOW_BOX_X+15, row2_y+36, "X", 0,1,0);
 is_follow ? rect(FOLLOW_BOX_X+11, row2_y+37, FOLLOW_BOX_W+1, FOLLOW_BOX_H,0.2*bri,  1.0*bri,  1.0*bri, 1);
-gfx_setfont(1, "Arial", 16, 'b');
+os == 0 ? gfx_setfont(1, "Arial", 16, 'b') : gfx_setfont(1, "Arial", 13, 'b'); 
 (mb && p_mb == 0 && mx>=FOLLOW_BOX_X-100 && mx<FOLLOW_BOX_X+FOLLOW_BOX_W+12 && my>=row2_y-37 && my<row2_y+38+FOLLOW_BOX_H) ? ( 
     mem[ui_locked_tab] == -1 ? mem[ui_locked_tab] = 26 : mem[ui_locked_tab] = -1; 
     gmem[GM_BASE+1] = mem[ui_locked_tab]; 
@@ -1681,7 +1681,7 @@ loop(TOTAL_TABS,
              rect(tx, ty, tw-5, 26, t_r*0.4, t_g*0.4, t_b*0.4, 1);
         );
         get_t_name(gui_t, #tn); 
-        gfx_setfont(1, "Arial", 16, 'b');
+        os == 0 ? gfx_setfont(1, "Arial", 16, 'b') : gfx_setfont(1, "Arial", 13, 'b'); 
         is_ed ? ( draw_text(tx+5, ty+5, #tn, 0, 0, 0); ) : ( draw_text(tx+5, ty+4, #tn, 1, 1, 1); );
         gfx_setfont(0);  
         (mb && p_mb == 0 && mx>=tx && mx<tx+tw-24 && my>=ty && my<ty+26) ? ( 
@@ -1752,7 +1752,7 @@ loop(TOTAL_TABS,
              rect(tx, ty, tw-5, 26, t_r*0.4, t_g*0.4, t_b*0.4, 1);
         );
         get_t_name(gui_t, #tn); 
-        gfx_setfont(1, "Arial", 16, 'b');
+        os == 0 ? gfx_setfont(1, "Arial", 16, 'b') : gfx_setfont(1, "Arial", 13, 'b'); 
         is_ed ? ( draw_text(tx+5, ty+5, #tn, 0, 0, 0); ) : ( draw_text(tx+5, ty+4, #tn, 1, 1, 1); );
         gfx_setfont(0);    
         
@@ -1823,7 +1823,7 @@ loop(TOTAL_TABS,
              rect(tx, ty, tw-5, 26, t_r*0.4, t_g*0.4, t_b*0.4, 1);
         );
         get_t_name(gui_t, #tn); 
-        gfx_setfont(1, "Arial", 16, 'b');
+        os == 0 ? gfx_setfont(1, "Arial", 16, 'b') : gfx_setfont(1, "Arial", 13, 'b'); 
         is_ed ? ( draw_text(tx+5, ty+5, #tn, 0, 0, 0); ) : ( draw_text(tx+5, ty+4, #tn, 1, 1, 1); );
         gfx_setfont(0);    
         
@@ -1897,7 +1897,7 @@ t_e = mem[ui_edit_tab];
 
     bx = BTN_X0;
     extrascoot = 205;
-    gfx_setfont(1, "Arial", 16, 'b');
+    os == 0 ? gfx_setfont(1, "Arial", 16, 'b') : gfx_setfont(1, "Arial", 13, 'b'); 
     btn(bx-15+extrascoot, row2_y, BTN_W_COPY+21, "  COPY PATTERN") ? ( 
         memcpy(copy_tab_v_buf, curr_pat_v_ptr, vel_stride_tab); 
         memcpy(copy_tab_g_buf, curr_pat_g_ptr, vel_stride_tab); 
@@ -2127,7 +2127,7 @@ t_e = mem[ui_edit_tab];
     mb == 0 ? last_preview_note = -1;
     ty+=38; 
     upser = 5;
-    gfx_setfont(1, "Arial", 16, 'b');
+    os == 0 ? gfx_setfont(1, "Arial", 16, 'b') : gfx_setfont(1, "Arial", 13, 'b'); 
     draw_text(10, ty-upser, "DRUM:", 0.7,0.7,0.7); 
     strlen(row_name_str_base + sel_r * str_size) > 0 ? (
         strcpy(#dn_cur, row_name_str_base + sel_r * str_size);
