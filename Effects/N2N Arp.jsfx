@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 11.99.1
+version: 11.99.2
 author: Rock Kennedy
 about:
-  # N2N Arp v11.99.1
+  # N2N Arp v11.99.2
   - FEATURE: Inventory Reporting to N2N Ecosystem.
   - FEATURE: Populated Pattern Indicators on Tabs.
   - FEATURE: Track Color/Name Header integration.
@@ -29,7 +29,7 @@ slider13:100<0,100,1>-Global Row Level
 
 @init
 scale_dirty = 0;
-thisversion = "v11.99.1";
+thisversion = "v11.99.2";
 // =========================================================
 // VISUALS
 // =========================================================
@@ -46,7 +46,7 @@ grid_height = slider11;
 ext_noinit == 0 ? (
     // Moved defaults to ui_init_done block below to ensure variables exist
     need_view_center = 1;   
-);;
+);
 
 
 ext_noinit = 1.0;
@@ -97,7 +97,7 @@ mem[ui_locked_tab] < -1 ? mem[ui_locked_tab] = -1;
 input_state_base = mem_pos; mem_pos += 128; 
 input_chan_base  = mem_pos; mem_pos += 128; 
 scale_state_base = mem_pos; mem_pos += 12; 
-scale_tonic      = -1; 
+scale_tonic      = -1;
 scale_note_vels  = mem_pos; mem_pos += 128; 
 
 chord_count = 0;
@@ -1254,13 +1254,13 @@ function dr_pat_mem(x, y, w, lab, val_in, min_v, max_v, mem_ptr, id_offset) (
 );
 
 
-x1 = X1 +90;
+x1 += 90;
 
 dr_slider(x1, row1_y, 80, "HGT:", slider11, 10, 30, 0, 11, 0); x1 += 90;
 dr_slider(x1, row1_y, 80, "ID:", slider5, 1, 64, 0, 5, 0); x1 += 90;
 
 rect(x1, row1_y, 90, 20, 0.2, 0.2, 0.2, 1); draw_text(x1+5, row1_y+5, "TRANSP:", 0.7,0.7,0.7); sprintf(#s, "%d", mem[ui_oct_transpose]); draw_text(x1+65, row1_y+5, #s, 1,1,1);
-(mb && p_mb==0 && mx>=x1 && mx<x1+90 && my>=row1_y && my<row1_y+20) ? ( capture_id=4999; capture_min=-3; capture_max=3; capture_ptr=ui_oct_transpose; capture_start_x=mx; capture_start_val=mem[ui_oct_transpose]; );
+(mb && p_mb==0 && mx>=x && mx<x1+90 && my>=row1_y && my<row1_y+20) ? ( capture_id=4999; capture_min=-3; capture_max=3; capture_ptr=ui_oct_transpose; capture_start_x=mx; capture_start_val=mem[ui_oct_transpose]; );
 x1 += 100;
 
 src_x = x1-375; 
@@ -1754,20 +1754,7 @@ gx_r = 0; loop(calc_rows,
                 (gx_s % steps_per_bar == 0) ? rect(cx, ry, cw, ROW_HEIGHT, 1, 1, 1, 0.20) : (gx_s % (steps_per_bar/4) == 0) ? rect(cx, ry, cw, ROW_HEIGHT, 1, 1, 1, 0.04) : 0; 
                 gfx_set(0.3, 0.3, 0.3, 0.4); gfx_rect(cx, ry, 1, ROW_HEIGHT); 
             );
-            (mb && capture_id == 0 && mx>=cx && mx<cx+cw && my>=ry && my<ry+ROW_HEIGHT && !chan_popup_active && !color_popup_active) ? (
-                drag_lock_row == -1 ? drag_lock_row = r_idx;
-                (r_idx == drag_lock_row && !is_tail) ? (
-                    cell_id = r_idx*1000 + gx_s; p_mb == 0 ? ( drag_mode = mem[curr_pat_g_ptr+idx] ? 2 : 1; );
-                    (cell_id != last_drag_idx) ? (
-                        step_in_bar = gx_s % steps_per_bar; step_in_beat = gx_s % (steps_per_bar/4); loop_s = 0; loop(st_v, should_apply = 0;
-                            target_bar = floor(gx_s / steps_per_bar); loop_bar = floor(loop_s / steps_per_bar);
-                            (ctrl_dn && shift_dn) ? (loop_s % (steps_per_bar/4) == step_in_beat ? should_apply=1) : ctrl_dn ? (loop_s % steps_per_bar == step_in_bar ? should_apply=1) : shift_dn ? ((loop_bar == target_bar) && (loop_s % (steps_per_bar/4) == step_in_beat) ? should_apply=1) : (loop_s == gx_s ? should_apply = 1);
-                            should_apply ? ( loop_idx = r_idx * vel_stride_row + loop_s; mem[curr_pat_g_ptr+loop_idx] = (drag_mode == 1); (drag_mode == 1) ? ( mem[curr_pat_l_ptr+loop_idx]=1; mem[curr_pat_v_ptr+loop_idx]<=0 ? mem[curr_pat_v_ptr+loop_idx]=slider1; ) : ( mem[curr_pat_l_ptr+loop_idx]=0; mem[curr_pat_v_ptr+loop_idx]=0; ); ); loop_s += 1;
-                        ); mem[ui_selected_row] = r_idx; last_drag_idx = cell_id;
-                        scan_active_tab();
-                    );
-                );
-            ); gx_s+=1;
+            gx_s+=1;
         ); 
         gfx_set(0,0,0,1); gfx_line(grid_x, ry, grid_x+grid_w, ry); gfx_line(grid_x, ry+ROW_HEIGHT, grid_x+grid_w, ry+ROW_HEIGHT);
     ); 
@@ -1823,6 +1810,8 @@ footer_y = grid_y + calc_rows * ROW_HEIGHT + 10;
 
 chan_popup_active ? draw_chan_popup(30, 200, chan_popup_row, chan_popup_is_input); 
 (mouse_wheel != 0) ? ( slider8 = clamp(slider8 - (mouse_wheel/120), 0, max_scroll); mouse_wheel = 0; );
+mouse_hwheel = 0; 
+
 
 (play_state & 1) ? ( 
     t_pl = (mem[ui_locked_tab] >= 0) ? mem[ui_locked_tab] : mem[ui_play_prog_tab]; 
