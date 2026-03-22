@@ -1,14 +1,13 @@
-desc:N2N Drum Arranger
-version: 5.8.9
+desc: N2N Drum Arranger
+version: 7.0.0
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v5.8.9
-  - FIXED: Pattern Settings (Bars, Subdiv, Swing) now load correctly from Legacy presets.
-  - TECHNICAL: Corrected legacy memory read from Interleaved (Wrong) to Sequential Arrays (Right).
-  - MAPPING: Uses the user-verified mapping table for both Grid Data and Pattern Settings.
-  - INSTANCE ID: Locked to prevent changes via presets.
-provides:
-  [data] ../Data/DrumArranger/*.txt > AHS_Music_Tech/DrumArranger/
+  # N2N Drum Arranger v7.0.0 -
+  ADDED CUE SETTING
+  ADDED PATTERN MUTE
+  ADDED FALLBACK PATTERN SYSTEM
+provides: [data].. / Data / DrumArranger
+/*.txt > AHS_Music_Tech/DrumArranger/
 options:maxmem=32000000
 options:gmem=N2N_Ecosystem_RSKennedy
 
@@ -25,6 +24,7 @@ slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
 slider11:14<10,30,1>-Grid Row Height
 
 @init
+init_gate = 0;
 fontsize = 13; // use 16 for PC and 13 for mac
 version_display = "v5.8.9";
 
@@ -35,7 +35,6 @@ reg_base = 8000000;
 parse_scratch = 500000; 
 LOCAL_GROOVE_DB = 550000; 
 GMEM_GROOVE_OFFSET = 5000000;
-inv_map_base = 6000000;
 
 // --- CUE STATE MACHINE VARIABLES ---
 cue_armed = 0; cue_target_tab = -1; cue_source_type = -1; cue_source_addr = -1;    
@@ -75,26 +74,54 @@ my_slot = slider5; // STORE THE ASSIGNED SLOT
 // =========================================================
 // MEMORY MANAGEMENT
 // =========================================================
-row_name_str_base = 0;   
-STR_BUF_LINE = 650; STR_BUF_NAME = 651; STR_BUF_COLOR = 652; STR_BUF_SWAP = 653; STR_BUF_MENU = 654;
-N2N_DIR_BUF = 1005; N2N_FILENAME = 1006; N2N_TEMP_LINE = 1007; N2N_NAME_BUF = 1008;  
-N2N_GRID_HEX = 1009; N2N_VEL_HEX = 1010; N2N_LEN_HEX = 1011;
-str_size = 1;
-last_load_handle = 0; last_load_lines = 0; last_load_rows = 0;
-ext_noinit = 1.0; grid_height = slider11; swing_sync = 1;
-last_kit_idx = slider10; last_maint_time = 0;
-save_msg_timer = 0; drag_accum_gen = 0; help_active = 0;    
-cp_valid = 0; cp_bars = 0; cp_sub = 0; cp_hum = 0; cp_sw = 0; cp_half = 0;
+str_size = 1; // JSFX strings are indexed, size is always 1 slot
+
+row_name_str_base = 512;   
+STR_BUF_LINE   = 700; 
+STR_BUF_NAME   = 701; 
+STR_BUF_COLOR  = 702; 
+STR_BUF_SWAP   = 703; 
+STR_BUF_MENU   = 704;
+N2N_DIR_BUF    = 705; 
+N2N_FILENAME   = 706; 
+N2N_TEMP_LINE  = 707; 
+N2N_NAME_BUF   = 708;  
+N2N_GRID_HEX   = 709; 
+N2N_VEL_HEX    = 710;
+N2N_LEN_HEX    = 711;
+
+last_load_handle = 0; 
+last_load_lines = 0; 
+last_load_rows = 0;
+ext_noinit = 1.0; 
+grid_height = slider11; 
+swing_sync = 1;
+last_kit_idx = slider10; 
+last_maint_time = 0;
+save_msg_timer = 0; 
+drag_accum_gen = 0; 
+help_active = 0;    
+cp_valid = 0; 
+cp_bars = 0; 
+cp_sub = 0; 
+cp_hum = 0; 
+cp_sw = 0; 
+cp_half = 0;
 
 // --- CONFIGURATION EXPANSION ---
 MAX_TABS = 28; 
 TOTAL_TABS = 80; 
 MAX_ROWS = 128; MAX_STEPS = 128;
 
-NEW_MAGIC_VER = 27030;
-LEGACY_MAGIC_VER = 27022; // v5.6.0 identifier
+LEGACY_MAGIC_VER = 27022; // Ancient v5.6
+OLD_NEW_VER      = 27030; // Intermediate development version
+MORNING_VER      = 27050; // Your presets from this morning (Sparse, no Mute)
+NEW_MAGIC_VER    = 27060; // THE CURRENT VERSION (Sparse + Mute)
 
 ver_chk = 700;
+
+midi_trigger_queued = -1;
+
 
 // --- RELOCATE NEW MEMORY TO 10,000,000 ---
 // Leaves 0 - 7,000,000 free for legacy load
@@ -110,6 +137,10 @@ tab_col_r = mem_pos; mem_pos += TOTAL_TABS;
 tab_col_g = mem_pos; mem_pos += TOTAL_TABS;
 tab_col_b = mem_pos; mem_pos += TOTAL_TABS;
 
+tab_mute_base  = mem_pos; mem_pos += TOTAL_TABS;
+tab_flash_base = mem_pos; mem_pos += TOTAL_TABS;
+
+
 row_mute_base = mem_pos; mem_pos += MAX_ROWS;
 row_solo_base = mem_pos; mem_pos += MAX_ROWS;
 row_note_base = mem_pos; mem_pos += MAX_ROWS;
@@ -120,7 +151,7 @@ row_len_base = mem_pos; mem_pos += MAX_ROWS;
 row_name_idx = mem_pos; mem_pos += MAX_ROWS;
 row_offs_base = mem_pos; mem_pos += MAX_ROWS;
 row_color_base = mem_pos; mem_pos += MAX_ROWS;
-
+row_flash_base = mem_pos; mem_pos += MAX_ROWS;
 bars_ov_base = mem_pos; mem_pos += TOTAL_TABS;
 subdiv_ov_base = mem_pos; mem_pos += TOTAL_TABS;
 hum_ov_base = mem_pos; mem_pos += TOTAL_TABS;
@@ -148,16 +179,20 @@ ownership_map = mem_pos; mem_pos += MAX_STEPS;
 kill_note = mem_pos; mem_pos += 128; 
 kill_chan = mem_pos; mem_pos += 128;
 
-bar_copy_base = 1500000; // Safe temp buffer
 
 // EXT pointers nulled
 ext_tab_w_base = 0; ext_bars_ov_base = 0; ext_subdiv_ov_base = 0; 
 ext_hum_ov_base = 0; ext_swing_ov_base = 0; ext_half_speed_ov_base = 0;
 ext_vel_base = 0; ext_grid_base = 0; ext_step_len_base = 0;
 
+
+bar_copy_base = mem_pos; mem_pos += 20000; // Safe buffer for Bar Ops
 kit_tmp_base = mem_pos; mem_pos += MAX_ROWS * 7; 
-state_len = mem_pos; 
-row_flash_base = mem_pos; mem_pos += MAX_ROWS;
+fallback_base = mem_pos; mem_pos += 800;
+inv_map_base = mem_pos; mem_pos += 128;
+state_len = mem_pos;
+
+ 
 
 // --- LEGACY MAP (Original v5.6 Addresses) ---
 OLD_UI_BASE = 701;
@@ -526,6 +561,8 @@ function get_t_name(idx, out) (
 );
 
 
+
+
 function get_palette_values(idx) (
     idx==0 ? (lcr=1.0; lcg=1.0; lcb=1.0;) : 
     idx==1 ? (lcr=1.0; lcg=0.4; lcb=0.4;) :
@@ -693,7 +730,7 @@ local(handle, note_out, chan_out, color_idx_out, current_chan,
     note_out = 50000; chan_out = 50001; color_idx_out = 50002; 
     SLOT_LINE = STR_BUF_LINE; SLOT_NAME = STR_BUF_NAME;
     tmp_kit_note = kit_tmp_base; tmp_kit_chan = kit_tmp_base + 128; tmp_kit_color = kit_tmp_base + 256; 
-    TEMP_STR_OFFSET = 3000; 
+    TEMP_STR_OFFSET = 800; // FIXED: Was 3000 (out of bounds)
     sel_r = mem[ui_selected_row];
     sel_r < 0 ? sel_r = 0; sel_r >= MAX_ROWS ? sel_r = MAX_ROWS - 1;
     context_chan = mem[row_chan_base + sel_r];
@@ -818,173 +855,455 @@ local(tmp, t, basev, baseg, basel, i, offa, offb, va, vb, ga, gb, la, lb, slot_a
     );
 );
 
+
+
+// =========================================================
+// SMART FALLBACK LOOKUP CHART
+// =========================================================
+// Allocates 10 memory slots per tab (Index 0-79 = 800 slots)
+// Structure: [Target Tab] -> [Fallback 1], [Fallback 2], ...,[Fallback 9], [Default/26]
+
+fallback_base = mem_pos;
+mem_pos += 800; // 80 tabs * 10 fallback slots each
+
+// Initialize everything to -1 (No fallback defined)
+i_fb = 0; 
+loop(800,
+    mem[fallback_base + i_fb] = -1;
+    i_fb += 1;
+);
+
+// Helper function to define the chain for a specific tab
+function def_fb(t, f1, f2, f3, f4, f5, f6, f7, f8, f9) local(ptr) (
+    ptr = fallback_base + (t * 10);
+    mem[ptr+0] = f1; mem[ptr+1] = f2; mem[ptr+2] = f3;
+    mem[ptr+3] = f4; mem[ptr+4] = f5; mem[ptr+5] = f6;
+    mem[ptr+6] = f7; mem[ptr+7] = f8; mem[ptr+8] = f9;
+    mem[ptr+9] = -1; // Removed hardcoded 26 so the cascade logic can trigger
+);
+
+// --- INTRO (1-4) ---
+def_fb(1,   -1, -1, -1, -1, -1, -1, -1, -1, -1);
+def_fb(2,    1, -1, -1, -1, -1, -1, -1, -1, -1);
+def_fb(3,    2,  1, -1, -1, -1, -1, -1, -1, -1);
+def_fb(4,    3,  2,  1, -1, -1, -1, -1, -1, -1);
+
+// --- VERSE 1 (5-8) ---
+def_fb(5,    1, -1, -1, -1, -1, -1, -1, -1, -1);
+def_fb(6,    5,  1, -1, -1, -1, -1, -1, -1, -1);
+def_fb(7,    6,  5,  1, -1, -1, -1, -1, -1, -1);
+def_fb(8,    7,  6,  5,  1, -1, -1, -1, -1, -1);
+
+// --- PRE 1 (9-12) ---
+def_fb(9,    5, -1, -1, -1, -1, -1, -1, -1, -1);
+def_fb(10,   9,  5, -1, -1, -1, -1, -1, -1, -1);
+def_fb(11,  10,  9,  5, -1, -1, -1, -1, -1, -1);
+def_fb(12,  11, 10,  9,  5, -1, -1, -1, -1, -1);
+
+// --- CHORUS 1 (13-16) ---
+def_fb(13,   9, -1, -1, -1, -1, -1, -1, -1, -1);
+def_fb(14,  13,  9, -1, -1, -1, -1, -1, -1, -1);
+def_fb(15,  14, 13,  9, -1, -1, -1, -1, -1, -1);
+def_fb(16,  15, 14, 13,  9, -1, -1, -1, -1, -1);
+
+// --- BRIDGE (17-20) ---
+def_fb(17,  13, -1, -1, -1, -1, -1, -1, -1, -1);
+def_fb(18,  17, 13, -1, -1, -1, -1, -1, -1, -1);
+def_fb(19,  18, 17, 13, -1, -1, -1, -1, -1, -1);
+def_fb(20,  19, 18, 17, 13, -1, -1, -1, -1, -1);
+
+// --- VERSE 2 (32-35) ---
+def_fb(32,   5, -1, -1, -1, -1, -1, -1, -1, -1);
+def_fb(33,  32,  6,  5, -1, -1, -1, -1, -1, -1);
+def_fb(34,  33, 32,  7,  5, -1, -1, -1, -1, -1);
+def_fb(35,  34, 33, 32,  8,  5, -1, -1, -1, -1);
+
+// --- PRE 2 (36-39) ---
+def_fb(36,  32,  9, -1, -1, -1, -1, -1, -1, -1);
+def_fb(37,  36, 10,  9, -1, -1, -1, -1, -1, -1);
+def_fb(38,  37, 36, 11,  9, -1, -1, -1, -1, -1);
+def_fb(39,  38, 37, 36, 12,  9, -1, -1, -1, -1);
+
+// --- CHORUS 2 (40-43) ---
+def_fb(40,  13, 36, -1, -1, -1, -1, -1, -1, -1);
+def_fb(41,  40, 14, 13, -1, -1, -1, -1, -1, -1);
+def_fb(42,  41, 40, 15, 13, -1, -1, -1, -1, -1);
+def_fb(43,  42, 41, 40, 16, 13, -1, -1, -1, -1);
+
+// --- SOLO (44-47) ---
+def_fb(44,  40, -1, -1, -1, -1, -1, -1, -1, -1);
+def_fb(45,  44, 40, -1, -1, -1, -1, -1, -1, -1);
+def_fb(46,  45, 44, 40, -1, -1, -1, -1, -1, -1);
+def_fb(47,  46, 45, 44, 40, -1, -1, -1, -1, -1);
+
+// --- VERSE 3 (59-62) ---
+def_fb(59,  32,  5, -1, -1, -1, -1, -1, -1, -1);
+def_fb(60,  59, 33, 32,  6,  5, -1, -1, -1, -1);
+def_fb(61,  60, 59, 34, 32,  7,  5, -1, -1, -1);
+def_fb(62,  61, 60, 59, 35, 32,  8,  5, -1, -1);
+
+// --- PRE 3 (63-66) ---
+def_fb(63,  36,  9, -1, -1, -1, -1, -1, -1, -1);
+def_fb(64,  63, 37, 36, 10,  9, -1, -1, -1, -1);
+def_fb(65,  64, 63, 38, 36, 11,  9, -1, -1, -1);
+def_fb(66,  65, 64, 63, 39, 36, 12,  9, -1, -1);
+
+// --- CHORUS 3 (67-70) ---
+def_fb(67,  40, 13, -1, -1, -1, -1, -1, -1, -1);
+def_fb(68,  67, 41, 40, 14, 13, -1, -1, -1, -1);
+def_fb(69,  68, 67, 42, 40, 15, 13, -1, -1, -1);
+def_fb(70,  69, 68, 67, 43, 40, 16, 13, -1, -1);
+
+// --- OUTRO (71-74) ---
+def_fb(71,  40, -1, -1, -1, -1, -1, -1, -1, -1);
+def_fb(72,  71, 40, -1, -1, -1, -1, -1, -1, -1);
+def_fb(73,  72, 71, 40, -1, -1, -1, -1, -1, -1);
+def_fb(74,  73, 72, 71, 40, -1, -1, -1, -1, -1);
+
 scan_all_tabs();
-freembuf(state_len + MAX_ROWS * str_size)
+freembuf(mem_pos);
+
+// Maps out patterns to flag if they qualify for Fallback behavior at all
+function needs_fallback(t) (
+    ((t >= 1 && t <= 20) || (t >= 32 && t <= 47) || (t >= 59 && t <= 74)) ? 1 : 0;
+);
+
+function get_active_fallback(req_tab) local(ptr, i, found_tab, cand, current_t, last_cand, iter) (
+    // 1. If it's Tab 0 (Off) or doesn't qualify for a fallback based on mapping list, return itself.
+    (req_tab == 0 || !needs_fallback(req_tab)) ? req_tab :
+    
+    // 2. Loop to resolve cascades
+    (
+        found_tab = -1;
+        current_t = req_tab;
+        iter = 0;
+        
+        while(iter < 20 && found_tab == -1) ( // 20 iterations max to prevent infinite loops
+            mem[LOC_TAB_POPULATED + current_t] ? (
+                found_tab = current_t;
+            ) : (
+                // Search its custom fallback list
+                ptr = fallback_base + (current_t * 10);
+                i = 0; 
+                last_cand = -1;
+                
+                while(i < 10 && found_tab == -1) (
+                    cand = mem[ptr + i];
+                    cand != -1 ? (
+                        mem[LOC_TAB_POPULATED + cand] ? (
+                            found_tab = cand;
+                        ) : (
+                            last_cand = cand; // Remember the last valid fallback in this chain
+                        );
+                    ) : (
+                        i = 10; // Break the inner loop early if we hit -1
+                    );
+                    i += 1;
+                );
+                
+                // If we didn't find anything in the list, cascade to the last candidate
+                found_tab == -1 ? (
+                    last_cand != -1 ? (
+                        current_t = last_cand; // Cascade!
+                    ) : (
+                        // No fallbacks defined and target is empty -> Force Default
+                        found_tab = 26; 
+                    );
+                );
+            );
+            iter += 1;
+        );
+        
+        // Failsafe: Return populated tab, or 26 if the entire chain is empty
+        found_tab != -1 ? found_tab : 26;
+    );
+);
+
+function update_active_row_list(t_idx) 
+local(r, s, has_data, p_grid)
+(
+    active_row_count = 0;
+    p_grid = grid_base + (t_idx * vel_stride_tab);
+    r = 0;
+    loop(MAX_ROWS,
+        has_data = 0;
+        s = 0;
+        // Check if this row has ANY notes in this specific pattern
+        while(s < vel_stride_row && !has_data) (
+            mem[p_grid + (r * vel_stride_row) + s] > 0 ? has_data = 1;
+            s += 1;
+        );
+        
+        has_data ? (
+            mem[active_row_list + active_row_count] = r;
+            active_row_count += 1;
+        );
+        r += 1;
+    );
+);
+
+
+
+function send_tab_trigger(t_idx) local(out_n) (
+    out_n = -1;
+
+    // --- SYSTEM & USER TABS ---
+    t_idx == 0  ? out_n = 24 : // Off
+    t_idx == 26 ? out_n = 25 : // Def
+    t_idx == 53 ? out_n = 19 : // Min
+    (t_idx >= 27 && t_idx <= 31) ? out_n = 1 + (t_idx - 27) : // User 1-5
+    (t_idx >= 54 && t_idx <= 58) ? out_n = 6 + (t_idx - 54) : // User 6-10
+
+    // --- HOOKS & FILLS ---
+    t_idx == 21 ? out_n = 20 : // H1
+    t_idx == 22 ? out_n = 21 : // H2
+    t_idx == 48 ? out_n = 22 : // H3
+    t_idx == 49 ? out_n = 23 : // H4
+    (t_idx >= 23 && t_idx <= 25) ? out_n = 26 + (t_idx - 23) : // Fills 1 < = >
+    (t_idx >= 50 && t_idx <= 52) ? out_n = 29 + (t_idx - 50) : // Fills 2 < = >
+
+    // --- SONG SECTIONS ---
+    (t_idx >= 1  && t_idx <= 4)  ? out_n = 32 + (t_idx - 1)  : // Intro A-D
+    (t_idx >= 5  && t_idx <= 8)  ? out_n = 36 + (t_idx - 5)  : // Verse 1 A-D
+    (t_idx >= 32 && t_idx <= 35) ? out_n = 40 + (t_idx - 32) : // Verse 2 A-D
+    (t_idx >= 59 && t_idx <= 62) ? out_n = 44 + (t_idx - 59) : // Verse 3 A-D
+    (t_idx >= 9  && t_idx <= 12) ? out_n = 48 + (t_idx - 9)  : // Pre 1 A-D
+    (t_idx >= 36 && t_idx <= 39) ? out_n = 52 + (t_idx - 36) : // Pre 2 A-D
+    (t_idx >= 63 && t_idx <= 66) ? out_n = 56 + (t_idx - 63) : // Pre 3 A-D
+    (t_idx >= 13 && t_idx <= 16) ? out_n = 60 + (t_idx - 13) : // Chorus 1 A-D
+    (t_idx >= 40 && t_idx <= 43) ? out_n = 64 + (t_idx - 40) : // Chorus 2 A-D
+    (t_idx >= 67 && t_idx <= 70) ? out_n = 68 + (t_idx - 67) : // Chorus 3 A-D
+    (t_idx >= 17 && t_idx <= 20) ? out_n = 72 + (t_idx - 17) : // Bridge A-D
+    (t_idx >= 44 && t_idx <= 47) ? out_n = 76 + (t_idx - 44) : // Solo A-D
+    (t_idx >= 71 && t_idx <= 74) ? out_n = 80 + (t_idx - 71) : // Outro A-D
+    (t_idx >= 75 && t_idx <= 79) ? out_n = 84 + (t_idx - 75) : // RSV 1-5
+
+    0;
+
+    (out_n != -1) ? (
+        midi_trigger_queued = out_n; 
+        cue_armed = 1;
+        cue_target_tab = t_idx;
+        
+        // REFINED: Only update grid if REC is OFF.
+        // This ensures clicking a tab while recording doesn't make it appear on the grid.
+        rec_cues_active == 0 ? (
+            mem[ui_edit_tab] = t_idx;
+        );
+        
+        needs_tab_update = 1;
+    );
+);
+
+function get_tab_from_pc(pc_val) (
+    pc_val == 0 ? 0 : // Off
+    (pc_val >= 1 && pc_val <= 5) ? 27 + (pc_val - 1) : // 1-5 -> Tabs 27-31
+    (pc_val >= 6 && pc_val <= 10) ? 54 + (pc_val - 6) : // 6-10 -> Tabs 54-58
+    pc_val == 19 ? 53 : // Min
+    pc_val == 20 ? 21 : // H1
+    pc_val == 21 ? 22 : // H2
+    pc_val == 22 ? 48 : // H3
+    pc_val == 23 ? 49 : // H4
+    pc_val == 24 ? 0 : // Off
+    pc_val == 25 ? 26 : // Def
+    pc_val == 26 ? 23 : // F1<
+    pc_val == 27 ? 24 : // F1=
+    pc_val == 28 ? 25 : // F1>
+    pc_val == 29 ? 50 : // F2<
+    pc_val == 30 ? 51 : // F2=
+    pc_val == 31 ? 52 : // F2>
+    (pc_val >= 32 && pc_val <= 35) ? 1 + (pc_val - 32) : // Intro A-D -> 1-4
+    (pc_val >= 36 && pc_val <= 39) ? 5 + (pc_val - 36) : // Verse 1 A-D -> 5-8
+    (pc_val >= 40 && pc_val <= 43) ? 32 + (pc_val - 40) : // Verse 2 A-D -> 32-35
+    (pc_val >= 44 && pc_val <= 47) ? 59 + (pc_val - 44) : // Verse 3 A-D -> 59-62
+    (pc_val >= 48 && pc_val <= 51) ? 9 + (pc_val - 48) : // Pre 1 A-D -> 9-12
+    (pc_val >= 52 && pc_val <= 55) ? 36 + (pc_val - 52) : // Pre 2 A-D -> 36-39
+    (pc_val >= 56 && pc_val <= 59) ? 63 + (pc_val - 56) : // Pre 3 A-D -> 63-66
+    (pc_val >= 60 && pc_val <= 63) ? 13 + (pc_val - 60) : // Chorus 1 A-D -> 13-16
+    (pc_val >= 64 && pc_val <= 67) ? 40 + (pc_val - 64) : // Chorus 2 A-D -> 40-43
+    (pc_val >= 68 && pc_val <= 71) ? 67 + (pc_val - 68) : // Chorus 3 A-D -> 67-70
+    (pc_val >= 72 && pc_val <= 75) ? 17 + (pc_val - 72) : // Bridge A-D -> 17-20
+    (pc_val >= 76 && pc_val <= 79) ? 44 + (pc_val - 76) : // Solo A-D -> 44-47
+    (pc_val >= 80 && pc_val <= 83) ? 71 + (pc_val - 80) : // Outro A-D -> 71-74
+    (pc_val >= 84 && pc_val <= 88) ? 75 + (pc_val - 84) : // Rsv -> 75-79
+    -2; // Unmapped
+);
+
+
+
+
+active_row_list = mem_pos; mem_pos += 128; // Ensure this has its own space
+needs_tab_update = 1;
+effective_play_tab = 26; // Default starting tab
+active_row_count = 0;
+
+// Initialize all to 0 (unmuted)
+// (Pointers for tab_mute_base & tab_flash_base were safely established earlier)
+i_mt = 0; loop(TOTAL_TABS, mem[tab_mute_base + i_mt] = 0; i_mt += 1;);
+
+
+
+
+
+
+
+
+
+
+
+
+
+GMEM_REC_FLAG_ADDR = 5000100;
+rec_cues_active = 0;
+
+
 
 @serialize
-preserved_id = slider5; // Save Instance ID before anything happens
+preserved_id = slider5; 
+
+ui_header_size = 32; 
+row_settings_size = MAX_ROWS * 10; 
+tab_grid_size = vel_stride_tab; 
 
 file_avail(0) > 0 ? (
-    // LOADING
+    // =========================================================
+    // LOADING SECTION
+    // =========================================================
     file_var(0, loaded_ver);
     
-    // --- LOAD "WHERE IT WAS" (v5.6 -> v5.8) ---
-    // We load the file directly into the Original Slots (0...7M).
-    
     (loaded_ver == LEGACY_MAGIC_VER) ? (
-        
-        // 1. Read the Entire File State into Low Memory (0..7M)
+        // --- PATH A: Ancient v5.6 Migration ---
         file_mem(0, 0, 7000000); 
-        i=0; loop(MAX_ROWS, file_string(0, row_name_str_base + i * str_size); i+=1;);
-        
-        // 2. MIGRATE DATA (Copy Low Mem -> High Mem)
-        
-        // --- ROWS (Attributes only) ---
+        // FIXED: Load names into safe zone 512+
+        i=0; loop(MAX_ROWS, file_string(0, row_name_str_base + i); i+=1;);
         memcpy(row_mute_base, OLD_ROW_START, 1280);
-        
-        // --- LOOP 0-63 (OLD TABS) AND MAP TO NEW ---
-        // Mapping Logic: Preserve A,B,C flows. Move Bank 2 to Bank 2 slots.
-        t_old = 0;
-        loop(64,
-            t_new = 
-            (t_old == 0) ? 0 : 
-            (t_old == 1) ? 1 : (t_old == 2) ? 2 : (t_old == 3) ? 3 : 
-            (t_old == 4) ? 5 : (t_old == 5) ? 6 : (t_old == 6) ? 7 : 
-            (t_old == 7) ? 9 : (t_old == 8) ? 10 : (t_old == 9) ? 11 : 
-            (t_old == 10) ? 13 : (t_old == 11) ? 14 : (t_old == 12) ? 15 : 
-            (t_old == 13) ? 17 : (t_old == 14) ? 18 : (t_old == 15) ? 19 : 
-            (t_old == 16) ? 71 : (t_old == 17) ? 72 : (t_old == 18) ? 73 : 
-            (t_old == 19) ? 21 : (t_old == 20) ? 22 : 
-            (t_old == 21) ? 23 : (t_old == 22) ? 24 : (t_old == 23) ? 25 : 
-            (t_old == 24) ? 27 : (t_old == 25) ? 28 : (t_old == 26) ? 29 : 
-            (t_old == 27) ? 30 : (t_old == 28) ? 31 : 
-            (t_old == 29) ? 26 : 
-            (t_old == 30) ? 4 : 
-            (t_old == 31) ? 44 : (t_old == 32) ? 45 : (t_old == 33) ? 46 : 
-            (t_old == 34) ? 8 : 
-            (t_old == 35) ? 32 : (t_old == 36) ? 33 : (t_old == 37) ? 34 : 
-            (t_old == 38) ? 12 : 
-            (t_old == 39) ? 36 : (t_old == 40) ? 37 : (t_old == 41) ? 38 : 
-            (t_old == 42) ? 16 : 
-            (t_old == 43) ? 40 : (t_old == 44) ? 41 : (t_old == 45) ? 42 : 
-            (t_old == 46) ? 20 : 
-            (t_old == 47) ? 47 : 
-            (t_old == 48) ? 75 : (t_old == 49) ? 76 : 
-            (t_old == 50) ? 74 : 
-            (t_old == 51) ? 77 : (t_old == 52) ? 78 : (t_old == 53) ? 79 : 
-            (t_old == 54) ? 48 : (t_old == 55) ? 49 : 
-            (t_old == 56) ? 50 : (t_old == 57) ? 51 : (t_old == 58) ? 52 : 
-            (t_old == 59) ? 54 : (t_old == 60) ? 55 : (t_old == 61) ? 56 : 
-            (t_old == 62) ? 57 : (t_old == 63) ? 58 : 
-            t_old;
-
-            // --- 1. UI PROPERTIES (SKIPPED) ---
-            // We intentionally DO NOT copy W, UI_ROW, COL_R/G/B.
-            // This forces the imported data to adopt the new v5.8 layout.
-
-            // --- 2. OVERRIDES (Bars, Subdiv, etc) ---
-            src_ov_base = 0;
+        t_old = 0; loop(64,
+            t_new = (t_old == 0) ? 0 : (t_old == 1) ? 1 : (t_old == 2) ? 2 : (t_old == 3) ? 3 : (t_old == 4) ? 5 : (t_old == 5) ? 6 : (t_old == 6) ? 7 : (t_old == 7) ? 9 : (t_old == 8) ? 10 : (t_old == 9) ? 11 : (t_old == 10) ? 13 : (t_old == 11) ? 14 : (t_old == 12) ? 15 : (t_old == 13) ? 17 : (t_old == 14) ? 18 : (t_old == 15) ? 19 : (t_old == 16) ? 71 : (t_old == 17) ? 72 : (t_old == 18) ? 73 : (t_old == 19) ? 21 : (t_old == 20) ? 22 : (t_old == 21) ? 23 : (t_old == 22) ? 24 : (t_old == 23) ? 25 : (t_old == 24) ? 27 : (t_old == 25) ? 28 : (t_old == 26) ? 29 : (t_old == 27) ? 30 : (t_old == 28) ? 31 : (t_old == 29) ? 26 : (t_old == 30) ? 4 : (t_old == 31) ? 44 : (t_old == 32) ? 45 : (t_old == 33) ? 46 : (t_old == 34) ? 8 : (t_old == 35) ? 32 : (t_old == 36) ? 33 : (t_old == 37) ? 34 : (t_old == 38) ? 12 : (t_old == 39) ? 36 : (t_old == 40) ? 37 : (t_old == 41) ? 38 : (t_old == 42) ? 16 : (t_old == 43) ? 40 : (t_old == 44) ? 41 : (t_old == 45) ? 42 : (t_old == 46) ? 20 : (t_old == 47) ? 47 : (t_old == 48) ? 75 : (t_old == 49) ? 76 : (t_old == 50) ? 74 : (t_old == 51) ? 77 : (t_old == 52) ? 78 : (t_old == 53) ? 79 : (t_old == 54) ? 48 : (t_old == 55) ? 49 : (t_old == 56) ? 50 : (t_old == 57) ? 51 : (t_old == 58) ? 52 : (t_old == 59) ? 54 : (t_old == 60) ? 55 : (t_old == 61) ? 56 : (t_old == 62) ? 57 : (t_old == 63) ? 58 : t_old;
             (t_old < 22) ? (
-                // MAIN OVERRIDES (Tabs 0-21)
-                // In v5.6, these were SEQUENTIAL arrays (Bars[0..21], then Sub[0..21])
-                // NOT interleaved.
-                
-                OLD_BARS = OLD_OV_START;
-                OLD_SUB  = OLD_BARS + 22;
-                OLD_HUM  = OLD_SUB + 22;
-                OLD_SW   = OLD_HUM + 22;
-                OLD_HALF = OLD_SW + 22;
-                
-                mem[bars_ov_base + t_new]       = mem[OLD_BARS + t_old];
-                mem[subdiv_ov_base + t_new]     = mem[OLD_SUB + t_old];
-                mem[hum_ov_base + t_new]        = mem[OLD_HUM + t_old];
-                mem[swing_ov_base + t_new]      = mem[OLD_SW + t_old];
-                mem[half_speed_ov_base + t_new] = mem[OLD_HALF + t_old];
-                
+                OLD_BARS = OLD_OV_START; OLD_SUB = OLD_BARS + 22; OLD_HUM = OLD_SUB + 22; OLD_SW = OLD_HUM + 22; OLD_HALF = OLD_SW + 22;
+                mem[bars_ov_base + t_new] = mem[OLD_BARS + t_old]; mem[subdiv_ov_base + t_new] = mem[OLD_SUB + t_old]; mem[hum_ov_base + t_new] = mem[OLD_HUM + t_old]; mem[swing_ov_base + t_new] = mem[OLD_SW + t_old]; mem[half_speed_ov_base + t_new] = mem[OLD_HALF + t_old];
             ) : (
-                // EXT OVERRIDES (Tabs 22-63)
-                // Base address calculated from v5.6 memory map: 5,245,690
-                // These were also SEQUENTIAL arrays of size 42 (64-22).
-                
-                EXT_OFFSET = t_old - 22;
-                
-                EXT_BARS = 5245690;
-                EXT_SUB  = EXT_BARS + 42;
-                EXT_HUM  = EXT_SUB + 42;
-                EXT_SW   = EXT_HUM + 42;
-                EXT_HALF = EXT_SW + 42;
-                
-                mem[bars_ov_base + t_new]       = mem[EXT_BARS + EXT_OFFSET];
-                mem[subdiv_ov_base + t_new]     = mem[EXT_SUB + EXT_OFFSET];
-                mem[hum_ov_base + t_new]        = mem[EXT_HUM + EXT_OFFSET];
-                mem[swing_ov_base + t_new]      = mem[EXT_SW + EXT_OFFSET];
-                mem[half_speed_ov_base + t_new] = mem[EXT_HALF + EXT_OFFSET];
+                EXT_OFFSET = t_old - 22; EXT_BARS = 5245690; EXT_SUB = EXT_BARS + 42; EXT_HUM = EXT_SUB + 42; EXT_SW = EXT_HUM + 42; EXT_HALF = EXT_SW + 42;
+                mem[bars_ov_base + t_new] = mem[EXT_BARS + EXT_OFFSET]; mem[subdiv_ov_base + t_new] = mem[EXT_SUB + EXT_OFFSET]; mem[hum_ov_base + t_new] = mem[EXT_HUM + EXT_OFFSET]; mem[swing_ov_base + t_new] = mem[EXT_SW + EXT_OFFSET]; mem[half_speed_ov_base + t_new] = mem[EXT_HALF + EXT_OFFSET];
             );
-
-            // --- 3. GRID DATA (Velocity, Steps, Length) ---
-            src_vel = OLD_GRID_START + (t_old * vel_stride_tab);
-            src_grid = OLD_GRID_START + (64 * vel_stride_tab) + (t_old * vel_stride_tab);
-            src_len = OLD_GRID_START + (128 * vel_stride_tab) + (t_old * vel_stride_tab);
-            
-            dst_vel = vel_base + (t_new * vel_stride_tab);
-            dst_grid = grid_base + (t_new * vel_stride_tab);
-            dst_len = step_len_base + (t_new * vel_stride_tab);
-            
-            memcpy(dst_vel, src_vel, vel_stride_tab);
-            memcpy(dst_grid, src_grid, vel_stride_tab);
-            memcpy(dst_len, src_len, vel_stride_tab);
-            
+            src_vel = OLD_GRID_START + (t_old * vel_stride_tab); src_grid = OLD_GRID_START + (64 * vel_stride_tab) + (t_old * vel_stride_tab); src_len = OLD_GRID_START + (128 * vel_stride_tab) + (t_old * vel_stride_tab);
+            memcpy(vel_base + (t_new * vel_stride_tab), src_vel, vel_stride_tab); memcpy(grid_base + (t_new * vel_stride_tab), src_grid, vel_stride_tab); memcpy(step_len_base + (t_new * vel_stride_tab), src_len, vel_stride_tab);
             t_old += 1;
         );
-        
-        scan_all_tabs();
-        
-    ) : (loaded_ver >= NEW_MAGIC_VER) ? (
-        // Normal Load (High Memory)
+
+    ) : (loaded_ver == OLD_NEW_VER) ? (
+        // --- PATH B: Intermediate Development Version (Full Dump) ---
         file_mem(0, 0, state_len);
-        i=0; loop(MAX_ROWS, file_string(0, row_name_str_base + i * str_size); i+=1;);
-        
+        i=0; loop(MAX_ROWS, file_string(0, row_name_str_base + i); i+=1;);
         t=0; loop(TOTAL_TABS,
-            file_var(0, val); mem[bars_ov_base + t] = val;
-            file_var(0, val); mem[subdiv_ov_base + t] = val;
-            file_var(0, val); mem[hum_ov_base + t] = val;
-            file_var(0, val); mem[swing_ov_base + t] = val;
-            file_var(0, val); mem[half_speed_ov_base + t] = val;
+            file_var(0, v1); mem[bars_ov_base + t] = v1;
+            file_var(0, v2); mem[subdiv_ov_base + t] = v2;
+            file_var(0, v3); mem[hum_ov_base + t] = v3;
+            file_var(0, v4); mem[swing_ov_base + t] = v4;
+            file_var(0, v5); mem[half_speed_ov_base + t] = v5;
             t+=1;
         );
-        
         file_mem(0, vel_base, TOTAL_TABS * vel_stride_tab);
         file_mem(0, grid_base, TOTAL_TABS * vel_stride_tab);
         file_mem(0, step_len_base, TOTAL_TABS * vel_stride_tab);
-        file_avail(0) >= 0 ? ( scan_all_tabs(); );
+
+    ) : (loaded_ver >= 27050) ? (
+        // --- PATH C: MODERN SPARSE FORMAT ---
+        memset(vel_base, 0, TOTAL_TABS * vel_stride_tab);
+        memset(grid_base, 0, TOTAL_TABS * vel_stride_tab);
+        memset(step_len_base, 0, TOTAL_TABS * vel_stride_tab);
+        t_rst = 0; loop(TOTAL_TABS,
+            mem[bars_ov_base + t_rst] = 0; mem[subdiv_ov_base + t_rst] = -1; 
+            mem[hum_ov_base + t_rst] = -1; mem[swing_ov_base + t_rst] = -1;
+            mem[half_speed_ov_base + t_rst] = 0; mem[tab_mute_base + t_rst] = 0;
+            t_rst += 1;
+        );
+
+        file_mem(0, ui_base, ui_header_size);
+        file_mem(0, row_mute_base, row_settings_size);
+        // FIXED: Load into Safe Zone 512
+        i=0; loop(MAX_ROWS, file_string(0, row_name_str_base + i); i+=1;);
+        
+        cont_load = 1;
+        while(cont_load) (
+            file_var(0, t_idx);
+            (t_idx == -1) ? ( cont_load = 0; ) : (
+                file_var(0, v1); mem[bars_ov_base+t_idx]=v1; 
+                file_var(0, v2); mem[subdiv_ov_base+t_idx]=v2;
+                file_var(0, v3); mem[hum_ov_base+t_idx]=v3; 
+                file_var(0, v4); mem[swing_ov_base+t_idx]=v4;
+                file_var(0, v5); mem[half_speed_ov_base+t_idx]=v5;
+                
+                // Mute logic: Handled for both 27050 (Morning) and 27060 (Newest)
+                file_var(0, v_mt); mem[tab_mute_base+t_idx]=v_mt;
+
+                file_mem(0, vel_base + t_idx*vel_stride_tab, vel_stride_tab);
+                file_mem(0, grid_base + t_idx*vel_stride_tab, vel_stride_tab);
+                file_mem(0, step_len_base + t_idx*vel_stride_tab, vel_stride_tab);
+            );
+        );
+        file_var(0, requested_start_bar);
+        file_var(0, rec_cues_active);
     );
     
-    // RESTORE ID
+    scan_all_tabs();
     slider5 = preserved_id;
+    last_kit_idx = slider10;
+    last_reported_id = slider5;
+    needs_tab_update = 1;
+    last_raw_target = -99; 
     
 ) : (
-    // SAVING
-    file_var(0, NEW_MAGIC_VER);
-    file_mem(0, 0, state_len);
-    i=0; loop(MAX_ROWS, file_string(0, row_name_str_base + i * str_size); i+=1;);
+    // =========================================================
+    // SAVING SECTION
+    // =========================================================
+    file_var(0, NEW_MAGIC_VER); // 27060
+    
+    file_mem(0, ui_base, ui_header_size);
+    file_mem(0, row_mute_base, row_settings_size);
+    // FIXED: Save from Safe Zone 512+
+    i=0; loop(MAX_ROWS, file_string(0, row_name_str_base + i); i+=1;);
     
     t=0; loop(TOTAL_TABS,
-        val = mem[bars_ov_base + t]; file_var(0, val);
-        val = mem[subdiv_ov_base + t]; file_var(0, val);
-        val = mem[hum_ov_base + t]; file_var(0, val);
-        val = mem[swing_ov_base + t]; file_var(0, val);
-        val = mem[half_speed_ov_base + t]; file_var(0, val);
-        t+=1;
+        mem[LOC_TAB_POPULATED + t] ? (
+            file_var(0, t); 
+            file_var(0, mem[bars_ov_base+t]); 
+            file_var(0, mem[subdiv_ov_base+t]);
+            file_var(0, mem[hum_ov_base+t]); 
+            file_var(0, mem[swing_ov_base+t]);
+            file_var(0, mem[half_speed_ov_base+t]);
+            file_var(0, mem[tab_mute_base+t]); 
+            file_mem(0, vel_base + t*vel_stride_tab, vel_stride_tab);
+            file_mem(0, grid_base + t*vel_stride_tab, vel_stride_tab);
+            file_mem(0, step_len_base + t*vel_stride_tab, vel_stride_tab);
+        );
+        t += 1;
     );
-    
-    file_mem(0, vel_base, TOTAL_TABS * vel_stride_tab);
-    file_mem(0, grid_base, TOTAL_TABS * vel_stride_tab);
-    file_mem(0, step_len_base, TOTAL_TABS * vel_stride_tab);
+    file_var(0, -1);
+    file_var(0, requested_start_bar);
+    last_kit_idx = slider10;
+    file_var(0, rec_cues_active);
 );
 
 @block
+
+// --- SEND QUEUED RECORDING NOTES ---
+midi_trigger_queued >= 0 ? (
+    // Send 128 samples (approx a 128th note) before the end of the block 
+    // to give Reaper time to "see" it before the bar line.
+    midisend(0, 0x9F, midi_trigger_queued | (127 << 8)); // Note On Ch 16
+    midisend(100, 0x8F, midi_trigger_queued);            // Note Off 100 samples later
+    midi_trigger_queued = -1; // Reset
+);
+
+
 (slider9 == 0) ? ( slider6 = gmem[1]; );
-(slider10 != last_kit_idx) ? (
+(init_gate < 100) ? (
+    // The first 100 blocks after a save, we just keep the tracker synced
+    last_kit_idx = slider10;
+    init_gate += 1;
+) : (slider10 != last_kit_idx) ? (
+    // Only allow loading after the "gate" is open
     load_kit_from_slider();
     last_kit_idx = slider10;
 );
@@ -1031,39 +1350,6 @@ mem[LOCAL_GROOVE_DB + 32] = max_gr;
 // 1. REPORT TYPE (I am Drums)
 (slider5 > 0) ? ( gmem[GMEM_TYPE_REPORT + slider5 - 1] = MY_TYPE_ID; );
 
-function get_tab_from_pc(pc_val) (
-    pc_val == 0 ? 0 : // Off
-    (pc_val >= 1 && pc_val <= 5) ? 27 + (pc_val - 1) : // 1-5 -> Tabs 27-31
-    (pc_val >= 6 && pc_val <= 10) ? 54 + (pc_val - 6) : // 6-10 -> Tabs 54-58
-    pc_val == 19 ? 53 : // Min
-    pc_val == 20 ? 21 : // H1
-    pc_val == 21 ? 22 : // H2
-    pc_val == 22 ? 48 : // H3
-    pc_val == 23 ? 49 : // H4
-    pc_val == 24 ? 0 : // Off
-    pc_val == 25 ? 26 : // Def
-    pc_val == 26 ? 23 : // F1<
-    pc_val == 27 ? 24 : // F1=
-    pc_val == 28 ? 25 : // F1>
-    pc_val == 29 ? 50 : // F2<
-    pc_val == 30 ? 51 : // F2=
-    pc_val == 31 ? 52 : // F2>
-    (pc_val >= 32 && pc_val <= 35) ? 1 + (pc_val - 32) : // Intro A-D -> 1-4
-    (pc_val >= 36 && pc_val <= 39) ? 5 + (pc_val - 36) : // Verse 1 A-D -> 5-8
-    (pc_val >= 40 && pc_val <= 43) ? 32 + (pc_val - 40) : // Verse 2 A-D -> 32-35
-    (pc_val >= 44 && pc_val <= 47) ? 59 + (pc_val - 44) : // Verse 3 A-D -> 59-62
-    (pc_val >= 48 && pc_val <= 51) ? 9 + (pc_val - 48) : // Pre 1 A-D -> 9-12
-    (pc_val >= 52 && pc_val <= 55) ? 36 + (pc_val - 52) : // Pre 2 A-D -> 36-39
-    (pc_val >= 56 && pc_val <= 59) ? 63 + (pc_val - 56) : // Pre 3 A-D -> 63-66
-    (pc_val >= 60 && pc_val <= 63) ? 13 + (pc_val - 60) : // Chorus 1 A-D -> 13-16
-    (pc_val >= 64 && pc_val <= 67) ? 40 + (pc_val - 64) : // Chorus 2 A-D -> 40-43
-    (pc_val >= 68 && pc_val <= 71) ? 67 + (pc_val - 68) : // Chorus 3 A-D -> 67-70
-    (pc_val >= 72 && pc_val <= 75) ? 17 + (pc_val - 72) : // Bridge A-D -> 17-20
-    (pc_val >= 76 && pc_val <= 79) ? 44 + (pc_val - 76) : // Solo A-D -> 44-47
-    (pc_val >= 80 && pc_val <= 83) ? 71 + (pc_val - 80) : // Outro A-D -> 71-74
-    (pc_val >= 84 && pc_val <= 88) ? 75 + (pc_val - 84) : // Rsv -> 75-79
-    -2; // Unmapped
-);
 
 // --- A. MIDI INPUT & IMMEDIATE MAPPING ---
 while (midirecv(off, m1, m23)) (
@@ -1072,7 +1358,13 @@ while (midirecv(off, m1, m23)) (
     d1 = m23 & 0x7F; 
     d2 = (m23 >> 8) & 0x7F; 
     
-    midisend(off, m1, m23);
+    (ch == 16) ? (
+            zerois = 0
+            
+        ) : (
+            // --- PASS THROUGH EVERYTHING ELSE ---
+            midisend(off, m1, m23);
+        );
 
     (ch == 16) ? (
         (status == 0xB0 && d1 == 0) ? (
@@ -1087,35 +1379,11 @@ while (midirecv(off, m1, m23)) (
                 midi_cue_source = 2; // 2=PC
             );
         ) 
-        : (status == 0x90 && d2 > 0) ? (
+: (status == 0x90 && d2 > 0) ? (
             nn = d1;
-            trig_t = -2;
-            (nn >= 36 && nn <= 83) ? (
-                rel_note = nn - 36;
-                oct = floor(rel_note / 12); 
-                pitch = rel_note % 12;      
-                pitch == 0 ? ( trig_t = 1; ) : 
-                pitch == 2 ? ( trig_t = 4; ) : 
-                pitch == 4 ? ( trig_t = 7; ) : 
-                pitch == 5 ? ( trig_t = 10; ) : 
-                pitch == 7 ? ( trig_t = 13; ) : 
-                pitch == 9 ? ( trig_t = 16; ) : 
-                pitch == 11 ? ( trig_t = 29; ) : 
-                (oct < 2) ? (
-                    pitch == 1 ? ( trig_t = 19 + (oct*35); ) : 
-                    pitch == 3 ? ( trig_t = 20 + (oct*35); ) : 
-                    pitch == 6 ? ( trig_t = 21 + (oct*35); ) : 
-                    pitch == 8 ? ( trig_t = 22 + (oct*35); ) : 
-                    pitch == 10 ? ( trig_t = 23 + (oct*35); ) : 0; 
-                ) : (
-                    u_base = (oct==2) ? 24 : 59;
-                    pitch == 1 ? ( trig_t = u_base + 0; ) : 
-                    pitch == 3 ? ( trig_t = u_base + 1; ) : 
-                    pitch == 6 ? ( trig_t = u_base + 2; ) : 
-                    pitch == 8 ? ( trig_t = u_base + 3; ) : 
-                    pitch == 10 ? ( trig_t = u_base + 4; ) : 0; 
-                );
-            ) : ( nn == 24 ? trig_t = -1; ); 
+            // Map the Note Number (nn) directly to a Tab index (tr_t) 
+            // using your existing verified get_tab_from_pc logic.
+            trig_t = get_tab_from_pc(nn); 
             
             (trig_t != -2) ? (
                 midi_cue_tab = trig_t;
@@ -1232,19 +1500,47 @@ preview_trig ? (
     );
     mem[ui_last_step] = -1;
 );
+
+// --- START OF NEW OPTIMIZED CODE ---
+
 last_play_state = play_state;
 
-playing = (play_state & 1);
-t_pl = mem[ui_locked_tab] == -1 ? mem[ui_play_prog_tab] : mem[ui_locked_tab];
+// --- OPTIMIZED TAB RESOLUTION ---
+raw_target = (mem[ui_locked_tab] == -1) ? mem[ui_play_prog_tab] : mem[ui_locked_tab];
 
-playing && t_pl != 0 && t_pl != -1 ? (
-    sub_v = eff_sub(t_pl); bar_v = eff_bars(t_pl); swing_v = eff_swing(t_pl);
+(raw_target != last_raw_target || needs_tab_update) ? (
+    // Check if THIS specific cue/tab is muted by the user
+    is_tab_muted = mem[tab_mute_base + raw_target];
+    
+    is_tab_muted ? (
+        effective_play_tab = 0; // Force to "Off" tab
+    ) : (
+        effective_play_tab = get_active_fallback(raw_target);
+    );
+    
+    update_active_row_list(effective_play_tab);
+    last_raw_target = raw_target;
+    needs_tab_update = 0;
+);
+
+t_pl = effective_play_tab; // Use the cached, efficient result for playback
+playing = (play_state & 1);
+
+// --- START PLAYBACK ENGINE ---
+playing && t_pl > 0 ? (
+    sub_v = eff_sub(t_pl); 
+    bar_v = eff_bars(t_pl); 
+    swing_v = eff_swing(t_pl);
+    
     is_half = eff_half(t_pl);
     spd_m = is_half ? 0.5 : 1.0; 
     st_v = bar_v * sub_v; 
     p_l = (bar_v * 4) / spd_m;
+    
+    // Use the raw tab for sync logic, but the effective tab for data
     curr_tab = mem[ui_play_prog_tab]; 
     curr_off = mem[ui_play_offset];
+
     (pc_triggered || curr_tab != last_play_tab || curr_off != last_play_offset) ? (
         curr_off >= bar_v ? curr_off = 0;
         target_beat = (curr_off * 4) / spd_m; 
@@ -1256,6 +1552,9 @@ playing && t_pl != 0 && t_pl != -1 ? (
         last_play_offset = curr_off; 
         pc_triggered = 0;
     );
+
+// --- END OF NEW OPTIMIZED CODE ---
+
     samps_per_beat = (srate * 60) / tempo;
     block_dur_beats = samplesblock / samps_per_beat;
     start_b = beat_position + playback_shift;
@@ -1268,15 +1567,11 @@ playing && t_pl != 0 && t_pl != -1 ? (
     h_solo = 0; 
     s_solo_chk=0; 
     loop(MAX_ROWS, mem[row_solo_base+s_solo_chk]?h_solo=1; s_solo_chk+=1;);
-    (t_pl < 22) ? (
-        cur_vel_ptr = vel_base + t_pl*vel_stride_tab;
-        cur_grid_ptr = grid_base + t_pl*vel_stride_tab;
-        cur_len_ptr = step_len_base + t_pl*vel_stride_tab;
-    ) : (
-        cur_vel_ptr = vel_base + t_pl*vel_stride_tab;
-        cur_grid_ptr = grid_base + t_pl*vel_stride_tab;
-        cur_len_ptr = step_len_base + t_pl*vel_stride_tab;
-    );
+    
+    cur_vel_ptr = vel_base + t_pl*vel_stride_tab;
+    cur_grid_ptr = grid_base + t_pl*vel_stride_tab;
+    cur_len_ptr = step_len_base + t_pl*vel_stride_tab;
+
     s_idx_iter = start_step_idx;
     loop((end_step_idx - start_step_idx) + 1,
         step_grid_time = s_idx_iter / steps_per_beat_grid;
@@ -1294,8 +1589,10 @@ playing && t_pl != 0 && t_pl != -1 ? (
         groove_slot = clamp(groove_slot, 0, 31);
         groove_val = mem[LOCAL_GROOVE_DB + groove_slot]; 
         groove_offset_beats = (groove_val * 0.125) * scan_rate;
-        r_p = 0;
-        loop(MAX_ROWS,
+    active_idx_ptr = 0;
+    loop(active_row_count,
+    r_p = mem[active_row_list + active_idx_ptr];
+    active_idx_ptr += 1;
             p_me = h_solo ? mem[row_solo_base+r_p] : (mem[row_mute_base+r_p] == 0);
             p_me ? (
                row_data_idx = r_p*vel_stride_row + p_step;
@@ -1331,7 +1628,6 @@ playing && t_pl != 0 && t_pl != -1 ? (
                    );
                );
             );
-            r_p += 1;
         );
         s_idx_iter += 1;
     );
@@ -1472,17 +1768,20 @@ p_rmb = l_rmb;
 p_mx = l_mx; 
 p_my = l_my; 
 
-(p_mb == 1 && mb == 0 && !color_popup_active) ? ( scan_active_tab(); );
+(p_mb == 1 && mb == 0 && !color_popup_active) ? ( 
+
+    scan_active_tab(); 
+    needs_tab_update = 1; // <--- Instantly alerts the audio engine that the grid changed
+
+);
 
 (!mb && !rmb) ? (
-  capture_id = 0;          
-  capture_slider_idx = 0;  
-  len_drag_active = 0; 
-  row_drag_active = 0; 
-  drag_mode = 0; 
-  last_drag_idx = -1; 
-  drag_accum_gen = 0; 
-  drag_lock_row = -1; 
+    capture_id = 0;          
+    paint_state = 0; 
+    last_paint_idx = -1; 
+    drag_accum_gen = 0; 
+    drag_lock_row = -1; 
+    drag_mode = 0; 
 );
 
 l_mb = mb;
@@ -1505,7 +1804,7 @@ FOLLOW_LBL_X=UI_TOP_X; FOLLOW_LBL_W=55;
 FOLLOW_BOX_X=UI_TOP_X + 60; FOLLOW_BOX_W=20; FOLLOW_BOX_H=16;
 
 BTN_H=20; BTN_Y=ROW2_Y; BTN_X0=UI_TOP_X + 120;
-BTN_W_COPY=109; BTN_W_PASTE=114; BTN_W_CLEAR=114; BTN_GAP=10;
+BTN_W_ACCEPT=169;  BTN_W_COPY=109; BTN_W_PASTE=114; BTN_W_CLEAR=114; BTN_GAP=10;
 
 PAT_LBL_W=190; PAT_BOX_H=20; PAT_BOX_W=120; PAT_BOX_GAP=70;
 HIT_PAD_L=2; HIT_PAD_R=2;
@@ -1530,7 +1829,7 @@ function btn(x,y,w,txt) (
     (mb && p_mb == 0 && mx>=x && mx<x+w && my>=y && my<y+BTN_H);
 );
 
-(mb && capture_id != 0 && capture_id != 9999 && capture_id != 12 && capture_id != 13 && capture_id != 12012 && capture_id != 42424 && capture_id != 88888 && capture_id != 77777 && capture_id != 11111) ? (
+(mb && capture_id != 0 && capture_id != 9999 && capture_id != 12 && capture_id != 13 && capture_id != 12012 && capture_id != 42424 && capture_id != 99999 && capture_id != 88888 && capture_id != 77777 && capture_id != 11111 && capture_id != 2000) ? (
     drag_sens = (capture_max - capture_min) > 60 ? 1.0 : 5.0;
     capture_mode == 2 ? drag_sens = 5.0;
     drag_accum_gen += (mx - p_mx);
@@ -1621,30 +1920,81 @@ x1 += GW_INST_W + UI_GAP_X;
 btn(x1+22, row1_y+4, 85, "RELOAD KIT") ? ( load_kit_from_slider(); ); 
 btn(x1+314, row1_y+4, 18, "?") ? ( help_active = !help_active; );
 
+
+
+
+
+
+
 // --- N2N IO BUTTONS ---
 io_x = x1 + 112; gap = 33;
-btn(io_x, row1_y+4, 27, "<") ? ( gfx_set(1,0,0,1); import_n2n_data(0); ); // Import Single
-btn(io_x+gap, row1_y+4, 27, "<") ? ( gfx_set(1,0,0,1); import_n2n_data(1); ); // Import Bank
-btn(io_x+gap*2, row1_y+4, 29, "   >") ? ( gfx_set(1,0,0,1); export_n2n_data(1); ); // Export Bank
-btn(io_x+gap*3+1, row1_y+4, 30, "   >") ? ( gfx_set(1,0,0,1); export_n2n_data(0); ); // Export Single
-rect(io_x+9, row1_y + 13, 13, 1, 1, 1, 1, 1);
-rect(io_x+44, row1_y + 12, 12, 1, 1, 1, 1, 1);
-rect(io_x+44, row1_y + 14, 12, 1, 1, 1, 1, 1);
-rect(io_x+73, row1_y + 12, 12, 1, 1, 1, 1, 1);
-rect(io_x+73, row1_y + 14, 12, 1, 1, 1, 1, 1);
-rect(io_x+107, row1_y + 13, 13, 1, 1, 1, 1, 1);
+//btn(io_x, row1_y+4, 27, "<") ? ( gfx_set(1,0,0,1); import_n2n_data(0); ); // Import Single
+//btn(io_x+gap, row1_y+4, 27, "<") ? ( gfx_set(1,0,0,1); import_n2n_data(1); ); // Import Bank
+//btn(io_x+gap*2, row1_y+4, 29, "   >") ? ( gfx_set(1,0,0,1); export_n2n_data(1); ); // Export Bank
+//btn(io_x+gap*3+1, row1_y+4, 30, "   >") ? ( gfx_set(1,0,0,1); export_n2n_data(0); ); // Export Single
+//rect(io_x+9, row1_y + 13, 13, 1, 1, 1, 1, 1);
+//rect(io_x+44, row1_y + 12, 12, 1, 1, 1, 1, 1);
+//rect(io_x+44, row1_y + 14, 12, 1, 1, 1, 1, 1);
+//rect(io_x+73, row1_y + 12, 12, 1, 1, 1, 1, 1);
+//rect(io_x+73, row1_y + 14, 12, 1, 1, 1, 1, 1);
+//rect(io_x+107, row1_y + 13, 13, 1, 1, 1, 1, 1);
 
+
+ 
 gfx_setfont(0);       
 x1 = x1 - xfix;
 //rect(0, 37, gfx_w, 1, 0.25, 0.25, 0.25, 1);
 row2_y = ROW2_Y; 
+
+
+
+
+
+
+gfx_setfont(1, "Arial", fontsize, 'b');
+
+// --- REC CUES TOGGLE ---
+rec_x = 64; // Left edge of the UI
+rec_y = row2_y; 
+rect(rec_x+1, rec_y+1, 52, 26, 0.2, 0.2, 0.2, 1);
+
+
+// Red background if active, gray if not
+rec_cues_active ? (
+    rect(rec_x+1, rec_y+1, 52, 26, 0.8, 0, 0, 1);
+    draw_text(rec_x+12, rec_y+1, " REC\nCUES", 1, 1, 1);
+) : (
+    draw_text(rec_x+12, rec_y+1, " REC\nCUES", 0.8, 0.8, 0.8);
+);
+
+rec_hit = (mx >= rec_x && mx < rec_x + 45 && my >= rec_y && my < rec_y + 16);
+
+(mb && p_mb == 0 && rec_hit) ? (
+    rec_cues_active = !rec_cues_active;
+    
+    rec_cues_active ? (
+        // When REC turns ON: Force Follow Mode
+        mem[ui_locked_tab] = -1; 
+        gmem[GM_BASE+1] = -1;
+        gmem[GMEM_REC_FLAG_ADDR] = 1;
+    ) : (
+        // When REC turns OFF: Stop REC flag, and Force FOLLOW mode
+        gmem[GMEM_REC_FLAG_ADDR] = 0;
+        mem[ui_locked_tab] = -1; 
+        gmem[GM_BASE+1] = -1;
+    );
+    needs_tab_update = 1;
+);
+
+movedownbit = 15;
+row2_y = row2_y+=movedownbit;
 
 mem[ui_locked_tab] == -1 ? mem[ui_edit_tab] = mem[ui_play_prog_tab]; 
 is_follow = (mem[ui_locked_tab] == -1);
 gfx_setfont(1, "Arial", fontsize, 'b'); 
 draw_text(FOLLOW_LBL_X+5, row2_y+20, "FOLLOW\n   MIDI\n  CUES:", 0.8,0.8,0.8); 
 
-gfx_circle(FOLLOW_BOX_X+21, row2_y+36, 7, 0); // Outer
+gfx_circle(FOLLOW_BOX_X+21, row2_y+46, 7, 0); // Outer
 gfx_circle(FOLLOW_BOX_X+21, row2_y+36, 6.5, 0); // Middle
 gfx_circle(FOLLOW_BOX_X+21, row2_y+36, 6, 0); // Middle
 gfx_circle(FOLLOW_BOX_X+21, row2_y+36, 5.5, 0); // Middle
@@ -1654,10 +2004,16 @@ gfx_setfont(1, "Arial", 21, 'b');
 is_follow ? draw_text(FOLLOW_BOX_X+15, row2_y+36, "X", 0,1,0);
 is_follow ? rect(FOLLOW_BOX_X+11, row2_y+37, FOLLOW_BOX_W+1, FOLLOW_BOX_H,0.2*bri,  1.0*bri,  1.0*bri, 1);
 gfx_setfont(1, "Arial", fontsize, 'b'); 
-(mb && p_mb == 0 && mx>=FOLLOW_BOX_X-100 && mx<FOLLOW_BOX_X+FOLLOW_BOX_W+12 && my>=row2_y-37 && my<row2_y+38+FOLLOW_BOX_H) ? ( 
-    mem[ui_locked_tab] == -1 ? mem[ui_locked_tab] = 26 : mem[ui_locked_tab] = -1; 
-    gmem[GM_BASE+1] = mem[ui_locked_tab]; 
+(mb && p_mb == 0 && !rec_hit && mx>=FOLLOW_BOX_X && mx<FOLLOW_BOX_X+FOLLOW_BOX_W+20 && my>=row2_y+25 && my<row2_y+45+FOLLOW_BOX_H+4) ? (
+    rec_cues_active == 0 ? ( // ONLY ALLOW CLICKS IF REC CUES IS OFF
+        mem[ui_locked_tab] == -1 ? mem[ui_locked_tab] = 26 : mem[ui_locked_tab] = -1; 
+        gmem[GM_BASE+1] = mem[ui_locked_tab]; 
+        needs_tab_update = 1;
+    );
 );
+
+row2_y = row2_y-=movedownbit;
+
 
 // =========================================================
 // RE-ORDERED: TABS NOW DRAW FIRST (At Top)
@@ -1685,41 +2041,77 @@ loop(TOTAL_TABS,
         gfx_setfont(1, "Arial", fontsize, 'b'); 
         is_ed ? ( draw_text(tx+5, ty+5, #tn, 0, 0, 0); ) : ( draw_text(tx+5, ty+4, #tn, 1, 1, 1); );
         gfx_setfont(0);  
-        (mb && p_mb == 0 && mx>=tx && mx<tx+tw-24 && my>=ty && my<ty+26) ? ( 
-            (time_precise() - last_tab_clk < 0.3 && last_tab_idx == gui_t) ? (
-                mem[ui_locked_tab] = gui_t; 
-                mem[ui_edit_tab] = gui_t;   
-                gmem[GM_BASE+1] = mem[ui_locked_tab]; 
-                last_tab_clk = 0; 
-            ) : (
-                mem[ui_locked_tab] != -1 ? (
-                    mem[ui_edit_tab] = gui_t; 
-                    mem[ui_play_offset] = 0; 
-                    playback_shift = 0; 
-                );
-                mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
-                last_tab_clk = time_precise(); 
-                last_tab_idx = gui_t;
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+(mb && p_mb == 0 && mx>=tx && mx<tx+tw-24 && my>=ty && my<ty+26) ? ( 
+    rec_cues_active ? (
+        // 1. REC CUES ON: Single click CUES the tab. Double clicks do nothing. No selecting.
+        send_tab_trigger(gui_t);
+        mem[tab_flash_base + gui_t] = 10;
+        mem[row_flash_base + 0] = 5; 
+    ) : (
+        // 2. REC CUES OFF: Normal Behavior (Select/Double-Click Lock)
+        (time_precise() - last_tab_clk < 0.3 && last_tab_idx == gui_t) ? (
+            mem[ui_locked_tab] = gui_t; 
+            mem[ui_edit_tab] = gui_t;   
+            gmem[GM_BASE+1] = mem[ui_locked_tab]; 
+            last_tab_clk = 0; 
+        ) : (
+            mem[ui_locked_tab] != -1 ? (
+                mem[ui_edit_tab] = gui_t; 
+                mem[ui_play_offset] = 0; 
+                playback_shift = 0; 
             );
-        );
-        
-        gfx_set(0.0, 0.0, 0.0, 1); 
-        gfx_circle(tx+tw-17, ly=ty+8, 6, 0); 
-        gfx_circle(tx+tw-17, ly=ty+8, 5, 0); 
-        gfx_circle(tx+tw-17, ly=ty+8, 4, 0); 
-        
-        lx=tx+tw-25; ly=ty+9; lw=17; lh=14;   
-        rect(lx,ly,lw,lh, 0.1,0.1,0.1,1); 
-        (mb && p_mb == 0 && mx>=lx && mx<lx+lw && my>=ly && my<ly+lh) ? ( 
-            mem[ui_locked_tab]=(mem[ui_locked_tab]==gui_t?-1:gui_t); 
-            gmem[GM_BASE+1]=mem[ui_locked_tab]; 
-            mem[ui_play_offset] = 0; 
-            playback_shift = 0; 
-        );
-        (rmb && !p_rmb && mx>=lx && mx<lx+lw && my>=ly && my<ly+lh) ? ( 
-            mem[ui_edit_tab] = gui_t; 
             mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
+            last_tab_clk = time_precise(); 
+            last_tab_idx = gui_t;
+            needs_tab_update = 1;
         );
+    );
+);
+
+gfx_set(0.0, 0.0, 0.0, 1); 
+gfx_circle(tx+tw-17, ly=ty+8, 6, 0); 
+gfx_circle(tx+tw-17, ly=ty+8, 5, 0); 
+gfx_circle(tx+tw-17, ly=ty+8, 4, 0); 
+
+lx=tx+tw-25; ly=ty+9; lw=17; lh=14;   
+rect(lx,ly,lw,lh, 0.1,0.1,0.1,1); 
+
+(mb && p_mb == 0 && mx>=lx-3 && mx<lx+lw+3 && my>=ly-2 && my<ly+lh+2) ? ( 
+    rec_cues_active == 0 ? (
+        mem[ui_locked_tab]=(mem[ui_locked_tab]==gui_t?-1:gui_t); 
+        gmem[GM_BASE+1]=mem[ui_locked_tab]; 
+        mem[ui_play_offset] = 0; 
+        playback_shift = 0; 
+        needs_tab_update = 1;
+    );
+);
+
+(rmb && !p_rmb && mx>=lx-3 && mx<lx+lw+3 && my>=ly-2 && my<ly+lh+2) ? ( 
+    rec_cues_active == 0 ? (
+        mem[ui_edit_tab] = gui_t; 
+        mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
+    );
+);
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         
         mem[ui_locked_tab] == gui_t ? rect(lx+1,ly+2,lw-2,lh-3, 0.3,.9,.7,1);  
         (mem[ui_play_prog_tab] == gui_t) ? (gfx_set(1,.5 ,0,1); gfx_circle(tx+tw-17, ty+16, 4, 1);); 
@@ -1729,7 +2121,15 @@ loop(TOTAL_TABS,
             gfx_rect(tx-1, ty-2, 41, 4);
             gfx_rect(tx-1, ty+23, 21, 4);
         );
+        f_amt = mem[tab_flash_base + gui_t];
+        f_amt > 0 ? (
+            // Draw a bright white overlay if flashing
+            rect(tx, ty, tw-5, 26, 1, 1, 1, f_amt/10); 
+            mem[tab_flash_base + gui_t] -= 1; // Count down the timer
+        );
+        
         tx+=tw;
+        
     );
     gui_t+=1;
 ); 
@@ -1757,41 +2157,76 @@ loop(TOTAL_TABS,
         is_ed ? ( draw_text(tx+5, ty+5, #tn, 0, 0, 0); ) : ( draw_text(tx+5, ty+4, #tn, 1, 1, 1); );
         gfx_setfont(0);    
         
-        (mb && p_mb == 0 && mx>=tx && mx<tx+tw-24 && my>=ty && my<ty+26) ? ( 
-            (time_precise() - last_tab_clk < 0.3 && last_tab_idx == gui_t) ? (
-                mem[ui_locked_tab] = gui_t; 
-                mem[ui_edit_tab] = gui_t;   
-                gmem[GM_BASE+1] = mem[ui_locked_tab]; 
-                last_tab_clk = 0; 
-            ) : (
-                mem[ui_locked_tab] != -1 ? (
-                    mem[ui_edit_tab] = gui_t; 
-                    mem[ui_play_offset] = 0; 
-                    playback_shift = 0; 
-                );
-                mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
-                last_tab_clk = time_precise(); 
-                last_tab_idx = gui_t;
-            );
-        );
-
-        gfx_set(0.0, 0.0, 0.0, 1); 
-        gfx_circle(tx+tw-17, ly=ty+8, 6, 0); 
-        gfx_circle(tx+tw-17, ly=ty+8, 5, 0); 
-        gfx_circle(tx+tw-17, ly=ty+8, 4, 0); 
         
-        lx=tx+tw-25; ly=ty+9; lw=17; lh=14;   
-        rect(lx,ly,lw,lh, 0.1,0.1,0.1,1); 
-        (mb && p_mb == 0 && mx>=lx && mx<lx+lw && my>=ly && my<ly+lh) ? ( 
-            mem[ui_locked_tab]=(mem[ui_locked_tab]==gui_t?-1:gui_t); 
-            gmem[GM_BASE+1]=mem[ui_locked_tab]; 
-            mem[ui_play_offset] = 0; 
-            playback_shift = 0;  
-        );
-        (rmb && !p_rmb && mx>=lx && mx<lx+lw && my>=ly && my<ly+lh) ? ( 
-            mem[ui_edit_tab] = gui_t; 
+        
+        
+        
+        
+        
+(mb && p_mb == 0 && mx>=tx && mx<tx+tw-24 && my>=ty && my<ty+26) ? ( 
+    rec_cues_active ? (
+        // 1. REC CUES ON: Single click CUES the tab. Double clicks do nothing. No selecting.
+        send_tab_trigger(gui_t);
+        mem[tab_flash_base + gui_t] = 10;
+        mem[row_flash_base + 0] = 5; 
+    ) : (
+        // 2. REC CUES OFF: Normal Behavior (Select/Double-Click Lock)
+        (time_precise() - last_tab_clk < 0.3 && last_tab_idx == gui_t) ? (
+            mem[ui_locked_tab] = gui_t; 
+            mem[ui_edit_tab] = gui_t;   
+            gmem[GM_BASE+1] = mem[ui_locked_tab]; 
+            last_tab_clk = 0; 
+        ) : (
+            mem[ui_locked_tab] != -1 ? (
+                mem[ui_edit_tab] = gui_t; 
+                mem[ui_play_offset] = 0; 
+                playback_shift = 0; 
+            );
             mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
+            last_tab_clk = time_precise(); 
+            last_tab_idx = gui_t;
+            needs_tab_update = 1;
         );
+    );
+);
+
+gfx_set(0.0, 0.0, 0.0, 1); 
+gfx_circle(tx+tw-17, ly=ty+8, 6, 0); 
+gfx_circle(tx+tw-17, ly=ty+8, 5, 0); 
+gfx_circle(tx+tw-17, ly=ty+8, 4, 0); 
+
+lx=tx+tw-25; ly=ty+9; lw=17; lh=14;   
+rect(lx,ly,lw,lh, 0.1,0.1,0.1,1); 
+
+(mb && p_mb == 0 && mx>=lx && mx<lx+lw && my>=ly && my<ly+lh) ? ( 
+    rec_cues_active == 0 ? ( // NO LOCKING IF REC CUES IS ON
+        mem[ui_locked_tab]=(mem[ui_locked_tab]==gui_t?-1:gui_t); 
+        gmem[GM_BASE+1]=mem[ui_locked_tab]; 
+        mem[ui_play_offset] = 0; 
+        playback_shift = 0; 
+        needs_tab_update = 1;
+    );
+);
+
+(rmb && !p_rmb && mx>=lx && mx<lx+lw && my>=ly && my<ly+lh) ? ( 
+    rec_cues_active == 0 ? ( // NO LOCKING IF REC CUES IS ON
+        mem[ui_edit_tab] = gui_t; 
+        mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
+    );
+);
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         mem[ui_locked_tab] == gui_t ? rect(lx+1,ly+2,lw-2,lh-3, 0.3,.9,.7,1);   
         (mem[ui_play_prog_tab] == gui_t) ? (gfx_set(1,.5 ,0,1); gfx_circle(tx+tw-17, ty+16, 4, 1););  
         mem[LOC_TAB_POPULATED + gui_t] ? (
@@ -1799,6 +2234,12 @@ loop(TOTAL_TABS,
             gfx_rect(tx-1, ty-1, 4, 24);
             gfx_rect(tx-1, ty-2, 41, 4);
             gfx_rect(tx-1, ty+23, 21, 4);
+        );
+        f_amt = mem[tab_flash_base + gui_t];
+        f_amt > 0 ? (
+            // Draw a bright white overlay if flashing
+            rect(tx, ty, tw-5, 26, 1, 1, 1, f_amt/10); 
+            mem[tab_flash_base + gui_t] -= 1; // Count down the timer
         );
         tx+=tw;
     );
@@ -1828,41 +2269,69 @@ loop(TOTAL_TABS,
         is_ed ? ( draw_text(tx+5, ty+5, #tn, 0, 0, 0); ) : ( draw_text(tx+5, ty+4, #tn, 1, 1, 1); );
         gfx_setfont(0);    
         
-        (mb && p_mb == 0 && mx>=tx && mx<tx+tw-24 && my>=ty && my<ty+26) ? ( 
-            (time_precise() - last_tab_clk < 0.3 && last_tab_idx == gui_t) ? (
-                mem[ui_locked_tab] = gui_t; 
-                mem[ui_edit_tab] = gui_t;   
-                gmem[GM_BASE+1] = mem[ui_locked_tab]; 
-                last_tab_clk = 0; 
-            ) : (
-                mem[ui_locked_tab] != -1 ? (
-                    mem[ui_edit_tab] = gui_t; 
-                    mem[ui_play_offset] = 0; 
-                    playback_shift = 0; 
-                );
-                mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
-                last_tab_clk = time_precise(); 
-                last_tab_idx = gui_t;
-            );
-        );
-
-        gfx_set(0.0, 0.0, 0.0, 1); 
-        gfx_circle(tx+tw-17, ly=ty+8, 6, 0); 
-        gfx_circle(tx+tw-17, ly=ty+8, 5, 0); 
-        gfx_circle(tx+tw-17, ly=ty+8, 4, 0); 
         
-        lx=tx+tw-25; ly=ty+9; lw=17; lh=14;   
-        rect(lx,ly,lw,lh, 0.1,0.1,0.1,1); 
-        (mb && p_mb == 0 && mx>=lx && mx<lx+lw && my>=ly && my<ly+lh) ? ( 
-            mem[ui_locked_tab]=(mem[ui_locked_tab]==gui_t?-1:gui_t); 
-            gmem[GM_BASE+1]=mem[ui_locked_tab]; 
-            mem[ui_play_offset] = 0; 
-            playback_shift = 0;  
-        );
-        (rmb && !p_rmb && mx>=lx && mx<lx+lw && my>=ly && my<ly+lh) ? ( 
-            mem[ui_edit_tab] = gui_t; 
+        
+        
+        
+        
+(mb && p_mb == 0 && mx>=tx && mx<tx+tw-24 && my>=ty && my<ty+26) ? ( 
+    rec_cues_active ? (
+        // 1. REC CUES ON: Single click CUES the tab. Double clicks do nothing. No selecting.
+        send_tab_trigger(gui_t);
+        mem[tab_flash_base + gui_t] = 10;
+        mem[row_flash_base + 0] = 5; 
+    ) : (
+        // 2. REC CUES OFF: Normal Behavior (Select/Double-Click Lock)
+        (time_precise() - last_tab_clk < 0.3 && last_tab_idx == gui_t) ? (
+            mem[ui_locked_tab] = gui_t; 
+            mem[ui_edit_tab] = gui_t;   
+            gmem[GM_BASE+1] = mem[ui_locked_tab]; 
+            last_tab_clk = 0; 
+        ) : (
+            mem[ui_locked_tab] != -1 ? (
+                mem[ui_edit_tab] = gui_t; 
+                mem[ui_play_offset] = 0; 
+                playback_shift = 0; 
+            );
             mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
+            last_tab_clk = time_precise(); 
+            last_tab_idx = gui_t;
+            needs_tab_update = 1;
         );
+    );
+);
+
+gfx_set(0.0, 0.0, 0.0, 1); 
+gfx_circle(tx+tw-17, ly=ty+8, 6, 0); 
+gfx_circle(tx+tw-17, ly=ty+8, 5, 0); 
+gfx_circle(tx+tw-17, ly=ty+8, 4, 0); 
+
+lx=tx+tw-25; ly=ty+9; lw=17; lh=14;   
+rect(lx,ly,lw,lh, 0.1,0.1,0.1,1); 
+
+(mb && p_mb == 0 && mx>=lx && mx<lx+lw && my>=ly && my<ly+lh) ? ( 
+    rec_cues_active == 0 ? ( // NO LOCKING IF REC CUES IS ON
+        mem[ui_locked_tab]=(mem[ui_locked_tab]==gui_t?-1:gui_t); 
+        gmem[GM_BASE+1]=mem[ui_locked_tab]; 
+        mem[ui_play_offset] = 0; 
+        playback_shift = 0; 
+        needs_tab_update = 1;
+    );
+);
+
+(rmb && !p_rmb && mx>=lx && mx<lx+lw && my>=ly && my<ly+lh) ? ( 
+    rec_cues_active == 0 ? ( // NO LOCKING IF REC CUES IS ON
+        mem[ui_edit_tab] = gui_t; 
+        mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
+    );
+);
+        
+        
+        
+        
+        
+        
+        
         mem[ui_locked_tab] == gui_t ? rect(lx+1,ly+2,lw-2,lh-3, 0.3,.9,.7,1);   
         (mem[ui_play_prog_tab] == gui_t) ? (gfx_set(1,.5 ,0,1); gfx_circle(tx+tw-17, ty+16, 4, 1););  
         mem[LOC_TAB_POPULATED + gui_t] ? (
@@ -1870,6 +2339,12 @@ loop(TOTAL_TABS,
             gfx_rect(tx-1, ty-1, 4, 24);
             gfx_rect(tx-1, ty-2, 41, 4);
             gfx_rect(tx-1, ty+23, 21, 4);
+        );
+        f_amt = mem[tab_flash_base + gui_t];
+        f_amt > 0 ? (
+            // Draw a bright white overlay if flashing
+            rect(tx, ty, tw-5, 26, 1, 1, 1, f_amt/10); 
+            mem[tab_flash_base + gui_t] -= 1; // Count down the timer
         );
         tx+=tw;
     );
@@ -1891,19 +2366,48 @@ t_e = mem[ui_edit_tab];
     gfx_drawstr("PATTERN OFF");
     gfx_setfont(1, "Arial", 18, 'b');
 ) : (
-    // Unified pointers for edit tab
+    // Unified pointers for edit tab (Corrected: using sequential memory arrays for all 80 tabs)
     curr_pat_v_ptr = vel_base + t_e*vel_stride_tab; 
     curr_pat_g_ptr = grid_base + t_e*vel_stride_tab; 
     curr_pat_l_ptr = step_len_base + t_e*vel_stride_tab; 
+    
+    // --- SET UP GHOST / FALLBACK POINTERS ---
+    fb_tab = get_active_fallback(t_e);
+    is_ghosting = (t_e != fb_tab);
+    
+    fb_pat_v_ptr = vel_base + fb_tab*vel_stride_tab; 
+    fb_pat_g_ptr = grid_base + fb_tab*vel_stride_tab; 
+    fb_pat_l_ptr = step_len_base + fb_tab*vel_stride_tab; 
 
     bx = BTN_X0;
-    extrascoot = 205;
+    extrascoot = 10;
+    gfx_setfont(1, "Arial", fontsize, 'b'); 
+    btn(bx-15+extrascoot, row2_y, BTN_W_ACCEPT+21, "  ACCEPT SUGGESTED PATTERN") ? ( 
+        is_ghosting ? (
+            // 1. Copy the Data
+            memcpy(curr_pat_v_ptr, fb_pat_v_ptr, vel_stride_tab);
+            memcpy(curr_pat_g_ptr, fb_pat_g_ptr, vel_stride_tab);
+            memcpy(curr_pat_l_ptr, fb_pat_l_ptr, vel_stride_tab);
+            
+            mem[tab_mute_base + t_e] = 0;
+            
+            // 2. Scan to alert Lua/Inventory that this pattern is now permanently written
+            scan_active_tab();
+            
+            // (Optional) Automatically update the 'is_ghosting' flag so the UI refreshes instantly
+            is_ghosting = 0; 
+            needs_tab_update = 1;
+        );
+    ); 
+
+    bx += BTN_W_ACCEPT + BTN_GAP+16;
     gfx_setfont(1, "Arial", fontsize, 'b'); 
     btn(bx-15+extrascoot, row2_y, BTN_W_COPY+21, "  COPY PATTERN") ? ( 
         memcpy(copy_tab_v_buf, curr_pat_v_ptr, vel_stride_tab); 
         memcpy(copy_tab_g_buf, curr_pat_g_ptr, vel_stride_tab); 
         memcpy(copy_tab_l_buf, curr_pat_l_ptr, vel_stride_tab);
         cp_valid = 1;
+        cp_mute = mem[tab_mute_base + t_e];
         cp_bars = eff_bars(mem[ui_edit_tab]);
         cp_sub = eff_sub(mem[ui_edit_tab]);
         cp_hum = eff_hum(mem[ui_edit_tab]);
@@ -1917,12 +2421,14 @@ t_e = mem[ui_edit_tab];
         memcpy(curr_pat_l_ptr, copy_tab_l_buf, vel_stride_tab); 
         cp_valid ? (
             act_t = mem[ui_edit_tab];
+            mem[tab_mute_base + act_t] = cp_mute;
             mem[bars_ov_base+act_t] = cp_bars;
             mem[subdiv_ov_base+act_t] = (cp_sub==8?0:cp_sub==12?1:cp_sub==16?2:cp_sub==24?3:4);
             mem[hum_ov_base+act_t] = cp_hum;
             mem[swing_ov_base+act_t] = cp_sw;
             mem[half_speed_ov_base+act_t] = cp_half;
-            scan_active_tab();    
+            scan_active_tab();
+            needs_tab_update = 1;
         );
     ); 
     bx += BTN_W_PASTE + BTN_GAP;
@@ -1930,20 +2436,22 @@ t_e = mem[ui_edit_tab];
         memset(curr_pat_g_ptr, 0, vel_stride_tab); 
         memset(curr_pat_v_ptr, 0, vel_stride_tab); 
         memset(curr_pat_l_ptr, 0, vel_stride_tab);
+        mem[tab_mute_base + t_e] = 0;
         scan_active_tab();
+        needs_tab_update = 1;
     ); 
     bx += BTN_W_CLEAR + BTN_GAP;
     pat_lbl_x = bx; 
     gfx_set(0.8,0.8,0.8,1); 
-    gfx_x = pat_lbl_x -482; 
-    gfx_y = row2_y + 1; 
-    gfx_drawstr("PATTERN SETTINGS:"); 
+    gfx_x = pat_lbl_x -679; 
+    gfx_y = row2_y -3; 
+    gfx_drawstr(" PATTERN\nSETTINGS:"); 
     pat_x = pat_lbl_x + PAT_LBL_W;
     pat_y = row2_y - 0; 
     box_w = PAT_BOX_W; 
     box_h = PAT_BOX_H; 
     gap_w = PAT_BOX_GAP;
-    bars_x = pat_x; 
+    bars_x = pat_x -195; 
     active_tab = mem[ui_edit_tab]; 
     
     // Unified Override Access
@@ -2050,7 +2558,7 @@ t_e = mem[ui_edit_tab];
         gfx_set(0,0,0,1); 
         gfx_line(hf_x-18, pat_y, hf_x-18, pat_y+box_h);
     );
-    btn(st_x-54, pat_y+1, 86, "  STRETCH") ? ( 
+    btn(1395, pat_y, 86, "  STRETCH") ? ( 
         gfx_x = st_x; 
         gfx_y = pat_y + 20;
         sel_stretch = gfx_showmenu("Stretch Pattern 2x (Short)|Stretch Pattern 2x (Long)|Stretch Pattern 4x (Short)|Stretch Pattern 4x (Long)||Stretch Selected Row 2x (Short)|Stretch Selected Row 2x (Long)|Stretch Selected Row 4x (Short)|Stretch Selected Row 4x (Long)");
@@ -2136,12 +2644,13 @@ t_e = mem[ui_edit_tab];
         get_d_name(mem[row_name_idx+sel_r], #dn_cur); 
     );
     set_ui_color(mem[row_color_base+sel_r]); 
-    gfx_x=65; 
-    gfx_y=ty-upser; 
+    gfx_x=65;
+    gfx_y=ty-upser;
     gfx_drawstr(#dn_cur);
-    (rmb && mx>=65 && mx<160 && my>=ty && my<ty+20) ? ( 
-        sel = gfx_showmenu(#name_menu); 
-        sel > 0 ? ( 
+    // FIX: Added p_rmb==0 and capture_id==0 protection
+    (rmb && p_rmb==0 && capture_id==0 && mx>=65 && mx<160 && my>=ty && my<ty+20) ? (
+    sel = gfx_showmenu(#name_menu);
+    sel > 0 ? (
             mem[row_name_idx+sel_r] = sel-1; 
             strcpy(row_name_str_base + sel_r, ""); 
         ) 
@@ -2215,6 +2724,9 @@ t_e = mem[ui_edit_tab];
     gfx_set(1, 1, 1, 0.8);
     gfx_x = def_x + 3; 
     gfx_y = ty ; 
+    
+    
+
     gfx_drawstr("DEF");
     sprintf(#dv, "%d", slider1);
     gfx_x = def_x + 3; 
@@ -2236,65 +2748,7 @@ t_e = mem[ui_edit_tab];
     rect(gx_s, ty, gx_w, 70, 0.2, 0.2, 0.2, 1);
     !mb ? vel_drag_mods = 0;
 
-    (rmb && capture_id == 88888) ? (
-         abs_cell = len_drag_cell_idx;
-         row_idx = floor(abs_cell / vel_stride_row);
-         row_base = row_idx * vel_stride_row;
-         step_idx = abs_cell % vel_stride_row; 
-         head_x = gx_s + (step_idx * cw_v);
-         dist_pixels = mx - head_x;
-         raw_l = ceil(dist_pixels / cw_v);
-         raw_l < 1 ? raw_l = 1;
-         drag_mods = 0; 
-         ctrl_dn ? drag_mods |= 1; 
-         shift_dn ? drag_mods |= 2;
-         beat_steps = s_v / 4; 
-         total_bars = st_v / s_v; 
-         step_in_bar = step_idx % s_v;
-         step_in_beat = (beat_steps > 0) ? (step_idx % beat_steps) : 0; 
-         bar_idx = floor(step_idx / s_v);
-         drag_mods == 0 ? (
-             local_max = st_v - step_idx;
-             final = raw_l > local_max ? local_max : raw_l;
-             mem[curr_pat_l_ptr + row_base + step_idx] = final;
-         ) : (drag_mods == 1) ? ( 
-             bb=0; loop(total_bars, 
-                 tgt = bb*s_v + step_in_bar; 
-                 tgt < st_v ? (
-                    local_max = st_v - tgt;
-                    final = raw_l > local_max ? local_max : raw_l;
-                    mem[curr_pat_l_ptr + row_base + tgt] = final;
-                    mem[curr_pat_g_ptr + row_base + tgt] = 1; 
-                 );
-                 bb+=1; 
-             );
-         ) : (drag_mods == 2) ? ( 
-             bt=0; loop(4, 
-                 tgt = bar_idx*s_v + bt*beat_steps + step_in_beat;
-                 (tgt >= bar_idx*s_v && tgt < (bar_idx+1)*s_v && tgt < st_v) ? (
-                    local_max = st_v - tgt;
-                    final = raw_l > local_max ? local_max : raw_l;
-                    mem[curr_pat_l_ptr + row_base + tgt] = final;
-                    mem[curr_pat_g_ptr + row_base + tgt] = 1;
-                 );
-                 bt+=1;
-             );
-         ) : ( 
-             bb=0; loop(total_bars,
-                 bt=0; loop(4,
-                     tgt = bb*s_v + bt*beat_steps + step_in_beat;
-                     tgt < st_v ? (
-                        local_max = st_v - tgt;
-                        final = raw_l > local_max ? local_max : raw_l;
-                        mem[curr_pat_l_ptr + row_base + tgt] = final;
-                        mem[curr_pat_g_ptr + row_base + tgt] = 1;
-                     );
-                     bt+=1;
-                 );
-                 bb+=1;
-             );
-         );
-    );
+
 
     all_mode = mem[ui_vel_edit_all];
     all_preview_v = clamp(floor((1-(my-ty)/70)*127), 1, 127);
@@ -2412,6 +2866,41 @@ t_e = mem[ui_edit_tab];
         s_i+=1;
     );
 
+
+
+//-----------------------------------------
+
+
+// --- PATTERN MUTE BUTTON ---
+mute_x = def_x -124;
+mute_y = ruler_y - 148; // Aligned with the "1, 2, 3, 4" bar markers
+mute_w = def_w+ 25;
+mute_h = ruler_h+06;
+
+is_p_muted = mem[tab_mute_base + t_e];
+
+// Draw the button
+is_p_muted ? (
+    rect(mute_x, mute_y, mute_w, mute_h, 1, .4, .4, .6); // Red if muted
+) : (
+    rect(mute_x, mute_y, mute_w, mute_h, 0.4, 0.3, 0.3, 1); // Dark if active
+);
+
+gfx_set(1,1,1,1);
+gfx_x = mute_x +10; gfx_y = mute_y+2;
+gfx_drawstr("MUTE"); // "MUTE PATTERN" for Mute
+
+// Handle Click
+(mb && p_mb == 0 && mx >= mute_x && mx < mute_x + mute_w && my >= mute_y && my < mute_y + mute_h) ? (
+    mem[tab_mute_base + t_e] = !mem[tab_mute_base + t_e];
+    needs_tab_update = 1; // Trigger the audio engine to notice the change
+);
+
+//------------------------------------------
+
+
+
+
     ruler_h = 15; 
     gap_h = 2;
     ruler_y = ty + 72;
@@ -2438,21 +2927,21 @@ t_e = mem[ui_edit_tab];
                 r_it = 0; 
                 loop(MAX_ROWS,
                     src_offset = r_it * vel_stride_row + op_start;
-                    dst_offset = r_it * 96;
-                    memcpy(bar_copy_base + dst_offset, curr_pat_v_ptr + src_offset, op_len);
-                    memcpy(bar_copy_base + dst_offset + 32, curr_pat_g_ptr + src_offset, op_len);
-                    memcpy(bar_copy_base + dst_offset + 64, curr_pat_l_ptr + src_offset, op_len);
+                    dst_offset = r_it * 128; // Spacing out the storage for each row
+                    memcpy(bar_copy_base + dst_offset,      curr_pat_v_ptr + src_offset, op_len);
+                    memcpy(bar_copy_base + dst_offset + 40, curr_pat_g_ptr + src_offset, op_len); // Increased offset to 40 for safety
+                    memcpy(bar_copy_base + dst_offset + 80, curr_pat_l_ptr + src_offset, op_len); // Increased offset to 80 for safety
                     r_it += 1;
                 );
             );
             sel_menu == 2 ? ( 
                 r_it = 0; 
                 loop(MAX_ROWS,
-                    src_offset = r_it * 96;
                     dst_offset = r_it * vel_stride_row + op_start;
-                    memcpy(curr_pat_v_ptr + dst_offset, bar_copy_base + src_offset, op_len);
-                    memcpy(curr_pat_g_ptr + dst_offset, bar_copy_base + src_offset + 32, op_len);
-                    memcpy(curr_pat_l_ptr + dst_offset, bar_copy_base + src_offset + 64, op_len);
+                    src_offset = r_it * 128; 
+                    memcpy(curr_pat_v_ptr + dst_offset, bar_copy_base + src_offset,      op_len);
+                    memcpy(curr_pat_g_ptr + dst_offset, bar_copy_base + src_offset + 40, op_len);
+                    memcpy(curr_pat_l_ptr + dst_offset, bar_copy_base + src_offset + 80, op_len);
                     r_it += 1;
                 );
             );
@@ -2467,10 +2956,14 @@ t_e = mem[ui_edit_tab];
                 );
             );
         );
+        
+        
+        
+        
         b_idx += 1;
     );
-
-    !mb ? (
+    
+    (!mb && !rmb) ? (
         last_drag_idx = -1;
         drag_mods = 0;
         vel_drag_mods = 0;
@@ -2482,8 +2975,10 @@ t_e = mem[ui_edit_tab];
         row_drag_last_y = 0;
         row_drag_anchor = -1;
     );
-
+    
     rows_that_fit = floor((gfx_h - grid_y) / row_h);
+    
+    
     visible_rows = min(slider7, rows_that_fit);
     visible_rows < 1 ? visible_rows = 1; 
     scroll_val = slider8; 
@@ -2555,17 +3050,18 @@ t_e = mem[ui_edit_tab];
             mem[ui_selected_row] = r_g; 
             mem[ui_vel_edit_all] = 0; 
         ); 
-        (mb && p_mb==0 && mx>=48 && mx<58 && my>=ry+1 && my<ry+11) ? ( 
-            color_popup_active = 1; 
-            color_popup_x = mx; 
-            color_popup_y = my; 
-            color_popup_row = r_g; 
-        );
-        (rmb && mx>=60 && mx<gx_s && my>=ry && my<ry+row_h) ? ( 
-            c_sel = gfx_showmenu(#name_menu); 
-            c_sel > 0 ? ( 
-                mem[row_name_idx+r_g] = c_sel-1; 
-                strcpy(STRING_SLOT_ID, ""); 
+            (mb && p_mb==0 && mx>=48 && mx<58 && my>=ry+1 && my<ry+11) ? (
+            color_popup_active = 1;
+            color_popup_x = mx;
+            color_popup_y = my;
+            color_popup_row = r_g;
+            );
+            // FIX: Added p_rmb==0 and capture_id==0 protection
+            (rmb && p_rmb==0 && capture_id==0 && mx>=60 && mx<gx_s && my>=ry && my<ry+row_h) ? (
+            c_sel = gfx_showmenu(#name_menu);
+            c_sel > 0 ? (
+            mem[row_name_idx+r_g] = c_sel-1;
+            strcpy(STRING_SLOT_ID, "");
             ); 
         );
         (mb && p_mb == 0 && capture_id == 0 && !color_popup_active && mx<gx_s && my>=ry && my<ry+row_h && !rmb && !(mx>=48 && mx<58) && !(mx>=65 && mx<165)) ? ( 
@@ -2646,116 +3142,50 @@ t_e = mem[ui_edit_tab];
                 : (s_v == 32 && (s_i % e_div == 0)) ? rect(cx_g, ry+1, cw_v-1, row_h-3, .08, .08, .08, 1) 
                 : rect(cx_g, ry+1, cw_v-1, row_h-3, 0.15, 0.15, 0.15, 1);
             );
-            (mb && mx>=cx_g && mx<cx_g+cw_v && my>=ry && my<ry+row_h && capture_id == 0) ? (
-                drag_lock_row == -1 ? drag_lock_row = r_g;
-                (r_g == drag_lock_row && !is_tail) ? (
-                    cell_id = r_g*1000 + s_i;
-                    p_mb == 0 ? ( 
-                        drag_mode = mem[curr_pat_g_ptr+idx_v] ? 2 : 1; 
-                        drag_mods = 0; 
-                        ctrl_dn ? drag_mods |= 1; 
-                        shift_dn ? drag_mods |= 2; 
-                    );
-                    (cell_id != last_drag_idx) ? (
-                        beat_steps = s_v/4; 
-                        total_bars = st_v / s_v; 
-                        step_idx = s_i; 
-                        step_in_bar = step_idx % s_v; 
-                        step_in_beat = (beat_steps > 0) ? (step_idx % beat_steps) : 0; 
-                        bar_idx = floor(step_idx / s_v);
-                        drag_mods == 0 ? ( 
-                            drag_mode == 1 ? ( 
-                                mem[curr_pat_g_ptr+idx_v] = 1; 
-                                mem[curr_pat_l_ptr+idx_v] = 0;
-                                mem[curr_pat_v_ptr+idx_v] <= 0 ? mem[curr_pat_v_ptr+idx_v] = slider1; 
-                            ) : ( 
-                                mem[curr_pat_g_ptr+idx_v] = 0; 
-                                mem[curr_pat_v_ptr+idx_v] = 0; 
-                                mem[curr_pat_l_ptr+idx_v] = 0; 
-                            ); 
-                        ) : (drag_mods == 1) ? ( 
-                            bb=0; 
-                            loop(total_bars, 
-                                tgt = bb*s_v + step_in_bar; 
-                                tgt < st_v ? ( 
-                                    ii = r_g*vel_stride_row + tgt; 
-                                    drag_mode == 1 ? ( 
-                                        mem[curr_pat_g_ptr+ii] = 1; 
-                                        mem[curr_pat_v_ptr+ii] <= 0 ? mem[curr_pat_v_ptr+ii] = slider1; 
-                                    ) : ( 
-                                        mem[curr_pat_g_ptr+ii] = 0; 
-                                        mem[curr_pat_v_ptr+ii] = 0; 
-                                        mem[curr_pat_l_ptr+ii] = 0; 
-                                    ); 
-                                ); 
-                                bb+=1; 
-                            ); 
-                        ) : (drag_mods == 2) ? ( 
-                            bt=0; 
-                            loop(4, 
-                                tgt = bar_idx*s_v + bt*beat_steps + step_in_beat; 
-                                (tgt >= bar_idx*s_v && tgt < (bar_idx+1)*s_v && tgt < st_v) ? ( 
-                                    ii = r_g*vel_stride_row + tgt; 
-                                    drag_mode == 1 ? ( 
-                                        mem[curr_pat_g_ptr+ii] = 1; 
-                                        mem[curr_pat_v_ptr+ii] <= 0 ? mem[curr_pat_v_ptr+ii] = slider1; 
-                                    ) : ( 
-                                        mem[curr_pat_g_ptr+ii] = 0; 
-                                        mem[curr_pat_v_ptr+ii] = 0; 
-                                        mem[curr_pat_l_ptr+ii] = 0; 
-                                    ); 
-                                ); 
-                                bt+=1; 
-                            ); 
-                        ) : ( 
-                            bb=0; 
-                            loop(total_bars, 
-                                bt=0; 
-                                loop(4, 
-                                    tgt = bb*s_v + bt*beat_steps + step_in_beat; 
-                                    tgt < st_v ? ( 
-                                        ii = r_g*vel_stride_row + tgt; 
-                                        drag_mode == 1 ? ( 
-                                            mem[curr_pat_g_ptr+ii] = 1; 
-                                            mem[curr_pat_v_ptr+ii] <= 0 ? mem[curr_pat_v_ptr+ii] = slider1; 
-                                        ) : ( 
-                                            mem[curr_pat_g_ptr+ii] = 0; 
-                                            mem[curr_pat_v_ptr+ii] = 0; 
-                                            mem[curr_pat_l_ptr+ii] = 0; 
-                                        ); 
-                                    ); 
-                                    bt+=1; 
-                                ); 
-                                bb+=1; 
-                            ); 
-                        );
-                        mem[ui_selected_row] = r_g; 
-                        last_drag_idx = cell_id;
-                    );
-                );
-            );
-            (rmb && mx>=cx_g && mx<cx_g+cw_v && my>=ry && my<ry+row_h && capture_id == 0) ? (
-                target_head = -1; 
-                owner_idx != -1 ? ( 
-                    target_head = owner_idx; 
-                    is_clicked_head = (mem[curr_pat_g_ptr + idx_v] != 0); 
-                    is_clicked_head && !ctrl_dn ? ( 
-                        under = find_covering_head(r_g, s_i, st_v); 
-                        under != -1 ? target_head = under; 
-                    ); 
-                ) : ( 
-                    target_head = idx_v; 
-                    mem[curr_pat_g_ptr + target_head] = 1; 
-                    mem[curr_pat_v_ptr + target_head] <= 0 ? mem[curr_pat_v_ptr + target_head] = slider1; 
-                    mem[curr_pat_l_ptr + target_head] = 1; 
-                );
-                capture_id = 88888; 
-                len_drag_active = 1; 
-                len_drag_cell_idx = target_head; 
-                head_pos = target_head % st_v; 
-                len_drag_max = st_v - head_pos;
-            );
+            
             s_i+=1;
+        );
+        
+        
+        is_ghosting ? (
+            s_g = 0; 
+            loop(st_v,
+                idx_ghost = r_g*vel_stride_row + s_g; 
+                
+                // If the fallback tab has a note here...
+                mem[fb_pat_g_ptr + idx_ghost] ? (
+                    cx_g = gx_s + s_g*cw_v; 
+                    
+                    // 1. Calculate Standard Row Color
+                    c_idx = mem[row_color_base+r_g];
+                    get_palette_values(c_idx); 
+                    
+                    // 2. Use Default Velocity to set brightness
+                    v_disp = slider1; 
+                    min_b = (c_idx == 0) ? 0.60 : 0.50;
+                    rng_b = 1.0 - min_b;
+                    v_scale = min_b + (rng_b * (v_disp / 127)); 
+                    
+                    // Flash playhead white, otherwise use row color
+                    ((play_state & 1) && play_step_idx == s_g) ? (
+                        gfx_set(1, 1, 1, 0.95); 
+                    ) : (
+                        gfx_set(cr*v_scale, cg*v_scale, cb*v_scale, 1); 
+                    );
+                    
+                    // 3. Calculate 1/3rd Size and Centering
+                    fb_l = mem[fb_pat_l_ptr + idx_ghost];
+                    fb_l < 1 ? fb_l = 1;
+                    
+                    ghost_w = (cw_v * fb_l) - (cw_v * (2/3));
+                    ghost_h = row_h / 3;
+                    g_x = cx_g + (cw_v / 3);
+                    g_y = ry + (row_h / 3);
+                    
+                    gfx_rect(g_x, g_y, ghost_w, ghost_h);
+                );
+                s_g += 1;
+            );
         );
         r_v+=1;
     );
@@ -2779,6 +3209,184 @@ t_e = mem[ui_edit_tab];
         );
     );
 
+// ---------------------------------------------------------
+    // NEW UNIFIED GRID MOUSE HANDLING (Adapted from N2N Arp)
+    // ---------------------------------------------------------
+
+    is_over_grid = (mx >= gx_s && mx < gx_s + gx_w && my >= grid_y && my < grid_y + (visible_rows * row_h));
+
+    // --- 1. RIGHT-CLICK INITIATION (Note Length) ---
+    (rmb && capture_id == 0 && is_over_grid && !color_popup_active) ? (
+        rel_x = mx - gx_s; rel_y = my - grid_y; 
+        hov_col = floor(rel_x / cw_v); 
+        hov_vis_row = floor(rel_y / row_h); 
+        hov_row = hov_vis_row + slider8; // add scroll offset
+
+        (hov_col >= 0 && hov_col < st_v && hov_row >= 0 && hov_row < MAX_ROWS) ? (
+            idx = hov_row * vel_stride_row + hov_col;
+            found_head = -1; scan_k = 0; 
+            
+            // Scan backwards up to 32 steps to see if we clicked on the tail of an existing note
+            loop(32, 
+                check_col = hov_col - scan_k; 
+                (check_col >= 0) ? ( 
+                    chk_idx = hov_row * vel_stride_row + check_col; 
+                    (mem[curr_pat_g_ptr + chk_idx] == 1) ? ( 
+                        len = mem[curr_pat_l_ptr + chk_idx]; 
+                        (check_col + len > hov_col) ? ( found_head = chk_idx; scan_k = 32; ); 
+                    ); 
+                ); 
+                scan_k += 1; 
+            );
+            
+            found_head != -1 ? ( 
+                len_drag_cell_idx = found_head; 
+            ) : ( 
+                mem[curr_pat_g_ptr+idx] = 1; 
+                mem[curr_pat_l_ptr+idx] = 1; 
+                mem[curr_pat_v_ptr+idx] <= 0 ? mem[curr_pat_v_ptr+idx] = slider1; 
+                len_drag_cell_idx = idx; 
+                scan_active_tab(); 
+            );
+            capture_id = 88888; 
+        );
+    );
+
+    // --- 2. RIGHT-CLICK DRAGGING ---
+    (rmb && capture_id == 88888) ? ( 
+        rel_x = mx - gx_s; 
+        curr_col = floor(rel_x / cw_v); 
+        head_col = (len_drag_cell_idx % vel_stride_row); 
+        clicked_row = floor(len_drag_cell_idx / vel_stride_row);
+        
+        new_len = (curr_col - head_col) + 1; 
+        new_len < 1 ? new_len = 1; 
+        (head_col + new_len > st_v) ? new_len = st_v - head_col; 
+        
+        step_in_bar = head_col % s_v; 
+        step_in_beat = head_col % (s_v/4); 
+        target_bar = floor(head_col / s_v);
+        
+        loop_s = 0; 
+        loop(st_v, should_apply = 0;
+            loop_bar = floor(loop_s / s_v);
+            (ctrl_dn && shift_dn) ? (loop_s % (s_v/4) == step_in_beat ? should_apply=1) : 
+            ctrl_dn ? (loop_s % s_v == step_in_bar ? should_apply=1) : 
+            shift_dn ? ((loop_bar == target_bar) && (loop_s % (s_v/4) == step_in_beat) ? should_apply=1) : 
+            (loop_s == head_col ? should_apply = 1);
+            
+            idx_target = clicked_row * vel_stride_row + loop_s;
+            mem[curr_pat_g_ptr + idx_target] == 1 ? (
+                should_apply ? ( 
+                    safe_len = new_len; 
+                    (loop_s + safe_len > st_v) ? safe_len = st_v - loop_s;
+                    mem[curr_pat_l_ptr + idx_target] = safe_len; 
+                    
+                    // Immediately wipe out notes underneath the tail to prevent overlapping ghost notes
+                    tail_scan = 1; 
+                    loop(safe_len - 1, 
+                        tail_idx = idx_target + tail_scan; 
+                        (tail_scan + loop_s < st_v) ? ( 
+                            mem[curr_pat_g_ptr + tail_idx] = 0; 
+                            mem[curr_pat_v_ptr + tail_idx] = 0; 
+                            mem[curr_pat_l_ptr + tail_idx] = 0; 
+                        ); 
+                        tail_scan += 1; 
+                    );
+                );
+            ); 
+            loop_s += 1;
+        );
+        needs_tab_update = 1;
+    );
+
+    // --- 3. LEFT-CLICK INITIATION (Paint/Erase Notes) ---
+    (mb && capture_id == 0 && is_over_grid && !color_popup_active) ? (
+        p_mb == 0 ? last_paint_idx = -1;
+        rel_x = mx - gx_s; rel_y = my - grid_y; 
+        hov_col = floor(rel_x / cw_v); 
+        hov_vis_row = floor(rel_y / row_h); 
+        hov_row = hov_vis_row + slider8;
+        
+        (hov_col >= 0 && hov_col < st_v && hov_row >= 0 && hov_row < MAX_ROWS) ? (
+            target_idx = hov_row * vel_stride_row + hov_col;
+            capture_id = 2000;
+            
+            // Determine if we are painting or erasing based on the FIRST cell we clicked
+            paint_state = !mem[curr_pat_g_ptr + target_idx];
+            
+            step_in_bar = hov_col % s_v; step_in_beat = hov_col % (s_v/4); target_bar = floor(hov_col / s_v);
+            
+            loop_s = 0; loop(st_v, should_apply = 0;
+                loop_bar = floor(loop_s / s_v);
+                (ctrl_dn && shift_dn) ? (loop_s % (s_v/4) == step_in_beat ? should_apply=1) : 
+                ctrl_dn ? (loop_s % s_v == step_in_bar ? should_apply=1) : 
+                shift_dn ? ((loop_bar == target_bar) && (loop_s % (s_v/4) == step_in_beat) ? should_apply=1) : 
+                (loop_s == hov_col ? should_apply = 1);
+                
+                should_apply ? ( 
+                    loop_idx = hov_row * vel_stride_row + loop_s; 
+                    mem[curr_pat_g_ptr + loop_idx] = paint_state; 
+                    paint_state ? (
+                        mem[curr_pat_l_ptr + loop_idx] = 1; 
+                        mem[curr_pat_v_ptr + loop_idx] <= 0 ? mem[curr_pat_v_ptr + loop_idx] = slider1;
+                    ) : (
+                        mem[curr_pat_l_ptr + loop_idx] = 0; 
+                        mem[curr_pat_v_ptr + loop_idx] = 0;
+                    ); 
+                ); 
+                loop_s += 1;
+            ); 
+            last_paint_idx = target_idx;
+            scan_active_tab();
+            needs_tab_update = 1;
+        );
+    );
+
+    // --- 4. LEFT-CLICK DRAGGING (Paint/Erase Notes) ---
+    (mb && capture_id == 2000 && is_over_grid) ? (
+        rel_x = mx - gx_s; rel_y = my - grid_y; 
+        hov_col = floor(rel_x / cw_v); 
+        hov_vis_row = floor(rel_y / row_h); 
+        hov_row = hov_vis_row + slider8;
+
+        (hov_col >= 0 && hov_col < st_v && hov_row >= 0 && hov_row < MAX_ROWS) ? (
+            target_idx = hov_row * vel_stride_row + hov_col;
+            
+            // Only process logic if we dragged into a NEW cell
+            (target_idx != last_paint_idx) ? (
+                step_in_bar = hov_col % s_v; step_in_beat = hov_col % (s_v/4); target_bar = floor(hov_col / s_v);
+                
+                loop_s = 0; loop(st_v, should_apply = 0;
+                    loop_bar = floor(loop_s / s_v);
+                    (ctrl_dn && shift_dn) ? (loop_s % (s_v/4) == step_in_beat ? should_apply=1) : 
+                    ctrl_dn ? (loop_s % s_v == step_in_bar ? should_apply=1) : 
+                    shift_dn ? ((loop_bar == target_bar) && (loop_s % (s_v/4) == step_in_beat) ? should_apply=1) : 
+                    (loop_s == hov_col ? should_apply = 1);
+                    
+                    should_apply ? ( 
+                        loop_idx = hov_row * vel_stride_row + loop_s; 
+                        mem[curr_pat_g_ptr + loop_idx] = paint_state; 
+                        paint_state ? (
+                            mem[curr_pat_l_ptr + loop_idx] = 1; 
+                            mem[curr_pat_v_ptr + loop_idx] <= 0 ? mem[curr_pat_v_ptr + loop_idx] = slider1;
+                        ) : (
+                            mem[curr_pat_l_ptr + loop_idx] = 0; 
+                            mem[curr_pat_v_ptr + loop_idx] = 0;
+                        ); 
+                    ); 
+                    loop_s += 1;
+                ); 
+                last_paint_idx = target_idx;
+                scan_active_tab();
+                needs_tab_update = 1;
+                
+            );
+        );
+    );
+
+
+
     color_popup_active && color_popup_row >= 0 ? draw_color_popup(color_popup_x, color_popup_y);
     is_over_grid = (my > grid_y);
     mouse_wheel != 0 && is_over_grid && !shift_dn && !ctrl_dn && !alt_dn && capture_id != 88888 ? (
@@ -2791,6 +3399,38 @@ t_e = mem[ui_edit_tab];
         mouse_wheel = 0;
     );
 ); 
+
+
+// --- PATTERN MUTE OVERLAY ---
+is_tab_muted_ui = mem[tab_mute_base + t_e];
+
+(t_e > 0 && is_tab_muted_ui) ? (
+    // Coordinates for the entire lower grid area
+    ov_x = 10; 
+    ov_y = grid_y; 
+    ov_w = gx_w + gx_s - 10; 
+    ov_h = visible_rows * row_h;
+
+    // 1. Draw the Dimmer (Black at 50% opacity)
+    rect(ov_x, ov_y, ov_w, ov_h, 0, 0, 0, 0.6);
+
+    // 2. Draw "MUTED" Warning Text
+    gfx_setfont(1, "Arial", 35, 'b');
+    #mt_warn = "PATTERN MUTED";
+    gfx_measurestr(#mt_warn, m_tw, m_th);
+    
+    // Center the text in the grid area
+    draw_text(gx_s + (gx_w/2) - (m_tw/2), ov_y + (ov_h/2) - (m_th/2), #mt_warn, .5, 0.1, 0.1);
+    gfx_setfont(0); // Reset font
+    
+    // 3. Block Mouse Interaction with the grid while muted
+    // This prevents accidental "ghost drawing" through the overlay
+    (mb && mx >= ov_x && my >= ov_y && mx < ov_x + ov_w && my < ov_y + ov_h) ? (
+        capture_id = 99999; // Set to a dummy ID to block grid handlers
+    );
+);
+
+
 
 help_active ? (
     gfx_set(0,0,0,0.85); gfx_rect(0,0,gfx_w,gfx_h);
@@ -2828,7 +3468,7 @@ help_active ? (
     gfx_drawstr(" - Swing P: Uses Project Swing (Numbers2Notes)");
     gfx_x = hx+20; 
     gfx_y += 16;
-    gfx_drawstr(" - [1x | 1/2]: Playback speed for 24/32 SubDivs");
+    gfx_drawstr(" -[1x | 1/2]: Playback speed for 24/32 SubDivs");
     gfx_x = hx+20; 
     gfx_y += 16;
     gfx_drawstr(" - PUSH/PULL: Adjust timing per row (+ = Lag, - = Push)");
