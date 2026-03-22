@@ -6,8 +6,7 @@ about:
   ADDED CUE SETTING
   ADDED PATTERN MUTE
   ADDED FALLBACK PATTERN SYSTEM
-provides: [data].. / Data / DrumArranger
-/*.txt > AHS_Music_Tech/DrumArranger/
+provides:[data] ../Data/DrumArranger/*.txt > AHS_Music_Tech/DrumArranger/
 options:maxmem=32000000
 options:gmem=N2N_Ecosystem_RSKennedy
 
