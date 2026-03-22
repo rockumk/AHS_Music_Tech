@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="a3c66135e1f8fc0fe5aa4a0ffe1d8ea3d09c5ea0">
+<index version="1" name="AHS_Music_Tech" commit="d2affdabc8f682c202a9a43aaa644ca64f240233">
   <category name="Effects">
     <reapack name="32_to_2_Downmix_N2N.jsfx" type="effect" desc="32_to_2_Downmix_N2N">
       <metadata>
@@ -13,6 +13,57 @@
       </metadata>
       <version name="1.0" author="Rock Kennedy" time="2026-03-22T21:40:03Z">
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/a3c66135e1f8fc0fe5aa4a0ffe1d8ea3d09c5ea0/Effects/32_to_2_Downmix_N2N.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="Back2Key_N2N.jsfx" type="effect" desc="Back2Key_N2N">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 Back2Key_N2N\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 MIDI note transposer where C=0.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Slider 1: Semitone shift using C as the reference (C=0).\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Slider 2: Octave shift (Down / No Change / Up).\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Auto octave clamp: if transposed note is <0 or >127, it is shifted by octaves (\u177 ?12) until in range.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Note-off is matched to the note-on even if sliders change while notes are held.\sa180\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.1" author="Rock Kennedy" time="2026-03-22T22:08:47Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/d2affdabc8f682c202a9a43aaa644ca64f240233/Effects/Back2Key_N2N.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="Bass_Assign_N2N.jsfx" type="effect" desc="Bass_Assign_N2N">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 Bass_Assign_N2N\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Pass only note-ons with velocity 90 on MIDI channel 2. Passes all note-offs and all MIDI on other channels.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.9" author="Rock Kennedy" time="2026-03-22T22:08:47Z">
+        <changelog><![CDATA[+ Corrected header text to match actual channel-2-only behavior]]></changelog>
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/d2affdabc8f682c202a9a43aaa644ca64f240233/Effects/Bass_Assign_N2N.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="Chords_Assign_N2N.jsfx" type="effect" desc="Chords_Assign_N2N">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 Chords_Assign_N2N\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Blocks note-ons with velocity 90 on MIDI channel 2. Passes all note-offs and all MIDI on other channels.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0.9" author="Rock Kennedy" time="2026-03-22T22:08:47Z">
+        <changelog><![CDATA[+ Fixed-purpose chord filter for channel-2 N2N data]]></changelog>
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/d2affdabc8f682c202a9a43aaa644ca64f240233/Effects/Chords_Assign_N2N.jsfx</source>
       </version>
     </reapack>
     <reapack name="Cue_Pattern_Filter_N2N.jsfx" type="effect" desc="Cue_Pattern_Filter_N2N">
