@@ -1,6 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="b129615003daf8fd0b9199829d8b1c3ccbf78182">
+<index version="1" name="AHS_Music_Tech" commit="a3c66135e1f8fc0fe5aa4a0ffe1d8ea3d09c5ea0">
   <category name="Effects">
+    <reapack name="32_to_2_Downmix_N2N.jsfx" type="effect" desc="32_to_2_Downmix_N2N">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 A utility to sum 32 audio channels down to 2 (Raw Sum). Used by N2N to capture Monster Drums and other FX multi-out audio.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="Rock Kennedy" time="2026-03-22T21:40:03Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/a3c66135e1f8fc0fe5aa4a0ffe1d8ea3d09c5ea0/Effects/32_to_2_Downmix_N2N.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="Cue_Pattern_Filter_N2N.jsfx" type="effect" desc="Cue_Pattern_Filter_N2N">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Filters MIDI output for the N2N Drum Arranger based on the REC CUE state. When REC CUE is off, filters out Channel 16. When REC CUE is on, filters out all channels except Channel 16.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="Rock Kennedy" time="2026-03-22T21:40:03Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/a3c66135e1f8fc0fe5aa4a0ffe1d8ea3d09c5ea0/Effects/Cue_Pattern_Filter_N2N.jsfx</source>
+      </version>
+    </reapack>
     <reapack name="HeadStart.jsfx" type="effect" desc="HeadStart">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 Courier;}}
