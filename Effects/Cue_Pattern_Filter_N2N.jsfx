@@ -1,0 +1,65 @@
+desc:Cue_Pattern_Filter_N2N
+version: 1.0
+author: Rock Kennedy
+about:
+  Filters MIDI output for the N2N Drum Arranger based on the REC CUE state.
+  When REC CUE is off, filters out Channel 16.
+  When REC CUE is on, filters out all channels except Channel 16.
+options:gmem=N2N_Ecosystem_RSKennedy
+
+@init
+// The shared GMEM address set by the main Drum Arranger plugin
+GMEM_REC_FLAG_ADDR = 5000100;
+
+@block
+// Retrieve the current REC CUE state (1 = ON, 0 = OFF)
+rec_mode = gmem[GMEM_REC_FLAG_ADDR];
+
+while (midirecv(offset, msg1, msg23)) (
+    status = msg1 & 0xF0;
+    channel = (msg1 & 0x0F) + 1;
+    pass = 1;
+    
+    // Only apply channel filtering to standard voice/channel messages (0x80 to 0xE0)
+    // This allows Clock/SysEx/Realtime messages to pass through untouched.
+    (status >= 0x80 && status <= 0xE0) ? (
+        rec_mode == 1 ? (
+            // REC MODE ON: Pass ONLY Channel 16 (Filter out 1-15)
+            channel != 16 ? pass = 0;
+        ) : (
+            // REC MODE OFF: Pass everything EXCEPT Channel 16
+            channel == 16 ? pass = 0;
+        );
+    );
+    
+    // If the message wasn't flagged for filtering, send it through
+    pass ? midisend(offset, msg1, msg23);
+);
+
+@gfx 420 160
+// Background color
+gfx_clear = 0.1;
+
+// Title
+gfx_set(0.8, 0.8, 0.8, 1);
+gfx_setfont(1, "Arial", 18, 'b');
+gfx_x = 20; gfx_y = 20;
+gfx_drawstr("Used by Numbers2Notes");
+
+// Standard Text
+gfx_set(0.6, 0.6, 0.6, 1);
+gfx_setfont(2, "Arial", 15, '');
+gfx_x = 20; gfx_y = 50;
+gfx_drawstr("This FX has no controls or user settings.");
+
+gfx_x = 20; gfx_y = 75;
+gfx_drawstr("This allows N2N Drum Arranger to record");
+
+gfx_x = 20; gfx_y = 95;
+gfx_drawstr("MIDI cues and MIDI drum patterns.");
+
+// Warning Text
+gfx_set(1.0, 0.3, 0.3, 1); // Reddish color for emphasis
+gfx_setfont(3, "Arial", 15, 'b');
+gfx_x = 20; gfx_y = 125;
+gfx_drawstr("NEEDED - DO NOT DELETE.");
