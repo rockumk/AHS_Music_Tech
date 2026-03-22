@@ -1,0 +1,37 @@
+desc:Chords_Assign_N2N
+// @description Chords_Assign_N2N
+// @version 1.0.9
+// @author Rock Kennedy
+// @about
+//   # Chords_Assign_N2N
+//   Blocks note-ons with velocity 90 on MIDI channel 2.
+//   Passes all note-offs and all MIDI on other channels.
+// @changelog
+//   + Fixed-purpose chord filter for channel-2 N2N data
+
+@block
+max_events = 4096;
+
+loop(max_events,
+  midirecv(offset, msg1, msg23) ? (
+    status  = msg1 & 240;
+    channel = msg1 & 15;
+    note    = msg23 & 127;
+    vel     = (msg23 / 256) & 127;
+
+    pass_it = 1;
+
+    // Apply velocity filter ONLY to MIDI channel 2
+    status == 144 && channel == 1 && vel > 0 ? (
+      pass_it = (vel != 90);
+    );
+
+    pass_it ? midisend(offset, msg1, msg23);
+  );
+);
+
+@gfx
+gfx_setfont(1, "Arial", 16, 'b');
+gfx_x = 10; gfx_y = 10;
+gfx_set(0.8,0.8,0.8,1);
+gfx_drawstr("This FX is needed by some N2N Chord Tracks.\nThere are no user settings.");

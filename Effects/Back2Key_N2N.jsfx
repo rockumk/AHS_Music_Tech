@@ -1,0 +1,170 @@
+desc:Back2Key_N2N
+version: 1.1
+author: Rock Kennedy
+about:
+  # Back2Key_N2N
+  MIDI note transposer where C=0.
+  - Slider 1: Semitone shift using C as the reference (C=0).
+  - Slider 2: Octave shift (Down / No Change / Up).
+  - Auto octave clamp: if transposed note is <0 or >127, it is shifted by octaves (±12) until in range.
+  - Note-off is matched to the note-on even if sliders change while notes are held.
+
+-slider1:5<0,11,1{C to G (-5),C to G#/Ab (-4),C to A (-3),C to A#/Bb (-2),C to B (-1),C to C (no change),C to C#/Db (+1),C to D (+2),C to D#/Eb (+3),C to E (+4),C to F (+5),C to F#/Gb (+6)}>Transpose (C=0)
+-slider2:1<0,2,1{Down,No Change,Up}>Octave
+
+@init
+i=0;
+loop(16*128,
+  active_map[i] = -1;
+  i += 1;
+);
+
+function clamp_with_octaves(n)
+(
+  while (n < 0) (
+    n += 12;
+  );
+  while (n > 127) (
+    n -= 12;
+  );
+  n;
+);
+
+@slider
+semi_shift = (slider1|0) - 5;         // 0..11 -> -5..+6
+oct_shift  = ((slider2|0) - 1) * 12;  // 0..2 -> -12,0,+12
+
+@block
+while (midirecv(offset, msg1, msg23))
+(
+  status = msg1 & 240;
+  chan   = msg1 & 15;
+  data1  = msg23 & 255;
+  data2  = (msg23 >> 8) & 255;
+
+  is_note_on  = (status == 144) && (data2 != 0);
+  is_note_off = (status == 128) || ((status == 144) && (data2 == 0));
+  is_poly_at  = (status == 160);
+
+  idx = chan*128 + data1;
+
+  is_note_on ? (
+    out_note = clamp_with_octaves(data1 + semi_shift + oct_shift);
+    active_map[idx] = out_note;
+    out_note = out_note|0;
+    msg23 = (msg23 & 65280) | out_note;
+    midisend(offset, msg1, msg23);
+  )
+  : is_note_off ? (
+    out_note = active_map[idx];
+    (out_note < 0) ? (
+      out_note = clamp_with_octaves(data1 + semi_shift + oct_shift);
+    );
+    active_map[idx] = -1;
+    out_note = out_note|0;
+    msg23 = (msg23 & 65280) | out_note;
+    midisend(offset, msg1, msg23);
+  )
+  : is_poly_at ? (
+    out_note = active_map[idx];
+    (out_note < 0) ? (
+      out_note = clamp_with_octaves(data1 + semi_shift + oct_shift);
+    );
+    out_note = out_note|0;
+    msg23 = (msg23 & 65280) | out_note;
+    midisend(offset, msg1, msg23);
+  )
+  : (
+    midisend(offset, msg1, msg23);
+  );
+);
+
+@gfx 420 220
+// Background color
+gfx_clear = 0.1;
+
+// Title
+gfx_set(0.8, 0.8, 0.8, 1);
+gfx_setfont(1, "Arial", 18, 'b');
+gfx_x = 20; gfx_y = 20;
+gfx_drawstr("Used by Numbers2Notes");
+
+// Standard Text
+gfx_set(0.7, 0.7, 0.7, 1);
+gfx_setfont(2, "Arial", 15, '');
+gfx_x = 20; gfx_y = 50;
+gfx_drawstr("This FX automatically transposes MIDI for the key.");
+
+gfx_x = 20; gfx_y = 70;
+gfx_drawstr("Unless things aren't working, it needs no manual changes.");
+
+// Warning Text
+gfx_set(1.0, 0.3, 0.3, 1); // Reddish color for emphasis
+gfx_setfont(3, "Arial", 15, 'b');
+gfx_x = 20; gfx_y = 100;
+gfx_drawstr("NEEDED - DO NOT DELETE.");
+
+// --- MANUAL CONTROLS ---
+
+// Transpose
+gfx_set(0.8, 0.8, 0.8, 1);
+gfx_setfont(2, "Arial", 15, '');
+gfx_x = 20; gfx_y = 145;
+gfx_drawstr("Transpose:  ");
+
+s1 = slider1|0;
+s1 == 0 ? strcpy(#str1, "C to G (-5)") :
+s1 == 1 ? strcpy(#str1, "C to G#/Ab (-4)") :
+s1 == 2 ? strcpy(#str1, "C to A (-3)") :
+s1 == 3 ? strcpy(#str1, "C to A#/Bb (-2)") :
+s1 == 4 ? strcpy(#str1, "C to B (-1)") :
+s1 == 5 ? strcpy(#str1, "C to C (no change)") :
+s1 == 6 ? strcpy(#str1, "C to C#/Db (+1)") :
+s1 == 7 ? strcpy(#str1, "C to D (+2)") :
+s1 == 8 ? strcpy(#str1, "C to D#/Eb (+3)") :
+s1 == 9 ? strcpy(#str1, "C to E (+4)") :
+s1 == 10 ? strcpy(#str1, "C to F (+5)") :
+strcpy(#str1, "C to F#/Gb (+6)");
+
+gfx_set(0.4, 0.8, 0.9, 1);
+gfx_drawstr(#str1);
+gfx_set(0.7, 0.7, 0.7, 1);
+gfx_drawstr("     [Click to change - NOT RECOMMENDED!]");
+
+// Octave
+gfx_set(0.8, 0.8, 0.8, 1);
+gfx_x = 20; gfx_y = 175;
+gfx_drawstr("Octave:        ");
+
+s2 = slider2|0;
+s2 == 0 ? strcpy(#str2, "Down") :
+s2 == 1 ? strcpy(#str2, "No Change") :
+strcpy(#str2, "Up");
+
+gfx_set(0.4, 0.8, 0.9, 1);
+gfx_drawstr(#str2);
+gfx_set(0.7, 0.7, 0.7, 1);
+gfx_drawstr("         [Click to change - NOT RECOMMENDED!]");
+
+// Mouse interaction for dropdown menus
+mouse_cap & 1 && !(last_cap & 1) ? (
+    mouse_y >= 135 && mouse_y <= 160 ? (
+        gfx_x = mouse_x; gfx_y = mouse_y;
+        menu_sel = gfx_showmenu("C to G (-5)|C to G#/Ab (-4)|C to A (-3)|C to A#/Bb (-2)|C to B (-1)|C to C (no change)|C to C#/Db (+1)|C to D (+2)|C to D#/Eb (+3)|C to E (+4)|C to F (+5)|C to F#/Gb (+6)");
+        menu_sel > 0 ? (
+            slider1 = menu_sel - 1;
+            slider_automate(slider1);
+            semi_shift = (slider1|0) - 5;
+        );
+    ) :
+    mouse_y >= 165 && mouse_y <= 190 ? (
+        gfx_x = mouse_x; gfx_y = mouse_y;
+        menu_sel = gfx_showmenu("Down|No Change|Up");
+        menu_sel > 0 ? (
+            slider2 = menu_sel - 1;
+            slider_automate(slider2);
+            oct_shift  = ((slider2|0) - 1) * 12;
+        );
+    );
+);
+last_cap = mouse_cap;
