@@ -1,5 +1,6 @@
 // @noindex
-// MIDI note name map
+
+# MIDI note name map
 121 [Hats] V Open Loose
 120 Open Pedal
 119 Open Min
@@ -67,4 +68,3 @@
 3 [Tambourine Pad]
 2 [Shaker Pad]
 1 [One Shot Pad]
-
