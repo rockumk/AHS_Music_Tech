@@ -1,3 +1,5 @@
+// @noindex
+
 35  BASS HIT 1 //  Blue
 36  BASS HIT 2 //  White
 37  SOFT HIT 1 //  Indigo

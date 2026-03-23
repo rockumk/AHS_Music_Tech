@@ -1,3 +1,5 @@
+// @noindex
+
 35  DANG       //  Blue
 36  DUT        //  White
 37  TAK        //  Indigo

@@ -1,3 +1,5 @@
+// @noindex
+
 35  DANG 1     //  Blue
 36  DANG 2     //  White
 37  MUTE 1     //  Indigo

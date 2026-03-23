@@ -1,3 +1,5 @@
+// @noindex
+
 35  KICK 1     //  Blue
 36  KICK 2     //  Blue
 37  SIDE STICK //  White

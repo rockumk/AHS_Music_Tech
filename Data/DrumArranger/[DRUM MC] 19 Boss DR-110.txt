@@ -1,3 +1,5 @@
+// @noindex
+
 35  KICK       //  Blue
 37  SNARE 1    //  White
 38  SNARE 2    //  Indigo
