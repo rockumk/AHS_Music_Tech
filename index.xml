@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="d2affdabc8f682c202a9a43aaa644ca64f240233">
+<index version="1" name="AHS_Music_Tech" commit="ff82edb8637f3199c69e5992956511e066ada31f">
   <category name="Effects">
     <reapack name="32_to_2_Downmix_N2N.jsfx" type="effect" desc="32_to_2_Downmix_N2N">
       <metadata>
@@ -188,13 +188,12 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Arp v11.99.3\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Arp v12.0.0\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FEATURE: Inventory Reporting to N2N Ecosystem.\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FEATURE: Populated Pattern Indicators on Tabs.\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FEATURE: Track Color/Name Header integration.\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FEATURE: Prioritized Cue System (Note > GMEM > PC).\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FIX: Channel 16 Notes are now Cues (not Chords).\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FIX: Scroll floor set\sa180\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab FIX: Channel 16 Notes are now Cues (not Chords).\sa180\par}
 }
 ]]></description>
       </metadata>
@@ -245,6 +244,9 @@
       </version>
       <version name="11.99.3" author="Rock Kennedy" time="2026-02-20T15:04:59Z">
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/f939e96250f0ce318bcbaa348def26e59593290c/Effects/N2N%20Arp.jsfx</source>
+      </version>
+      <version name="12.0.0" author="Rock Kennedy" time="2026-03-23T03:26:50Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/ff82edb8637f3199c69e5992956511e066ada31f/Effects/N2N%20Arp.jsfx</source>
       </version>
     </reapack>
     <reapack name="N2N Drum Arranger.jsfx" type="effect" desc="N2N Drum Arranger">
