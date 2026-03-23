@@ -1,18 +1,17 @@
 -- @description numbers2notes_gmem
--- @version 1.21
--- @noindex
+-- @version 1.4
 -- @author Rock Kennedy
+-- @noindex
 -- @about
 --   # numbers2notes_gmem
 --   Numbers2Notes Support File.
 -- @changelog
 --   + First version
---   + new gmem space
 
 
 
 
-
+-- RESERVE local REC_CUES_ON = 5000100;
 
 
 local export = {}
