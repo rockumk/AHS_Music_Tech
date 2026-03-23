@@ -1,11 +1,12 @@
 -- @description Numbers2Notes
--- @version  1.5.5
+-- @version  1.7.7
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.5.5
+--   # Numbers2Notes 1.7.7
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
+--   numbers2notes_advanced_user_setup.lua
 --   numbers2notes_config.lua
 --   numbers2notes_form.lua
 --   numbers2notes_gmem.lua
@@ -15,7 +16,7 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
---   # Major Update 1.5.5
+--   # Major Update 1.7.7
 --   + Added Groove
 --   + Changed N2N Drum Arranger to N2N Drum Arranger.jsfx
 --   + Changed gmem name
@@ -28,6 +29,7 @@ local info = debug.getinfo(1, "S")
 -----------------------------------------------   REQUIRED FILES
 local script_path = info.source:match [[^@?(.*[\/])[^\/]-$]]
 package.path = package.path .. ";" .. "?.lua"
+local advanced_user_setup = require(script_path .. "numbers2notes_advanced_user_setup")
 local musictheory = require(script_path .. "numbers2notes_musictheory")
 local spectrum = require(script_path .. "numbers2notes_spectrum")
 local songs = require(script_path .. "numbers2notes_songs")
@@ -35,9 +37,13 @@ local help = require(script_path .. "numbers2notes_help")
 local form = require(script_path .. "numbers2notes_form")
 local config = require(script_path .. "numbers2notes_config")
 local gmem_export = require(script_path .. "numbers2notes_gmem")
+reaper.gmem_attach("N2N_Ecosystem_RSKennedy")
 local track_table = config.track_table
 local pluginsources = config.pluginsources
 local G_startup_missing_report = ""
+
+
+
 
 -----------------------------------------------   GUI VARIABLES AND SETUP
 
@@ -63,6 +69,50 @@ OM_ex_warning = ""
 cancel_OM_opperation = false
 OMfalsesofar = 0
 the_itemOM = ""
+
+-- GLOBAL RENDER SETTINGS
+G_render_mode = 0 -- 0 = Relative (Default), 1 = Absolute
+G_DRUM_CUE_PLACEMENT = "Every 4 Bars"
+G_ARP_CUE_PLACEMENT  = "Every Section"
+
+
+-- Optional: Load saved state for this specific project if you want it to remember
+local rv1, saved_mode = reaper.GetProjExtState(0, "N2N", "RenderMode")
+if rv1 > 0 then G_render_mode = tonumber(saved_mode) end
+
+local rv2, saved_drum_cue = reaper.GetProjExtState(0, "N2N", "DrumCueMode")
+if rv2 > 0 and saved_drum_cue ~= "" then G_DRUM_CUE_PLACEMENT = saved_drum_cue end
+
+local rv3, saved_arp_cue = reaper.GetProjExtState(0, "N2N", "ArpCueMode")
+if rv3 > 0 and saved_arp_cue ~= "" then G_ARP_CUE_PLACEMENT = saved_arp_cue end
+
+-- Inject loaded states into the UI Recipe so dropdowns match upon boot
+for _, tr in ipairs(config.track_recipe) do
+    if tr.type == 32 and rv2 > 0 then tr.drum_arp_mode = saved_drum_cue end
+    if tr.type == 33 and rv3 > 0 then tr.drum_arp_mode = saved_arp_cue end
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 -- GROOVE VARIABLES
 groove_data = {}
@@ -217,7 +267,6 @@ end
 -- Save to GMEM (Offset 5,000,000)
 function Export_Groove_To_GMEM()
     -- Ensure we are attached to the right namespace
-    reaper.gmem_attach("N2N_Ecosystem_RSKennedy")
 
     for i = 1, 32 do
         -- Lua arrays are 1-based, GMEM is 0-based offset
@@ -250,25 +299,27 @@ function set_the_time_sig(stk_progression)
     -- Default to 4/4 if missing
     local num = 4
     local den = 4
-    
+
     local _, time_start = string.find(stk_progression, "Time:")
-    
+
     if time_start then
         -- Find end of line
         local line_end = string.find(stk_progression, "\n", time_start)
-        if not line_end then line_end = string.len(stk_progression) end
-        
+        if not line_end then
+            line_end = string.len(stk_progression)
+        end
+
         -- Extract string "3/4" or "6/8"
         local time_str = string.sub(stk_progression, time_start + 1, line_end)
-        
+
         -- Find the slash
         local slash = string.find(time_str, "/")
-        
+
         if slash then
             -- Extract numbers
             local n_str = string.sub(time_str, 1, slash - 1)
             local d_str = string.sub(time_str, slash + 1)
-            
+
             -- Clean and convert
             num = tonumber(string.match(n_str, "%d+")) or 4
             den = tonumber(string.match(d_str, "%d+")) or 4
@@ -277,10 +328,9 @@ function set_the_time_sig(stk_progression)
             num = tonumber(string.match(time_str, "%d+")) or 4
         end
     end
-    
+
     return num, den
 end
-
 
 function Load_Groove()
     local retval, file = reaper.GetUserFileNameForRead("", "Load Groove Preset", "n2ng")
@@ -299,127 +349,64 @@ function Load_Groove()
     end
 end
 -- ________________________________________________________ PLUGIN AUDIT SYSTEM
--- ________________________________________________________ PLUGIN AUDIT SYSTEM
+
 function Check_Plugins_On_Startup()
     reaper.PreventUIRefresh(1)
 
     local missing_log = {}
-    local checked_cache = {} -- Cache to prevent checking the same plugin twice
     local missing_count = 0
 
-    -- 1. Create a temporary "Sandbox" track
+    -- Core Engine Plugins + Bundled VSTis required for N2N to function
+    local core_plugins = {
+        {name = "pad-synth", ext = ".jsfx", source = 4},
+        {name = "SwingProjectMIDI", ext = "", source = 3},
+        {name = "N2N Chooser", ext = ".jsfx", source = 3},
+        {name = "N2N Arp", ext = ".jsfx", source = 3},
+        {name = "N2N Drum Arranger", ext = ".jsfx", source = 3},
+        -- Added your bundled VSTis (Fallback strings will catch VST3 vs CLAP differences)
+        {name = "CLAP: Surge XT", fallback = "VST3i: Surge XT", ext = "", source = 8},
+        {name = "Pro Punk Drums", fallback = "VSTi: Pro Punk Drums", ext = "", source = 10}
+    }
+
     local track_idx = reaper.CountTracks(0)
     reaper.InsertTrackAtIndex(track_idx, false)
     local temp_track = reaper.GetTrack(0, track_idx)
 
-    -- 2. Check the "Audition" Synth (Special Case)
-    local pad_check = reaper.TrackFX_AddByName(temp_track, "pad-synth", false, 1)
-    if pad_check == -1 then
-         -- Fallback: try adding .jsfx extension
-        pad_check = reaper.TrackFX_AddByName(temp_track, "pad-synth.jsfx", false, 1)
-    end
+    for _, plug in ipairs(core_plugins) do
+        local index = reaper.TrackFX_AddByName(temp_track, plug.name, false, 1)
 
-    if pad_check == -1 then
-        missing_count = missing_count + 1
-        table.insert(
-            missing_log,
-            "CRITICAL: 'pad-synth' (Auditioning) is missing.\nSource: " .. (pluginsources[3] or "Unknown")
-        )
-    else
-        reaper.TrackFX_Delete(temp_track, pad_check)
-    end
+        -- Try extension fallback
+        if index == -1 and plug.ext ~= "" then
+            index = reaper.TrackFX_AddByName(temp_track, plug.name .. plug.ext, false, 1)
+        end
 
-    -- 3. Audit the Track Table
-    for _, track_data in pairs(track_table) do
-        if track_data[5] then -- If track has plugins defined
-            for _, plug_data in pairs(track_data[5]) do
-                local name = plug_data[1] -- The name from your config
-                local source_id = plug_data[4] or 99
+        -- Try alternate format fallback (e.g. VST3i instead of CLAP)
+        if index == -1 and plug.fallback then
+            index = reaper.TrackFX_AddByName(temp_track, plug.fallback, false, 1)
+        end
 
-                if checked_cache[name] == nil then
-                    
-                    -- ====================================================
-                    -- STRATEGY: Try Exact -> Try Cleaned (Root)
-                    -- ====================================================
-
-                    -- Attempt 1: Try the name exactly as written in config
-                    -- If config is "CLAP: Bass Squeezer", this forces CLAP format.
-                    local index = reaper.TrackFX_AddByName(temp_track, name, false, 1)
-
-                    -- Attempt 2: If failed, strip parentheses/garbage but KEEP prefix
-                    -- Input:  "CLAP: Bass Squeezer (Stereo)"
-                    -- Output: "CLAP: Bass Squeezer"
-                    if index == -1 then
-                        local clean_name = name:gsub("%s*%(.-%)", "") -- remove (...)
-                        clean_name = clean_name:gsub("%s*$", "")      -- remove trailing spaces
-                        
-                        if clean_name ~= name then
-                            index = reaper.TrackFX_AddByName(temp_track, clean_name, false, 1)
-                        end
-                    end
-
-                    -- Attempt 3: If failed, strip extensions (common in JSFX)
-                    -- Input:  "Utility/Volume.jsfx"
-                    -- Output: "Utility/Volume"
-                    if index == -1 then
-                        local no_ext = name:gsub("%.%w+$", "")
-                        if no_ext ~= name then
-                            index = reaper.TrackFX_AddByName(temp_track, no_ext, false, 1)
-                        end
-                    end
-
-                    -- ====================================================
-                    -- RESULTS PROCESSING
-                    -- ====================================================
-
-                    if index ~= -1 then
-                        -- SUCCESS
-                        checked_cache[name] = true 
-
-                        -- CRITICAL STEP: Get the ACTUAL name found by REAPER
-                        -- If we asked for "CLAP: Bass Squeezer" and found "CLAP: Bass Squeezer (Vendor)",
-                        -- we capture the long name.
-                        local retval, actual_name = reaper.TrackFX_GetFXName(temp_track, index, "")
-                        
-                        if retval and actual_name ~= "" then
-                            -- Update the script's memory so Setup_Tracks uses the working name
-                            plug_data[1] = actual_name
-                        end
-                        
-                        -- Remove the test instance
-                        reaper.TrackFX_Delete(temp_track, index) 
-
-                    else
-                        -- FAILURE
-                        checked_cache[name] = false 
-                        missing_count = missing_count + 1
-
-                        local source_msg = pluginsources[source_id] or "Unknown Source."
-                        table.insert(missing_log, "Missing: " .. name .. "\n-> " .. source_msg)
-                    end
-                end
-            end
+        if index == -1 then
+            missing_count = missing_count + 1
+            local source_msg = config.pluginsources[plug.source] or "Unknown Source"
+            table.insert(missing_log, "CRITICAL MISSING: '" .. plug.name .. "'\nSource: " .. source_msg)
+        else
+            reaper.TrackFX_Delete(temp_track, index)
         end
     end
 
-    -- 4. Clean up the sandbox track
     reaper.DeleteTrack(temp_track)
     reaper.PreventUIRefresh(-1)
 
-    -- 5. Generate Report
     if missing_count > 0 then
         G_startup_missing_report =
             "SYSTEM NOT READY: " ..
-            missing_count ..
-                " PLUGINS MISSING\n\n" ..
-                    "The script cannot build tracks correctly without these plugins.\n" ..
-                        "Please install them, OR edit 'numbers2notes_config.lua'.\n\n"
+            missing_count .. " CORE COMPONENTS MISSING\n\n" .. "The script cannot operate without these plugins.\n\n"
         for _, msg in pairs(missing_log) do
             G_startup_missing_report = G_startup_missing_report .. msg .. "\n\n"
         end
-        return true -- Errors found
+        return true
     else
-        return false -- All good
+        return false
     end
 end
 
@@ -544,22 +531,126 @@ Form: # I V C V C B C O]]
     end
 end
 
+function Set_Mood2Mode_Parameters(r_tonic, m_center)
+    -- Calculate mode based on interval between Parent Major and Modal Center
+    local interval = (m_center - r_tonic) % 12
+    if interval < 0 then
+        interval = interval + 12
+    end
+
+    local mode_val = 1 -- Default Major (Ionian)
+    if interval == 2 then
+        mode_val = 2 -- Dorian
+    elseif interval == 4 then
+        mode_val = 3 -- Phrygian
+    elseif interval == 5 then
+        mode_val = 4 -- Lydian
+    elseif interval == 7 then
+        mode_val = 5 -- Mixolydian
+    elseif interval == 9 then
+        mode_val = 6 -- Aeolian (Minor)
+    elseif interval == 11 then
+        mode_val = 7 -- Locrian
+    end
+
+    -- Scan all tracks in the project for JS: Mood2Mode
+    local track_count = reaper.CountTracks(0)
+    for i = 0, track_count - 1 do
+        local track = reaper.GetTrack(0, i)
+
+        -- BULLETPROOF FX FINDER
+        local fx_idx = -1
+        for j = 0, reaper.TrackFX_GetCount(track) - 1 do
+            local retval, fx_name = reaper.TrackFX_GetFXName(track, j, "")
+            if retval and fx_name:find("Mood2Mode") then
+                fx_idx = j
+                break
+            end
+        end
+
+        if fx_idx >= 0 then
+            -- Param 0 = Slider 1 (Mode 1-7)
+            reaper.TrackFX_SetParam(track, fx_idx, 0, mode_val)
+            -- Param 1 = Slider 2 (Parent Major Tonic 0-11)
+            reaper.TrackFX_SetParam(track, fx_idx, 1, r_tonic)
+            -- Param 2 = Slider 3 (Modal Tonic 0-11)
+            reaper.TrackFX_SetParam(track, fx_idx, 2, m_center)
+
+            -- Param 3 = Slider 4 (White vs Black Keys)
+            -- Automatically detect based on the track name!
+            local _, tr_name = reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "", false)
+		if tr_name:lower():find("black", 1, true) then
+			-- Use raw value: 2 = Black Keys 1
+			reaper.TrackFX_SetParam(track, fx_idx, 3, 2) 
+			local actual = reaper.TrackFX_GetParam(track, fx_idx, 3)
+		else
+			-- Use raw value: 1 = White Keys
+			reaper.TrackFX_SetParam(track, fx_idx, 3, 1) 
+			local actual = reaper.TrackFX_GetParam(track, fx_idx, 3)
+		end
+        end
+    end
+end
+
 -----------------------------------------------                 CHECK IF A PROJECT IS OPEN
 local function is_project_open()
     return reaper.GetProjectName(0, "") ~= ""
 end
 
------------------------------------------------                 CHECK IF THE "N2N Audition" TRACK EXISTS
-local function get_playback_track()
+----------------------------------------------- CHECK OR BUILD "N2N Audition" TRACK
+function Ensure_Audition_Track_Exists()
+    -- 1. Check if we already have it safely cached
+    if audition_track and reaper.ValidatePtr(audition_track, "MediaTrack*") then
+        return audition_track
+    end
+
+    -- 2. Scan project to see if it exists
     local track_count = reaper.CountTracks(0)
     for i = 0, track_count - 1 do
         local track = reaper.GetTrack(0, i)
         local _, track_name = reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "", false)
         if track_name == "N2N Audition" then
+            audition_track = track
             return track
         end
     end
-    return nil
+
+    -- 3. Doesn't exist? Create it!
+    reaper.InsertTrackAtIndex(reaper.CountTracks(0), false)
+    local new_track = reaper.GetTrack(0, reaper.CountTracks(0) - 1)
+    reaper.GetSetMediaTrackInfo_String(new_track, "P_NAME", "N2N Audition", true)
+
+    -- Add FX
+    reaper.TrackFX_AddByName(new_track, "pad-synth.jsfx", false, -1)
+    reaper.TrackFX_AddByName(new_track, "Isolator", false, -1)
+
+    -- Set Colors and hidden state
+    local track_color = reaper.ColorToNative(222, 222, 222) | 0x10000000
+    reaper.SetTrackColor(new_track, track_color)
+    reaper.SetMediaTrackInfo_Value(new_track, "B_SHOWINTCP", 0)
+    reaper.SetMediaTrackInfo_Value(new_track, "B_SHOWINMIXER", 0)
+    reaper.SetMediaTrackInfo_Value(new_track, "I_RECARM", 1)
+    reaper.SetMediaTrackInfo_Value(new_track, "I_RECMODE", 2)
+    reaper.SetMediaTrackInfo_Value(new_track, "B_MUTE", 1)
+
+    -- 4. Try Virtual Keyboard, fallback to All MIDI if not found
+    local dev_id = nil
+    for j = 0, 64 do
+        local retval, nameout = reaper.GetMIDIInputName(j, "")
+        if nameout:lower():match("virtual midi keyboard") then
+            dev_id = j
+            break
+        end
+    end
+
+    local val = 6112 -- Safe fallback: All MIDI Inputs, All Channels
+    if dev_id then
+        val = 4096 + 1 + (dev_id << 5)
+    end
+    reaper.SetMediaTrackInfo_Value(new_track, "I_RECINPUT", val)
+
+    audition_track = new_track
+    return new_track
 end
 
 -----------------------------------------------                 GUI VARIABLES AND SETUP
@@ -585,9 +676,19 @@ r.ImGui_Attach(ctx, font)
 
 local click_count, text = 0, ""
 local window_flags = r.ImGui_WindowFlags_NoResize() | r.ImGui_WindowFlags_MenuBar()
-r.ImGui_SetNextWindowSize(ctx, 1300, 705)
-r.ImGui_SetNextWindowPos(ctx, 7, 65)
-r.ImGui_SetNextWindowCollapsed(ctx, false, nil)
+
+local win_w, win_h = 1300, 705
+
+local mainwindow = r.ImGui_GetMainViewport(ctx)
+local vp_x, vp_y = r.ImGui_Viewport_GetPos(mainwindow)
+local screen_w, screen_h = r.ImGui_Viewport_GetSize(mainwindow)
+
+local x = vp_x + ((screen_w - win_w) / 2)
+local y = vp_y + ((screen_h - win_h) / 2)
+
+r.ImGui_SetNextWindowSize(ctx, win_w, win_h, r.ImGui_Cond_FirstUseEver())
+r.ImGui_SetNextWindowPos(ctx, x, y, r.ImGui_Cond_FirstUseEver())
+r.ImGui_SetNextWindowCollapsed(ctx, false, r.ImGui_Cond_FirstUseEver())
 r.ImGui_SetNextWindowBgAlpha(ctx, 1)
 
 GridTrueFalse = true
@@ -617,46 +718,630 @@ function Link(url)
     end
 end
 
+-- ==============================================================================
+-- TRACK BUILDER UI & FX CHOOSER
+-- ==============================================================================
+
+local FX_CACHE = nil
+local FX_CACHE_BUILT = false
+
+local FXC = {
+    open = false,
+    tr = nil,
+    field = nil,
+    filter = "",
+    results = {},
+    sel = 1,
+    instruments_only = false,
+    fx_only = false,
+    pending_open = false,
+    pending_tr = nil,
+    pending_field = nil
+}
+
+local function BuildFXCache()
+    if FX_CACHE_BUILT then
+        return
+    end
+    FX_CACHE = {"Container", "Video processor"}
+    for i = 0, math.huge do
+        local ret, name = reaper.EnumInstalledFX(i)
+        if not ret then
+            break
+        end
+        FX_CACHE[#FX_CACHE + 1] = name
+    end
+    table.sort(
+        FX_CACHE,
+        function(a, b)
+            return a:lower() < b:lower()
+        end
+    )
+    FX_CACHE_BUILT = true
+end
+
+local function Trim(s)
+    return (s or ""):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function IsInstrumentFXName(name)
+    return name:match("^VSTi: ") or name:match("^VST3i: ") or name:match("^AUi: ") or name:match("^CLAPi: ") or
+        name:match("^LV2i: ")
+end
+
+local function FXC_TypePass(name)
+    if FXC.instruments_only then
+        return IsInstrumentFXName(name) ~= nil
+    elseif FXC.fx_only then
+        return IsInstrumentFXName(name) == nil
+    end
+    return true
+end
+
+local function FXC_UpdateResults()
+    local f = Trim(FXC.filter):lower()
+    local t = {}
+
+    if f == "" then
+        local added = 0
+        for i = 1, #FX_CACHE do
+            local name = FX_CACHE[i]
+            if FXC_TypePass(name) then
+                added = added + 1
+                t[#t + 1] = {name = name, score = i}
+                if added >= 500 then
+                    break
+                end
+            end
+        end
+    else
+        for i = 1, #FX_CACHE do
+            local name = FX_CACHE[i]
+            if FXC_TypePass(name) then
+                local s = name:lower()
+                local ok = true
+                for w in f:gmatch("%S+") do
+                    if not s:find(w, 1, true) then
+                        ok = false
+                        break
+                    end
+                end
+                if ok then
+                    t[#t + 1] = {name = name, score = (#name - #f)}
+                end
+            end
+        end
+        table.sort(
+            t,
+            function(a, b)
+                if a.score == b.score then
+                    return a.name:lower() < b.name:lower()
+                end
+                return a.score < b.score
+            end
+        )
+    end
+
+    FXC.results = t
+    FXC.sel = math.max(1, math.min(FXC.sel, #t))
+end
+
+local function FXChooser_Open(tr_ref, field_name)
+    BuildFXCache()
+    FXC.tr = tr_ref
+    FXC.field = field_name
+    FXC.filter = ""
+    FXC.sel = 1
+    FXC.open = true
+    FXC_UpdateResults()
+    reaper.ImGui_OpenPopup(ctx, "Choose FX##N2N_FX_CHOOSER")
+end
+
+local function FXChooser_CommitSelection()
+    local pick = FXC.results[FXC.sel] and FXC.results[FXC.sel].name
+    if pick and FXC.tr and FXC.field then
+        FXC.tr[FXC.field] = {
+            selection_label = pick,
+            search = pick,
+            preset = ""
+        }
+    end
+    FXC.open = false
+    reaper.ImGui_CloseCurrentPopup(ctx)
+end
+
+local function FXChooser_Draw()
+    if not FXC.open then
+        return
+    end
+
+    local vp_x, vp_y = reaper.ImGui_Viewport_GetCenter(reaper.ImGui_GetMainViewport(ctx))
+    reaper.ImGui_SetNextWindowPos(ctx, vp_x, vp_y, reaper.ImGui_Cond_Appearing(), 0.5, 0.5)
+    reaper.ImGui_SetNextWindowSize(ctx, 680, 560, reaper.ImGui_Cond_Appearing())
+
+    local flags = reaper.ImGui_WindowFlags_NoCollapse() | reaper.ImGui_WindowFlags_NoSavedSettings()
+
+    local visible, open = reaper.ImGui_BeginPopupModal(ctx, "Choose FX##N2N_FX_CHOOSER", true, flags)
+    if visible then
+        reaper.ImGui_Text(ctx, "Type to filter. Enter = choose. Esc = cancel. Double-click = choose.")
+        reaper.ImGui_Separator(ctx)
+
+        do
+            local changed
+            changed, FXC.instruments_only = reaper.ImGui_Checkbox(ctx, "Instruments only", FXC.instruments_only)
+            if changed and FXC.instruments_only then
+                FXC.fx_only = false
+            end
+            reaper.ImGui_SameLine(ctx)
+            changed, FXC.fx_only = reaper.ImGui_Checkbox(ctx, "FX only", FXC.fx_only)
+            if changed and FXC.fx_only then
+                FXC.instruments_only = false
+            end
+            if changed then
+                FXC_UpdateResults()
+            end
+        end
+
+        reaper.ImGui_SetNextItemWidth(ctx, -1)
+        if reaper.ImGui_IsWindowAppearing(ctx) then
+            reaper.ImGui_SetKeyboardFocusHere(ctx)
+        end
+        local changed
+        changed, FXC.filter = reaper.ImGui_InputTextWithHint(ctx, "##fx_filter", "Search installed FX...", FXC.filter)
+        if changed then
+            FXC_UpdateResults()
+        end
+
+        if reaper.ImGui_BeginChild(ctx, "##fx_list", 0, -40, 0) then
+            for i = 1, #FXC.results do
+                local selected = (i == FXC.sel)
+                if reaper.ImGui_Selectable(ctx, FXC.results[i].name, selected) then
+                    FXC.sel = i
+                end
+                if reaper.ImGui_IsItemHovered(ctx) and reaper.ImGui_IsMouseDoubleClicked(ctx, 0) then
+                    FXC.sel = i
+                    FXChooser_CommitSelection()
+                end
+            end
+            reaper.ImGui_EndChild(ctx)
+        end
+
+        if reaper.ImGui_IsKeyPressed(ctx, reaper.ImGui_Key_Escape()) then
+            FXC.open = false
+            reaper.ImGui_CloseCurrentPopup(ctx)
+        end
+        if
+            reaper.ImGui_IsKeyPressed(ctx, reaper.ImGui_Key_Enter()) or
+                reaper.ImGui_IsKeyPressed(ctx, reaper.ImGui_Key_KeypadEnter())
+         then
+            FXChooser_CommitSelection()
+        end
+
+        reaper.ImGui_EndPopup(ctx)
+    end
+    if not open then
+        FXC.open = false
+    end
+end
+
+-- Safely get text label whether it's a table or a string
+local function GetLabel(item)
+    if type(item) == "table" then
+        return item.selection_label or "Unknown"
+    end
+    return tostring(item)
+end
+
+-- Dropdown Drawer
+local function Draw_Dropdown(id, current_val, options, tr_ref, field_name)
+    local changed = false
+    local new_val = current_val
+    reaper.ImGui_SetNextItemWidth(ctx, 330)
+
+    local preview_str = GetLabel(current_val)
+
+    if reaper.ImGui_BeginCombo(ctx, id, preview_str) then
+        for _, option in ipairs(options) do
+            local opt_str = GetLabel(option)
+            local is_selected = (preview_str == opt_str)
+
+            if reaper.ImGui_Selectable(ctx, opt_str, is_selected) then
+                if opt_str == "Select Other..." then
+                    FXC.pending_open = true
+                    FXC.pending_tr = tr_ref
+                    FXC.pending_field = field_name
+                else
+                    new_val = option
+                    changed = true
+                end
+            end
+            if is_selected then
+                reaper.ImGui_SetItemDefaultFocus(ctx)
+            end
+        end
+        reaper.ImGui_EndCombo(ctx)
+    end
+
+    return changed, new_val
+end
+
+-- State tracking for Auto-Reselect logic
+local last_has_drum = true
+local last_has_arp = true
+is_track_builder_open = false -- Global state
+
+local track_builder_was_open = false
+
+function Draw_Track_Builder_Modal()
+    -- Only trigger OpenPopup exactly on the frame the state transitions to true
+    if is_track_builder_open and not track_builder_was_open then
+        reaper.ImGui_OpenPopup(ctx, "Configure N2N Tracks")
+    end
+    track_builder_was_open = is_track_builder_open
+
+    if not is_track_builder_open then
+        return
+    end
+
+    local track_recipe = config.track_recipe
+    local mode_options = config.mode_options
+    local drum_arp_mode_options = config.drum_arp_mode_options
+
+    -- Force standard colors for the modal so it's readable
+    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_PopupBg(), 0x2E3440FF)
+    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Text(), 0xECEFF4FF)
+    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_FrameBg(), 0x4C566AFF)
+    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Button(), 0x5E81ACFF)
+
+    local vp_x, vp_y = reaper.ImGui_Viewport_GetCenter(reaper.ImGui_GetMainViewport(ctx))
+    reaper.ImGui_SetNextWindowPos(ctx, vp_x, vp_y, reaper.ImGui_Cond_Appearing(), 0.5, 0.5)
+    reaper.ImGui_OpenPopup(ctx, "Configure N2N Tracks")
+
+    n2n_main_x, n2n_main_y = reaper.ImGui_GetWindowPos(ctx)
+    n2n_main_w, n2n_main_h = reaper.ImGui_GetWindowSize(ctx)
+
+    local center_x = n2n_main_x + (n2n_main_w * 0.5)
+    local center_y = n2n_main_y + (n2n_main_h * 0.5)
+
+    reaper.ImGui_SetNextWindowPos(ctx, center_x, center_y, reaper.ImGui_Cond_Appearing(), 0.5, 0.5)
+
+    reaper.ImGui_SetNextWindowSize(ctx, 1300, 720, reaper.ImGui_Cond_Appearing())
+    if reaper.ImGui_BeginPopupModal(ctx, "Configure N2N Tracks", true) then
+        reaper.ImGui_Text(ctx, "Configure your N2N Tracks for this project:")
+        reaper.ImGui_Separator(ctx)
+        reaper.ImGui_Dummy(ctx, 0, 5)
+
+        local has_drum_arranger = false
+        local has_arp = false
+
+        for _, tr in ipairs(track_recipe) do
+            if tr.active then
+                if tr.type == 31 then
+                    has_drum_arranger = true
+                end
+                if tr.mode and (tr.mode == "Arpeggiated - N2N Arp" or tr.mode == "N2N Arp") then
+                    has_arp = true
+                end
+            end
+        end
+
+        local drum_just_enabled = (has_drum_arranger and not last_has_drum)
+        local arp_just_enabled = (has_arp and not last_has_arp)
+        last_has_drum = has_drum_arranger
+        last_has_arp = has_arp
+
+        local actions = {}
+
+        reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_ChildBg(), 0x242933FF)
+
+        -- Adjusted height down to 400 so it doesn't stretch past small laptop screens!
+        if reaper.ImGui_BeginChild(ctx, "track_list_scroll", 0, 580, 0) then
+            for i, tr in ipairs(track_recipe) do
+                reaper.ImGui_PushID(ctx, i)
+
+                local is_drum_cue = (tr.type == 32)
+                local is_arp_cue = (tr.type == 33)
+
+                if is_drum_cue and drum_just_enabled then
+                    tr.active = true
+                end
+                if is_arp_cue and arp_just_enabled then
+                    tr.active = true
+                end
+
+                local force_disable = (is_drum_cue and not has_drum_arranger) or (is_arp_cue and not has_arp)
+
+                if force_disable then
+                    reaper.ImGui_BeginDisabled(ctx)
+                    tr.active = false
+                end
+
+                if tr.IndentMIDI == -1 then
+                    if tr.divider_before then
+                        reaper.ImGui_Separator(ctx)
+                    end
+                end
+
+                if tr.IndentMIDI == 0 then
+                    if tr.divider_before then
+                        reaper.ImGui_Separator(ctx)
+
+                        -- RADIO BUTTONS FOR RENDER MODE
+                        reaper.ImGui_Dummy(ctx, 150, 0)
+                        reaper.ImGui_SameLine(ctx)
+                        reaper.ImGui_Text(ctx, "MIDI Render Mode:")
+
+                        reaper.ImGui_SameLine(ctx)
+                        if reaper.ImGui_RadioButton(ctx, "Relative (Always C)", G_render_mode == 0) then
+                            G_render_mode = 0
+                            reaper.SetProjExtState(0, "N2N", "RenderMode", "0")
+                        end
+
+                        reaper.ImGui_SameLine(ctx)
+                        if reaper.ImGui_RadioButton(ctx, "Absolute (Actual Key)", G_render_mode == 1) then
+                            G_render_mode = 1
+                            reaper.SetProjExtState(0, "N2N", "RenderMode", "1")
+                        end
+                        reaper.ImGui_Dummy(ctx, 0, 5)
+                    end
+                    reaper.ImGui_Dummy(ctx, 150, 0)
+                    reaper.ImGui_SameLine(ctx)
+                end
+
+                if tr.IndentMIDI == 1 then
+                    reaper.ImGui_Dummy(ctx, 150, 0)
+                    reaper.ImGui_SameLine(ctx)
+                end
+
+                local rv, checked = reaper.ImGui_Checkbox(ctx, "##act", tr.active)
+                if rv then
+                    tr.active = checked
+                end
+
+                reaper.ImGui_SameLine(ctx)
+                reaper.ImGui_SetNextItemWidth(ctx, 350) -- Trimmed text width to keep modal size clean
+
+                -- DYNAMIC TEXT REPLACEMENT: Swap <TYPE SELECT> with the active radio button choice
+                local display_label = tr.ItemLabel or ("Type " .. tostring(tr.type))
+                if display_label:find("<TYPE SELECT>") then
+                    local mode_str = (G_render_mode == 0) and "Relative" or "Absolute"
+                    display_label = display_label:gsub("<TYPE SELECT>", mode_str)
+                end
+
+                -- Custom display: Shorten the text if it's too long, or just let it clip cleanly
+                reaper.ImGui_Text(ctx, display_label)
+
+                if force_disable then
+                    reaper.ImGui_EndDisabled(ctx)
+                    if reaper.ImGui_IsItemHovered(ctx, reaper.ImGui_HoveredFlags_AllowWhenDisabled()) then
+                        reaper.ImGui_SetTooltip(ctx, "Requires the parent arranger track to be active.")
+                    end
+                end
+
+
+
+
+
+
+
+                local dropdown_x_offset = 480
+
+                local list = tr.vsti_list or tr.vst_list or tr.audio_list
+                local field = tr.vsti_list and "vsti_choice"
+                    or (tr.vst_list and "vst_choice"
+                    or (tr.audio_list and "audio_choice" or nil))
+                local cur = field and tr[field] or nil
+
+                if list and field and cur then
+                    reaper.ImGui_SameLine(ctx, dropdown_x_offset)
+                    local changed, new_val = Draw_Dropdown("##fxpick", cur, list, tr, field)
+                    if changed then
+                        tr[field] = new_val
+                    end
+                    dropdown_x_offset = dropdown_x_offset + 340
+                end
+
+                if tr.preset_list and tr.preset_choice then
+                    reaper.ImGui_SameLine(ctx, dropdown_x_offset)
+                    local preset_changed, new_preset =
+                        Draw_Dropdown("##presetpick", tr.preset_choice, tr.preset_list, tr, "preset_choice")
+                    if preset_changed then
+                        tr.preset_choice = new_preset
+                    end
+                    dropdown_x_offset = dropdown_x_offset + 340
+                end
+
+                if tr.drum_arp_mode then
+                    reaper.ImGui_SameLine(ctx, dropdown_x_offset)
+                    local arp_mode_changed, new_arp_mode =
+                        Draw_Dropdown("##drum_arp", tr.drum_arp_mode, drum_arp_mode_options, tr, "drum_arp_mode")
+                    if arp_mode_changed then
+                        tr.drum_arp_mode = new_arp_mode
+                        if tr.type == 32 then reaper.SetProjExtState(0, "N2N", "DrumCueMode", new_arp_mode) end
+                        if tr.type == 33 then reaper.SetProjExtState(0, "N2N", "ArpCueMode", new_arp_mode) end
+                    end
+                    dropdown_x_offset = dropdown_x_offset + 340
+                end
+
+                if tr.mode then
+                    reaper.ImGui_SameLine(ctx, dropdown_x_offset)
+                    local mode_changed, new_mode = Draw_Dropdown("##mode", tr.mode, mode_options)
+                    if mode_changed then
+                        tr.mode = new_mode
+                    end
+                    dropdown_x_offset = dropdown_x_offset + 340
+                end
+
+                if not tr.single then
+                    reaper.ImGui_SameLine(ctx, dropdown_x_offset)
+
+                    if reaper.ImGui_Button(ctx, "+") then
+                        table.insert(
+                            actions,
+                            {
+                                action = "add",
+                                index = i,
+                                data = {
+                                    type = tr.type,
+                                    ItemLabel = tr.ItemLabel,
+                                    divider_before = false,
+                                    Tr_divider_before = false,
+                                    active = true,
+                                    single = false,
+                                    vsti_choice = tr.vsti_choice,
+                                    vsti_list = tr.vsti_list,
+                                    vst_choice = tr.vst_choice,
+                                    vst_list = tr.vst_list,
+                                    audio_choice = tr.audio_choice,
+                                    audio_list = tr.audio_list,
+                                    preset_choice = tr.preset_choice,
+                                    preset_list = tr.preset_list,
+                                    mode = tr.mode,
+                                    drum_arp_mode = tr.drum_arp_mode,
+                                    is_clone = true,
+                                    addchain = tr.addchain,
+                                    IndentMIDI = tr.IndentMIDI
+                                }
+                            }
+                        )
+                    end
+
+                    if tr.is_clone then
+                        reaper.ImGui_SameLine(ctx)
+                        if reaper.ImGui_Button(ctx, "-") then
+                            table.insert(actions, {action = "remove", index = i})
+                        end
+                    end
+                end
+
+
+
+
+
+
+
+
+
+
+
+
+                reaper.ImGui_PopID(ctx)
+            end
+            reaper.ImGui_EndChild(ctx)
+        end
+        reaper.ImGui_PopStyleColor(ctx)
+
+        if #actions > 0 then
+            table.sort(
+                actions,
+                function(a, b)
+                    return a.index > b.index
+                end
+            )
+            for _, act in ipairs(actions) do
+                if act.action == "add" then
+                    table.insert(track_recipe, act.index + 1, act.data)
+                elseif act.action == "remove" then
+                    table.remove(track_recipe, act.index)
+                end
+            end
+        end
+
+        reaper.ImGui_Dummy(ctx, 0, 5)
+        reaper.ImGui_Separator(ctx)
+        reaper.ImGui_Dummy(ctx, 0, 5)
+
+        if reaper.ImGui_Button(ctx, "Build Tracks & Render", 200, 35) then
+            is_track_builder_open = false
+            reaper.ImGui_CloseCurrentPopup(ctx)
+            Start_Render_Coroutine()
+        end
+
+        reaper.ImGui_SameLine(ctx)
+        if reaper.ImGui_Button(ctx, "Cancel", 100, 35) then
+            is_track_builder_open = false
+            reaper.ImGui_CloseCurrentPopup(ctx)
+        end
+
+        if FXC.pending_open then
+            FXC.pending_open = false
+            FXChooser_Open(FXC.pending_tr, FXC.pending_field)
+            FXC.pending_tr, FXC.pending_field = nil, nil
+        end
+
+        FXChooser_Draw()
+        reaper.ImGui_EndPopup(ctx)
+    else
+        is_track_builder_open = false
+    end
+
+    reaper.ImGui_PopStyleColor(ctx, 4) -- Pop the 4 dialog colors we pushed!
+end
+
+local last_audition_validate_time = 0
+
+local function Ensure_Audition_Track_Valid()
+    local now = reaper.time_precise()
+    -- Validate at most once every 3 seconds to save CPU/prevent UI stutter
+    if now - last_audition_validate_time < 3.0 then
+        return
+    end
+    last_audition_validate_time = now
+    Ensure_Audition_Track_Exists()
+end
+
+----------------------------------------------- STYLE COLOR MANAGER
+local n2n_styles = {
+    {reaper.ImGui_Col_WindowBg(), 0xC8CED3FF},
+    {reaper.ImGui_Col_TitleBg(), 0xD5D5D5FF},
+    {reaper.ImGui_Col_TitleBgActive(), 0xD5D5D5FF},
+    {reaper.ImGui_Col_TitleBgCollapsed(), 0x63636382},
+    {reaper.ImGui_Col_MenuBarBg(), 0xD5D5D5FF},
+    {reaper.ImGui_Col_InputTextCursor(), 0x000000FF},
+    {reaper.ImGui_Col_Text(), 0x000000FF},
+    {reaper.ImGui_Col_ChildBg(), 0xC8858500},
+    {reaper.ImGui_Col_PopupBg(), 0x77B384F0},
+    {reaper.ImGui_Col_BorderShadow(), 0x466C9000},
+    {reaper.ImGui_Col_FrameBg(), 0xFFFFFFFE},
+    {reaper.ImGui_Col_ScrollbarBg(), 0x82589E87},
+    {reaper.ImGui_Col_Button(), 0x2A9AC0FF},
+    {reaper.ImGui_Col_ButtonHovered(), 0xFFF06FCC},
+    {reaper.ImGui_Col_ButtonActive(), 0xFFFFFFFF},
+    {reaper.ImGui_Col_Tab(), 0xEEEFEEDC},
+    {reaper.ImGui_Col_TabHovered(), 0xFFFFFFFF},
+    {reaper.ImGui_Col_TabActive(), 0xFFF06FCC},
+    {reaper.ImGui_Col_TabUnfocused(), 0x834568F8},
+    {reaper.ImGui_Col_TableHeaderBg(), 0xC9BB00FF},
+    {reaper.ImGui_Col_DockingEmptyBg(), 0x00F2FFFF},
+    {reaper.ImGui_Col_TableRowBg(), 0xFF000000},
+    {reaper.ImGui_Col_TableBorderLight(), 0x0000FFFF}
+}
+
+local function Push_N2N_Styles(context)
+    for _, style in ipairs(n2n_styles) do
+        reaper.ImGui_PushStyleColor(context, style[1], style[2])
+    end
+end
+
+local function Pop_N2N_Styles(context)
+    reaper.ImGui_PopStyleColor(context, #n2n_styles)
+end
 -----------------------------------------------                 IMGUI LOOP FUNCTION
 function IM_GUI_Loop()
     local rv
     local rc
 
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_WindowBg(), 0xC8CED3FF)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_TitleBg(), 0xD5D5D5FF)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_TitleBgActive(), 0xD5D5D5FF)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_TitleBgCollapsed(), 0x63636382)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_MenuBarBg(), 0xD5D5D5FF)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_InputTextCursor(), 0x000000FF)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Text(), 0x000000FF)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_ChildBg(), 0xC8858500)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_PopupBg(), 0x77B384F0)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_BorderShadow(), 0x466C9000)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_FrameBg(), 0xFFFFFFFE)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_ScrollbarBg(), 0x82589E87)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Button(), 0x2A9AC0FF)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_ButtonHovered(), 0xFFF06FCC)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_ButtonActive(), 0xFFFFFFFF)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Tab(), 0xEEEFEEDC)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_TabHovered(), 0xFFFFFFFF)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_TabActive(), 0xFFF06FCC)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_TabUnfocused(), 0x834568F8)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_TableHeaderBg(), 0xC9BB00FF)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_DockingEmptyBg(), 0x00F2FFFF)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_TableRowBg(), 0xFF000000)
-    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_TableBorderLight(), 0x0000FFFF)
+    local current_audition_key = set_the_key(header_area)
+    audition_key_shift = musictheory.key_table[current_audition_key] or 0
+
+    Push_N2N_Styles(ctx)
     reaper.ImGui_PushFont(ctx, font)
 
     local visible, open =
         reaper.ImGui_Begin(ctx, "Numbers2Notes - Nashville Number Charts for Reaper", true, window_flags)
 
-    local playback_track = get_playback_track()
-
-    if not playback_track then
-        -- If the track doesn't exist, call Initialize_Track_Setup to create it
-        Initialize_Track_Setup()
-        playback_track = get_playback_track() -- Re-fetch the track after creation
-    end
+    -- Safely ensure the audition track is built and mapped to the Global Variable
+    Ensure_Audition_Track_Valid()
 
     if liveMIDI_playing_timer > 1 and liveMIDI_playing_timer < 41 then
         liveMIDI_playing_timer = liveMIDI_playing_timer - 1
@@ -672,25 +1357,44 @@ function IM_GUI_Loop()
             reaper.StuffMIDIMessage(0, 128, 48 + v + musictheory.root_table[last_play_root] + audition_key_shift, 100)
         end
         liveMIDI_playing_timer = 0
-        reaper.SetMediaTrackInfo_Value(audition_track, "B_MUTE", 1)
+
+        -- Safe Mute Call
+        if audition_track and reaper.ValidatePtr(audition_track, "MediaTrack*") then
+            reaper.SetMediaTrackInfo_Value(audition_track, "B_MUTE", 1)
+        end
     end
 
     if visible then
         if modal_on == true then
+            reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_PopupBg(), 0x2E3440FF)
+            reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Text(), 0xECEFF4FF)
+            reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_FrameBg(), 0x4C566AFF)
+            reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Button(), 0x5E81ACFF)
+
             r.ImGui_OpenPopup(ctx, "Status:")
 
-            -- Center the popup
-            local vp_x, vp_y = r.ImGui_Viewport_GetCenter(main_viewport)
-            r.ImGui_SetNextWindowPos(ctx, vp_x, vp_y, r.ImGui_Cond_Appearing(), 0.5, 0.5)
+            local win_x, win_y = r.ImGui_GetWindowPos(ctx)
+            local win_w, win_h = r.ImGui_GetWindowSize(ctx)
 
-            if r.ImGui_BeginPopupModal(ctx, "Status:", nil, r.ImGui_WindowFlags_AlwaysAutoResize()) then
+            r.ImGui_SetNextWindowPos(
+                ctx,
+                win_x + (win_w * 0.5),
+                win_y + (win_h * 0.5),
+                r.ImGui_Cond_Appearing(),
+                0.5,
+                0.5
+            )
+
+            r.ImGui_SetNextWindowSize(ctx, 720, 460, r.ImGui_Cond_Appearing())
+
+            if r.ImGui_BeginPopupModal(ctx, "Status:") then
                 -- ERROR STATE: Show Missing Plugins
                 if G_startup_missing_report ~= "" then
                     r.ImGui_TextColored(ctx, 0xFF5555FF, "MISSING DEPENDENCIES")
                     r.ImGui_Separator(ctx)
 
                     -- 1. Scrollable, Selectable Text Box (Allows Copying)
-                    if r.ImGui_BeginChild(ctx, "error_scroll", 600, 350) then
+                    if r.ImGui_BeginChild(ctx, "error_scroll", 700, 350) then
                         r.ImGui_InputTextMultiline(
                             ctx,
                             "##report_display",
@@ -726,12 +1430,35 @@ function IM_GUI_Loop()
                         open = false
                     end
                 else
-                    -- NORMAL STATE: Just Processing
-                    r.ImGui_Text(ctx, "       Processing...       \n\n")
+                    -- NORMAL STATE: Coroutine Processing
+                    r.ImGui_Text(ctx, render_status_msg .. "       \n\n")
+
+                    -- Push the background coroutine forward 1 step per frame
+                    if render_co then
+                        if coroutine.status(render_co) ~= "dead" then
+                            local success, msg = coroutine.resume(render_co)
+                            if success then
+                                if msg then
+                                    render_status_msg = msg
+                                end
+                            else
+                                reaper.ShowConsoleMsg("Render Error: " .. tostring(msg) .. "\n")
+                                render_co = nil
+                                modal_on = false
+                                r.ImGui_CloseCurrentPopup(ctx)
+                            end
+                        else
+                            -- Coroutine finished successfully!
+                            render_co = nil
+                            modal_on = false
+                            r.ImGui_CloseCurrentPopup(ctx)
+                        end
+                    end
                 end
 
                 r.ImGui_EndPopup(ctx)
             end
+            reaper.ImGui_PopStyleColor(ctx, 4) -- Clean up the styles!
         end
 
         -- Always center this window when appearing
@@ -780,7 +1507,7 @@ function IM_GUI_Loop()
                     show_headers = false
                 end
                 r.ImGui_SameLine(ctx)
-                rv, header_area =
+                local changed_h, new_h =
                     r.ImGui_InputTextMultiline(
                     ctx,
                     "##header_area",
@@ -789,7 +1516,11 @@ function IM_GUI_Loop()
                     102,
                     reaper.ImGui_InputTextFlags_AllowTabInput()
                 )
-                rv, chord_charting_area =
+                if changed_h then
+                    header_area = new_h
+                end
+
+                local changed_c, new_c =
                     r.ImGui_InputTextMultiline(
                     ctx,
                     "##chord_charting_area",
@@ -798,11 +1529,14 @@ function IM_GUI_Loop()
                     487,
                     reaper.ImGui_InputTextFlags_AllowTabInput()
                 )
+                if changed_c then
+                    chord_charting_area = new_c
+                end
             else
                 if r.ImGui_Button(ctx, "Display Header Info", nil, nil) then
                     show_headers = true
                 end
-                rv, chord_charting_area =
+                local changed_c, new_c =
                     r.ImGui_InputTextMultiline(
                     ctx,
                     "##chord_charting_area",
@@ -811,21 +1545,40 @@ function IM_GUI_Loop()
                     562,
                     reaper.ImGui_InputTextFlags_AllowTabInput()
                 )
+                if changed_c then
+                    chord_charting_area = new_c
+                end
+            end
+            reaper.ImGui_Dummy(ctx, 230, 1)
+            reaper.ImGui_Dummy(ctx, 230, 15)
+            r.ImGui_SameLine(ctx)
+            if r.ImGui_Button(ctx, "Setup & Render", nil, nil) then
+                is_track_builder_open = true
             end
 
-            reaper.ImGui_Dummy(ctx, 250, 5)
             r.ImGui_SameLine(ctx)
-            if r.ImGui_Button(ctx, "Render Chart Tracks", nil, nil) then
-                modal_on = true
-                render_all()
-            end
-            r.ImGui_SameLine(ctx)
-            if r.ImGui_Button(ctx, "New Render", nil, nil) then
-                modal_on = true
-                render_gather_go()
+            if r.ImGui_Button(ctx, "Update", nil, nil) then
+                -- Smart Update Logic
+                Scan_Existing_Tracks()
+                local has_tracks = false
+                for k, v in pairs(FOUND_TRACKS) do
+                    if #v > 0 then
+                        has_tracks = true
+                        break
+                    end
+                end
+
+                -- If they hit Quick Render but have no tracks, force open the Builder!
+                if has_tracks then
+                    if not render_co then
+                        Start_Render_Coroutine()
+                    end
+                else
+                    is_track_builder_open = true
+                end
             end
         elseif charting_tab_mode == 2 then
-            rv, lead1_charting_area =
+            local changed_l1, new_l1 =
                 r.ImGui_InputTextMultiline(
                 ctx,
                 "##lead1_charting_area",
@@ -834,13 +1587,17 @@ function IM_GUI_Loop()
                 589,
                 reaper.ImGui_InputTextFlags_AllowTabInput()
             )
+            if changed_l1 then
+                lead1_charting_area = new_l1
+            end
+
             reaper.ImGui_Dummy(ctx, 250, 5)
             r.ImGui_SameLine(ctx)
             if r.ImGui_Button(ctx, "Render Lead 1 Track", nil, nil) then
                 render_lead1()
             end
         elseif charting_tab_mode == 3 then
-            rv, lead2_charting_area =
+            local changed_l2, new_l2 =
                 r.ImGui_InputTextMultiline(
                 ctx,
                 "##lead2_charting_area",
@@ -849,13 +1606,17 @@ function IM_GUI_Loop()
                 589,
                 reaper.ImGui_InputTextFlags_AllowTabInput()
             )
+            if changed_l2 then
+                lead2_charting_area = new_l2
+            end
+
             reaper.ImGui_Dummy(ctx, 250, 5)
             r.ImGui_SameLine(ctx)
             if r.ImGui_Button(ctx, "Render Lead 2 Track", nil, nil) then
                 render_lead2()
             end
         elseif charting_tab_mode == 4 then
-            rv, bass_charting_area =
+            local changed_b, new_b =
                 r.ImGui_InputTextMultiline(
                 ctx,
                 "##bass_charting_area",
@@ -864,13 +1625,17 @@ function IM_GUI_Loop()
                 589,
                 reaper.ImGui_InputTextFlags_AllowTabInput()
             )
+            if changed_b then
+                bass_charting_area = new_b
+            end
+
             reaper.ImGui_Dummy(ctx, 250, 5)
             r.ImGui_SameLine(ctx)
             if r.ImGui_Button(ctx, "Render Bass Track", nil, nil) then
                 render_bass()
             end
         elseif charting_tab_mode == 5 then
-            rv, lyrics_charting_area =
+            local changed_ly, new_ly =
                 r.ImGui_InputTextMultiline(
                 ctx,
                 "##lyrics_charting_area",
@@ -879,8 +1644,11 @@ function IM_GUI_Loop()
                 618,
                 reaper.ImGui_InputTextFlags_AllowTabInput()
             )
+            if changed_ly then
+                lyrics_charting_area = new_ly
+            end
         elseif charting_tab_mode == 6 then
-            rv, notes_charting_area =
+            local changed_n, new_n =
                 r.ImGui_InputTextMultiline(
                 ctx,
                 "##notes_charting_area",
@@ -889,7 +1657,12 @@ function IM_GUI_Loop()
                 618,
                 reaper.ImGui_InputTextFlags_AllowTabInput()
             )
+            if changed_n then
+                notes_charting_area = new_n
+            end
         end
+        -- Call the modals right before ImGui_End(ctx)
+        Draw_Track_Builder_Modal()
 
         reaper.ImGui_EndGroup(ctx)
         r.ImGui_SameLine(ctx)
@@ -904,7 +1677,8 @@ BPM:
 Key: 
 Swing: 
 Form: I V C V C B C O]]
-                    chord_charting_area = [[
+                    chord_charting_area =
+                        [[
 {#}
 - -
 
@@ -1319,7 +2093,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.5.5")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.7.7")
             reaper.ImGui_Text(ctx, "https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
 
@@ -2146,7 +2920,7 @@ Form: I V C V C B C O]]
             )
         end
 
-if feedback_tab_mode == 10 then
+        if feedback_tab_mode == 10 then
             reaper.ImGui_Text(ctx, "N2N Groove Editor (32nd Note Offsets)")
             reaper.ImGui_Separator(ctx)
 
@@ -2176,9 +2950,9 @@ if feedback_tab_mode == 10 then
             -- =========================================================
             -- LAYOUT CONFIGURATION
             -- =========================================================
-            local col_w_1    = 163  -- Width for Beat 1 (Has Labels)
-            local col_w_rest = 135  -- Width for Beats 2,3,4 (No Labels)
-            local gap_tight  = 5    -- Gap between Checkbox and Slider for Beats 2-4
+            local col_w_1 = 163 -- Width for Beat 1 (Has Labels)
+            local col_w_rest = 135 -- Width for Beats 2,3,4 (No Labels)
+            local gap_tight = 5 -- Gap between Checkbox and Slider for Beats 2-4
             -- =========================================================
 
             for beat = 0, 3 do
@@ -2201,7 +2975,6 @@ if feedback_tab_mode == 10 then
 
                 -- 3. Create Column (Child)
                 if r.ImGui_BeginChild(ctx, "beat_col_" .. beat, current_width, 220, false) then
-
                     -- HEADER: Black Text
                     r.ImGui_TextColored(ctx, 0x000000FF, "BEAT " .. (beat + 1))
                     r.ImGui_Separator(ctx)
@@ -2288,7 +3061,6 @@ if feedback_tab_mode == 10 then
         SaveLastNumbers2NotesChart()
     end
 end
-
 --  ________________________________________________________      ADDITIONAL VARIABLES
 G_split = 0
 G_error_log = "START ERROR LOG - " .. string.char(10)
@@ -2344,243 +3116,573 @@ function Set_The_Current_Simulated_Userinput_Data(datachunk)
     return datachunk
 end
 
--- ________________________________________________________ SET UP TRACKS
+-- ==============================================================================
+-- TRACK COMPILER & GENERATOR
+-- ==============================================================================
 
--- ________________________________________________________ SET UP TRACKS (DYNAMIC)
-function Setup_Tracks()
-    -- 1. Reset internal state of the table
-    for _, v in pairs(track_table) do
-        v[2] = false -- Reset Found Bool
-        v[3] = nil -- Reset Track Pointer
+-- Removed "local" so the UI Loop can see these globally!
+FOUND_TRACKS = {}
+G_RENDER_TARGETS = {}
+G_BUILD_REGIONS = false
+G_DRUM_CUE_MODE = false
+G_ARP_CUE_MODE = false
+G_MISSING_PLUGINS = {}
+G_SOURCE_INDICES = {}
+final_ppqpos_total = 0 -- Add this so place_special doesn't crash!
+
+function Set_Back2Key_Transpositions()
+    local actual_key_val = musictheory.key_table[current_key] or 0
+
+    for _, tr_data in ipairs(G_DYNAMIC_TABLE) do
+        local track = tr_data.track_ptr
+        -- Apply only to Source tracks (mode 0)
+        if track and tr_data.mode_id == 0 then
+            -- BULLETPROOF FX FINDER
+            local fx_idx = -1
+            for j = 0, reaper.TrackFX_GetCount(track) - 1 do
+                local retval, fx_name = reaper.TrackFX_GetFXName(track, j, "")
+                if retval and fx_name:find("Back2Key_N2N") then
+                    fx_idx = j
+                    break
+                end
+            end
+
+            if fx_idx >= 0 then
+                -- JSFX dropdowns ignore the <-5,6> range and expect the list Index (0 to 11).
+                -- C(0)+5=5 (C to C). G(7)+5=12->0 (C to G). F#(6)+5=11 (C to F#).
+                local slider_index = (actual_key_val + 5) % 12
+
+                -- Param 0 is slider1 (Transpose)
+                reaper.TrackFX_SetParam(track, fx_idx, 0, slider_index)
+            end
+        end
+    end
+end
+
+local function DeepCopy(orig)
+    local orig_type = type(orig)
+    local copy
+    if orig_type == "table" then
+        copy = {}
+        for orig_key, orig_value in next, orig, nil do
+            copy[DeepCopy(orig_key)] = DeepCopy(orig_value)
+        end
+        setmetatable(copy, DeepCopy(getmetatable(orig)))
+    else
+        copy = orig
+    end
+    return copy
+end
+
+function Compile_Dynamic_Track_Table(recipe)
+    local dynamic_table = {}
+    G_SOURCE_INDICES = {}
+    local name_counts = {}
+    local current_idx = 1
+
+    local function AddTrack(template, tr_data, type_id, mode_id)
+        local t = DeepCopy(template)
+
+        -- Lock the IDs into the track data so the Builder knows what it is!
+        t.type_id = type_id
+        t.mode_id = mode_id
+
+        -- SPACER LOGIC (Source vs Receiver)
+        if tr_data and tr_data.Tr_divider_before then
+            -- Does this track type have a Source Track (Mode 0)?
+            if config.track_table[type_id] and config.track_table[type_id][0] then
+                -- Yes: Only put the spacer on the Source (0), not the receivers (1, 2, 3...)
+                if mode_id == 0 then
+                    t.Tr_divider_before = true
+                end
+            else
+                -- No Source track (e.g. Drums, FX): Just put the spacer on it directly
+                t.Tr_divider_before = true
+            end
+        end
+
+        -- APPLY COMMON FX (ONLY TO RECEIVERS, NEVER TO MODE 0 SOURCE TRACKS)
+        if tr_data and tr_data.addchain and advanced_user_setup.commonchain then
+            if mode_id > 0 then
+                for _, common_fx in ipairs(advanced_user_setup.commonchain) do
+                    table.insert(t[5], DeepCopy(common_fx))
+                end
+            end
+        end
+
+        local base_name = t[1]
+        local choice = tr_data and (tr_data.vsti_choice or tr_data.vst_choice)
+        if base_name:find("REPLACEFX") and choice then
+            base_name = base_name:gsub("REPLACEFX", choice.selection_label or "")
+        end
+
+        name_counts[base_name] = (name_counts[base_name] or 0) + 1
+        local instance_num = name_counts[base_name]
+
+        if base_name:find("##") then
+            t[1] = base_name:gsub("##", tostring(instance_num))
+        else
+            if instance_num > 1 then
+                t[1] = base_name .. " " .. instance_num
+            else
+                t[1] = base_name
+            end
+        end
+
+        dynamic_table[current_idx] = t
+        current_idx = current_idx + 1
+        return current_idx - 1
     end
 
-    -- 2. IDENTIFY EXISTING TRACKS
+    for _, tr in ipairs(recipe) do
+        if tr.active and config.track_table[tr.type] then
+            
+            -- =========================================================
+            -- ROUTING CONSOLIDATION: Force Types 16 & 20 to use 17's Source
+            -- =========================================================
+            local source_type = tr.type
+            if source_type == 16 or source_type == 20 then
+                source_type = 17
+            end
+
+            -- A. Build Source Track (Mode 0)
+            if config.track_table[source_type] and config.track_table[source_type][0] then
+                if not G_SOURCE_INDICES[source_type] then
+                    -- Pass 'tr' so the Source track inherits the divider!
+                    G_SOURCE_INDICES[source_type] = AddTrack(config.track_table[source_type][0], tr, source_type, 0)
+                end
+            end
+
+-- Convert mode string to numeric index
+            local mode_key = 1
+            if tr.mode then
+                for idx, m_name in ipairs(config.mode_options) do
+                    if m_name == tr.mode then
+                        mode_key = idx
+                        break
+                    end
+                end
+            elseif tr.audio_choice and config.audiochoice then
+                -- Map the Audio dropdown selection to indices 1-8
+                for idx, a_choice in ipairs(config.audiochoice) do
+                    if a_choice.selection_label == tr.audio_choice.selection_label then
+                        mode_key = idx
+                        break
+                    end
+                end
+            end
+
+            -- B. Build Target Track
+            if config.track_table[tr.type][mode_key] then
+                local target_idx = AddTrack(config.track_table[tr.type][mode_key], tr, tr.type, mode_key)
+                local t_data = dynamic_table[target_idx]
+                local active_choice = tr.vsti_choice or tr.vst_choice or tr.audio_choice
+
+
+
+
+
+
+                local chosen_drum_preset = tr.preset_choice and tr.preset_choice.preset or nil
+
+                for _, fx_info in ipairs(t_data[5]) do
+                    if fx_info[1] == "REPLACEFX" and active_choice then
+                        fx_info[1] = active_choice.search or ""
+                        fx_info[4] = active_choice.pluginsources or 0
+                    end
+
+                    if fx_info[3] == "REPLACEPRESET" and active_choice then
+                        fx_info[3] = active_choice.preset or nil
+                    end
+                end
+
+                if tr.type == 31 and chosen_drum_preset and chosen_drum_preset ~= "" then
+                    for _, fx_info in ipairs(t_data[5]) do
+                        if fx_info[1] and (
+                            fx_info[1]:find("N2N Drum Arranger") or
+                            (active_choice and fx_info[1] == (active_choice.search or ""))
+                        ) then
+                            fx_info[3] = chosen_drum_preset
+                        end
+                    end
+                end
+
+
+
+
+
+
+
+
+                local clean_fx = {}
+                for _, fx_info in ipairs(t_data[5]) do
+                    if fx_info[1] ~= "" and fx_info[1] ~= "Select Other..." then
+                        table.insert(clean_fx, fx_info)
+                    end
+                end
+                t_data[5] = clean_fx
+
+                -- Link the receiver track to the consolidated Master MIDI Source
+                if G_SOURCE_INDICES[source_type] then
+                    local src_idx = G_SOURCE_INDICES[source_type]
+                    table.insert(dynamic_table[src_idx][6], target_idx)
+                end
+            end
+        end
+    end
+    return dynamic_table
+end
+
+function Track_Needs_Cue_Child(tr)
+    if not tr or not tr[5] then
+        return false
+    end
+
+    for _, fx_info in ipairs(tr[5]) do
+        local fx_name = fx_info[1]
+        if fx_name and (
+            fx_name:find("N2N Drum Arranger") or
+            fx_name:find("N2N Arp")
+        ) then
+            return true
+        end
+    end
+
+    return false
+end
+
+function Brighten_RGB_10(rgb)
+    local function clamp(v)
+        if v < 0 then return 0 end
+        if v > 255 then return 255 end
+        return math.floor(v + 0.5)
+    end
+
+    return {
+        clamp(rgb[1] * 1.10),
+        clamp(rgb[2] * 1.10),
+        clamp(rgb[3] * 1.10)
+    }
+end
+
+function Find_Cue_Child_By_Unique_ID(unique_id)
+    local track_count = reaper.CountTracks(0)
+    for i = 0, track_count - 1 do
+        local tr = reaper.GetTrack(0, i)
+        local retval, ext_val = reaper.GetSetMediaTrackInfo_String(tr, "P_EXT:N2N:CUECHILD_FOR", "", false)
+        if retval and ext_val == unique_id then
+            return tr
+        end
+    end
+    return nil
+end
+
+function Ensure_Cue_Child_Track(parent_track, tr, unique_id)
+    local cue_track = Find_Cue_Child_By_Unique_ID(unique_id)
+
+    if not cue_track then
+        local parent_idx = reaper.CSurf_TrackToID(parent_track, false) - 1
+        reaper.InsertTrackAtIndex(parent_idx + 1, true)
+        cue_track = reaper.GetTrack(0, parent_idx + 1)
+
+        reaper.GetSetMediaTrackInfo_String(cue_track, "P_NAME", "Your Cues", true)
+        reaper.GetSetMediaTrackInfo_String(cue_track, "P_EXT:N2N:CUECHILD_FOR", unique_id, true)
+        reaper.GetSetMediaTrackInfo_String(cue_track, "P_EXT:N2N:IS_CUECHILD", "1", true)
+    end
+
+    local bright = Brighten_RGB_10(tr[8])
+    local cue_color = reaper.ColorToNative(bright[1], bright[2], bright[3]) | 0x10000000
+    reaper.SetTrackColor(cue_track, cue_color)
+
+    -- minimal TCP height
+    reaper.SetMediaTrackInfo_Value(cue_track, "B_HEIGHTLOCK", 1)
+    reaper.SetMediaTrackInfo_Value(cue_track, "I_HEIGHTOVERRIDE", 24)
+
+    -- keep visible in TCP, hide in mixer
+    reaper.SetMediaTrackInfo_Value(cue_track, "B_SHOWINTCP", 1)
+    reaper.SetMediaTrackInfo_Value(cue_track, "B_SHOWINMIXER", 0)
+
+    return cue_track
+end
+
+
+function Scan_Existing_Tracks()
+    FOUND_TRACKS = {}
     local track_count = reaper.CountTracks(0)
     for i = 0, track_count - 1 do
         local track = reaper.GetTrack(0, i)
-        local _, current_name = reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "", false)
-
-        for k, v in pairs(track_table) do
-            if current_name == v[1] then
-                v[2] = true -- Found it!
-                v[3] = track -- Store ID
-
-                -- Optional: Re-assert color?
-                local track_color = reaper.ColorToNative(v[8][1], v[8][2], v[8][3]) | 0x10000000
-                reaper.SetTrackColor(track, track_color)
+        -- Reaper reads the invisible metadata string (e.g. "16_6")
+        local retval, ext_val = reaper.GetSetMediaTrackInfo_String(track, "P_EXT:N2N:ID", "", false)
+        if retval and ext_val ~= "" then
+            if not FOUND_TRACKS[ext_val] then
+                FOUND_TRACKS[ext_val] = {}
             end
+            table.insert(FOUND_TRACKS[ext_val], track)
         end
     end
-
-    -- 3. CREATE NEW TRACKS or CLEAN EXISTING ONES
-    for i, v in pairs(track_table) do
-        if v[2] == true then
-            -- CASE A: TRACK EXISTS
-            -- We ONLY clear the items if the flag v[4] is 1. (Non-Destructive)
-            if v[4] == 1 then
-                local current_track = v[3]
-                local item_count = reaper.CountTrackMediaItems(current_track)
-                for j = item_count, 1, -1 do
-                    local item = reaper.GetTrackMediaItem(current_track, j - 1)
-                    reaper.DeleteTrackMediaItem(current_track, item)
-                end
-            end
-        elseif v[2] == false then
-            -- CASE B: TRACK IS MISSING -> CREATE IT
-            reaper.InsertTrackAtIndex(reaper.CountTracks(0), true)
-            local idx = reaper.CountTracks(0) - 1
-            local new_track = reaper.GetTrack(0, idx)
-
-            reaper.GetSetMediaTrackInfo_String(new_track, "P_NAME", v[1], true)
-            v[3] = new_track
-
-            -- Set Volume and Color
-            local track_color = reaper.ColorToNative(v[8][1], v[8][2], v[8][3]) | 0x10000000
-            reaper.SetTrackColor(new_track, track_color)
-            reaper.SetTrackUIVolume(new_track, v[9], false, true, 0)
-
-            -- ADD PLUGINS
-            -- We assume the startup check passed, so we just add them.
-            -- If they are missing here, they just won't load, but it won't crash.
-            local plug_order = 1000
-
-            for _, fx_info in pairs(v[5]) do
-                local fx_name = fx_info[1]
-                local fx_enabled = fx_info[2]
-                local fx_preset = fx_info[3]
-
-                local fx_index = reaper.TrackFX_AddByName(new_track, fx_name, false, plug_order)
-
-                if fx_index >= 0 then
-                    reaper.TrackFX_SetEnabled(new_track, fx_index, fx_enabled)
-                    if fx_preset ~= nil then
-                        reaper.TrackFX_SetPreset(new_track, fx_index, fx_preset)
-                    end
-                end
-                plug_order = plug_order - 1
-            end
-        end
-    end
-
-    -- 4. SETUP SENDS
-for i, v in pairs(track_table) do
-    if reaper.GetTrackNumSends(v[3], 0) == 0 then
-        for _, target_index in pairs(v[6]) do
-            if track_table[target_index] and track_table[target_index][3] then
-                -- Create the send
-                reaper.CreateTrackSend(v[3], track_table[target_index][3])
-            end
-        end
-        
-        -- >>> SET VOLUME ON ALL SENDS WE JUST CREATED <<<
-        local num_sends = reaper.GetTrackNumSends(v[3], 0)
-        for send_idx = 0, num_sends - 1 do
-            local send_volume_db = -12.0
-            local send_volume_linear = 10^(send_volume_db/20)
-            reaper.SetTrackSendInfo_Value(v[3], 0, send_idx, "D_VOL", send_volume_linear)
-        end
-    end
-end  
-
-    return nil, track_table
 end
+
+local function Safe_Add_FX(track, fx_search_name, preset_name, source_id)
+    if not fx_search_name or fx_search_name == "" then
+        return
+    end
+    local fx_idx = reaper.TrackFX_AddByName(track, fx_search_name, false, -1)
+    if fx_idx >= 0 then
+        if preset_name and preset_name ~= "" then
+            reaper.TrackFX_SetPreset(track, fx_idx, preset_name)
+        end
+    else
+        table.insert(G_MISSING_PLUGINS, {name = fx_search_name, source = source_id or 0})
+    end
+end
+
+-- FIXED SIGNATURE: It only receives "tr", and pulls the types out safely!
+function Build_Single_Track(tr)
+    local tr_type = tr.type_id
+    local tr_mode = tr.mode_id
+
+    -- Meta-Tracks
+    if tr_type == 0 then
+        G_BUILD_REGIONS = true
+        return false
+    end
+    if tr_type == 32 then
+        G_DRUM_CUE_MODE = true
+        return false
+    end
+    if tr_type == 33 then
+        G_ARP_CUE_MODE = true
+        return false
+    end
+
+    -- The Unique ID the scanner looks for
+    local unique_id = tostring(tr_type) .. "_" .. tostring(tr_mode)
+
+    local existing_tracks = FOUND_TRACKS[unique_id]
+    local track_to_use = nil
+    local is_new = false
+
+    if existing_tracks and #existing_tracks > 0 then
+        track_to_use = table.remove(existing_tracks, 1)
+
+        -- CLEAN MIDI ONLY IF CONFIG ALLOWS IT (tr[4] == 1)
+        if tr[4] == 1 then
+            local item_count = reaper.CountTrackMediaItems(track_to_use)
+            for j = item_count - 1, 0, -1 do
+                local item = reaper.GetTrackMediaItem(track_to_use, j)
+                reaper.DeleteTrackMediaItem(track_to_use, item)
+            end
+        end
+    else
+        is_new = true
+        reaper.InsertTrackAtIndex(reaper.CountTracks(0), true)
+        track_to_use = reaper.GetTrack(0, reaper.CountTracks(0) - 1)
+        reaper.GetSetMediaTrackInfo_String(track_to_use, "P_NAME", tr[1], true)
+
+        -- INVISIBLE TAG: Locks the track permanently!
+        reaper.GetSetMediaTrackInfo_String(track_to_use, "P_EXT:N2N:ID", unique_id, true)
+
+        local plug_order = 1000
+        for _, fx_info in ipairs(tr[5]) do
+            local fx_name = fx_info[1]
+            local fx_enabled = fx_info[2]
+            local fx_preset = fx_info[3]
+            local fx_source = fx_info[4] or 0
+
+            if fx_name and fx_name ~= "" then
+                Safe_Add_FX(track_to_use, fx_name, fx_preset, fx_source)
+                local added_idx = reaper.TrackFX_GetByName(track_to_use, fx_name, false)
+                if added_idx >= 0 then
+                    reaper.TrackFX_SetEnabled(track_to_use, added_idx, fx_enabled)
+                end
+            end
+            plug_order = plug_order - 1
+        end
+    end
+    -- === DYNAMIC Back2Key_N2N INSERTION ===
+    -- Only apply to Source Tracks (Mode 0) for Chords (16), Chbass (17), Bass (20)
+    if tr_mode == 0 and (tr_type == 16 or tr_type == 17 or tr_type == 20) then
+        local fx_idx = reaper.TrackFX_GetByName(track_to_use, "Back2Key_N2N", false)
+        if G_render_mode == 0 then -- Relative Mode Selected
+            if fx_idx < 0 then
+                reaper.TrackFX_AddByName(track_to_use, "JS: Back2Key_N2N", false, -1)
+            end
+        else -- Absolute Mode Selected
+            if fx_idx >= 0 then
+                reaper.TrackFX_Delete(track_to_use, fx_idx)
+            end
+        end
+    end
+
+    -- === DYNAMIC TRACK RENAMING ===
+    local display_name = tr[1]
+    if display_name:find("<TYPE SELECT>") then
+        display_name = display_name:gsub("<TYPE SELECT>", G_render_mode == 0 and "Relative" or "Absolute")
+        reaper.GetSetMediaTrackInfo_String(track_to_use, "P_NAME", display_name, true)
+    end
+    -- =======================================
+
+    -- APPLIED TO BOTH NEW AND EXISTING TRACKS:
+    local track_color = reaper.ColorToNative(tr[8][1], tr[8][2], tr[8][3]) | 0x10000000
+
+    -- APPLIED TO BOTH NEW AND EXISTING TRACKS:
+    local track_color = reaper.ColorToNative(tr[8][1], tr[8][2], tr[8][3]) | 0x10000000
+    reaper.SetTrackColor(track_to_use, track_color)
+
+    -- ONLY reset volume if the track is brand new!
+    if is_new then
+        reaper.SetTrackUIVolume(track_to_use, tr[9], false, true, 0)
+    end
+
+    -- TCP / MCP Visibility Control
+    local show_tcp = (tr[2] ~= false) and 1 or 0
+    local show_mcp = (tr[3] ~= false) and 1 or 0
+
+    reaper.SetMediaTrackInfo_Value(track_to_use, "B_SHOWINTCP", show_tcp)
+    reaper.SetMediaTrackInfo_Value(track_to_use, "B_SHOWINMIXER", show_mcp)
+
+
+
+    if not G_RENDER_TARGETS[tr_type] then
+        G_RENDER_TARGETS[tr_type] = {}
+    end
+    table.insert(G_RENDER_TARGETS[tr_type], track_to_use)
+
+	tr.track_ptr = track_to_use
+
+	if Track_Needs_Cue_Child(tr) then
+		tr.cue_track_ptr = Ensure_Cue_Child_Track(track_to_use, tr, unique_id)
+	end
+
+	return is_new
+end
+
+function Organize_Tracks_And_Routing(dynamic_table)
+    local fx_indices = {}
+
+    for i, tr in ipairs(dynamic_table) do
+        if tr.type_id == 30 then
+            table.insert(fx_indices, i)
+        end
+        if tr.track_ptr then
+            reaper.SetMediaTrackInfo_Value(tr.track_ptr, "I_FOLDERDEPTH", 0)
+        end
+        if tr.cue_track_ptr and reaper.ValidatePtr(tr.cue_track_ptr, "MediaTrack*") then
+            reaper.SetMediaTrackInfo_Value(tr.cue_track_ptr, "I_FOLDERDEPTH", 0)
+        end
+    end
+
+    -- Find the highest-positioned N2N parent track to use as our top anchor
+    local start_idx = reaper.CountTracks(0)
+    local has_any_tracks = false
+    for _, tr in ipairs(dynamic_table) do
+        if tr.track_ptr then
+            local idx = reaper.CSurf_TrackToID(tr.track_ptr, false) - 1
+            if idx < start_idx then
+                start_idx = idx
+                has_any_tracks = true
+            end
+        end
+    end
+    if not has_any_tracks then
+        start_idx = 0
+    end
+
+    local insert_pos = start_idx
+
+    local function SendExists(src_track, dest_track)
+        local num_sends = reaper.GetTrackNumSends(src_track, 0)
+        for s = 0, num_sends - 1 do
+            local dest = reaper.GetTrackSendInfo_Value(src_track, 0, s, "P_DESTTRACK")
+            if dest == dest_track then
+                return true
+            end
+        end
+        return false
+    end
+
+    for i, tr in ipairs(dynamic_table) do
+        local track = tr.track_ptr
+        if not track then
+            goto continue
+        end
+
+        local cue_track = tr.cue_track_ptr
+
+        -- Move parent track first
+        reaper.SetOnlyTrackSelected(track)
+        reaper.ReorderSelectedTracks(insert_pos, 0)
+
+        if cue_track and reaper.ValidatePtr(cue_track, "MediaTrack*") then
+            -- Parent becomes folder start
+            reaper.SetMediaTrackInfo_Value(track, "I_FOLDERDEPTH", 1)
+            reaper.SetMediaTrackInfo_Value(track, "I_FOLDERCOMPACT", 0)
+
+            -- Move cue track directly under parent
+            reaper.SetOnlyTrackSelected(cue_track)
+            reaper.ReorderSelectedTracks(insert_pos + 1, 0)
+
+            -- Cue track closes folder, so it is the last item in the folder
+            reaper.SetMediaTrackInfo_Value(cue_track, "I_FOLDERDEPTH", -1)
+            reaper.SetMediaTrackInfo_Value(cue_track, "I_FOLDERCOMPACT", 0)
+
+            insert_pos = insert_pos + 2
+        else
+            reaper.SetMediaTrackInfo_Value(track, "I_FOLDERDEPTH", 0)
+            reaper.SetMediaTrackInfo_Value(track, "I_FOLDERCOMPACT", 0)
+            insert_pos = insert_pos + 1
+        end
+
+        local is_instrument =
+            (tr.type_id == 16 and tr.mode_id > 0) or
+            (tr.type_id == 17 and tr.mode_id > 0) or
+            (tr.type_id == 20 and tr.mode_id > 0) or
+            (tr.type_id == 31)
+
+        if is_instrument then
+            for _, fx_idx in ipairs(fx_indices) do
+                local fx_track = dynamic_table[fx_idx].track_ptr
+                if fx_track and not SendExists(track, fx_track) then
+                    local new_send = reaper.CreateTrackSend(track, fx_track)
+                    reaper.SetTrackSendInfo_Value(track, 0, new_send, "D_VOL", 10 ^ (-12.0 / 20))
+                end
+            end
+        end
+
+        for _, target_idx in ipairs(tr[6] or {}) do
+            local target_track = dynamic_table[target_idx] and dynamic_table[target_idx].track_ptr
+            if target_track and not SendExists(track, target_track) then
+                reaper.CreateTrackSend(track, target_track)
+            end
+        end
+
+        ::continue::
+    end
+
+    reaper.TrackList_AdjustWindows(false)
+    reaper.UpdateArrange()
+
+    -- Apply spacers only to parent tracks after ordering
+    for i, tr in ipairs(dynamic_table) do
+        local track = tr.track_ptr
+        if track then
+            if tr.Tr_divider_before then
+                reaper.SetMediaTrackInfo_Value(track, "I_SPACER", 1)
+            else
+                reaper.SetMediaTrackInfo_Value(track, "I_SPACER", 0)
+            end
+        end
+    end
+
+    reaper.TrackList_AdjustWindows(false)
+    reaper.UpdateArrange()
+end
+
+-------------------------------------------------------------------- OLD SETUP TRACKS ENDS HERE
 
 function Sync_Chart_Colors()
-    -- Helper function to find track by name
-    local function GetTrackByName(name)
-        local count = reaper.CountTracks(0)
-        for i = 0, count - 1 do
-            local tr = reaper.GetTrack(0, i)
-            local _, tr_name = reaper.GetSetMediaTrackInfo_String(tr, "P_NAME", "", false)
-            if tr_name == name then
-                return tr
-            end
-        end
-        return nil
-    end
-
-    -- 1. Find the specific tracks by name
-    local track_src = GetTrackByName("N2N # Chart")      -- Source (Numbers)
-    local track_dst = GetTrackByName("N2N Letter Chart") -- Dest (Letters)
-
-    -- 2. Only proceed if both tracks exist
-    if track_src and track_dst then
-        local item_count = reaper.CountTrackMediaItems(track_src)
-        
-        -- 3. Loop through items and sync colors
-        for i = 0, item_count - 1 do
-            local item_s = reaper.GetTrackMediaItem(track_src, i)
-            if item_s then
-                local color = reaper.GetMediaItemInfo_Value(item_s, "I_CUSTOMCOLOR")
-                
-                -- We assume items are generated in sync, so index matching works here
-                local item_d = reaper.GetTrackMediaItem(track_dst, i)
-                if item_d then
-                    reaper.SetMediaItemInfo_Value(item_d, "I_CUSTOMCOLOR", color)
-                end
-            end
-        end
-    end
-end
-
-
-function Initialize_Track_Setup() -- ERASE OLD TRACK (IF NEEDED) AND SET UP A REPLACEMENT
-    reaper.PreventUIRefresh(1)
-    local isut_tracklist = {}
-    local isut_current_track = ""
-    local isut_current_trackname = ""
-    local itrack_count
-    local isut_track_item_count
-
-    local found_bool_audition = false
-    local trackID_audition = ""
-
-    -- 0 = Table Column Descriptions
-    local itrack_table = {
-        [0] = {
-            "Name",
-            "found?bool",
-            "trackID",
-            "clear contents required?",
-            {"plugin 1", "plugin 2"},
-            "Sends",
-            "Volume = MIDI 0 = No 1 = Yes"
-        },
-        [1] = {
-            "N2N Audition",
-            found_bool_audition,
-            trackID_audition,
-            0,
-            {"pad-synth.jsfx", "Isolator"},
-            {},
-            0,
-            {222, 222, 222}
-        }
-    }
-
-    --Show_To_Dev("Started: " .. string.char(10))
-    itrack_count = reaper.CountTracks(0)
-    for i = 0, itrack_count - 1, 1 do -- CHECK EACH TRACK FOR ONE NAMED "Charted Track'
-        --Show_To_Dev(i .. string.char(10))
-        local isut_current_track_id = reaper.GetTrack(0, i)
-        --Show_To_Dev(tostring(isut_current_track_id) .. string.char(10))
-
-        _, isut_current_trackname = reaper.GetTrackName(isut_current_track_id)
-        --Show_To_Dev(isut_current_trackname .. string.char(10))
-
-        for i, v in pairs(itrack_table) do
-            if isut_current_trackname == v[1] then
-                itrack_table[i][2] = true
-                itrack_table[i][3] = isut_current_track_id
-                itrack_color = reaper.ColorToNative(v[8][1], v[8][2], v[8][3]) | 0x10000000
-                reaper.SetTrackColor(isut_current_track_id, itrack_color)
-            else
-            end
-            --Show_To_Dev(i .. " " .. tostring(v[2]) .. " | " .. tostring(v[3]) .. " | " .. tostring(v[4]) .. string.char(10))
-        end
-    end
-    for i, v in pairs(itrack_table) do
-        if v[2] == true and v[4] == 1 then
-            local icurrent_working_track = itrack_table[i][3]
-            --Show_To_Dev("yes " .. i.. " " .. tostring(v[2]) .. " | " .. tostring(v[3]) .. " | " .. tostring(v[4]) .. string.char(10))
-            isut_track_item_count = reaper.CountTrackMediaItems(icurrent_working_track)
-            --Show_To_Dev("track item count =  " .. isut_track_item_count .. string.char(10))
-            for i = isut_track_item_count, 1, -1 do
-                --Show_To_Dev("current working track =  " .. tostring(icurrent_working_track) .. " | i = "   .. i .. string.char(10))
-
-                iitem_index = reaper.GetTrackMediaItem(icurrent_working_track, i - 1)
-                --Show_To_Dev("item_index =  " .. tostring(iitem_index) .. string.char(10))
-                reaper.DeleteTrackMediaItem(icurrent_working_track, iitem_index)
-            end
-        elseif v[2] == false then
-            reaper.InsertTrackAtIndex(i - 1, false) -- INSERT A NEW TRACK
-            inewly_created_track = reaper.GetTrack(0, i - 1)
-            --Show_To_Dev(tostring(newly_created_track) .. string.char(10))
-            reaper.GetSetMediaTrackInfo_String(inewly_created_track, "P_NAME", v[1], true)
-            itrack_table[i][3] = inewly_created_track
-            --Show_To_Dev("yes " .. i.. " " .. tostring(v[2]) .. " | " .. tostring(v[3]) .. " | " .. tostring(v[4]) .. string.char(10))
-            iplug_order = 1000
-            for j, value in pairs(v[5]) do
-                addedFX = reaper.TrackFX_AddByName(v[3], v[5][j], false, iplug_order) -- ADD INSTRUMENT FX
-                if v[5][j][3] ~= nil then
-                    reaper.TrackFX_SetPreset(v[3], addedFX, v[5][j][3])
-                end
-                iplug_order = iplug_order - 1
-            end
-        end
-    end
-
-    for i, v in pairs(itrack_table) do
-        if i > 0 and v[2] == false then
-            for j, w in pairs(v[6]) do
-                --Show_To_Dev("i... " .. i .. " hello... " .. tostring(v[3]) .. " and the send is... " .. tostring(itrack_table[itrack_table[i][6][j]][3]) .. string.char(10))
-                reaper.CreateTrackSend(v[3], itrack_table[itrack_table[i][6][j]][3])
-            end
-        end
-    end
-    SetVMidiInput(1, "Virtual MIDI Keyboard")
-    reaper.PreventUIRefresh(-1)
-    return isup_tracklist, itrack_table
+    -- Colors are now synced instantly via track pointers in place_MIDI_data.
+    -- This function is safely retired!
 end
 
 function inital_swaps(chunky1)
@@ -2813,7 +3915,6 @@ function set_the_swing(stk_progression)
                     starting_swing = project_swing
                 else
                     starting_swing = number_from_string
-                    reaper.gmem_attach("N2N_Ecosystem_RSKennedy")
                     reaper.gmem_write(2, starting_swing)
 
                     render_feedback = render_feedback .. "Swing set to " .. number_from_string .. string.char(10)
@@ -2822,7 +3923,7 @@ function set_the_swing(stk_progression)
         end
     end
     --reaper.ShowConsoleMsg("=======BPM=======" .. starting_bpm .. "=======BPM=======")
-    return starting_bpm
+    return starting_swing
 end
 
 -- ______________________________________________ORGANIZE INPUTS INTO BARS
@@ -3095,138 +4196,206 @@ function process_nested_split_sections(pnss_split, pnss_error_log)
     return pnss_split, pnss_error_log
 end
 
--- _______________________________________________________________________ PLACE TEXT ITEMS  / ITEMS WILL NOT YET BE COLOR CODED
+-- _______________________________________________________________________ PLACE TEXT ITEMS  /
 
-
--- _______________________________________________________________________ PLACE TEXT ITEMS
-
-function place_TEXT_data(ptd_track_table)
+function place_TEXT_data(dynamic_table)
     local ptd_updating_start_ppqpos = 0
     local ptd_note_end_ppqpos = 0
-    local ptd_last_updated_ppqpos = 0
-    
-    -- FIX: Initialize to 0 so they are never nil
     local ptd_measure_start_point = 0
     local ptd_measure_end_point = 0
     local ptd_first_run_start_point = 0
     local ptd_last_end_point = 0
-
-    local ptd_chord_entry_to_text = ""
     local ptd_text_item_count = 0
-    local ptd_new_text_item = ""
+
+    local tr_nns = G_RENDER_TARGETS[1] and G_RENDER_TARGETS[1][1]
+
+    -- Setup text targets and their transposition shifts
+    local text_targets = {}
+
+    if G_RENDER_TARGETS[6] then
+        table.insert(
+            text_targets,
+            {
+                tr = G_RENDER_TARGETS[6][1],
+                shift = musictheory.key_table[current_key] or 0,
+                use_flats = musictheory.is_it_flat_table[current_key]
+            }
+        )
+    end
+
+    if G_RENDER_TARGETS[5] then
+        table.insert(text_targets, {tr = G_RENDER_TARGETS[5][1], shift = 0, use_flats = false})
+    end
+
+    if G_RENDER_TARGETS[4] then
+        -- Find out which key the user picked from the recipe!
+        local u_shift, u_flats = 0, false
+        for _, tr in ipairs(config.track_recipe) do
+            if tr.type == 4 then
+                local choice = tr.vst_choice or tr.vsti_choice
+                if choice then
+                    u_shift = choice.transpose or 0
+                    u_flats = choice.flat or false
+                end
+                break
+            end
+        end
+        table.insert(text_targets, {tr = G_RENDER_TARGETS[4][1], shift = u_shift, use_flats = u_flats})
+    end
 
     for i, value in pairs(chord_table) do
         ptd_note_end_ppqpos = ptd_updating_start_ppqpos + value[3]
-        ptd_last_updated_ppqpos = ptd_note_end_ppqpos
-        
+
         if ptd_updating_start_ppqpos == 0 then
             ptd_measure_start_point = 0
         else
-            ptd_measure_start_point = ptd_updating_start_ppqpos / (G_ticks_per_measure)
+            ptd_measure_start_point = ptd_updating_start_ppqpos / G_ticks_per_measure
         end
-        
+
         if i == 1 then
             ptd_first_run_start_point = ptd_measure_start_point
         end
-        
+
         if ptd_note_end_ppqpos == 0 then
             ptd_measure_end_point = 0
         else
-            ptd_measure_end_point = ptd_note_end_ppqpos / (G_ticks_per_measure)
+            ptd_measure_end_point = ptd_note_end_ppqpos / G_ticks_per_measure
         end
 
-        -- CREATE A TEXT ITEM ON THE TRACK
-        ptd_new_MIDI_item = reaper.CreateNewMIDIItemInProj(ptd_track_table[1][3], ptd_measure_start_point, ptd_measure_end_point, true)
-        ptd_new_MIDI_item_2 = reaper.CreateNewMIDIItemInProj(ptd_track_table[2][3], ptd_measure_start_point, ptd_measure_end_point, true)
-        
-        if ptd_new_MIDI_item and ptd_new_MIDI_item_2 then
-            text_position = reaper.GetMediaItemInfo_Value(ptd_new_MIDI_item, "D_POSITION")
-            text_length = reaper.GetMediaItemInfo_Value(ptd_new_MIDI_item, "D_LENGTH")
-            
-            ptd_new_text_item = reaper.AddMediaItemToTrack(ptd_track_table[1][3]) 
-            ptd_new_text_item_2 = reaper.AddMediaItemToTrack(ptd_track_table[2][3]) 
-            
-            reaper.SetMediaItemInfo_Value(ptd_new_text_item, "D_POSITION", text_position)
-            reaper.SetMediaItemInfo_Value(ptd_new_text_item, "D_LENGTH", text_length)
-            reaper.SetMediaItemInfo_Value(ptd_new_text_item_2, "D_POSITION", text_position)
-            reaper.SetMediaItemInfo_Value(ptd_new_text_item_2, "D_LENGTH", text_length)    
-        
-            reaper.DeleteTrackMediaItem(ptd_track_table[1][3], ptd_new_MIDI_item)
-            reaper.DeleteTrackMediaItem(ptd_track_table[2][3], ptd_new_MIDI_item_2)    
-        
-            ptd_chord_entry_to_text = value[4]
-            if ptd_chord_entry_to_text == "-" then ptd_chord_entry_to_text = "Rest" end
-            
-            if text ~= nil then
-                reaper.ULT_SetMediaItemNote(ptd_new_text_item, ptd_chord_entry_to_text)
-            end
+        local ptd_chord_entry_to_text = value[4]
+        if ptd_chord_entry_to_text == "-" then
+            ptd_chord_entry_to_text = "Rest"
+        end
 
-            -- LOGIC FOR LETTER LABELS (Track 2)
-            if text ~= nil then
+        -- 1. NNS Number Chart
+        if tr_nns then
+            local m_item = reaper.CreateNewMIDIItemInProj(tr_nns, ptd_measure_start_point, ptd_measure_end_point, true)
+            local t_pos = reaper.GetMediaItemInfo_Value(m_item, "D_POSITION")
+            local t_len = reaper.GetMediaItemInfo_Value(m_item, "D_LENGTH")
+            local text_item = reaper.AddMediaItemToTrack(tr_nns)
+            reaper.SetMediaItemInfo_Value(text_item, "D_POSITION", t_pos)
+            reaper.SetMediaItemInfo_Value(text_item, "D_LENGTH", t_len)
+            reaper.DeleteTrackMediaItem(tr_nns, m_item)
+            reaper.ULT_SetMediaItemNote(text_item, ptd_chord_entry_to_text)
+        end
+
+        -- 2. Letter Charts (Loops through Active Types 4, 5, and 6)
+        for _, tgt in ipairs(text_targets) do
+            local m_item = reaper.CreateNewMIDIItemInProj(tgt.tr, ptd_measure_start_point, ptd_measure_end_point, true)
+            local t_pos = reaper.GetMediaItemInfo_Value(m_item, "D_POSITION")
+            local t_len = reaper.GetMediaItemInfo_Value(m_item, "D_LENGTH")
+            local text_item = reaper.AddMediaItemToTrack(tgt.tr)
+            reaper.SetMediaItemInfo_Value(text_item, "D_POSITION", t_pos)
+            reaper.SetMediaItemInfo_Value(text_item, "D_LENGTH", t_len)
+            reaper.DeleteTrackMediaItem(tgt.tr, m_item)
+
+            local final_text = ptd_chord_entry_to_text
+            if ptd_chord_entry_to_text ~= "Rest" and string.sub(ptd_chord_entry_to_text, 1, 1) ~= "{" then
                 local numberRoot, chordtypy, notSharped, isFlatted
-                
                 if string.sub(ptd_chord_entry_to_text, 1, 1) == "#" then
                     numberRoot = string.sub(ptd_chord_entry_to_text, 1, 2)
-                    notSharped = false; isFlatted = false
-                    chordtypy = string.sub(ptd_chord_entry_to_text, 3, string.len(ptd_chord_entry_to_text))
+                    chordtypy = string.sub(ptd_chord_entry_to_text, 3)
+                    notSharped = false
+                    isFlatted = false
                 elseif string.sub(ptd_chord_entry_to_text, 1, 1) == "b" then
                     numberRoot = string.sub(ptd_chord_entry_to_text, 1, 2)
-                    chordtypy = string.sub(ptd_chord_entry_to_text, 3, string.len(ptd_chord_entry_to_text))
-                    notSharped = true; isFlatted = true
+                    chordtypy = string.sub(ptd_chord_entry_to_text, 3)
+                    notSharped = true
+                    isFlatted = true
                 else
                     numberRoot = string.sub(ptd_chord_entry_to_text, 1, 1)
-                    chordtypy = string.sub(ptd_chord_entry_to_text, 2, string.len(ptd_chord_entry_to_text))
-                    notSharped = true; isFlatted = false
+                    chordtypy = string.sub(ptd_chord_entry_to_text, 2)
+                    notSharped = true
+                    isFlatted = false
                 end
-            
-                if chordtypy == nil then chordtypy = "" end
-            
-                flatOrNot = musictheory.is_it_flat_table[current_key]
+
+                if chordtypy == nil then
+                    chordtypy = ""
+                end
+
+                local flatOrNot = tgt.use_flats
                 local rootShiftedAmount = musictheory.root_table[numberRoot]
-                local keyShiftedAmount = musictheory.key_table[current_key]
-            
-                if rootShiftedAmount ~= nil and keyShiftedAmount ~= nil then
+                local keyShiftedAmount = tgt.shift
+
+                if rootShiftedAmount and keyShiftedAmount then
                     local finalshifty = rootShiftedAmount + keyShiftedAmount
-                    if finalshifty > 11 then finalshifty = finalshifty - 12 end
-                    if finalshifty < 0 then finalshifty = finalshifty + 12 end
-                  
-                    if flatOrNot and notSharped then
-                        reaper.ULT_SetMediaItemNote(ptd_new_text_item_2, musictheory.flats_table[finalshifty]..chordtypy)
-                    elseif isFlatted then
-                        reaper.ULT_SetMediaItemNote(ptd_new_text_item_2, musictheory.flats_table[finalshifty]..chordtypy)
-                    else
-                        reaper.ULT_SetMediaItemNote(ptd_new_text_item_2, musictheory.sharps_table[finalshifty]..chordtypy)
+                    if finalshifty > 11 then
+                        finalshifty = finalshifty - 12
                     end
-                else
-                    reaper.ULT_SetMediaItemNote(ptd_new_text_item_2, ptd_chord_entry_to_text)
+                    if finalshifty < 0 then
+                        finalshifty = finalshifty + 12
+                    end
+
+                    if flatOrNot and notSharped then
+                        final_text = musictheory.flats_table[finalshifty] .. chordtypy
+                    elseif isFlatted then
+                        final_text = musictheory.flats_table[finalshifty] .. chordtypy
+                    else
+                        final_text = musictheory.sharps_table[finalshifty] .. chordtypy
+                    end
                 end
-            end    
+            end
+            reaper.ULT_SetMediaItemNote(text_item, final_text)
         end
 
         ptd_text_item_count = ptd_text_item_count + 1
         ptd_updating_start_ppqpos = ptd_note_end_ppqpos
         ptd_last_end_point = ptd_measure_end_point
     end
-
-    -- FIX: Ensure container items are created even if song is blank
-    if ptd_last_end_point <= ptd_first_run_start_point then 
-        ptd_last_end_point = ptd_first_run_start_point + 1 
+--[[
+    if ptd_last_end_point <= ptd_first_run_start_point then
+        ptd_last_end_point = ptd_first_run_start_point + 1
     end
 
-    -- CORRECTED: Uses 'ptd_track_table' (not pmd_)
-    grid_midi_item_id = reaper.CreateNewMIDIItemInProj(ptd_track_table[3][3], ptd_first_run_start_point, ptd_last_end_point, true)
-    lead_midi_item_id = reaper.CreateNewMIDIItemInProj(ptd_track_table[4][3], ptd_first_run_start_point, ptd_last_end_point, true)
-    chords_midi_item_id = reaper.CreateNewMIDIItemInProj(ptd_track_table[5][3], ptd_first_run_start_point, ptd_last_end_point, true)
-    chbass_midi_item_id = reaper.CreateNewMIDIItemInProj(ptd_track_table[13][3], ptd_first_run_start_point, ptd_last_end_point, true)
-    bass_midi_item_id = reaper.CreateNewMIDIItemInProj(ptd_track_table[15][3], ptd_first_run_start_point, ptd_last_end_point, true)
+    local tr_abs_grid = G_RENDER_TARGETS[7] and G_RENDER_TARGETS[7][1]
+    local tr_rel_grid = G_RENDER_TARGETS[15] and G_RENDER_TARGETS[15][1]  ]]
+--    local tr_chords = G_SOURCE_INDICES[16] and dynamic_table[G_SOURCE_INDICES[16]].track_ptr
+--   local tr_chbass = G_SOURCE_INDICES[17] and dynamic_table[G_SOURCE_INDICES[17]].track_ptr
+--  local tr_bass = G_SOURCE_INDICES[20] and dynamic_table[G_SOURCE_INDICES[20]].track_ptr
+--[[
+    local grid_midi =
+        tr_abs_grid and reaper.CreateNewMIDIItemInProj(tr_abs_grid, ptd_first_run_start_point, ptd_last_end_point, true)
+    local lead_midi =
+        tr_rel_grid and reaper.CreateNewMIDIItemInProj(tr_rel_grid, ptd_first_run_start_point, ptd_last_end_point, true)
+    local chords_midi =
+        tr_chords and reaper.CreateNewMIDIItemInProj(tr_chords, ptd_first_run_start_point, ptd_last_end_point, true)
+    local chbass_midi =
+        tr_chbass and reaper.CreateNewMIDIItemInProj(tr_chbass, ptd_first_run_start_point, ptd_last_end_point, true)
+    local bass_midi =
+        tr_bass and reaper.CreateNewMIDIItemInProj(tr_bass, ptd_first_run_start_point, ptd_last_end_point, true)
 
-    return ptd_text_item_count, lead_midi_item_id, chords_midi_item_id, bass_midi_item_id, chbass_midi_item_id, grid_midi_item_id
+
+
+    return ptd_text_item_count, lead_midi, chords_midi, bass_midi, chbass_midi, grid_midi
+end
+]]
+
+
+if ptd_last_end_point <= ptd_first_run_start_point then
+        ptd_last_end_point = ptd_first_run_start_point + 1
+    end
+
+    local tr_abs_grid = G_RENDER_TARGETS[7] and G_RENDER_TARGETS[7][1]
+    local tr_rel_grid = G_RENDER_TARGETS[15] and G_RENDER_TARGETS[15][1]
+    
+    -- ONLY pull the track pointer for Type 17 (N2N Master MIDI Source)
+    local tr_chbass = G_SOURCE_INDICES[17] and dynamic_table[G_SOURCE_INDICES[17]].track_ptr
+
+    local grid_midi = tr_abs_grid and reaper.CreateNewMIDIItemInProj(tr_abs_grid, ptd_first_run_start_point, ptd_last_end_point, true)
+    local lead_midi = tr_rel_grid and reaper.CreateNewMIDIItemInProj(tr_rel_grid, ptd_first_run_start_point, ptd_last_end_point, true)
+    
+    -- LEGACY PATHS MADE DORMANT
+    local chords_midi = nil
+    local bass_midi   = nil
+    
+    -- Create the single unified MIDI item
+    local chbass_midi = tr_chbass and reaper.CreateNewMIDIItemInProj(tr_chbass, ptd_first_run_start_point, ptd_last_end_point, true)
+
+    return ptd_text_item_count, lead_midi, chords_midi, bass_midi, chbass_midi, grid_midi
 end
 
+
 -- _______________________________________________________________________ PLACE MIDI
-
-
-
 
 -- _______________________________________________________________________ PLACE MIDI
 
@@ -3234,37 +4403,35 @@ end
 
 function place_MIDI_data(
     pmd_text_item_count,
-    pmd_lead_midi_item_id,
-    pmd_chords_midi_item_id,
-    pmd_bass_midi_item_id,
-    pmd_chbass_midi_item_id,
-    pmd_grid_midi_item_id,
-    pmd_track_table)
-    
+    pmd_lead_id,
+    pmd_chords_id,
+    pmd_bass_id,
+    pmd_chbass_id,
+    pmd_grid_id,
+    dynamic_table)
     local pmd_running_ppqpos_total = 0
     local pmd_note_end_ppqpos = 0
     local pmd_error_log = ""
-    local pmd_item_red = 192
-    local pmd_item_green = 192
-    local pmd_item_blue = 192
-    local ptd_rgb_color = {192, 192, 192}
-  
-    -- DEFINE TAKES
-    local lead_item_first_take = reaper.GetMediaItemTake(pmd_lead_midi_item_id, 0)
-    local chord_item_first_take = reaper.GetMediaItemTake(pmd_chords_midi_item_id, 0)
-    local bass_item_first_take = reaper.GetMediaItemTake(pmd_bass_midi_item_id, 0)
-    local chbass_item_first_take = reaper.GetMediaItemTake(pmd_chbass_midi_item_id, 0)
-    local grid_item_first_take = reaper.GetMediaItemTake(pmd_grid_midi_item_id, 0)
+
+    local lead_item_first_take = pmd_lead_id and reaper.GetMediaItemTake(pmd_lead_id, 0)
+    local chord_item_first_take = pmd_chords_id and reaper.GetMediaItemTake(pmd_chords_id, 0)
+    local bass_item_first_take = pmd_bass_id and reaper.GetMediaItemTake(pmd_bass_id, 0)
+    local chbass_item_first_take = pmd_chbass_id and reaper.GetMediaItemTake(pmd_chbass_id, 0)
+    local grid_item_first_take = pmd_grid_id and reaper.GetMediaItemTake(pmd_grid_id, 0)
+
+    -- Safely grab the track if it exists
+    local tr_nns = G_RENDER_TARGETS[1] and G_RENDER_TARGETS[1][1]
 
     for i, value in pairs(chord_table) do
-        local pmd_root = ""
-        local rel_root = 0 -- For Relative Grid
-        local bass_note = 0
-        local rel_bass = 0 -- For Relative Grid
-        
+        local pmd_root, rel_root, bass_note, rel_bass = "", 0, 0, 0
         local chord_type = ""
-        local pmd_item_to_color = reaper.GetTrackMediaItem(pmd_track_table[1][3], i - 1)
-        
+
+        -- Safely get the item to color ONLY if the track exists
+        local pmd_item_to_color = nil
+        if tr_nns then
+            pmd_item_to_color = reaper.GetTrackMediaItem(tr_nns, i - 1)
+        end
+
         -- ============================================================
         -- COMMAND PARSER
         -- ============================================================
@@ -3274,129 +4441,176 @@ function place_MIDI_data(
             if new_key_str and musictheory.key_table[new_key_str] then
                 current_key = new_key_str
                 keyshift = musictheory.key_table[current_key]
-                reaper.AddProjectMarker(0, false, reaper.MIDI_GetProjTimeFromPPQPos(grid_item_first_take, pmd_running_ppqpos_total), 0, "Key: " .. current_key, -1)
+                if grid_item_first_take then
+                    reaper.AddProjectMarker(
+                        0,
+                        false,
+                        reaper.MIDI_GetProjTimeFromPPQPos(grid_item_first_take, pmd_running_ppqpos_total),
+                        0,
+                        "Key: " .. current_key,
+                        -1
+                    )
+                end
             end
             local _, _, new_bpm_str = string.find(tag_content, "BPM:%s*(%d+)")
             if new_bpm_str then
                 local new_bpm = tonumber(new_bpm_str)
-                if new_bpm and new_bpm > 0 then
+                if new_bpm and new_bpm > 0 and grid_item_first_take then
                     local t_pos = reaper.MIDI_GetProjTimeFromPPQPos(grid_item_first_take, pmd_running_ppqpos_total)
                     reaper.SetTempoTimeSigMarker(0, -1, t_pos, -1, -1, new_bpm, 0, 0, false)
                 end
             end
             local _, _, new_sw_str = string.find(tag_content, "Swing:%s*(%d+)")
-            if new_sw_str then
+            if new_sw_str and grid_item_first_take then
                 local sw_val = tonumber(new_sw_str)
                 if sw_val then
-                    if sw_val < 0 then sw_val = 0 end if sw_val > 100 then sw_val = 100 end
+                    if sw_val < 0 then
+                        sw_val = 0
+                    end
+                    if sw_val > 100 then
+                        sw_val = 100
+                    end
                     local ins_pos = pmd_running_ppqpos_total
-                    if ins_pos > 0 then ins_pos = ins_pos - 1 end
+                    if ins_pos > 0 then
+                        ins_pos = ins_pos - 1
+                    end
                     reaper.MIDI_InsertCC(grid_item_first_take, false, false, ins_pos, 176, 0, 119, sw_val)
                 end
             end
         end
 
         -- ============================================================
-        -- PARSING & ERROR LOGIC (Restored)
+        -- PARSING & ERROR LOGIC
         -- ============================================================
         if string.sub(value[4], 1, 1) == "-" then
-            -- Rest
             pmd_note_end_ppqpos = pmd_running_ppqpos_total + value[3]
             pmd_running_ppqpos_total = pmd_note_end_ppqpos
-            reaper.SetMediaItemInfo_Value(pmd_item_to_color, "I_CUSTOMCOLOR", reaper.ColorToNative(133, 133, 133)|0x1000000)
-
+            if pmd_item_to_color then
+                reaper.SetMediaItemInfo_Value(
+                    pmd_item_to_color,
+                    "I_CUSTOMCOLOR",
+                    reaper.ColorToNative(133, 133, 133) | 0x1000000
+                )
+            end
         elseif (string.sub(value[4], 1, 1) == "b" and musictheory.root_table[string.sub(value[4], 1, 2)] == nil) then
-            -- Invalid Flat Root
-            pmd_error_log = pmd_error_log .. "Invalid flat root " .. string.sub(value[4], 1, 2) .. " used." .. string.char(10)
             pmd_note_end_ppqpos = pmd_running_ppqpos_total + value[3]
             pmd_running_ppqpos_total = pmd_note_end_ppqpos
-            reaper.SetMediaItemInfo_Value(pmd_item_to_color, "I_CUSTOMCOLOR", reaper.ColorToNative(0, 0, 0)|0x1000000)
-            reaper.ULT_SetMediaItemNote(pmd_item_to_color, '!!! ENTRY ERROR !!! \n"' .. string.sub(value[4], 1, 2) .. '" \nis not a supported chord root.')
+            if pmd_item_to_color then
+                reaper.SetMediaItemInfo_Value(
+                    pmd_item_to_color,
+                    "I_CUSTOMCOLOR",
+                    reaper.ColorToNative(0, 0, 0) | 0x1000000
+                )
+                reaper.ULT_SetMediaItemNote(pmd_item_to_color, "!!! ENTRY ERROR !!!")
+            end
             pmd_root = "-"
-
         elseif (string.sub(value[4], 1, 1) == "#" and musictheory.root_table[string.sub(value[4], 1, 2)] == nil) then
-            -- Invalid Sharp Root
-            pmd_error_log = pmd_error_log .. "Invalid sharp root " .. string.sub(value[4], 1, 2) .. " used." .. string.char(10)
             pmd_note_end_ppqpos = pmd_running_ppqpos_total + value[3]
             pmd_running_ppqpos_total = pmd_note_end_ppqpos
-            reaper.SetMediaItemInfo_Value(pmd_item_to_color, "I_CUSTOMCOLOR", reaper.ColorToNative(0, 0, 0)|0x1000000)
-            reaper.ULT_SetMediaItemNote(pmd_item_to_color, '!!! ENTRY ERROR !!! \n"' .. string.sub(value[4], 1, 2) .. '" \nis not a supported chord root.')
+            if pmd_item_to_color then
+                reaper.SetMediaItemInfo_Value(
+                    pmd_item_to_color,
+                    "I_CUSTOMCOLOR",
+                    reaper.ColorToNative(0, 0, 0) | 0x1000000
+                )
+                reaper.ULT_SetMediaItemNote(pmd_item_to_color, "!!! ENTRY ERROR !!!")
+            end
             pmd_root = "-"
-
-        elseif (musictheory.root_table[string.sub(value[4], 1, 1)] == nil and string.sub(value[4], 1, 1) ~= "{" and string.sub(value[4], 1, 1) ~= "b" and string.sub(value[4], 1, 1) ~= "#") then
-            -- Invalid Root Char
-            pmd_error_log = pmd_error_log .. "Invalid root character " .. string.sub(value[4], 1, 1) .. " used." .. string.char(10)
+        elseif
+            (musictheory.root_table[string.sub(value[4], 1, 1)] == nil and string.sub(value[4], 1, 1) ~= "{" and
+                string.sub(value[4], 1, 1) ~= "b" and
+                string.sub(value[4], 1, 1) ~= "#")
+         then
             pmd_note_end_ppqpos = pmd_running_ppqpos_total + value[3]
             pmd_running_ppqpos_total = pmd_note_end_ppqpos
-            reaper.SetMediaItemInfo_Value(pmd_item_to_color, "I_CUSTOMCOLOR", reaper.ColorToNative(0, 0, 0)|0x1000000)
-            reaper.ULT_SetMediaItemNote(pmd_item_to_color, '!!! ENTRY ERROR !!! \n"' .. string.sub(value[4], 1, 1) .. '" \nis not a supported chord root.')
+            if pmd_item_to_color then
+                reaper.SetMediaItemInfo_Value(
+                    pmd_item_to_color,
+                    "I_CUSTOMCOLOR",
+                    reaper.ColorToNative(0, 0, 0) | 0x1000000
+                )
+                reaper.ULT_SetMediaItemNote(pmd_item_to_color, "!!! ENTRY ERROR !!!")
+            end
             pmd_root = "-"
-
-        elseif (musictheory.root_table[string.sub(value[4], 1, 1)] == nil and string.sub(value[4], 1, 1) ~= "b" and string.sub(value[4], 1, 1) ~= "#") then
-            -- SPECIAL CASE / MARKERS
-            pmd_error_log = pmd_error_log .. "Found special case where " .. string.sub(value[4], 1, 1) .. " has been used." .. string.char(10)
+        elseif
+            (musictheory.root_table[string.sub(value[4], 1, 1)] == nil and string.sub(value[4], 1, 1) ~= "b" and
+                string.sub(value[4], 1, 1) ~= "#")
+         then
+            -- MARKERS
             pmd_note_end_ppqpos = pmd_running_ppqpos_total + 0
             pmd_running_ppqpos_total = pmd_note_end_ppqpos
             local raw = tostring(value[4] or "")
             local marker_name = raw:match("{%$(.-)%$}") or raw:match("{(.-)}") or raw
             marker_name = marker_name:gsub("^%s*", ""):gsub("%s*$", ""):gsub("%$$", "")
             table.insert(G_region_table, {pmd_running_ppqpos_total, marker_name})
-            
-            -- Look Ahead Logic
-            if chord_table[i + 1] ~= nil then 
-                next_records_value_4 = chord_table[i + 1][4]
-                user_left_section_empty = false
-            else
-                user_left_section_empty = true   
-            end
-            if next_records_value_4 == nil or string.sub(next_records_value_4, 1,2) == "{$" or chord_table[i + 1] == nil then
-                user_left_section_empty = true
-            else
-                user_left_section_empty = false          
-            end
 
-            -- Coloring logic for markers
-            if string.sub(next_records_value_4, 1, 1) == "-" then
-                reaper.SetMediaItemInfo_Value(pmd_item_to_color, "I_CUSTOMCOLOR", reaper.ColorToNative(133, 133, 133)|0x1000000)
-            elseif (string.sub(next_records_value_4, 1, 1) == "b" and musictheory.root_table[string.sub(next_records_value_4, 1, 2)] == nil) then
-                pmd_error_log = pmd_error_log .. "Invalid flat root " .. string.sub(next_records_value_4, 1, 2) .. " used." .. string.char(10)
-                reaper.SetMediaItemInfo_Value(pmd_item_to_color, "I_CUSTOMCOLOR", reaper.ColorToNative(0, 0, 0)|0x1000000)
-                pmd_root = "-"
-            elseif (string.sub(next_records_value_4, 1, 1) == "#" and musictheory.root_table[string.sub(next_records_value_4, 1, 2)] == nil) then
-                pmd_error_log = pmd_error_log .. "Invalid sharp root " .. string.sub(next_records_value_4, 1, 2) .. " used." .. string.char(10)
-                reaper.SetMediaItemInfo_Value(pmd_item_to_color, "I_CUSTOMCOLOR", reaper.ColorToNative(0, 0, 0)|0x1000000)
-                pmd_root = "-"
-            elseif (musictheory.root_table[string.sub(next_records_value_4, 1, 1)] == nil and string.sub(next_records_value_4, 1, 1) ~= "{" and string.sub(next_records_value_4, 1, 1) ~= "b" and string.sub(next_records_value_4, 1, 1) ~= "#") then
-                pmd_error_log = pmd_error_log .. "Invalid root character " .. string.sub(next_records_value_4, 1, 1) .. " used." .. string.char(10)
-                reaper.SetMediaItemInfo_Value(pmd_item_to_color, "I_CUSTOMCOLOR", reaper.ColorToNative(0, 0, 0)|0x1000000)
-                pmd_root = "-"
-            elseif string.sub(next_records_value_4, 1, 1) == "b" or string.sub(next_records_value_4, 1, 1) == "#" then
-                local color_table = musictheory.root_colors[string.sub(next_records_value_4, 1, 2)]
-                reaper.SetMediaItemInfo_Value(pmd_item_to_color, "I_CUSTOMCOLOR", reaper.ColorToNative(color_table[1], color_table[2], color_table[3])|0x1000000)
-            else
-                local color_table = musictheory.root_colors[string.sub(next_records_value_4, 1, 1)]
-                if user_left_section_empty == false then
-                    reaper.SetMediaItemInfo_Value(pmd_item_to_color, "I_CUSTOMCOLOR", reaper.ColorToNative(color_table[1], color_table[2], color_table[3])|0x1000000)
-                else
-                    render_feedback = render_feedback .. "\nMinor error. Don't enter sections with no chords...\n" .. 'Remove the empty section(s) from either the "Form:" field or from the\nChord entry area and re-render.\n\n'
+            -- Smart Forward-Crawl for Colors
+
+            local color_root = nil
+            for search_idx = i + 1, #chord_table do
+                local future_val = chord_table[search_idx] and chord_table[search_idx][4]
+                -- Stop searching as soon as we hit a non-marker item
+                if future_val and not future_val:match("^{") then
+                    if future_val == "-" then
+                        color_root = "REST"
+                    else
+                        local first_char = string.sub(future_val, 1, 1)
+                        if first_char == "b" or first_char == "#" then
+                            color_root = string.sub(future_val, 1, 2)
+                        else
+                            color_root = first_char
+                        end
+                    end
+                    break
                 end
             end
-            
+
+            if pmd_item_to_color and color_root then
+                if color_root == "REST" then
+                    reaper.SetMediaItemInfo_Value(
+                        pmd_item_to_color,
+                        "I_CUSTOMCOLOR",
+                        reaper.ColorToNative(133, 133, 133) | 0x1000000
+                    )
+                else
+                    local color_table = musictheory.root_colors[color_root]
+                    if color_table then
+                        reaper.SetMediaItemInfo_Value(
+                            pmd_item_to_color,
+                            "I_CUSTOMCOLOR",
+                            reaper.ColorToNative(color_table[1], color_table[2], color_table[3]) | 0x1000000
+                        )
+                    end
+                end
+            end
         else
             -- NORMAL CHORD PROCESSING
             if string.sub(value[4], 1, 1) == "b" or string.sub(value[4], 1, 1) == "#" then
                 pmd_root = musictheory.root_table[string.sub(value[4], 1, 2)]
                 chord_type = string.sub(value[4], 3, string.len(value[4]))
-                color_table = musictheory.root_colors[string.sub(value[4], 1, 2)]
-                text_item_color = reaper.ColorToNative(color_table[1], color_table[2], color_table[3]) | 0x1000000
-                reaper.SetMediaItemInfo_Value(pmd_item_to_color, "I_CUSTOMCOLOR", text_item_color)
+                if pmd_item_to_color then
+                    local color_table = musictheory.root_colors[string.sub(value[4], 1, 2)]
+                    reaper.SetMediaItemInfo_Value(
+                        pmd_item_to_color,
+                        "I_CUSTOMCOLOR",
+                        reaper.ColorToNative(color_table[1], color_table[2], color_table[3]) | 0x1000000
+                    )
+                end
             else
                 pmd_root = musictheory.root_table[string.sub(value[4], 1, 1)]
                 chord_type = string.sub(value[4], 2, string.len(value[4]))
-                color_table = musictheory.root_colors[string.sub(value[4], 1, 1)]
-                text_item_color = reaper.ColorToNative(color_table[1], color_table[2], color_table[3]) | 0x1000000
-                reaper.SetMediaItemInfo_Value(pmd_item_to_color, "I_CUSTOMCOLOR", text_item_color)
+                if pmd_item_to_color then
+                    local color_table = musictheory.root_colors[string.sub(value[4], 1, 1)]
+                    reaper.SetMediaItemInfo_Value(
+                        pmd_item_to_color,
+                        "I_CUSTOMCOLOR",
+                        reaper.ColorToNative(color_table[1], color_table[2], color_table[3]) | 0x1000000
+                    )
+                end
             end
+
+            -----------------------------------------------------------------
+
             if string.find(chord_type, "/") then
                 local _, slash_end = string.find(chord_type, "/")
                 local bass_str = string.sub(chord_type, slash_end + 1)
@@ -3405,168 +4619,302 @@ function place_MIDI_data(
             else
                 bass_note = pmd_root
             end
-            if chord_type == "" then chord_type = "z" end
 
-            -- >>> SAVE RELATIVE ROOTS <<<
-            rel_root = pmd_root
-            rel_bass = bass_note
+            if chord_type == "" then
+                chord_type = "z"
+            end
 
-            -- APPLY KEY SHIFT
-            if musictheory.key_table[current_key] == nil then
-                pmd_error_log = pmd_error_log .. "Invalid Key " .. current_key .. " used." .. string.char(10)
-            else
-                keyshift = musictheory.key_table[current_key]
-                pmd_root = pmd_root + keyshift
-                bass_note = bass_note + keyshift
-                if pmd_root > 12 then pmd_root = pmd_root - 12 end
-                if bass_note > 12 then bass_note = bass_note - 12 end
+            -- PREPARE FOR PERFECT INVERSION MATH
+            local keyshift = musictheory.key_table[current_key] or 0
+
+            -- Calculate absolute roots for perfect voicing boundaries
+            local abs_root = (pmd_root + keyshift) % 12
+            local abs_bass = (bass_note + keyshift) % 12
+
+            -- Calculate the exact shift the JSFX will apply (-5 to +6)
+            local jsfx_shift = keyshift
+            if jsfx_shift > 6 then
+                jsfx_shift = jsfx_shift - 12
             end
 
             pmd_note_end_ppqpos = pmd_running_ppqpos_total + value[3]
             tiny_table_of_chord_tones = musictheory.type_table[chord_type]
-            
+
             if tiny_table_of_chord_tones == nil then
-                pmd_error_log = pmd_error_log .. "The chord type: " .. chord_type .. " was not found in the chord database." .. string.char(10)
-                text_item_color = reaper.ColorToNative(0, 0, 0) | 0x1000000
-                reaper.ULT_SetMediaItemNote(pmd_item_to_color, '!!! ENTRY ERROR !!! \n"' .. chord_type .. '" \nis not a supported chord type.')
-                reaper.SetMediaItemInfo_Value(pmd_item_to_color, "I_CUSTOMCOLOR", text_item_color)
-                pmd_root = "-"
-                pmd_note_end_ppqpos = pmd_running_ppqpos_total + value[3]
+                if pmd_item_to_color then
+                    reaper.SetMediaItemInfo_Value(
+                        pmd_item_to_color,
+                        "I_CUSTOMCOLOR",
+                        reaper.ColorToNative(0, 0, 0) | 0x1000000
+                    )
+                    reaper.ULT_SetMediaItemNote(pmd_item_to_color, "!!! ENTRY ERROR !!!")
+                end
                 pmd_running_ppqpos_total = pmd_note_end_ppqpos
             else
-                
-                -- >>> GROOVE + VELOCITY LOGIC <<<
-                
-        
--- 1. Calculate START Shift (Attack)
-                local start_qn_project = reaper.MIDI_GetProjQNFromPPQPos(grid_item_first_take, pmd_running_ppqpos_total)
-                local start_bar_pos_qn = start_qn_project % 4
-                local start_step_idx = math.floor(start_bar_pos_qn * 8) + 1 
-                
-                -- Safety clamp
-                if start_step_idx < 1 then start_step_idx = 1 end
-                if start_step_idx > 32 then start_step_idx = 1 end -- Wraps 32nd notes
+                -- GROOVE + VELOCITY LOGIC
+                local start_qn_project = 0
+                if grid_item_first_take then
+                    start_qn_project = reaper.MIDI_GetProjQNFromPPQPos(grid_item_first_take, pmd_running_ppqpos_total)
+                end
 
-                local start_groove_pct = groove_data[start_step_idx] or 0.0
-                local start_ticks_shift = math.floor(start_groove_pct * 60)
-                
-                -- 2. Calculate END Shift (Release)
-                -- Look at the grid point where the note ENDS to determine its specific groove offset
-                local end_qn_project = reaper.MIDI_GetProjQNFromPPQPos(grid_item_first_take, pmd_note_end_ppqpos)
+                local start_bar_pos_qn = start_qn_project % 4
+                local start_step_idx = math.floor(start_bar_pos_qn * 8) + 1
+                if start_step_idx < 1 then
+                    start_step_idx = 1
+                end
+                if start_step_idx > 32 then
+                    start_step_idx = 1
+                end
+
+                local start_ticks_shift = math.floor((groove_data[start_step_idx] or 0.0) * 60)
+
+                local end_qn_project = 0
+                if grid_item_first_take then
+                    end_qn_project = reaper.MIDI_GetProjQNFromPPQPos(grid_item_first_take, pmd_note_end_ppqpos)
+                end
+
                 local end_bar_pos_qn = end_qn_project % 4
                 local end_step_idx = math.floor(end_bar_pos_qn * 8) + 1
+                if end_step_idx < 1 then
+                    end_step_idx = 1
+                end
+                if end_step_idx > 32 then
+                    end_step_idx = 1
+                end
 
-                -- Safety clamp
-                if end_step_idx < 1 then end_step_idx = 1 end
-                if end_step_idx > 32 then end_step_idx = 1 end
+                local end_ticks_shift = math.floor((groove_data[end_step_idx] or 0.0) * 60)
 
-                local end_groove_pct = groove_data[end_step_idx] or 0.0
-                local end_ticks_shift = math.floor(end_groove_pct * 60)
-                
-                -- 3. Apply Independent Shifts (Rubber Band Effect)
                 local final_start = pmd_running_ppqpos_total + start_ticks_shift
-                local final_end   = pmd_note_end_ppqpos + end_ticks_shift
-                
-                -- Safety Clamps
-                if final_start < 0 then final_start = 0 end
-                if final_end <= final_start then final_end = final_start + 10 end
-        
-        
-        
-        
+                local raw_end = pmd_note_end_ppqpos + end_ticks_shift
+
+                local grooved_duration = raw_end - final_start
+                local trim_amount = math.floor(G_ticks_per_measure / 32)
+
+                if grooved_duration <= (trim_amount * 2) then
+                    trim_amount = math.floor(grooved_duration * 0.3)
+                end
+
+                local final_end = raw_end - trim_amount
+                if final_start < 0 then
+                    final_start = 0
+                end
+                if final_end <= final_start then
+                    final_end = final_start + 1
+                end
 
                 for _, v in pairs(tiny_table_of_chord_tones) do
                     local chan = 1
-                    
-                    -- VELOCITY CODING
-                    local vel = 80
-                    local vel_bass = 90
+                    local vel, vel_bass = 80, 90
                     local is_dim = string.find(chord_type, "dim")
 
-                    if v == 0 then vel = 89 
-                    elseif v == 1 or v == 2 then vel = 88 
-                    elseif v == 3 or v == 4 then vel = 87 
-                    elseif v == 5 then vel = 86 
-                    elseif v == 6 then if is_dim then vel = 85 else vel = 86 end 
-                    elseif v == 7 or v == 8 then vel = 85 
-                    elseif v == 9 then if is_dim then vel = 83 else vel = 84 end 
-                    elseif v >= 10 then vel = 83 
+                    if v == 0 then
+                        vel = 89
+                    elseif v == 1 or v == 2 then
+                        vel = 88
+                    elseif v == 3 or v == 4 then
+                        vel = 87
+                    elseif v == 5 then
+                        vel = 86
+                    elseif v == 6 then
+                        vel = is_dim and 85 or 86
+                    elseif v == 7 or v == 8 then
+                        vel = 85
+                    elseif v == 9 then
+                        vel = is_dim and 83 or 84
+                    elseif v >= 10 then
+                        vel = 83
                     end
 
-                    -- INSERT ABSOLUTE
-                    if v + pmd_root > 10 then
-                        local pitch = 60 + pmd_root + v - 12
-                        reaper.MIDI_InsertNote(chord_item_first_take, 0, 0, final_start, final_end, chan, pitch, vel)
-                        reaper.MIDI_InsertNote(grid_item_first_take, 0, 0, final_start, final_end, chan, pitch, vel)
-                        reaper.MIDI_InsertNote(chbass_item_first_take, 0, 0, final_start, final_end, chan, pitch, vel)
-                        if v == 0 then
-                            local bp = 60 + bass_note + v - 36
-                            reaper.MIDI_InsertNote(bass_item_first_take, 0, 0, final_start, final_end, chan, bp, vel_bass)
-                            reaper.MIDI_InsertNote(grid_item_first_take, 0, 0, final_start, final_end, chan, bp, vel_bass)
-                            reaper.MIDI_InsertNote(chbass_item_first_take, 0, 0, final_start, final_end, chan, bp, vel_bass)
-                        end
-                    else
-                        local pitch = 60 + pmd_root + v
-                        reaper.MIDI_InsertNote(chord_item_first_take, 0, 0, final_start, final_end, chan, pitch, vel)
-                        reaper.MIDI_InsertNote(grid_item_first_take, 0, 0, final_start, final_end, chan, pitch, vel)
-                        reaper.MIDI_InsertNote(chbass_item_first_take, 0, 0, final_start, final_end, chan, pitch, vel)
-                        if v == 0 then
-                            local bp = 60 + bass_note + v - 24
-                            reaper.MIDI_InsertNote(bass_item_first_take, 0, 0, final_start, final_end, chan, bp, vel_bass)
-                            reaper.MIDI_InsertNote(grid_item_first_take, 0, 0, final_start, final_end, chan, bp, vel_bass)
-                            reaper.MIDI_InsertNote(chbass_item_first_take, 0, 0, final_start, final_end, chan, bp, vel_bass)
-                        end
+                    -- Generate perfectly tuned Absolute pitch first
+
+                    local pitch = (v + abs_root > 10) and (60 + abs_root + v - 12) or (60 + abs_root + v)
+
+                    -- Visually reverse the JSFX shift for Relative modes so it sits cleanly on C in the editor!
+                    local visual_pitch = (G_render_mode == 0) and (pitch - jsfx_shift) or pitch
+                    local rel_grid_pitch = pitch - jsfx_shift -- Type 15 is ALWAYS in C
+
+                    if chord_item_first_take then
+                        reaper.MIDI_InsertNote(
+                            chord_item_first_take,
+                            0,
+                            0,
+                            final_start,
+                            final_end,
+                            chan,
+                            visual_pitch,
+                            vel
+                        )
+                    end
+                    if chbass_item_first_take then
+                        reaper.MIDI_InsertNote(
+                            chbass_item_first_take,
+                            0,
+                            0,
+                            final_start,
+                            final_end,
+                            chan,
+                            visual_pitch,
+                            vel
+                        )
                     end
 
-                    -- >>> INSERT RELATIVE (KEY OF C) for Lead/Delay Track <<<
-                    -- We use 'rel_root' instead of 'pmd_root'
-                    if v + rel_root > 10 then
-                         local rel_p = 60 + rel_root + v - 12
-                         reaper.MIDI_InsertNote(lead_item_first_take, 0, 0, final_start, final_end, chan, rel_p, vel)
-                         if v == 0 then
-                             local rel_bp = 60 + rel_bass + v - 36
-                             reaper.MIDI_InsertNote(lead_item_first_take, 0, 0, final_start, final_end, chan, rel_bp, vel_bass)
-                         end
-                    else
-                         local rel_p = 60 + rel_root + v
-                         reaper.MIDI_InsertNote(lead_item_first_take, 0, 0, final_start, final_end, chan, rel_p, vel)
-                         if v == 0 then
-                             local rel_bp = 60 + rel_bass + v - 24
-                             reaper.MIDI_InsertNote(lead_item_first_take, 0, 0, final_start, final_end, chan, rel_bp, vel_bass)
-                         end
+                    -- Explicitly populate BOTH grids!
+                    if grid_item_first_take then
+                        reaper.MIDI_InsertNote(grid_item_first_take, 0, 0, final_start, final_end, chan, pitch, vel)
+                    end
+                    if lead_item_first_take then
+                        reaper.MIDI_InsertNote(
+                            lead_item_first_take,
+                            0,
+                            0,
+                            final_start,
+                            final_end,
+                            chan,
+                            rel_grid_pitch,
+                            vel
+                        )
+                    end
+
+                    if v == 0 then
+                        local bp = (v + abs_root > 10) and (60 + abs_bass + v - 36) or (60 + abs_bass + v - 24)
+                        local visual_bp = (G_render_mode == 0) and (bp - jsfx_shift) or bp
+                        local rel_grid_bp = bp - jsfx_shift
+
+                        if bass_item_first_take then
+                            reaper.MIDI_InsertNote(
+                                bass_item_first_take,
+                                0,
+                                0,
+                                final_start,
+                                final_end,
+                                chan,
+                                visual_bp,
+                                vel_bass
+                            )
+                        end
+                        if chbass_item_first_take then
+                            reaper.MIDI_InsertNote(
+                                chbass_item_first_take,
+                                0,
+                                0,
+                                final_start,
+                                final_end,
+                                chan,
+                                visual_bp,
+                                vel_bass
+                            )
+                        end
+
+                        -- Explicitly populate BOTH grids with bass!
+                        if grid_item_first_take then
+                            reaper.MIDI_InsertNote(
+                                grid_item_first_take,
+                                0,
+                                0,
+                                final_start,
+                                final_end,
+                                chan,
+                                bp,
+                                vel_bass
+                            )
+                        end
+                        if lead_item_first_take then
+                            reaper.MIDI_InsertNote(
+                                lead_item_first_take,
+                                0,
+                                0,
+                                final_start,
+                                final_end,
+                                chan,
+                                rel_grid_bp,
+                                vel_bass
+                            )
+                        end
                     end
                 end
             end
             pmd_running_ppqpos_total = pmd_note_end_ppqpos
         end
     end
-  
-    -- COLOR COPYING
-    local tr_source = pmd_track_table[1][3]
-    local tr_dest   = pmd_track_table[2][3]
-    if tr_source and tr_dest then
+
+    -- SAFE COLOR COPYING FOR ALL TEXT TRACKS
+    local tr_source = G_RENDER_TARGETS[1] and G_RENDER_TARGETS[1][1]
+    local dest_types = {4, 5, 6} -- Target the 3 Letter Chart types
+
+    if tr_source then
         local item_count = reaper.CountTrackMediaItems(tr_source)
-        for i = 0, item_count - 1 do
-            local item_src = reaper.GetTrackMediaItem(tr_source, i)
-            local color = reaper.GetMediaItemInfo_Value(item_src, "I_CUSTOMCOLOR")
-            local item_dst = reaper.GetTrackMediaItem(tr_dest, i)
-            if item_dst then
-                reaper.SetMediaItemInfo_Value(item_dst, "I_CUSTOMCOLOR", color)
+        for _, d_type in ipairs(dest_types) do
+            local tr_dest = G_RENDER_TARGETS[d_type] and G_RENDER_TARGETS[d_type][1]
+            if tr_dest then
+                for i = 0, item_count - 1 do
+                    local item_src = reaper.GetTrackMediaItem(tr_source, i)
+                    if item_src then
+                        local color = reaper.GetMediaItemInfo_Value(item_src, "I_CUSTOMCOLOR")
+                        local item_dst = reaper.GetTrackMediaItem(tr_dest, i)
+                        if item_dst then
+                            reaper.SetMediaItemInfo_Value(item_dst, "I_CUSTOMCOLOR", color)
+                        end
+                    end
+                end
             end
         end
     end
-  
+
     return pmd_error_log, pmd_running_ppqpos_total, grid_item_first_take, lead_item_first_take
 end
+
+
+
+function Get_Stretched_ABCD_Index(phrase_idx, total_phrases)
+    if total_phrases <= 1 then
+        return 0 -- A
+    elseif total_phrases == 2 then
+        return phrase_idx -- A B
+    elseif total_phrases == 3 then
+        return phrase_idx -- A B C
+    elseif total_phrases == 4 then
+        return phrase_idx -- A B C D
+    elseif total_phrases == 5 then
+        local map = {0, 0, 1, 2, 3} -- A A B C D
+        return map[phrase_idx + 1]
+    elseif total_phrases == 6 then
+        local map = {0, 0, 1, 2, 2, 3} -- A A B C C D
+        return map[phrase_idx + 1]
+    elseif total_phrases == 7 then
+        local map = {0, 0, 1, 1, 2, 2, 3} -- A A B B C C D
+        return map[phrase_idx + 1]
+    elseif total_phrases == 8 then
+        local map = {0, 0, 0, 1, 2, 2, 2, 3} -- A A A B C C C D
+        return map[phrase_idx + 1]
+    else
+        local t = phrase_idx / (total_phrases - 1)
+
+        if t < 0.30 then
+            return 0 -- A
+        elseif t < 0.50 then
+            return 1 -- B
+        elseif t < 0.80 then
+            return 2 -- C
+        else
+            return 3 -- D
+        end
+    end
+end
+
+
+
+
+
+
+
+
+
+
 
 
 -- =========================================================
 -- DRUM CONDUCTOR HELPERS v4 (Final Corrections)
 -- =========================================================
-
-
-
-
 
 -- 1. VISUAL LOOKUP (Colors & Names for Text Items)
 function Get_Drum_Visuals(pc)
@@ -3575,82 +4923,69 @@ function Get_Drum_Visuals(pc)
 
     -- Count-In (24)
     if pc == 24 then
+        -- Intro (32-35)
         name = "Count-In"
         r, g, b = 0.3, 0.3, 0.3
-    
-    -- Intro (32-35)
     elseif pc >= 32 and pc <= 35 then
+        -- Verse 1 (36-39)
         local letter = string.char(64 + (pc - 31))
         name = "Intro-" .. letter
         r, g, b = 0.2, 1.0, 1.0
-    
-    -- Verse 1 (36-39)
     elseif pc >= 36 and pc <= 39 then
+        -- Verse 2 (40-43)
         local letter = string.char(64 + (pc - 35))
         name = "Verse 1-" .. letter
         r, g, b = 0.4, 0.6, 1.0
-    
-    -- Verse 2 (40-43)
     elseif pc >= 40 and pc <= 43 then
+        -- Verse 3 (44-47)
         local letter = string.char(64 + (pc - 39))
         name = "Verse 2-" .. letter
         r, g, b = 0.4, 0.6, 1.0
-    
-    -- Verse 3 (44-47)
     elseif pc >= 44 and pc <= 47 then
+        -- Pre-Chorus 1 (48-51)
         local letter = string.char(64 + (pc - 43))
         name = "Verse 3-" .. letter
         r, g, b = 0.4, 0.6, 1.0
-    
-    -- Pre-Chorus 1 (48-51)
     elseif pc >= 48 and pc <= 51 then
+        -- Pre-Chorus 2 (52-55)
         local letter = string.char(64 + (pc - 47))
         name = "Pre 1-" .. letter
         r, g, b = 0.7, 0.4, 1.0
-    
-    -- Pre-Chorus 2 (52-55)
     elseif pc >= 52 and pc <= 55 then
+        -- Pre-Chorus 3 (56-59)
         local letter = string.char(64 + (pc - 51))
         name = "Pre 2-" .. letter
         r, g, b = 0.7, 0.4, 1.0
-    
-    -- Pre-Chorus 3 (56-59)
     elseif pc >= 56 and pc <= 59 then
+        -- Chorus 1 (60-63)
         local letter = string.char(64 + (pc - 55))
         name = "Pre 3-" .. letter
         r, g, b = 0.7, 0.4, 1.0
-    
-    -- Chorus 1 (60-63)
     elseif pc >= 60 and pc <= 63 then
+        -- Chorus 2 (64-67)
         local letter = string.char(64 + (pc - 59))
         name = "Chorus 1-" .. letter
         r, g, b = 1.0, 0.4, 0.4
-    
-    -- Chorus 2 (64-67)
     elseif pc >= 64 and pc <= 67 then
+        -- Chorus 3 (68-71)
         local letter = string.char(64 + (pc - 63))
         name = "Chorus 2-" .. letter
         r, g, b = 1.0, 0.4, 0.4
-    
-    -- Chorus 3 (68-71)
     elseif pc >= 68 and pc <= 71 then
+        -- Bridge (72-75)
         local letter = string.char(64 + (pc - 67))
         name = "Chorus 3-" .. letter
         r, g, b = 1.0, 0.4, 0.4
-    
-    -- Bridge (72-75)
     elseif pc >= 72 and pc <= 75 then
+        -- Solo (76-79)
         local letter = string.char(64 + (pc - 71))
         name = "Bridge-" .. letter
         r, g, b = 1.0, 0.9, 0.2
-    
-    -- Solo (76-79)
     elseif pc >= 76 and pc <= 79 then
+        -- Outro (80-83)
         local letter = string.char(64 + (pc - 75))
         name = "Solo-" .. letter
         r, g, b = 0.8, 0.5, 0.9
-    
-    -- Outro (80-83)
     elseif pc >= 80 and pc <= 83 then
         local letter = string.char(64 + (pc - 79))
         name = "Outro-" .. letter
@@ -3663,15 +4998,21 @@ end
 -- 2. SELECTIVE CLEANUP - Only remove our PC stamps (24-83)
 -- 2. SELECTIVE CLEANUP - Optimized
 function Clean_Drum_Track(track)
-    if not track then return end
-    
+    if not track then
+        return
+    end
+
     local r = reaper
     local item_count = r.CountTrackMediaItems(track)
-    if item_count == 0 then return end
+    if item_count == 0 then
+        return
+    end
 
     -- Valid PC range that we manage (24-83)
     local valid_pcs = {}
-    for i = 24, 83 do valid_pcs[i] = true end
+    for i = 24, 83 do
+        valid_pcs[i] = true
+    end
 
     for i = item_count - 1, 0, -1 do
         local item = r.GetTrackMediaItem(track, i)
@@ -3679,17 +5020,8 @@ function Clean_Drum_Track(track)
 
         -- Check for text labels first (faster than MIDI parsing)
         local _, notes = r.GetSetMediaItemInfo_String(item, "P_NOTES", "", false)
-        
-        if notes ~= "" and (
-            notes:match("^Drums Count%-In$") or
-            notes:match("^Drums Intro%-") or
-            notes:match("^Drums Verse %d+%-") or
-            notes:match("^Drums Pre %d+%-") or
-            notes:match("^Drums Chorus %d+%-") or
-            notes:match("^Drums Bridge%-") or
-            notes:match("^Drums Solo%-") or
-            notes:match("^Drums Outro%-")
-        ) then
+
+        if notes ~= "" and notes:match("^Drums ") then
             should_delete = true
         else
             -- Only check MIDI if no text match
@@ -3712,9 +5044,6 @@ function Clean_Drum_Track(track)
     end
 end
 
-
-
-
 -- 3. MAP REGION TO PC
 function Parse_Region_To_PC(name)
     if not name or name == "" then
@@ -3731,7 +5060,7 @@ function Parse_Region_To_PC(name)
         ["Hit"] = 71,
         ["Fill"] = 81
     }
-    
+
     arpmap = {
         ["Intro"] = 8,
         ["Verse"] = 16,
@@ -3760,16 +5089,14 @@ function Parse_Region_To_PC(name)
     return base_pc + (var - 1)
 end
 
-
-
-
-
 -- 3. MAP REGION NAME TO BASE PC
 function Parse_Region_To_Base_PC(name)
-    if not name or name == "" then return nil end
-    
+    if not name or name == "" then
+        return nil
+    end
+
     local upper = string.upper(name)
-    
+
     -- Count-In / Off
     if upper:find("COUNT IN") or upper:find("COUNT%-IN") or upper:find("OFF") then
         return 24
@@ -3777,19 +5104,31 @@ function Parse_Region_To_Base_PC(name)
         return 32
     elseif upper:find("VERSE") then
         local instance = tonumber(name:match("%d+")) or 1
-        if instance == 1 then return 36
-        elseif instance == 2 then return 40
-        else return 44 end
+        if instance == 1 then
+            return 36
+        elseif instance == 2 then
+            return 40
+        else
+            return 44
+        end
     elseif upper:find("PRE") then
         local instance = tonumber(name:match("%d+")) or 1
-        if instance == 1 then return 48
-        elseif instance == 2 then return 52
-        else return 56 end
+        if instance == 1 then
+            return 48
+        elseif instance == 2 then
+            return 52
+        else
+            return 56
+        end
     elseif upper:find("CHORUS") then
         local instance = tonumber(name:match("%d+")) or 1
-        if instance == 1 then return 60
-        elseif instance == 2 then return 64
-        else return 68 end
+        if instance == 1 then
+            return 60
+        elseif instance == 2 then
+            return 64
+        else
+            return 68
+        end
     elseif upper:find("BRIDGE") then
         return 72
     elseif upper:find("SOLO") then
@@ -3801,16 +5140,15 @@ function Parse_Region_To_Base_PC(name)
     end
 end
 
-
-
-
 -- 4. INSERT TRIGGER & TEXT (Text = 1 bar, Pattern = 4 bars)
 function Insert_Drum_Trigger(track, time_pos, pc_val)
     local r = reaper
 
     -- MIDI EARLY (8th note early = 0.5 QN)
     local midi_qn = r.TimeMap2_timeToQN(0, time_pos) - 0.5
-    if midi_qn < 0 then midi_qn = 0 end
+    if midi_qn < 0 then
+        midi_qn = 0
+    end
 
     local midi_time = r.TimeMap2_QNToTime(0, midi_qn)
     local end_time = r.TimeMap2_QNToTime(0, midi_qn + 1.0)
@@ -3829,7 +5167,7 @@ function Insert_Drum_Trigger(track, time_pos, pc_val)
 
     -- Text item spans 1 bar (changed from 4)
     local start_qn = r.TimeMap2_timeToQN(0, time_pos)
-    local end_qn = start_qn + 4  -- 1 bar instead of 4
+    local end_qn = start_qn + 4 -- 1 bar instead of 4
     local end_time_text = r.TimeMap2_QNToTime(0, end_qn)
 
     local t_item = r.AddMediaItemToTrack(track)
@@ -3839,72 +5177,101 @@ function Insert_Drum_Trigger(track, time_pos, pc_val)
         r.GetSetMediaItemInfo_String(t_item, "P_NAME", label, true)
         r.GetSetMediaItemInfo_String(t_item, "P_NOTES", label, true)
 
-        local native_color = r.ColorToNative(
-            math.floor(rr * 255), 
-            math.floor(gg * 255), 
-            math.floor(bb * 255)
-        ) | 0x1000000
+        local native_color =
+            r.ColorToNative(math.floor(rr * 255), math.floor(gg * 255), math.floor(bb * 255)) | 0x1000000
         r.SetMediaItemInfo_Value(t_item, "I_CUSTOMCOLOR", native_color)
     end
 end
 
--- 5. PROCESS REGIONS WITH 4-BAR PHRASE ROTATION (Single Track)
--- 5. PROCESS REGIONS WITH 4-BAR PHRASE ROTATION (Single Track)
+
+
 function Generate_Drum_Conductor_For_Track(drum_track)
     local r = reaper
-    if not drum_track then return end
-    
-    Clean_Drum_Track(drum_track)
+    if not drum_track then
+        return
+    end
 
-    -- Insert initial Count-In at time 0
-    Insert_Drum_Trigger(drum_track, 0.0, 24)
+    Clean_Drum_Track(drum_track)
 
     local _, num_markers, num_regions = r.CountProjectMarkers(0)
     local total = num_markers + num_regions
-    
-    -- Track the end position of the last region
+
+    local first_region_pos = nil
     local last_region_end = 0
+    local has_region_at_zero = false
 
     for i = 0, total - 1 do
-        local _, isrgn, pos, rgnend, name, idx = r.EnumProjectMarkers(i)
+        local _, isrgn, pos, rgnend = r.EnumProjectMarkers(i)
         if isrgn then
-            -- Update last region end position
+            if first_region_pos == nil or pos < first_region_pos then
+                first_region_pos = pos
+            end
             if rgnend > last_region_end then
                 last_region_end = rgnend
             end
-            
+            if pos <= 0.01 then
+                has_region_at_zero = true
+            end
+        end
+    end
+
+    if G_DRUM_CUE_PLACEMENT == "On/Off" then
+        if not has_region_at_zero then
+            Insert_Drum_Trigger(drum_track, 0.0, 0)
+        end
+
+        if first_region_pos ~= nil then
+            Insert_Drum_Trigger(drum_track, first_region_pos, 26)
+        end
+
+        if last_region_end > 0 then
+            Insert_Drum_Trigger(drum_track, last_region_end, 0)
+        end
+
+        r.UpdateArrange()
+        return
+    end
+
+    if not has_region_at_zero then
+        Insert_Drum_Trigger(drum_track, 0.0, 24)
+    end
+
+    for i = 0, total - 1 do
+        local _, isrgn, pos, rgnend, name = r.EnumProjectMarkers(i)
+        if isrgn then
             local base_pc = Parse_Region_To_Base_PC(name)
-            
+
             if base_pc then
-                local start_qn = r.TimeMap2_timeToQN(0, pos)
-                local end_qn = r.TimeMap2_timeToQN(0, rgnend)
-                local length_qn = end_qn - start_qn
-                
-                -- Calculate number of 4-bar phrases (16 QN per phrase)
-                local num_phrases = math.ceil(length_qn / 16)
-                
-                for phrase = 0, num_phrases - 1 do
-                    -- Each phrase is 16 QN (4 bars)
-                    local phrase_start_qn = start_qn + (phrase * 16)
-                    if phrase_start_qn >= end_qn then break end
-                    
-                    -- Pattern cycles every 4 phrases (A, B, C, D)
-                    local pattern_index = phrase % 4
-                    local pc_val = base_pc + pattern_index
-                    
-                    local phrase_time = r.TimeMap2_QNToTime(0, phrase_start_qn)
-                    Insert_Drum_Trigger(drum_track, phrase_time, pc_val)
+                if G_DRUM_CUE_PLACEMENT == "Every Section" then
+                    Insert_Drum_Trigger(drum_track, pos, base_pc)
+
+                elseif G_DRUM_CUE_PLACEMENT == "Every 4 Bars" then
+                    local start_qn = r.TimeMap2_timeToQN(0, pos)
+                    local end_qn = r.TimeMap2_timeToQN(0, rgnend)
+                    local length_qn = end_qn - start_qn
+                    local num_phrases = math.ceil(length_qn / 16)
+
+                    for phrase = 0, num_phrases - 1 do
+                        local phrase_start_qn = start_qn + (phrase * 16)
+                        if phrase_start_qn >= end_qn then
+                            break
+                        end
+                        local pattern_index = Get_Stretched_ABCD_Index(phrase, num_phrases)
+                        local pc_val = base_pc + pattern_index
+                        local phrase_time = r.TimeMap2_QNToTime(0, phrase_start_qn)
+                        Insert_Drum_Trigger(drum_track, phrase_time, pc_val)
+                    end
                 end
             end
         end
     end
-    
-    -- Insert OFF/Count-In (PC 24) at the end of the last region
+
     if last_region_end > 0 then
         Insert_Drum_Trigger(drum_track, last_region_end, 24)
     end
-end
 
+    r.UpdateArrange()
+end
 
 -- HELPER: Find ALL tracks with N2N Drum Arranger FX
 function Find_All_Tracks_With_Drum_FX()
@@ -3931,87 +5298,26 @@ function Find_All_Tracks_With_Drum_FX()
     return matching_tracks
 end
 
-
 -- 6. PROCESS ALL N2N DRUM ARRANGER TRACKS
 function Generate_Drum_Conductor_All()
     local r = reaper
     local tracks = Find_All_Tracks_With_Drum_FX()
-    
+
     for _, track in ipairs(tracks) do
         Generate_Drum_Conductor_For_Track(track)
     end
-    
+
     r.UpdateArrange()
 end
 
-
-
 -- 1. PARSE REGION TO ARP PC (using arpmap)
 function Parse_Region_To_Arp_PC(name)
-
-arpmap = {
-    ["Intro"] = 8,
-    ["Verse"] = 16,
-    ["Pre"] = 24,
-    ["Chorus"] = 32,
-    ["Bridge"] = 40,
-    ["Outro"] = 48
-}
-
-
-    if not name or name == "" then
-        return nil
-    end
-    
-    local base_pc = nil
-    for key, pc in pairs(arpmap) do
-        if name:find(key) then
-            base_pc = pc
-            break
-        end
-    end
-    
-    if not base_pc then
-        return nil
-    end
-    
-    -- Add variation number (1-7) based on number in region name
-    local var = tonumber(name:match("%d+")) or 1
-    if var < 1 then var = 1 end
-    if var > 7 then var = 7 end
-    
-    return base_pc + (var - 1)
+    return Parse_Region_To_Base_PC(name)
 end
 
 -- 2. GET ARP VISUALS (colors/names for the Arp track)
 function Get_Arp_Visuals(pc)
-    local name = "Section"
-    local r, g, b = 0.7, 0.7, 0.7
-
-    if pc == 0 then
-        name = "Off"
-        r, g, b = 0.3, 0.3, 0.3
-    elseif pc >= 8 and pc <= 14 then      -- Intro (8-14): Cyan
-        name = (pc == 8) and "Intro" or "Intro " .. (pc - 7)
-        r, g, b = 0.2, 1.0, 1.0
-    elseif pc >= 16 and pc <= 22 then     -- Verse (16-22): Blue  
-        name = (pc == 16) and "Verse" or "Verse " .. (pc - 15)
-        r, g, b = 0.4, 0.6, 1.0
-    elseif pc >= 24 and pc <= 30 then     -- Pre (24-30): Purple
-        name = (pc == 24) and "Pre" or "Pre " .. (pc - 23)
-        r, g, b = 0.7, 0.4, 1.0
-    elseif pc >= 32 and pc <= 38 then     -- Chorus (32-38): Red
-        name = (pc == 32) and "Chorus" or "Chorus " .. (pc - 31)
-        r, g, b = 1.0, 0.4, 0.4
-    elseif pc >= 40 and pc <= 46 then     -- Bridge (40-46): Orange
-        name = (pc == 40) and "Bridge" or "Bridge " .. (pc - 39)
-        r, g, b = 1.0, 0.9, 0.2
-    elseif pc >= 48 and pc <= 54 then     -- Outro (48-54): Greenish
-        name = (pc == 48) and "Outro" or "Outro " .. (pc - 47)
-        r, g, b = 0.5, 0.8, 0.7
-    end
-
-    return name, r, g, b
+    return Get_Drum_Visuals(pc)
 end
 
 -- 3. INSERT ARP TRIGGER (similar to drum trigger but with arp-specific visuals)
@@ -4020,7 +5326,9 @@ function Insert_Arp_Trigger(track, time_pos, pc_val)
 
     -- MIDI timing (8th note early = 0.5 QN)
     local midi_qn = r.TimeMap2_timeToQN(0, time_pos) - 0.5
-    if midi_qn < 0 then midi_qn = 0 end
+    if midi_qn < 0 then
+        midi_qn = 0
+    end
 
     local midi_time = r.TimeMap2_QNToTime(0, midi_qn)
     local end_time = r.TimeMap2_QNToTime(0, midi_qn + 1.0)
@@ -4051,14 +5359,17 @@ function Insert_Arp_Trigger(track, time_pos, pc_val)
         r.GetSetMediaItemInfo_String(t_item, "P_NAME", label, true)
         r.GetSetMediaItemInfo_String(t_item, "P_NOTES", label, true)
 
-        local native_color = r.ColorToNative(math.floor(rr * 255), math.floor(gg * 255), math.floor(bb * 255)) | 0x1000000
+        local native_color =
+            r.ColorToNative(math.floor(rr * 255), math.floor(gg * 255), math.floor(bb * 255)) | 0x1000000
         r.SetMediaItemInfo_Value(t_item, "I_CUSTOMCOLOR", native_color)
     end
 end
 
 -- 4. CLEAN ARP TRACK (similar to Clean_Drum_Track)
 function Clean_Arp_Track(track)
-    if not track then return end
+    if not track then
+        return
+    end
     local r = reaper
     local item_count = r.CountTrackMediaItems(track)
 
@@ -4070,11 +5381,16 @@ function Clean_Arp_Track(track)
         local _, name = r.GetSetMediaItemInfo_String(item, "P_NAME", "", false)
         local _, notes = r.GetSetMediaItemInfo_String(item, "P_NOTES", "", false)
 
-        if notes and string.find(notes, "Arp") then
+        if notes ~= "" and notes:match("^Arp ") then
             should_delete = true
-        elseif name and (name:match("^Arp") or name:match("^Intro") or name:match("^Verse") or 
-                         name:match("^Pre") or name:match("^Chorus") or name:match("^Bridge") or 
-                         name:match("^Outro") or name:match("^Off")) then
+        elseif
+            name and
+                (name:match("^Arp") or name:match("^Intro") or name:match("^Verse") or name:match("^Pre") or
+                    name:match("^Chorus") or
+                    name:match("^Bridge") or
+                    name:match("^Outro") or
+                    name:match("^Off"))
+         then
             should_delete = true
         else
             -- Check for MIDI PC messages
@@ -4097,37 +5413,94 @@ function Clean_Arp_Track(track)
     end
 end
 
--- 5. GENERATE ARP CONDUCTOR (main function to populate the Arp track)
 function Generate_Arp_Conductor(arp_track)
     local r = reaper
     Clean_Arp_Track(arp_track)
 
-    -- Start with OFF (PC 0)
-    Insert_Arp_Trigger(arp_track, 0.0, 0)
-
     local _, num_markers, num_regions = r.CountProjectMarkers(0)
     local total = num_markers + num_regions
 
+    local first_region_pos = nil
+    local last_region_end = 0
+    local has_region_at_zero = false
+
     for i = 0, total - 1 do
-        local _, isrgn, pos, rgnend, name, idx = r.EnumProjectMarkers(i)
+        local _, isrgn, pos, rgnend = r.EnumProjectMarkers(i)
         if isrgn then
-            local pc = Parse_Region_To_Arp_PC(name)
-            if pc then
-                Insert_Arp_Trigger(arp_track, pos, pc)
+            if first_region_pos == nil or pos < first_region_pos then
+                first_region_pos = pos
+            end
+            if rgnend > last_region_end then
+                last_region_end = rgnend
+            end
+            if pos <= 0.01 then
+                has_region_at_zero = true
             end
         end
     end
+
+    if G_ARP_CUE_PLACEMENT == "On/Off" then
+        if not has_region_at_zero then
+            Insert_Arp_Trigger(arp_track, 0.0, 0)
+        end
+
+        if first_region_pos ~= nil then
+            Insert_Arp_Trigger(arp_track, first_region_pos, 1) -- default ARP cue
+        end
+
+        if last_region_end > 0 then
+            Insert_Arp_Trigger(arp_track, last_region_end, 0)
+        end
+
+        r.UpdateArrange()
+        return
+    end
+
+    if not has_region_at_zero then
+        Insert_Arp_Trigger(arp_track, 0.0, 0)
+    end
+
+    for i = 0, total - 1 do
+        local _, isrgn, pos, rgnend, name = r.EnumProjectMarkers(i)
+        if isrgn then
+            if G_ARP_CUE_PLACEMENT == "Every Section" then
+                local pc = Parse_Region_To_Arp_PC(name)
+                if pc then
+                    Insert_Arp_Trigger(arp_track, pos, pc)
+                end
+
+            elseif G_ARP_CUE_PLACEMENT == "Every 4 Bars" then
+                local base_pc = Parse_Region_To_Arp_PC(name)
+                if base_pc then
+                    local start_qn = r.TimeMap2_timeToQN(0, pos)
+                    local end_qn = r.TimeMap2_timeToQN(0, rgnend)
+                    local length_qn = end_qn - start_qn
+                    local num_phrases = math.ceil(length_qn / 16)
+
+                    for phrase = 0, num_phrases - 1 do
+                        local phrase_start_qn = start_qn + (phrase * 16)
+                        if phrase_start_qn >= end_qn then
+                            break
+                        end
+
+                        local pattern_index = Get_Stretched_ABCD_Index(phrase, num_phrases)
+                        local pc_val = base_pc + pattern_index
+                        local phrase_time = r.TimeMap2_QNToTime(0, phrase_start_qn)
+                        Insert_Arp_Trigger(arp_track, phrase_time, pc_val)
+                    end
+                end
+            end
+        end
+    end
+
     r.UpdateArrange()
 end
-
-
-
 
 -- Find ALL tracks containing N2N Arp FX
 function Find_All_Tracks_With_Arp_FX()
     local r = reaper
     local target_fx = "N2N Arp"
-    local arp_tracks = {}  -- Table to hold all matching tracks
+    local arp_tracks = {} -- Table to hold all matching tracks
 
     local track_count = r.CountTracks(0)
     for i = 0, track_count - 1 do
@@ -4139,86 +5512,89 @@ function Find_All_Tracks_With_Arp_FX()
             if retval and buf then
                 local normalized = buf:lower()
                 local target_lower = target_fx:lower()
-                
-                if normalized:find(target_fx, 1, true) or 
-                   normalized:find(target_lower, 1, true) or
-                   normalized:find("js: " .. target_lower, 1, true) then
+
+                if
+                    normalized:find(target_fx, 1, true) or normalized:find(target_lower, 1, true) or
+                        normalized:find("js: " .. target_lower, 1, true)
+                 then
                     -- Add to table instead of returning immediately
                     table.insert(arp_tracks, tr)
-                    break  -- Found FX on this track, move to next track
+                    break -- Found FX on this track, move to next track
                 end
             end
         end
     end
-    
-    return arp_tracks  -- Return table of all matching tracks
+
+    return arp_tracks -- Return table of all matching tracks
 end
 
 function place_special()
-    num_regions = reaper.CountProjectMarkers(0)
-    for i = num_regions, 0, -1 do
+    -- 1. Bulletproof Region Clearing
+    local retval, num_markers, num_regions = reaper.CountProjectMarkers(0)
+    local total_markers = num_markers + num_regions
+    for i = total_markers - 1, 0, -1 do
         reaper.DeleteProjectMarkerByIndex(0, i)
     end
 
     -- Track instance counts for each region type
     local region_counts = {}
 
-    for i, v in pairs(G_region_table) do
+    -- 2. Use ipairs() to strictly guarantee timeline chronological order
+    for i, v in ipairs(G_region_table) do
+        local region_end = 0
         if G_region_table[i + 1] == nil then
             region_end = reaper.TimeMap2_beatsToTime(0, final_ppqpos_total / 960)
         else
             region_end = reaper.TimeMap2_beatsToTime(0, G_region_table[i + 1][1] / 960)
         end
 
-        the_regions_name = v[2]
+        local the_regions_name = v[2]
 
         -- Check if this region type should be numbered
         local should_number = false
         local region_type_upper = string.upper(the_regions_name)
-        
-        if region_type_upper == "VERSE" or 
-           region_type_upper == "PRE" or 
-           string.find(region_type_upper, "^PRE[- ]?") or  -- matches Pre, Pre-Chorus, Pre Chorus, PreChorus
-           region_type_upper == "CHORUS" then
+
+        if
+            region_type_upper == "VERSE" or region_type_upper == "PRE" or string.find(region_type_upper, "^PRE[- ]?") or
+                region_type_upper == "CHORUS"
+         then
             should_number = true
         end
 
         local display_name = the_regions_name
 
         if should_number then
-            -- Increment count for this region type
             region_counts[the_regions_name] = (region_counts[the_regions_name] or 0) + 1
-            local instance_number = region_counts[the_regions_name]
-            
-            -- Append instance number to name
-            display_name = the_regions_name .. " " .. instance_number
+            display_name = the_regions_name .. " " .. region_counts[the_regions_name]
         end
 
-        region_item_color = reaper.ColorToNative(80, 80, 100) | 0x1000000
-        if form.sections_colors[the_regions_name] == nil then
-            region_item_color = reaper.ColorToNative(80, 80, 100) | 0x1000000
-        else
-            the_color_values = form.sections_colors[the_regions_name]
+        local region_item_color = reaper.ColorToNative(80, 80, 100) | 0x1000000
+        if form.sections_colors and form.sections_colors[the_regions_name] then
+            local the_color_values = form.sections_colors[the_regions_name]
             region_item_color =
                 reaper.ColorToNative(the_color_values[1], the_color_values[2], the_color_values[3]) | 0x1000000
         end
 
-        starts_position = reaper.TimeMap2_beatsToTime(0, v[1] / 960)
+        local starts_position = reaper.TimeMap2_beatsToTime(0, v[1] / 960)
 
-        -- Use display_name (numbered or original)
-        reaper.AddProjectMarker2(0, true, starts_position, region_end, display_name, i - 1, region_item_color)
+        if G_region_table[i + 1] == nil then
+            region_end = reaper.TimeMap2_beatsToTime(0, final_ppqpos_total / 960)
+        else
+            region_end = reaper.TimeMap2_beatsToTime(0, G_region_table[i + 1][1] / 960)
+        end
+        
+        if region_end <= starts_position then
+            region_end = starts_position + 0.001
+        end
+
+
+        -- Pass 0 as the ID so Reaper auto-assigns the safest ID number
+        reaper.AddProjectMarker2(0, true, starts_position, region_end, display_name, 0, region_item_color)
     end
-    
-    -- Cleanup
-    num_regions = 0
-    G_region_table = {}
-    starts_position = 0
-    region_item_color = reaper.ColorToNative(80, 80, 100) | 0x1000000
-    the_regions_name = ""
-    region_end = 0
-    region_counts = nil
-end
 
+    -- 3. Cleanup
+    G_region_table = {}
+end
 
 goopy = 0
 
@@ -4375,16 +5751,14 @@ function chords_to_onemotion()
     onemotionoutput = om_notice .. onemotionoutput
 end
 
-function render_all()
-  
+function PreRender_Setup()
     reaper.ClearConsole()
-    
     Autosave()
     SaveLastNumbers2NotesChart()
-  
-    thetime = os.date('%Y-%m-%d %H-%M-%S')
-    render_feedback = render_feedback .. "Rendered at " .. thetime .."\n"
-    
+
+    local thetime = os.date("%Y-%m-%d %H-%M-%S")
+    render_feedback = render_feedback .. "Rendered at " .. thetime .. "\n"
+
     -- CHECK GROOVE STATUS
     local is_groove_active = false
     for i = 1, 32 do
@@ -4393,112 +5767,122 @@ function render_all()
             break
         end
     end
-    
+
     if is_groove_active then
         render_feedback = render_feedback .. "NOTE: Rendering with Custom Groove active.\n"
     end
 
-    reaper.PreventUIRefresh(1)
+    -- FORCE CLEAN STATE TO PREVENT ACCUMULATION BUGS FROM PREVIOUS RENDERS
+    G_split = 0
+    G_error_log = "START ERROR LOG - " .. string.char(10)
+    G_time_signature_top = 4
+    G_ticks_per_measure = 960
+    inparenthetical = false
+    chord_table = {}
+    temp_chord_table = {}
+    updated_chord_table = {}
+    chord_splitsection_count = 0
+    temp_chord_splitsection_count = 0
+    updated_chord_splitsection_count = 0
+    G_region_table = {}
+    final_ppqpos_total = 0
 
     chord_charting_area = inital_swaps(chord_charting_area)
-    G_track_list, G_track_table = Setup_Tracks()
-
     unfolded_user_data, error_zone = form.process_the_form(header_area, chord_charting_area)
     progression = Set_The_Current_Simulated_Userinput_Data(unfolded_user_data)
-    
+end
+
+function Apply_Project_Settings()
     current_key = set_the_key(header_area)
     current_bpm = set_the_bpm(header_area)
-    
+
     -- Time Sig is handled inside the parser now, but we init here
--- Time Sig is handled inside the parser now, but we init here
     local ts_num, ts_denom = set_the_time_sig(header_area)
     G_time_signature_top = ts_num
-    
+
     -- CORRECTED: Use SetTempoTimeSigMarker at time 0.0 to set project default
-    -- (proj, ptidx, time, measure, beat, bpm, num, denom, lineartempo)
     reaper.SetTempoTimeSigMarker(0, -1, 0.0, -1, -1, current_bpm, ts_num, ts_denom, false)
-    
     set_the_swing(header_area)
-    
+end
+
+function Parse_Chord_Data()
     G_split, G_error_log = orgainize_input_into_bars(G_error_log)
     G_split, G_error_log = process_nested_split_sections(G_split, G_error_log)
-
     process_pushes()
     presentdata(G_split, G_error_log)
-    
-    -- 1. CREATE EMPTY ITEMS (Returns IDs)
-    G_text_item_count,
-    G_lead_midi_item_id,
-    G_chords_midi_item_id,
-    G_bass_midi_item_id,
-    G_chbass_midi_item_id,
-    G_grid_midi_item_id = place_TEXT_data(G_track_table)
+end
 
-    -- 2. FILL ITEMS WITH NOTES (Returns Takes)
-    -- >>> CRITICAL CHANGE: We now capture G_lead_item_first_take (The 4th return) <<<
-    _, final_ppqpos_total, G_grid_item_first_take, G_lead_item_first_take = place_MIDI_data(
-        G_text_item_count,
-        G_lead_midi_item_id,
-        G_chords_midi_item_id,
-        G_bass_midi_item_id,
-        G_chbass_midi_item_id,
-        G_grid_midi_item_id,
-        G_track_table
-    )
+function Export_To_GMEM(chbass_item_id)
+    if gmem_export and chbass_item_id then
+        local light_take = reaper.GetActiveTake(chbass_item_id)
+        if light_take then
+            -- CRITICAL: Must attach before any gmem_write!
+            reaper.gmem_attach("N2N_Ecosystem_RSKennedy")
 
-    -- 3. EXPORT TO GMEM (Using the "Light" Chord-Bass take for speed)
-if gmem_export and G_chbass_midi_item_id then
-    local light_take = reaper.GetActiveTake(G_chbass_midi_item_id)
-    
-    if light_take then
-        -- CRITICAL: Must attach before any gmem_write!
-        reaper.gmem_attach("N2N_Ecosystem_RSKennedy")
-        
-        local r_tonic, m_center = gmem_export.Analyze(light_take, current_key)
-        gmem_export.SendToGMEM(light_take, r_tonic, m_center)
-        gmem_export.SendScaleToGMEM(light_take, r_tonic)
+            local r_tonic, m_center = gmem_export.Analyze(light_take, current_key)
+            gmem_export.SendToGMEM(light_take, r_tonic, m_center)
+            gmem_export.SendScaleToGMEM(light_take, r_tonic)
+
+            return r_tonic, m_center -- RETURN THE VALUES!
+        end
+    end
+
+    -- Fallback if GMEM isn't set up yet
+    local fallback_key = musictheory.key_table[current_key] or 0
+    return fallback_key, fallback_key
+end
+
+function Resolve_Cue_Placement_Modes()
+    G_DRUM_CUE_PLACEMENT = "Every 4 Bars"
+    G_ARP_CUE_PLACEMENT  = "Every Section"
+
+    for _, tr in ipairs(config.track_recipe) do
+        if tr.active and tr.drum_arp_mode then
+            if tr.type == 32 then
+                G_DRUM_CUE_PLACEMENT = tr.drum_arp_mode
+            elseif tr.type == 33 then
+                G_ARP_CUE_PLACEMENT = tr.drum_arp_mode
+            end
+        end
     end
 end
 
-    -- 4A. PROCESS MARKERS & DRUMS
-place_special()
+function Generate_Arranger_Conductors()
+    Resolve_Cue_Placement_Modes()
 
-local drum_tracks = Find_All_Tracks_With_Drum_FX() 
+    place_special()
 
--- Iterate through all found tracks
-for _, drum_track in ipairs(drum_tracks) do
-    Generate_Drum_Conductor_For_Track(drum_track)
-end
+    local drum_tracks = Find_All_Tracks_With_Drum_FX()
+    for _, drum_track in ipairs(drum_tracks) do
+        Generate_Drum_Conductor_For_Track(drum_track)
+    end
 
- 
-
-
--- Process all Arp tracks
-local arp_tracks = Find_All_Tracks_With_Arp_FX()
-for _, arp_track in ipairs(arp_tracks) do
-    if arp_track then
-        Generate_Arp_Conductor(arp_track)
+    local arp_tracks = Find_All_Tracks_With_Arp_FX()
+    for _, arp_track in ipairs(arp_tracks) do
+        if arp_track then
+            Generate_Arp_Conductor(arp_track)
+        end
     end
 end
 
-
-    -- 5. GENERATE SPECTRUMS
+function Generate_Spectrums(grid_take, lead_take)
     -- A. Absolute Grid (Key of Song)
-    if G_grid_item_first_take and reaper.ValidatePtr(G_grid_item_first_take, "MediaItem_Take*") then
-        notneeded = spectrum.make_full_spectrum(G_grid_item_first_take)
+    if grid_take and reaper.ValidatePtr(grid_take, "MediaItem_Take*") then
+        local notneeded = spectrum.make_full_spectrum(grid_take)
     end
-    
+
     -- B. Relative Grid (Key of C - For Lead/Delay Track)
-    -- >>> NEW: This fills the "Relative" track with the full spectrum <<<
-    if G_lead_item_first_take and reaper.ValidatePtr(G_lead_item_first_take, "MediaItem_Take*") then
-        notneeded = spectrum.make_full_spectrum(G_lead_item_first_take)
+    if lead_take and reaper.ValidatePtr(lead_take, "MediaItem_Take*") then
+        local notneeded = spectrum.make_full_spectrum(lead_take)
     end
-  
-  Sync_Chart_Colors()
-  
-    close_all_fx_windows = reaper.NamedCommandLookup("_S&M_WNCLS3") 
+end
+
+function PostRender_Cleanup()
+    Sync_Chart_Colors()
+
+    local close_all_fx_windows = reaper.NamedCommandLookup("_S&M_WNCLS3")
     reaper.Main_OnCommand(close_all_fx_windows, 0)
-    
+
     -- RESET VARIABLES
     G_split = 0
     G_error_log = "START ERROR LOG - " .. string.char(10)
@@ -4513,9 +5897,75 @@ end
     chord_splitsection_count = 0
     temp_chord_splitsection_count = 0
     updated_chord_splitsection_count = 0
+end
 
+-- Global variables to hold our background rendering state
+render_co = nil
+render_status_msg = ""
+G_DYNAMIC_TABLE = {}
+
+function Start_Render_Coroutine()
+    modal_on = true
+    render_status_msg = "Preparing Project..."
+    render_co = coroutine.create(Render_Process_Routine)
+end
+
+function Render_Process_Routine()
+    reaper.PreventUIRefresh(1)
+    PreRender_Setup()
+
+    -- Reset Render Targets so old track pointers don't linger!
+    G_RENDER_TARGETS = {}
+
+    G_DYNAMIC_TABLE = Compile_Dynamic_Track_Table(config.track_recipe)
+
+    Scan_Existing_Tracks()
     reaper.PreventUIRefresh(-1)
-    modal_on = false
+
+    coroutine.yield("Scanning existing tracks...")
+
+    for i, tr in ipairs(G_DYNAMIC_TABLE) do
+        reaper.PreventUIRefresh(1)
+        local is_new = Build_Single_Track(tr)
+        reaper.PreventUIRefresh(-1)
+
+        if is_new then
+            coroutine.yield("Building Track: " .. tostring(tr[1]))
+        end
+    end
+
+    reaper.PreventUIRefresh(1)
+    Organize_Tracks_And_Routing(G_DYNAMIC_TABLE)
+    reaper.PreventUIRefresh(-1)
+
+    coroutine.yield("Generating MIDI Data...")
+
+    reaper.PreventUIRefresh(1)
+    Apply_Project_Settings()
+    Parse_Chord_Data()
+
+    local pmd_tc, lead_id, chord_id, bass_id, chbass_id, grid_id = place_TEXT_data(G_DYNAMIC_TABLE)
+
+    -- Ensuring final_ppqpos_total maps globally to place_special
+
+  local dummy_err, fppt, grid_take, lead_take =
+    place_MIDI_data(pmd_tc, lead_id, chord_id, bass_id, chbass_id, grid_id, G_DYNAMIC_TABLE)
+
+  final_ppqpos_total = fppt
+
+
+    Set_Back2Key_Transpositions()
+
+    local r_tonic, m_center = Export_To_GMEM(chbass_id)
+    Set_Mood2Mode_Parameters(r_tonic, m_center)
+
+    Generate_Arranger_Conductors()
+
+    -- Pass them explicitly into the spectrum generator!
+    Generate_Spectrums(grid_take, lead_take)
+
+    PostRender_Cleanup()
+    reaper.PreventUIRefresh(-1)
 end
 
 function import_onemotion()
@@ -4790,9 +6240,6 @@ function letters_to_numbers(keysig, letters)
 end
 
 function play_button_midi(v_in, play_root_in)
-    local audition_key = set_the_key(header_area)
-    audition_key_shift = musictheory.key_table[audition_key]
-
     if r.ImGui_Button(ctx, play_root_in .. v_in[2], wx, hx) then
         if v_in[1] == "" then
             this_type = "z"
@@ -4802,7 +6249,6 @@ function play_button_midi(v_in, play_root_in)
 
         -- NEW ROBUST CHECK: Is Control (or Command on Mac) held down?
         local is_ctrl_down = reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Mod_Ctrl())
-
         if is_ctrl_down then
             -- 1. Clean the button name (remove the extra visual spaces inside "sus    ")
             local clean_chord_name = v_in[2]:gsub("%s+", "")
@@ -4819,44 +6265,14 @@ function play_button_midi(v_in, play_root_in)
         current_playing_tone_array = musictheory.type_table[this_type]
         if liveMIDI_playing_timer == 0 then
             for i, v in pairs(current_playing_tone_array) do
-                reaper.SetMediaTrackInfo_Value(audition_track, "B_MUTE", 0)
+                -- SAFETY WRAPPER ADDED HERE:
+                if audition_track and reaper.ValidatePtr(audition_track, "MediaTrack*") then
+                    reaper.SetMediaTrackInfo_Value(audition_track, "B_MUTE", 0)
+                end
                 reaper.StuffMIDIMessage(0, 144, 48 + v + musictheory.root_table[play_root_in] + audition_key_shift, 111)
                 last_play_root = play_root_in
             end
             liveMIDI_playing_timer = 24
-        end
-    end
-end
-
-function SetVMidiInput(chan, dev_name)
-    trac_count = reaper.CountTracks(0)
-    --reaper.ShowConsoleMsg(trac_count)
-    for i = 0, trac_count - 1, 1 do
-        trac_id = reaper.GetTrack(0, i)
-        yeahnothing, trac_name = reaper.GetTrackName(trac_id)
-        if trac_name == "N2N Audition" then
-            local tr = trac_id
-            if not tr then
-                return
-            end
-            for i = 0, 64 do
-                local retval, nameout = reaper.GetMIDIInputName(i, "")
-                if nameout:lower():match(dev_name:lower()) then
-                    dev_id = i
-                end
-            end
-            if not dev_id then
-                return
-            end
-            val = 4096 + chan + (dev_id << 5)
-            reaper.SetMediaTrackInfo_Value(tr, "I_RECARM", 1)
-            reaper.SetMediaTrackInfo_Value(tr, "I_RECMODE", 2)
-            reaper.SetMediaTrackInfo_Value(tr, "B_MUTE", 1)
-            reaper.SetMediaTrackInfo_Value(tr, "B_SHOWINTCP", 0)
-            reaper.SetMediaTrackInfo_Value(tr, "B_SHOWINMIXER", 0)
-            reaper.SetMediaTrackInfo_Value(tr, "I_RECINPUT", val)
-            audition_track = tr
-        --reaper.ShowConsoleMsg(tostring(audition_track))
         end
     end
 end
@@ -6903,7 +8319,7 @@ function render_gather_go()
 end
 
 -- _______________________________________________________________________ MAIN FUNCTION  ____________________
-Initialize_Track_Setup()
+--Initialize_Track_Setup()
 LoadLastNumbers2NotesChart()
 
 -- RUN THE STARTUP AUDIT

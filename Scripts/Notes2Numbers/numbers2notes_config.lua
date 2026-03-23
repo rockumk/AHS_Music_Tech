@@ -1,5 +1,5 @@
 -- @description numbers2notes_config
--- @version 1.7.0
+-- @version 1.7.1
 -- @noindex
 -- @author Rock Kennedy
 -- @about
@@ -451,7 +451,11 @@ config.track_table = {
         [5] = {"Drums Audio", true, true, 0, {{"", true, nil, 0}}, {}, 0, {207, 207, 160}, 1.0},
         [6] = {"Piano Audio", true, true, 0, {{"", true, nil, 0}}, {}, 0, {207, 207, 160}, 1.0},
         [7] = {"BG Vocals ##", true, true, 0, {{"", true, nil, 0}}, {}, 0, {207, 207, 160}, 1.0},
-        [8] = {"Lead Vocals", true, true, 0, {{"", true, nil, 0}}, {}, 0, {207, 207, 160}, 1.0}
+        [8] = {"Lead Vocals", true, true, 0, {
+		{"JS: Vocoder S2", false, nil, 0},
+		{"VST: ReaPitch", false, nil, 0},
+		{"JS: Lime Deesser S2", false, nil, 0}
+		}, {}, 0, {207, 207, 160}, 1.0}
     }
 	
 	
