@@ -1,0 +1,28 @@
+35  KICK 1     //  Blue
+36  KICK 2     //  Blue
+37  SNR 1      //  White
+38  SNR 2      //  White
+39  SNR 3      //  Indigo
+40  SNR 4      //  Indigo
+42  HH 1       //  White
+44  HH 2       //  White
+46  OPEN HH    //  Purple
+48  TOM 1      //  White
+47  TOM 2      //  White
+45  TOM 3      //  Violet
+43  TOM 4      //  Violet
+41  FLOOR      //  White
+49  CRASH 1    //  Magenta
+53  CHINA      //  White
+57  CRASH 2    //  Rose
+60  FIRE 1     //  White
+61  FIRE 2     //  White
+62  FIRE 3     //  Red
+63  FIRE 4     //  Red
+65  SFX 1      //  White
+66  SFX 2      //  White
+67  SFX 4      //  Deep Orange
+69  SFX 6      //  Deep Orange
+70  SFX 7      //  White
+72  SFX 9      //  White
+

@@ -1,0 +1,21 @@
+35  KICK 1     //  Blue
+36  KICK 2     //  Blue
+37  BIG HIT 1  //  White
+38  SNARE 1    //  Indigo
+39  SNARE 2    //  Indigo
+40  BIG HIT 2  //  White
+42  CLOCK 1    //  Purple
+44  CLOCK 2    //  White
+46  DOOM'S BELL //  Violet
+48  TOM 1      //  White
+47  TOM 2      //  White
+45  TOM 3      //  Magenta
+43  TOM 4      //  Magenta
+41  FLOOR TOM  //  White
+49  CRASH 1    //  Rose
+51  PERC 1     //  White
+52  CRASH 2    //  Red
+53  PERC 2     //  White
+55  DOOM'S HORN //  Deep Orange
+57  CRASH 3    //  White
+

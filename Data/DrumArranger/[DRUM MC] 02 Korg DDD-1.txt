@@ -1,0 +1,22 @@
+35  KICK 1     //  Blue
+36  KICK 2     //  Blue
+37  SIDE STICK //  White
+38  SNARE 1    //  Indigo
+39  CLAP       //  White
+40  SNARE 2    //  Purple
+42  HIHAT 1    //  White
+44  HIHAT 2    //  Violet
+46  OPEN HH    //  White
+48  TOM 1      //  Magenta
+47  TOM 2      //  Magenta
+45  TOM 3      //  White
+43  TOM 4      //  White
+41  FLOOR TOM  //  Rose
+49  CRASH      //  White
+51  RIDE CY    //  Red
+53  BELL       //  Red
+54  TAMB       //  White
+56  COWBELL    //  White
+69  CABASA     //  Deep Orange
+57  CRASH 3    //  White
+

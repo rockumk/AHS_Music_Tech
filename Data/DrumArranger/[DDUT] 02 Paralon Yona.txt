@@ -1,0 +1,17 @@
+35  DANG       //  Blue
+36  DUT        //  White
+37  TAK        //  Indigo
+38  TUNG 1     //  White
+39  PLAK       //  Purple
+40  TUNG 2     //  White
+42  TEK 1      //  Violet
+44  TEK 2      //  White
+46  TEK 3      //  Magenta
+48  DUNG 1     //  White
+47  DUNG 2     //  Rose
+45  DUNG 3     //  White
+43  DUNG 4     //  Red
+41  DUNG 5     //  White
+51  BERAS      //  Deep Orange
+53  TUTUP BTI  //  White
+

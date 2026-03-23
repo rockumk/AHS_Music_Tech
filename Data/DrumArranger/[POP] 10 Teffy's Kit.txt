@@ -1,0 +1,24 @@
+35  KICK 1       //  Blue
+36  KICK 2       //  Blue
+37  RIM SH       //  White
+38  SNR 1        //  Indigo
+39  SNR 2        //  Indigo
+40  SNARE 3      //  White
+42  CLO HH       //  Purple
+30  HH HALF      //  Purple
+44  PEDAL HI 1   //  White
+32  PEDAL HI 2   //  White
+46  OPEN HH 1    //  Violet
+34  OPEN HH 2    //  Violet
+48  TOM 1        //  White
+47  TOM 2        //  White
+45  TOM 3        //  Magenta
+43  TOM 4        //  Magenta
+41  FLOOR        //  White
+49  CRASH 1      //  Rose
+51  RIDE CY      //  White
+52  CRASH 2      //  Red
+53  RIDE BELL    //  White
+55  SPLASH       //  Deep Orange
+57  CRASH 3      //  White
+

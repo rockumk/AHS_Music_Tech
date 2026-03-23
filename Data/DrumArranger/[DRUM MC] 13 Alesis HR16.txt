@@ -1,0 +1,28 @@
+35  KICK 1     //  Blue
+36  KICK 2     //  Blue
+37  RIMSHOT    //  White
+39  CLAP       //  White
+38  SNARE 1    //  Indigo
+40  SNARE 2    //  Indigo
+42  HIHAT 1    //  White
+44  HIHAT 2    //  White
+46  OPEN HIHAT //  Purple
+48  TOM 1      //  White
+47  TOM 2      //  White
+45  TOM 3      //  Violet
+43  TOM 4      //  Violet
+41  TOM 5      //  White
+49  CRASH 1    //  Magenta
+51  RIDE CYMBAL //  White
+52  CRASH 2    //  Rose
+54  WIND FX    //  White
+56  CRATCH     //  White
+59  METBELL    //  Red
+60  COW        //  Red
+61  CONGA SLP  //  White
+63  LOW        //  White
+65  POP FX     //  Deep Orange
+66  FX 2       //  Deep Orange
+67  HIT FX     //  White
+68  2         //  White
+

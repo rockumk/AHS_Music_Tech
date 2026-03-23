@@ -1,0 +1,17 @@
+35  KICK       //  Blue
+37  SNARE 1    //  White
+38  SNARE 2    //  Indigo
+39  CLAP       //  White
+40  SNARE 3    //  Purple
+41  SNARE 4    //  White
+42  HIHAT 1    //  Violet
+44  HIHAT 2    //  White
+46  OPEN HH    //  Magenta
+43  SNARE 5    //  White
+45  SNARE 6    //  Rose
+47  SNARE 7    //  White
+48  SNARE 8    //  Red
+49  CRASH 1    //  White
+52  CRASH 2    //  Deep Orange
+57  CRASH 3    //  White
+

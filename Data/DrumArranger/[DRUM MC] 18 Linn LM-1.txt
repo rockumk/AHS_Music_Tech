@@ -1,0 +1,23 @@
+35  KICK 1     //  Blue
+36  KICK 2     //  Blue
+37  SIDE STICK //  White
+38  SNARE 1    //  Indigo
+39  HAND CLAP  //  White
+40  SNARE 2    //  Purple
+42  HIHAT 1    //  White
+44  HIHAT 2    //  White
+46  OPEN HH    //  Violet
+48  TOM 1      //  White
+47  TOM 2      //  White
+45  TOM 3      //  Magenta
+43  TOM 4      //  Magenta
+41  TOM 5      //  White
+49  CYMBAL 1   //  Rose
+54  TAMB       //  White
+56  COWBELL    //  White
+52  CYMBAL 2   //  Red
+61  CONGA HI   //  White
+63  LOW        //  White
+69  CABASA     //  Deep Orange
+75  CLAVE      //  White
+

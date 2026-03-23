@@ -1,0 +1,24 @@
+35  KICK 1     //  Blue
+36  KICK 2     //  Blue
+37  SIDE STICK //  White
+38  SNARE      //  Indigo
+39  HAND CLAP  //  White
+40  SNARE 2    //  Purple
+42  HIHAT 1    //  White
+44  HIHAT 2    //  White
+46  OPEN HIHAT //  Violet
+48  TOM 1      //  White
+47  TOM 2      //  White
+45  TOM 3      //  Magenta
+43  TOM 4      //  Magenta
+41  TOM 5      //  White
+49  CYMBAL 1   //  Rose
+51  RIDE CY    //  White
+53  RD BELL    //  White
+52  CYMBAL 2   //  Red
+54  TAMB       //  White
+56  COWBELL    //  White
+61  CONGA HI   //  Deep Orange
+63  MID LOW    //  Deep Orange
+69  CABASA     //  White
+

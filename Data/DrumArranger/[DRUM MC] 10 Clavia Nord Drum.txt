@@ -1,0 +1,22 @@
+35  KICK 1     //  Blue
+36  KICK 2     //  Blue
+37  RIM SHOT   //  White
+38  SNARE 1    //  Indigo
+39  HAND CLAP  //  White
+40  SNARE 2    //  Purple
+42  HIHAT 1    //  White
+44  HIHAT 2    //  White
+46  OPEN HIHAT //  Violet
+48  TOM 1      //  White
+47  TOM 2      //  White
+45  TOM 3      //  Magenta
+43  TOM 4      //  Magenta
+41  TOM 5      //  White
+49  CYMBAL 1   //  Rose
+52  CYMBAL 2   //  White
+57  CYMBAL 3   //  Red
+58  PERC 1     //  White
+59  PERC 2     //  Deep Orange
+60  PERC 3     //  Deep Orange
+62  SFX BOMB   //  White
+

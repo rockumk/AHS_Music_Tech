@@ -1,0 +1,21 @@
+35  KICK 1     //  Blue
+36  KICK 2     //  Blue
+37  RIM SH     //  White
+38  SNARE 1    //  Indigo
+39  CLAP       //  White
+40  SNARE 2    //  Purple
+42  HIHAT 1    //  White
+44  HIHAT 2    //  Violet
+46  OPEN H     //  White
+48  TOM 1      //  Magenta
+47  TOM 2      //  Magenta
+45  TOM 3      //  White
+43  TOM 4      //  White
+41  FLOOR      //  Rose
+49  CYM 1      //  White
+51  RD         //  Red
+53  BELL       //  Red
+52  CYM 2      //  White
+56  COWB       //  Deep Orange
+57  CYM 3      //  White
+

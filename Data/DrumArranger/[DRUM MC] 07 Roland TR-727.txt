@@ -1,0 +1,17 @@
+60  HI BONGO   //  Blue
+61  LOW BONGO  //  White
+62  CONGA MUTE //  Indigo
+63  CONGA OPEN //  White
+64  LOW CONGA  //  Purple
+65  CONGA SLAP //  White
+66  HI TIMBALE //  Violet
+67  LOW TIMBALE //  White
+68  HI AGOGO   //  Magenta
+69  LOW AGOGO  //  White
+70  CABASA     //  Rose
+71  MARACAS    //  White
+72  SHORT WHISTLE //  Red
+73  LONG WHISTLE //  White
+74  QUIJADA    //  Deep Orange
+75  STAR CHIME //  White
+

@@ -1,0 +1,18 @@
+35  KICK 1     //  Blue
+36  KICK 2     //  White
+37  SNARE 1    //  Indigo
+38  SNARE 2    //  White
+39  SNARE 3    //  Purple
+40  SNARE 4    //  White
+42  HIHAT 1    //  Violet
+44  HIHAT 2    //  White
+46  OPEN HH    //  Magenta
+48  TOM HI 1   //  White
+47  TOM HI 2   //  Rose
+45  TLOW 1     //  White
+43  TLOW 2     //  White
+41  DOBL TOM   //  Red
+49  CYMBAL 1   //  White
+53  CYMBAL 2   //  Deep Orange
+57  CYMBAL 3   //  White
+

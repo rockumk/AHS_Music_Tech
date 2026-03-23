@@ -1,0 +1,17 @@
+35  DANG 1     //  Blue
+36  DANG 2     //  White
+37  MUTE 1     //  Indigo
+38  DUT 1      //  White
+39  MUTE 2     //  Purple
+40  DUT 2      //  White
+42  PUK        //  Violet
+44  TUK        //  White
+46  TUNG       //  Magenta
+48  FILL 1     //  White
+47  FILL 2     //  Rose
+45  FILL 3     //  White
+43  FILL 4     //  Red
+41  FILL 5     //  White
+50  TAK        //  Deep Orange
+53  TANG       //  White
+

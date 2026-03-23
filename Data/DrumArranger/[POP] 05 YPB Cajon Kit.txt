@@ -1,0 +1,18 @@
+35  BASS HIT 1 //  Blue
+36  BASS HIT 2 //  White
+37  SOFT HIT 1 //  Indigo
+38  SLAP 1     //  White
+39  SOFT HIT 2 //  Purple
+40  SLAP 2     //  White
+42  BRUSH 1    //  Violet
+44  BRUSH 2    //  White
+46  BRUSH 3    //  White
+48  FOOT TOM 1 //  Magenta
+47  FOOT TOM 2 //  White
+45  FOOT TOM 3 //  Rose
+43  FOOT TOM 4 //  White
+41  FOOT TOM 5 //  Red
+54  TAMB       //  White
+69  CABASA     //  Deep Orange
+70  MARACAS    //  White
+

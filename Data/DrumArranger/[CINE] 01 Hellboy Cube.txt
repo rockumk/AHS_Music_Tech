@@ -1,0 +1,21 @@
+35  KICK       //  Blue
+37  RIM SH     //  White
+38  SNARE 1    //  Indigo
+39  SNARE 2    //  Indigo
+42  HIHAT 1    //  White
+44  HIHAT 2    //  White
+46  OPEN HIHAT //  Purple
+48  TOM 1      //  White
+47  TOM 2      //  White
+45  TOM 3      //  Violet
+43  TOM 4      //  Violet
+49  FLOOR      //  White
+49  CRASH 1    //  Magenta
+52  CRASH 2    //  White
+57  CRASH 3    //  Rose
+60  SFX DRONE  //  White
+61  MUSIC SFX  //  Red
+62  FX HEART   //  White
+63  SFX FLASH BACK //  Deep Orange
+64  SFX HELL FIRE  //  White
+
