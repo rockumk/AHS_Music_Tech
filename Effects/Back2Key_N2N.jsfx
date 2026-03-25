@@ -1,6 +1,4 @@
 desc:Back2Key_N2N
-ext_noinit = 1;   // Prevent @init (and the following @slider) from running on playback start / sample rate changes 
-
 version: 1.2
 author: Rock Kennedy
 about:
@@ -10,7 +8,7 @@ about:
   - Slider 2: Octave shift (Down / No Change / Up).
   - Auto octave clamp: if transposed note is <0 or >127, it is shifted by octaves (±12) until in range.
   - Note-off is matched to the note-on even if sliders change while notes are held.
-
+ext_noinit = 1;   // Prevent @init (and the following @slider) from running on playback start / sample rate changes 
 slider1:5<0,11,1{C to G (-5),C to G#/Ab (-4),C to A (-3),C to A#/Bb (-2),C to B (-1),C to C (no change),C to C#/Db (+1),C to D (+2),C to D#/Eb (+3),C to E (+4),C to F (+5),C to F#/Gb (+6)}>-Transpose (C=0)
 slider2:1<0,2,1{Down,No Change,Up}>-Octave
 
