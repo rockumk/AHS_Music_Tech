@@ -1,5 +1,5 @@
 -- @description numbers2notes_config
--- @version 1.7.1
+-- @version 1.7.2
 -- @noindex
 -- @author Rock Kennedy
 -- @about
@@ -269,7 +269,7 @@ config.track_recipe = {
   
   -- END INDENTATION
   
-  { type = 31, ItemLabel = "N2N Drum Arranger - N2N Swing and Groove integration", IndentMIDI = -1, divider_before = true, Tr_divider_before = true, active = true, single = false, vsti_choice = config.vsti_drum_options[1], vsti_list = config.vsti_drum_options, preset_choice = config.drum_preset_options[1], preset_list = config.drum_preset_options, addchain = true },
+  { type = 31, ItemLabel = "N2N Drum Arranger - N2N Swing and Groove integration", IndentMIDI = -1, divider_before = true, Tr_divider_before = true, active = true, single = false, vsti_choice = config.vsti_drum_options[1], vsti_list = config.vsti_drum_options, preset_choice = config.drum_preset_options[64], preset_list = config.drum_preset_options, addchain = true },
   { type = 32, ItemLabel = "Create Cues for all N2N Drum Arranger tracks", IndentMIDI = -1, divider_before = true, Tr_divider_before = false, active = true, single = true, drum_arp_mode = config.drum_arp_mode_options[3], addchain = false },
   { type = 33, ItemLabel = "Create Cues for all N2N Arp tracks", IndentMIDI = -1, divider_before = false, Tr_divider_before = false, active = true, single = true, drum_arp_mode = config.drum_arp_mode_options[3], addchain = false },
   
@@ -337,9 +337,10 @@ config.track_table = {
             {"REPLACEFX", true, "N2N Vital Default", 0}
         }, {}, 0, {207, 179, 160}, 0.4}
     },
-    [16] = {[0] = {"N2N Chord MIDI Source", true, false, 1, {{"JS: Back2Key_N2N.jsfx", true, nil, 3}}, {}, 1, {107, 138, 145}, 0},
+    [16] = {[0] = {"N2N Chord MIDI Source", true, false, 1, {}, {}, 1, {107, 138, 145}, 0},
         [1] = {"N2N Arp Chord ##", true, true, 0, {
             {"JS: N2N Arp.jsfx", true, nil, 3},
+			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACEPRESET", 0}
         }, {}, 0, {160, 198, 207}, 0.2},
         [2] = {"N2N Sust. Chord ##", true, true, 0, {
@@ -348,6 +349,7 @@ config.track_table = {
             {"ReaPulsive-8ths", false, nil, 3},  
             {"SwingTrackMIDI", true, nil, 3},
             {"ThisTriggersThat", false, nil, 3},
+			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACEPRESET", 0}
         }, {}, 0, {160, 198, 207}, 0.4},
         [3] = {"N2N DrumA. Chord ##", true, true, 0, {
@@ -356,20 +358,24 @@ config.track_table = {
         }, {}, 0, {160, 198, 207}, 0.4},	
         [4] = {"N2N LibreA. Chord ##", true, true, 0, {
             {"VST3i: LibreArp", true, nil, 20},
+			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACE PRESET", 0}
         }, {}, 0, {160, 198, 207}, 0.4},[5] = {"N2N SaikeMA. Chord ##", true, true, 0, {
             {"JS: Saike MIDI Arp", true, nil, 5},
+			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACE PRESET", 0}
         }, {}, 0, {160, 198, 207}, 0.4},	
         [6] = {"N2N BlueA. Chord ##", true, true, 0, {
             {"VSTi: BlueARP", true, nil, 19},
+			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACE PRESET", 0}
         }, {}, 0, {160, 198, 207}, 0.4}		
     },
     [17] = {
-        [0] = {"N2N MIDI Source", true, false, 1, {{"JS: Back2Key_N2N.jsfx", true, nil, 3}}, {}, 1, {207, 160, 170}, 0}, 
+        [0] = {"N2N MIDI Source", true, false, 1, {}, {}, 1, {207, 160, 170}, 0}, 
         [1] = {"N2N Arp Chord-Bass ##", true, true, 0, {
             {"JS: N2N Arp.jsfx", true, nil, 3},  
+			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACEPRESET", 0}
         }, {}, 0, {198, 160, 207}, 0.4},
         [2] = {"N2N Sust. Chord-Bass ##", true, true, 0, {
@@ -378,6 +384,7 @@ config.track_table = {
             {"ReaPulsive-8ths", false, nil, 3},  
             {"SwingTrackMIDI", true, nil, 3},
             {"ThisTriggersThat", false, nil, 3},
+			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACE PRESET", 0}
         }, {}, 0, {198, 160, 207}, 0.4},
         [3] = {"N2N DrumA. Chord-Bass ##", true, true, 0, {
@@ -385,22 +392,26 @@ config.track_table = {
             {"REPLACEFX", true, "REPLACE PRESET", 0}
         }, {}, 0, {198, 160, 207}, 0.4},
         [4] = {"N2N LibreA. Chord-Bass ##", true, true, 0, {
-            {"VST3i: LibreArp", true, nil, 20},  
+            {"VST3i: LibreArp", true, nil, 20},
+			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACE PRESET", 0}
         }, {}, 0, {198, 160, 207}, 0.4},
         [5] = {"N2N SaikeMA. Chord-Bass ##", true, true, 0, {
             {"JS: Saike MIDI Arp", true, nil, 5},  
+			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACE PRESET", 0}
         }, {}, 0, {198, 160, 207}, 0.4},
         [6] = {"N2N BlueA. Chord-Bass ##", true, true, 0, {
             {"VSTi: BlueARP", true, nil, 19},  
+			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACE PRESET", 0}
         }, {}, 0, {198, 160, 207}, 0.4}
     },
     [20] = {
-        [0] = {"N2N Bass MIDI Source", true, false, 1, {{"JS: Back2Key_N2N.jsfx", true, nil, 3}}, {}, 1, {107, 122, 145}, 0},
+        [0] = {"N2N Bass MIDI Source", true, false, 1, {}, {}, 1, {107, 122, 145}, 0},
         [1] = {"N2N Arp Bass ##", true, true, 0, {
             {"JS: N2N Arp.jsfx", true, nil, 3},
+			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACEPRESET", 0}
         }, {}, 0, {160, 179, 207}, 1.0},
         [2] = {"N2N Sust. Bass ##", true, true, 0, {
@@ -409,6 +420,7 @@ config.track_table = {
             {"ReaPulsive-8ths", false, nil, 3},  
             {"SwingTrackMIDI", true, nil, 3},
             {"ThisTriggersThat", false, nil, 3},
+			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACEPRESET", 0}
         }, {}, 0, {160, 179, 207}, 1.0},
         [3] = {"N2N DrumA. Bass ##", true, true, 0, {
@@ -416,14 +428,17 @@ config.track_table = {
             {"REPLACEFX", true, "REPLACEPRESET", 0}
         }, {}, 0, {160, 179, 207}, 1.3},[4] = {"N2N LibreA. Bass ##", true, true, 0, {
             {"VST3i: LibreArp", true, nil, 20},
+			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACEPRESET", 0}
         }, {}, 0, {160, 179, 207}, 1.0},	
         [5] = {"N2N SaikeMA Bass ##", true, true, 0, {
             {"JS: Saike MIDI Arp", true, nil, 5},
+			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACEPRESET", 0}
         }, {}, 0, {160, 179, 207}, 1.0},
         [6] = {"N2N BlueA. Bass ##", true, true, 0, {
             {"VSTi: BlueARP", true, nil, 19},
+			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACEPRESET", 0}
         }, {}, 0, {160, 179, 207}, 1.0}
     },

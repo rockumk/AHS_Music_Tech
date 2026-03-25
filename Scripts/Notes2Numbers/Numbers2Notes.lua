@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.7.7
+-- @version  1.7.8
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.7.7
+--   # Numbers2Notes 1.7.8
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -16,7 +16,7 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
---   # Major Update 1.7.7
+--   # Major Update 1.7.8
 --   + Added Groove
 --   + Changed N2N Drum Arranger to N2N Drum Arranger.jsfx
 --   + Changed gmem name
@@ -42,8 +42,8 @@ local track_table = config.track_table
 local pluginsources = config.pluginsources
 local G_startup_missing_report = ""
 
-
-
+real_song_key = "C"
+processing_key = "C"
 
 -----------------------------------------------   GUI VARIABLES AND SETUP
 
@@ -579,15 +579,15 @@ function Set_Mood2Mode_Parameters(r_tonic, m_center)
             -- Param 3 = Slider 4 (White vs Black Keys)
             -- Automatically detect based on the track name!
             local _, tr_name = reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "", false)
-		if tr_name:lower():find("black", 1, true) then
-			-- Use raw value: 2 = Black Keys 1
-			reaper.TrackFX_SetParam(track, fx_idx, 3, 2) 
-			local actual = reaper.TrackFX_GetParam(track, fx_idx, 3)
-		else
-			-- Use raw value: 1 = White Keys
-			reaper.TrackFX_SetParam(track, fx_idx, 3, 1) 
-			local actual = reaper.TrackFX_GetParam(track, fx_idx, 3)
-		end
+    if tr_name:lower():find("black", 1, true) then
+      -- Use raw value: 2 = Black Keys 1
+      reaper.TrackFX_SetParam(track, fx_idx, 3, 2) 
+      local actual = reaper.TrackFX_GetParam(track, fx_idx, 3)
+    else
+      -- Use raw value: 1 = White Keys
+      reaper.TrackFX_SetParam(track, fx_idx, 3, 1) 
+      local actual = reaper.TrackFX_GetParam(track, fx_idx, 3)
+    end
         end
     end
 end
@@ -1005,7 +1005,7 @@ function Draw_Track_Builder_Modal()
 
     reaper.ImGui_SetNextWindowPos(ctx, center_x, center_y, reaper.ImGui_Cond_Appearing(), 0.5, 0.5)
 
-    reaper.ImGui_SetNextWindowSize(ctx, 1300, 720, reaper.ImGui_Cond_Appearing())
+    reaper.ImGui_SetNextWindowSize(ctx, 1300, 705, reaper.ImGui_Cond_Appearing())
     if reaper.ImGui_BeginPopupModal(ctx, "Configure N2N Tracks", true) then
         reaper.ImGui_Text(ctx, "Configure your N2N Tracks for this project:")
         reaper.ImGui_Separator(ctx)
@@ -1295,7 +1295,7 @@ local n2n_styles = {
     {reaper.ImGui_Col_WindowBg(), 0xC8CED3FF},
     {reaper.ImGui_Col_TitleBg(), 0xD5D5D5FF},
     {reaper.ImGui_Col_TitleBgActive(), 0xD5D5D5FF},
-    {reaper.ImGui_Col_TitleBgCollapsed(), 0x63636382},
+    {reaper.ImGui_Col_TitleBgCollapsed(), 0xD5D5D5FF},
     {reaper.ImGui_Col_MenuBarBg(), 0xD5D5D5FF},
     {reaper.ImGui_Col_InputTextCursor(), 0x000000FF},
     {reaper.ImGui_Col_Text(), 0x000000FF},
@@ -1337,8 +1337,16 @@ function IM_GUI_Loop()
     Push_N2N_Styles(ctx)
     reaper.ImGui_PushFont(ctx, font)
 
+
     local visible, open =
         reaper.ImGui_Begin(ctx, "Numbers2Notes - Nashville Number Charts for Reaper", true, window_flags)
+
+
+
+    reaper.ImGui_SetWindowSize(ctx, 1300, 705) 
+
+
+
 
     -- Safely ensure the audition track is built and mapped to the Global Variable
     Ensure_Audition_Track_Valid()
@@ -2093,7 +2101,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.7.7")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.7.8")
             reaper.ImGui_Text(ctx, "https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
 
@@ -3131,29 +3139,34 @@ G_SOURCE_INDICES = {}
 final_ppqpos_total = 0 -- Add this so place_special doesn't crash!
 
 function Set_Back2Key_Transpositions()
-    local actual_key_val = musictheory.key_table[current_key] or 0
-
     for _, tr_data in ipairs(G_DYNAMIC_TABLE) do
         local track = tr_data.track_ptr
-        -- Apply only to Source tracks (mode 0)
-        if track and tr_data.mode_id == 0 then
+
+        -- Apply only to receiver/playback tracks for Chords, Chords+Bass, and Bass
+        if track and tr_data.mode_id > 0 and (tr_data.type_id == 16 or tr_data.type_id == 17 or tr_data.type_id == 20) then
             -- BULLETPROOF FX FINDER
             local fx_idx = -1
             for j = 0, reaper.TrackFX_GetCount(track) - 1 do
                 local retval, fx_name = reaper.TrackFX_GetFXName(track, j, "")
-                if retval and fx_name:find("Back2Key_N2N") then
+                if retval and fx_name:find("Back2Key_N2N", 1, true) then
                     fx_idx = j
                     break
                 end
             end
 
             if fx_idx >= 0 then
+                local key_for_back2key = (G_render_mode == 0) and real_song_key or "C"
+                local key_val = musictheory.key_table[key_for_back2key] or 0
+
                 -- JSFX dropdowns ignore the <-5,6> range and expect the list Index (0 to 11).
                 -- C(0)+5=5 (C to C). G(7)+5=12->0 (C to G). F#(6)+5=11 (C to F#).
-                local slider_index = (actual_key_val + 5) % 12
+                local slider_index = (key_val + 5) % 12
 
                 -- Param 0 is slider1 (Transpose)
                 reaper.TrackFX_SetParam(track, fx_idx, 0, slider_index)
+
+                -- Enable only in Relative mode; disable in Absolute mode
+                reaper.TrackFX_SetEnabled(track, fx_idx, G_render_mode == 0)
             end
         end
     end
@@ -3422,6 +3435,28 @@ function Scan_Existing_Tracks()
     end
 end
 
+
+function Make_Monster_Drums_32_Chan()
+      local track_count = reaper.CountTracks(0)
+      for i = 0, track_count - 1 do
+          local track = reaper.GetTrack(0, i)
+          local fx_count = reaper.TrackFX_GetCount(track)
+      
+          for fx = 0, fx_count - 1 do
+              local retval, fx_name = reaper.TrackFX_GetFXName(track, fx, "")
+              if retval and fx_name:lower():find("monster drums") then
+                  local current_nchan = reaper.GetMediaTrackInfo_Value(track, "I_NCHAN")
+                  if current_nchan < 32 then
+                      reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", 32)
+                  end
+                  break
+              end
+          end
+      end
+end
+
+
+
 local function Safe_Add_FX(track, fx_search_name, preset_name, source_id)
     if not fx_search_name or fx_search_name == "" then
         return
@@ -3499,20 +3534,9 @@ function Build_Single_Track(tr)
             plug_order = plug_order - 1
         end
     end
-    -- === DYNAMIC Back2Key_N2N INSERTION ===
-    -- Only apply to Source Tracks (Mode 0) for Chords (16), Chbass (17), Bass (20)
-    if tr_mode == 0 and (tr_type == 16 or tr_type == 17 or tr_type == 20) then
-        local fx_idx = reaper.TrackFX_GetByName(track_to_use, "Back2Key_N2N", false)
-        if G_render_mode == 0 then -- Relative Mode Selected
-            if fx_idx < 0 then
-                reaper.TrackFX_AddByName(track_to_use, "JS: Back2Key_N2N", false, -1)
-            end
-        else -- Absolute Mode Selected
-            if fx_idx >= 0 then
-                reaper.TrackFX_Delete(track_to_use, fx_idx)
-            end
-        end
-    end
+
+
+
 
     -- === DYNAMIC TRACK RENAMING ===
     local display_name = tr[1]
@@ -3548,13 +3572,13 @@ function Build_Single_Track(tr)
     end
     table.insert(G_RENDER_TARGETS[tr_type], track_to_use)
 
-	tr.track_ptr = track_to_use
+  tr.track_ptr = track_to_use
 
-	if Track_Needs_Cue_Child(tr) then
-		tr.cue_track_ptr = Ensure_Cue_Child_Track(track_to_use, tr, unique_id)
-	end
+  if Track_Needs_Cue_Child(tr) then
+    tr.cue_track_ptr = Ensure_Cue_Child_Track(track_to_use, tr, unique_id)
+  end
 
-	return is_new
+  return is_new
 end
 
 function Organize_Tracks_And_Routing(dynamic_table)
@@ -4625,16 +4649,23 @@ function place_MIDI_data(
             end
 
             -- PREPARE FOR PERFECT INVERSION MATH
-            local keyshift = musictheory.key_table[current_key] or 0
+            local processing_keyshift = musictheory.key_table[processing_key] or 0
+            local real_keyshift = musictheory.key_table[real_song_key] or 0
+
+
+
 
             -- Calculate absolute roots for perfect voicing boundaries
-            local abs_root = (pmd_root + keyshift) % 12
-            local abs_bass = (bass_note + keyshift) % 12
+            local abs_root = (pmd_root + processing_keyshift) % 12
+            local abs_bass = (bass_note + processing_keyshift) % 12
 
             -- Calculate the exact shift the JSFX will apply (-5 to +6)
-            local jsfx_shift = keyshift
-            if jsfx_shift > 6 then
-                jsfx_shift = jsfx_shift - 12
+            local jsfx_shift = 0
+            if G_render_mode ~= 0 then
+                jsfx_shift = real_keyshift
+                if jsfx_shift > 6 then
+                    jsfx_shift = jsfx_shift - 12
+                end
             end
 
             pmd_note_end_ppqpos = pmd_running_ppqpos_total + value[3]
@@ -4741,7 +4772,7 @@ function place_MIDI_data(
                             final_start,
                             final_end,
                             chan,
-                            visual_pitch,
+                            pitch,
                             vel
                         )
                     end
@@ -4753,7 +4784,7 @@ function place_MIDI_data(
                             final_start,
                             final_end,
                             chan,
-                            visual_pitch,
+                            pitch,
                             vel
                         )
                     end
@@ -4788,7 +4819,7 @@ function place_MIDI_data(
                                 final_start,
                                 final_end,
                                 chan,
-                                visual_bp,
+                                bp,
                                 vel_bass
                             )
                         end
@@ -4800,7 +4831,7 @@ function place_MIDI_data(
                                 final_start,
                                 final_end,
                                 chan,
-                                visual_bp,
+                                bp,
                                 vel_bass
                             )
                         end
@@ -5793,7 +5824,17 @@ function PreRender_Setup()
 end
 
 function Apply_Project_Settings()
-    current_key = set_the_key(header_area)
+
+    real_song_key = set_the_key(header_area)
+
+    if G_render_mode == 0 then
+        processing_key = "C"
+    else
+        processing_key = real_song_key
+    end
+    
+    current_key = processing_key
+    
     current_bpm = set_the_bpm(header_area)
 
     -- Time Sig is handled inside the parser now, but we init here
@@ -5819,7 +5860,7 @@ function Export_To_GMEM(chbass_item_id)
             -- CRITICAL: Must attach before any gmem_write!
             reaper.gmem_attach("N2N_Ecosystem_RSKennedy")
 
-            local r_tonic, m_center = gmem_export.Analyze(light_take, current_key)
+            local r_tonic, m_center = gmem_export.Analyze(light_take, processing_key)
             gmem_export.SendToGMEM(light_take, r_tonic, m_center)
             gmem_export.SendScaleToGMEM(light_take, r_tonic)
 
@@ -5828,7 +5869,7 @@ function Export_To_GMEM(chbass_item_id)
     end
 
     -- Fallback if GMEM isn't set up yet
-    local fallback_key = musictheory.key_table[current_key] or 0
+    local fallback_key = musictheory.key_table[processing_key] or 0
     return fallback_key, fallback_key
 end
 
@@ -5920,6 +5961,7 @@ function Render_Process_Routine()
     G_DYNAMIC_TABLE = Compile_Dynamic_Track_Table(config.track_recipe)
 
     Scan_Existing_Tracks()
+    
     reaper.PreventUIRefresh(-1)
 
     coroutine.yield("Scanning existing tracks...")
@@ -5956,8 +5998,16 @@ function Render_Process_Routine()
 
     Set_Back2Key_Transpositions()
 
-    local r_tonic, m_center = Export_To_GMEM(chbass_id)
-    Set_Mood2Mode_Parameters(r_tonic, m_center)
+local r_tonic, m_center = Export_To_GMEM(chbass_id)
+
+local abs_tonic = musictheory.key_table[real_song_key] or 0
+local modal_offset = (m_center - r_tonic) % 12
+local abs_m_center = (abs_tonic + modal_offset) % 12
+
+Set_Mood2Mode_Parameters(abs_tonic, abs_m_center)
+
+
+
 
     Generate_Arranger_Conductors()
 
