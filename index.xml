@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="e35079fdd2ef55d9fe1957e2be793810019a1ef4">
+<index version="1" name="AHS_Music_Tech" commit="c89ed386bca5ac4d956a2b164ab2a215bd15eff8">
   <category name="Effects">
     <reapack name="32_to_2_Downmix_N2N.jsfx" type="effect" desc="32_to_2_Downmix_N2N">
       <metadata>
@@ -775,6 +775,23 @@
     </reapack>
   </category>
   <category name="Scripts">
+    <reapack name="FX_Graffiti.lua" type="script" desc="FX Graffiti">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 A ReaScript to draw and overlay custom shapes/graffiti on FX windows. Features include importing/exporting overlays, customizable shapes (circles, squares, outlines), opacity controls, and dynamic window tracking.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.1.0" author="Rock Kennedy" time="2026-03-28T19:42:07Z">
+        <changelog><![CDATA[+ Added per-FX Show / Hide / Keep Hidden overlay visibility states
++ Added blue hidden-overlay reminder dot in upper-left title bar area
++ Improved Alt title-bar popup behavior so it stays up more reliably while Alt is held]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/c89ed386bca5ac4d956a2b164ab2a215bd15eff8/Scripts/FX_Graffiti.lua</source>
+      </version>
+    </reapack>
     <reapack name="N2N Drum Layout Tool.lua" type="script" desc="N2N Drum Layout Tool">
       <version name="2.4" author="Rock Kennedy + ChatGPT" time="2026-01-20T04:56:27Z">
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/8d7b6f0256fc9a96bbf7a73625cf9505a3b1af86/Scripts/N2N%20Drum%20Layout%20Tool.lua</source>
