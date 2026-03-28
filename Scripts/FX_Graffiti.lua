@@ -9,8 +9,6 @@
 --   + Added per-FX Show / Hide / Keep Hidden overlay visibility states
 --   + Added blue hidden-overlay reminder dot in upper-left title bar area
 --   + Improved Alt title-bar popup behavior so it stays up more reliably while Alt is held
--- @provides
---[nomain] .
 
 --------------------------------------------------------------------------------
 -- INITIALIZATION & DEPENDENCIES
