@@ -1,6 +1,6 @@
 -- @description FX Graffiti
 -- @author Rock Kennedy
--- @version 1.1.0
+-- @version 1.1.1
 -- @about
 --   A ReaScript to draw and overlay custom shapes/graffiti on FX windows.
 --   Features include importing/exporting overlays, customizable shapes (circles, squares, outlines),
@@ -904,13 +904,12 @@ function Open_The_Overlay_Window(track, index)
             local overlay_visible = FX_IsOverlayVisible(fx_name, fx_data)
 
             reaper.ImGui_SetNextWindowPos(ctx, left + 5, top - 2)
-            reaper.ImGui_SetNextWindowSize(ctx, has_overlay and 395 or 71, 35)
+            reaper.ImGui_SetNextWindowSize(ctx, has_overlay and 395 or 176, 35, reaper.ImGui_Cond_Always())
             reaper.ImGui_SetNextWindowBgAlpha(ctx, 1.0)
             reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_WindowBg(), 0x000000FF)
 
             local prompt_flags =
                 reaper.ImGui_WindowFlags_NoDecoration() | reaper.ImGui_WindowFlags_NoFocusOnAppearing() |
-                reaper.ImGui_WindowFlags_AlwaysAutoResize() |
                 reaper.ImGui_WindowFlags_NoSavedSettings()
 
             if is_topmost then
@@ -933,12 +932,12 @@ function Open_The_Overlay_Window(track, index)
                     edit_mode = true
                     edit_prompt_timer = 0
                 end
-
+            
                 if has_overlay then
                     reaper.ImGui_SameLine(ctx)
                     reaper.ImGui_Dummy(ctx, 30, 2)
                     reaper.ImGui_SameLine(ctx)
-
+            
                     if overlay_visible then
                         reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Button(), 0x228B22FF)
                         reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_ButtonHovered(), 0x32CD32FF)
@@ -953,9 +952,9 @@ function Open_The_Overlay_Window(track, index)
                     if overlay_visible then
                         reaper.ImGui_PopStyleColor(ctx, 3)
                     end
-
+            
                     reaper.ImGui_SameLine(ctx)
-
+            
                     local off_active = temp_hidden_fx[fx_name] == true
                     if off_active then
                         reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Button(), 0x8B6B22FF)
@@ -969,9 +968,9 @@ function Open_The_Overlay_Window(track, index)
                     if off_active then
                         reaper.ImGui_PopStyleColor(ctx, 3)
                     end
-
+            
                     reaper.ImGui_SameLine(ctx)
-
+            
                     local keep_hidden_active = (fx_data.visible == false and not temp_hidden_fx[fx_name])
                     if keep_hidden_active then
                         reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Button(), 0x8B2222FF)
@@ -984,20 +983,22 @@ function Open_The_Overlay_Window(track, index)
                         fx_data.visible = false
                         Save_FX_Graffiti()
                     end
-                    
-                    reaper.ImGui_SameLine(ctx)
-                    reaper.ImGui_Dummy(ctx, 30, 2)
-                    reaper.ImGui_SameLine(ctx)
-                    
-                    if reaper.ImGui_Button(ctx, "QUIT") then
-                        quit_requested = true
+                    if keep_hidden_active then
+                        reaper.ImGui_PopStyleColor(ctx, 3)
                     end
-                    
                 end
-
+            
+                reaper.ImGui_SameLine(ctx)
+                reaper.ImGui_Dummy(ctx, 30, 2)
+                reaper.ImGui_SameLine(ctx)
+            
+                if reaper.ImGui_Button(ctx, "QUIT") then
+                    quit_requested = true
+                end
+            
                 reaper.ImGui_End(ctx)
             end
-
+            
             reaper.ImGui_PopStyleColor(ctx)
         end
     end
