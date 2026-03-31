@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="f10aff3341888daef1efa8fec84d4257c5c847d4">
+<index version="1" name="AHS_Music_Tech" commit="3bc624cb9e58aa197783e75512f2378d761ec5e6">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -1403,6 +1403,11 @@
     </reapack>
   </category>
   <category name="Scripts/Notes2Numbers">
+    <reapack name="MapDrumsToLaunchpad.lua" type="script" desc="MapDrumsToLaunchpad">
+      <version name="1.3" time="2026-03-31T04:37:18Z">
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/3bc624cb9e58aa197783e75512f2378d761ec5e6/Scripts/Notes2Numbers/MapDrumsToLaunchpad.lua</source>
+      </version>
+    </reapack>
     <reapack name="N2N_Drum_System.lua" type="script" desc="N2N Drum System">
       <version name="1.3" time="2026-03-31T04:13:22Z">
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/f10aff3341888daef1efa8fec84d4257c5c847d4/Scripts/Notes2Numbers/N2N_Drum_System.lua</source>
