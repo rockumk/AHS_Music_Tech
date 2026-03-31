@@ -1,12 +1,125 @@
 desc: N2N Drum Arranger
-version: 7.0.0
+version: 7.1.0
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.0.0 -
+  # N2N Drum Arranger v7.1.0 -
   ADDED CUE SETTING
   ADDED PATTERN MUTE
   ADDED FALLBACK PATTERN SYSTEM
-provides:[data] ../Data/DrumArranger/*.txt > AHS_Music_Tech/DrumArranger/
+provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
+provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
+provides:[data] ../Data/DrumArranger/[BEATBOX] 01 Street Jam.txt > AHS_Music_Tech/DrumArranger/[BEATBOX] 01 Street Jam.txt
+provides:[data] ../Data/DrumArranger/[BEATBOX] 02 Humana Hit.txt > AHS_Music_Tech/DrumArranger/[BEATBOX] 02 Humana Hit.txt
+provides:[data] ../Data/DrumArranger/[BEATBOX] 03 Disco Bee.txt > AHS_Music_Tech/DrumArranger/[BEATBOX] 03 Disco Bee.txt
+provides:[data] ../Data/DrumArranger/[BEATBOX] 04 Big Badda Boom.txt > AHS_Music_Tech/DrumArranger/[BEATBOX] 04 Big Badda Boom.txt
+provides:[data] ../Data/DrumArranger/[CINE] 01 Hellboy Cube.txt > AHS_Music_Tech/DrumArranger/[CINE] 01 Hellboy Cube.txt
+provides:[data] ../Data/DrumArranger/[CINE] 02 CineFlix Perc.txt > AHS_Music_Tech/DrumArranger/[CINE] 02 CineFlix Perc.txt
+provides:[data] ../Data/DrumArranger/[CINE] 03 Doomsday 2040.txt > AHS_Music_Tech/DrumArranger/[CINE] 03 Doomsday 2040.txt
+provides:[data] ../Data/DrumArranger/[DDUT] 01 Vian Dangdut Kit.txt > AHS_Music_Tech/DrumArranger/[DDUT] 01 Vian Dangdut Kit.txt
+provides:[data] ../Data/DrumArranger/[DDUT] 02 Paralon Yona.txt > AHS_Music_Tech/DrumArranger/[DDUT] 02 Paralon Yona.txt
+provides:[data] ../Data/DrumArranger/[DDUT] 03 Yonk Graffity Koplo.txt > AHS_Music_Tech/DrumArranger/[DDUT] 03 Yonk Graffity Koplo.txt
+provides:[data] ../Data/DrumArranger/[DISCO] 01 Discoria.txt > AHS_Music_Tech/DrumArranger/[DISCO] 01 Discoria.txt
+provides:[data] ../Data/DrumArranger/[DISCO] 02 Dance Club.txt > AHS_Music_Tech/DrumArranger/[DISCO] 02 Dance Club.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 01 Roland R8.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 01 Roland R8.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 02 Korg DDD-1.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 02 Korg DDD-1.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 03 Casio VL-1.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 03 Casio VL-1.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 04 Roland TR-606.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 04 Roland TR-606.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 05 Roland TR-626.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 05 Roland TR-626.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 06 Roland TR-707.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 06 Roland TR-707.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 07 Roland TR-727.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 07 Roland TR-727.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 08 Roland TR-808.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 08 Roland TR-808.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 09 Roland TR-909.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 09 Roland TR-909.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 10 Clavia Nord Drum.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 10 Clavia Nord Drum.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 11 Linn LinnDrum.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 11 Linn LinnDrum.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 12 Linn Linn9000.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 12 Linn Linn9000.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 13 Alesis HR16.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 13 Alesis HR16.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 14 E-mu Drumulator.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 14 E-mu Drumulator.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 15 Yamaha RX5.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 15 Yamaha RX5.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 16 Korg KR-55.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 16 Korg KR-55.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 17 Oberheim DMX.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 17 Oberheim DMX.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 18 Linn LM-1.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 18 Linn LM-1.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 19 Boss DR-110.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 19 Boss DR-110.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 20 SCI DrumTraks.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 20 SCI DrumTraks.txt
+provides:[data] ../Data/DrumArranger/[ELECTRO] 01 Futura Kit.txt > AHS_Music_Tech/DrumArranger/[ELECTRO] 01 Futura Kit.txt
+provides:[data] ../Data/DrumArranger/[ELECTRO] 02 ElectroGroove.txt > AHS_Music_Tech/DrumArranger/[ELECTRO] 02 ElectroGroove.txt
+provides:[data] ../Data/DrumArranger/[ELECTRO] 03 Dream Catcher.txt > AHS_Music_Tech/DrumArranger/[ELECTRO] 03 Dream Catcher.txt
+provides:[data] ../Data/DrumArranger/[ELECTRO] 04 Techa Kit.txt > AHS_Music_Tech/DrumArranger/[ELECTRO] 04 Techa Kit.txt
+provides:[data] ../Data/DrumArranger/[ELECTRO] 05 Matrix Kit.txt > AHS_Music_Tech/DrumArranger/[ELECTRO] 05 Matrix Kit.txt
+provides:[data] ../Data/DrumArranger/[ELECTRO] 06 Trappa Kit.txt > AHS_Music_Tech/DrumArranger/[ELECTRO] 06 Trappa Kit.txt
+provides:[data] ../Data/DrumArranger/[FUNK] 01 Funk It.txt > AHS_Music_Tech/DrumArranger/[FUNK] 01 Funk It.txt
+provides:[data] ../Data/DrumArranger/[FUNK] 02 SoulVibe.txt > AHS_Music_Tech/DrumArranger/[FUNK] 02 SoulVibe.txt
+provides:[data] ../Data/DrumArranger/[FUNK] 03 FonkaWonka.txt > AHS_Music_Tech/DrumArranger/[FUNK] 03 FonkaWonka.txt
+provides:[data] ../Data/DrumArranger/[FUNK] 04 Funky Flix.txt > AHS_Music_Tech/DrumArranger/[FUNK] 04 Funky Flix.txt
+provides:[data] ../Data/DrumArranger/[HIP HOP] 01 CocaCola Kit.txt > AHS_Music_Tech/DrumArranger/[HIP HOP] 01 CocaCola Kit.txt
+provides:[data] ../Data/DrumArranger/[HIP HOP] 02 Drop It, Hop It.txt > AHS_Music_Tech/DrumArranger/[HIP HOP] 02 Drop It, Hop It.txt
+provides:[data] ../Data/DrumArranger/[HIP HOP] 03 Groove Ghetto.txt > AHS_Music_Tech/DrumArranger/[HIP HOP] 03 Groove Ghetto.txt
+provides:[data] ../Data/DrumArranger/[INDUST] 01 Factory Reset.txt > AHS_Music_Tech/DrumArranger/[INDUST] 01 Factory Reset.txt
+provides:[data] ../Data/DrumArranger/[INDUST] 02 Barrel Beater.txt > AHS_Music_Tech/DrumArranger/[INDUST] 02 Barrel Beater.txt
+provides:[data] ../Data/DrumArranger/[JAZZ] 01 Tooth Brush Kit.txt > AHS_Music_Tech/DrumArranger/[JAZZ] 01 Tooth Brush Kit.txt
+provides:[data] ../Data/DrumArranger/[JAZZ] 02 Jive Kit.txt > AHS_Music_Tech/DrumArranger/[JAZZ] 02 Jive Kit.txt
+provides:[data] ../Data/DrumArranger/[JAZZ] 03 Jazz For You.txt > AHS_Music_Tech/DrumArranger/[JAZZ] 03 Jazz For You.txt
+provides:[data] ../Data/DrumArranger/[LOFI] 01 Summer Picnic.txt > AHS_Music_Tech/DrumArranger/[LOFI] 01 Summer Picnic.txt
+provides:[data] ../Data/DrumArranger/[METAL] 01 RacikSuara Metal.txt > AHS_Music_Tech/DrumArranger/[METAL] 01 RacikSuara Metal.txt
+provides:[data] ../Data/DrumArranger/[METAL] 02 Kalkal Tremor.txt > AHS_Music_Tech/DrumArranger/[METAL] 02 Kalkal Tremor.txt
+provides:[data] ../Data/DrumArranger/[METAL] 03 Caveman.txt > AHS_Music_Tech/DrumArranger/[METAL] 03 Caveman.txt
+provides:[data] ../Data/DrumArranger/[METAL] 04 Animus Monster.txt > AHS_Music_Tech/DrumArranger/[METAL] 04 Animus Monster.txt
+provides:[data] ../Data/DrumArranger/[METAL] 05 Metal Mayhem.txt > AHS_Music_Tech/DrumArranger/[METAL] 05 Metal Mayhem.txt
+provides:[data] ../Data/DrumArranger/[METAL] 06 Adun SG Djent Kit.txt > AHS_Music_Tech/DrumArranger/[METAL] 06 Adun SG Djent Kit.txt
+provides:[data] ../Data/DrumArranger/[ORCH] 01 Marching Ants.txt > AHS_Music_Tech/DrumArranger/[ORCH] 01 Marching Ants.txt
+provides:[data] ../Data/DrumArranger/[POP] 01 Acoustica Hits.txt > AHS_Music_Tech/DrumArranger/[POP] 01 Acoustica Hits.txt
+provides:[data] ../Data/DrumArranger/[POP] 02 Pidux Pop Kit.txt > AHS_Music_Tech/DrumArranger/[POP] 02 Pidux Pop Kit.txt
+provides:[data] ../Data/DrumArranger/[POP] 03 Pop Jam.txt > AHS_Music_Tech/DrumArranger/[POP] 03 Pop Jam.txt
+provides:[data] ../Data/DrumArranger/[POP] 04 eNKa Worship Kit.txt > AHS_Music_Tech/DrumArranger/[POP] 04 eNKa Worship Kit.txt
+provides:[data] ../Data/DrumArranger/[POP] 05 YPB Cajon Kit.txt > AHS_Music_Tech/DrumArranger/[POP] 05 YPB Cajon Kit.txt
+provides:[data] ../Data/DrumArranger/[POP] 06 Red Drums.txt > AHS_Music_Tech/DrumArranger/[POP] 06 Red Drums.txt
+provides:[data] ../Data/DrumArranger/[POP] 07 Pepadu Kit.txt > AHS_Music_Tech/DrumArranger/[POP] 07 Pepadu Kit.txt
+provides:[data] ../Data/DrumArranger/[POP] 08 Steven's LAS Kit.txt > AHS_Music_Tech/DrumArranger/[POP] 08 Steven's LAS Kit.txt
+provides:[data] ../Data/DrumArranger/[POP] 09 K Drum.txt > AHS_Music_Tech/DrumArranger/[POP] 09 K Drum.txt
+provides:[data] ../Data/DrumArranger/[POP] 10 Teffy's Kit.txt > AHS_Music_Tech/DrumArranger/[POP] 10 Teffy's Kit.txt
+provides:[data] ../Data/DrumArranger/[POP] 11 Emerald Kit.txt > AHS_Music_Tech/DrumArranger/[POP] 11 Emerald Kit.txt
+provides:[data] ../Data/DrumArranger/[PUNK] 01 Punkadelic Kit.txt > AHS_Music_Tech/DrumArranger/[PUNK] 01 Punkadelic Kit.txt
+provides:[data] ../Data/DrumArranger/[PUNK] 02 Altanative Kit.txt > AHS_Music_Tech/DrumArranger/[PUNK] 02 Altanative Kit.txt
+provides:[data] ../Data/DrumArranger/[REGGAE] 01 Adun SG Reggae Kit.txt > AHS_Music_Tech/DrumArranger/[REGGAE] 01 Adun SG Reggae Kit.txt
+provides:[data] ../Data/DrumArranger/[REGGAE] 02 Reggae Cezzo Kit.txt > AHS_Music_Tech/DrumArranger/[REGGAE] 02 Reggae Cezzo Kit.txt
+provides:[data] ../Data/DrumArranger/[REGGAE] 03 Zion Reggae Kit.txt > AHS_Music_Tech/DrumArranger/[REGGAE] 03 Zion Reggae Kit.txt
+provides:[data] ../Data/DrumArranger/[RNB] 01 Groove Nation.txt > AHS_Music_Tech/DrumArranger/[RNB] 01 Groove Nation.txt
+provides:[data] ../Data/DrumArranger/[RNB] 02 Soul N Joy.txt > AHS_Music_Tech/DrumArranger/[RNB] 02 Soul N Joy.txt
+provides:[data] ../Data/DrumArranger/[ROCK] 01 Sonic Rock.txt > AHS_Music_Tech/DrumArranger/[ROCK] 01 Sonic Rock.txt
+provides:[data] ../Data/DrumArranger/[ROCK] 02 Dragon Yao Gun.txt > AHS_Music_Tech/DrumArranger/[ROCK] 02 Dragon Yao Gun.txt
+provides:[data] ../Data/DrumArranger/[ROCK] 03 Water Jug Kit.txt > AHS_Music_Tech/DrumArranger/[ROCK] 03 Water Jug Kit.txt
+provides:[data] ../Data/DrumArranger/[ROCK] 04 RacikSuara V-Rock.txt > AHS_Music_Tech/DrumArranger/[ROCK] 04 RacikSuara V-Rock.txt
+provides:[data] ../Data/DrumArranger/[ROCK] 05 Pulse Rock.txt > AHS_Music_Tech/DrumArranger/[ROCK] 05 Pulse Rock.txt
+provides:[data] ../Data/DrumArranger/[ROCK] 06 Heavy Hitter.txt > AHS_Music_Tech/DrumArranger/[ROCK] 06 Heavy Hitter.txt
+provides:[data] ../Data/DrumArranger/[ROCK] 07 Boom Bang Kit.txt > AHS_Music_Tech/DrumArranger/[ROCK] 07 Boom Bang Kit.txt
+provides:[data] ../Data/DrumArranger/[SYNWAV] 01 G-Linn Kit.txt > AHS_Music_Tech/DrumArranger/[SYNWAV] 01 G-Linn Kit.txt
+provides:[data] ../Data/DrumArranger/[SYNWAV] 02 Groovebox Story.txt > AHS_Music_Tech/DrumArranger/[SYNWAV] 02 Groovebox Story.txt
+provides:[data] ../Data/DrumArranger/[SYNWAV] 03 Midnight Glow.txt > AHS_Music_Tech/DrumArranger/[SYNWAV] 03 Midnight Glow.txt
+provides:[data] ../Data/DrumArranger/Clear All.txt > AHS_Music_Tech/DrumArranger/Clear All.txt
+provides:[data] ../Data/DrumArranger/Drum8.txt > AHS_Music_Tech/DrumArranger/Drum8.txt
+provides:[data] ../Data/DrumArranger/Drumtastic.txt > AHS_Music_Tech/DrumArranger/Drumtastic.txt
+provides:[data] ../Data/DrumArranger/EZdrummer 2 Americana.txt > AHS_Music_Tech/DrumArranger/EZdrummer 2 Americana.txt
+provides:[data] ../Data/DrumArranger/Ezdrummer 2 Classic.txt > AHS_Music_Tech/DrumArranger/Ezdrummer 2 Classic.txt
+provides:[data] ../Data/DrumArranger/EZDrummer Default Kit.txt > AHS_Music_Tech/DrumArranger/EZDrummer Default Kit.txt
+provides:[data] ../Data/DrumArranger/EZDrummer Nashville.txt > AHS_Music_Tech/DrumArranger/EZDrummer Nashville.txt
+provides:[data] ../Data/DrumArranger/EZDrummer.txt > AHS_Music_Tech/DrumArranger/EZDrummer.txt
+provides:[data] ../Data/DrumArranger/EzDrummer2.txt > AHS_Music_Tech/DrumArranger/EzDrummer2.txt
+provides:[data] ../Data/DrumArranger/EZDrummer2_Hip-Hop.txt > AHS_Music_Tech/DrumArranger/EZDrummer2_Hip-Hop.txt
+provides:[data] ../Data/DrumArranger/Funkbass.txt > AHS_Music_Tech/DrumArranger/Funkbass.txt
+provides:[data] ../Data/DrumArranger/GMajor.txt > AHS_Music_Tech/DrumArranger/GMajor.txt
+provides:[data] ../Data/DrumArranger/LilKit.txt > AHS_Music_Tech/DrumArranger/LilKit.txt
+provides:[data] ../Data/DrumArranger/MT-PowerDrumKit.txt > AHS_Music_Tech/DrumArranger/MT-PowerDrumKit.txt
+provides:[data] ../Data/DrumArranger/MultiKit.txt > AHS_Music_Tech/DrumArranger/MultiKit.txt
+provides:[data] ../Data/DrumArranger/Nashville Copy.txt > AHS_Music_Tech/DrumArranger/Nashville Copy.txt
+provides:[data] ../Data/DrumArranger/Note Names.txt > AHS_Music_Tech/DrumArranger/Note Names.txt
+provides:[data] ../Data/DrumArranger/One Based MIDI.txt > AHS_Music_Tech/DrumArranger/One Based MIDI.txt
+provides:[data] ../Data/DrumArranger/Pro Punk Drums.txt > AHS_Music_Tech/DrumArranger/Pro Punk Drums.txt
+provides:[data] ../Data/DrumArranger/Roland SRX.txt > AHS_Music_Tech/DrumArranger/Roland SRX.txt
+provides:[data] ../Data/DrumArranger/Spitfire-LABS.txt > AHS_Music_Tech/DrumArranger/Spitfire-LABS.txt
+provides:[data] ../Data/DrumArranger/SSD5 Frees.txt > AHS_Music_Tech/DrumArranger/SSD5 Frees.txt
+provides:[data] ../Data/DrumArranger/Zero Based MIDI.txt > AHS_Music_Tech/DrumArranger/Zero Based MIDI.txt
+
+
+
 options:maxmem=32000000
 options:gmem=N2N_Ecosystem_RSKennedy
 
