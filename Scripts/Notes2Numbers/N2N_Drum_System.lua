@@ -1,5 +1,8 @@
 -- @description N2N Drum System
--- @version 1.5
+-- @version 1.7
+
+local mymidi = 3
+
 
 local script_path = debug.getinfo(1, "S").source:match("@(.*[\\/])")
 package.path = package.path .. ";" .. script_path .. "?.lua"
@@ -22,6 +25,7 @@ local MIDI_NOTE_NAMES_FOLDER = reaper.GetResourcePath() .. sep .. "MIDINoteNames
 local DRUM_MAP_FOLDER = reaper.GetResourcePath() .. sep .. "Data" .. sep .. "AHS_Music_Tech" .. sep .. "DrumArranger" .. sep
 
 
+mymidi = mymidi - 1
 
 local TXT_MATCH_THRESHOLD = 60
 
@@ -38,7 +42,7 @@ local last_scan_time = 0
 local current_flashed_preset = ""
 local is_initial_scan = true
 
-local MIDI_OUTPUT_INDEX = nil
+local MIDI_OUTPUT_INDEX = mymidi
 local MIDI_OUTPUT_NAME = nil
 
 --------------------------------------------------
@@ -232,7 +236,7 @@ local function load_saved_output()
 
     for i = 1, #midi_outputs do
         if midi_outputs[i].name == saved_name then
-            MIDI_OUTPUT_INDEX = midi_outputs[i].index
+            MIDI_OUTPUT_INDEX = mymidi
             MIDI_OUTPUT_NAME = midi_outputs[i].name
             selected_output_ui_index = i
             return
@@ -241,19 +245,14 @@ local function load_saved_output()
 end
 
 local function ensure_default_output()
-    if MIDI_OUTPUT_INDEX ~= nil then return end
-    if #midi_outputs > 0 then
-        MIDI_OUTPUT_INDEX = midi_outputs[1].index
-        MIDI_OUTPUT_NAME = midi_outputs[1].name
-        selected_output_ui_index = 1
-    end
+
 end
 
 local function set_active_output_from_ui(i)
     local item = midi_outputs[i]
     if not item then return end
     selected_output_ui_index = i
-    MIDI_OUTPUT_INDEX = item.index
+    MIDI_OUTPUT_INDEX = mymidi
     MIDI_OUTPUT_NAME = item.name
     save_selected_output(item.name)
 end
@@ -416,7 +415,7 @@ local function trigger_launchpad_update(preset_name)
     local pad_sysex = drum_map.GenerateSysexFromFile(chosen_path, CUSTOM_SLOT)
 
     if pad_sysex then
-        reaper.SendMIDIMessageToHardware(MIDI_OUTPUT_INDEX, pad_sysex)
+        reaper.SendMIDIMessageToHardware(mymidi, pad_sysex)
 
         local start = reaper.time_precise()
         while (reaper.time_precise() - start) * 1000 < 100 do end
@@ -424,7 +423,7 @@ local function trigger_launchpad_update(preset_name)
         local switch_to_custom_sysex = {
             0xF0, 0x00, 0x20, 0x29, 0x02, 0x0D, 0x00, (0x03 + CUSTOM_SLOT), 0xF7
         }
-        send_bytes_to_output(MIDI_OUTPUT_INDEX, switch_to_custom_sysex)
+        send_bytes_to_output(mymidi, switch_to_custom_sysex)
 
         current_flashed_preset = preset_name
     else
@@ -460,8 +459,8 @@ local fx_b = get_best_matching_fx(
     track,
     "VST3i: MONSTER Drums v3",
     {
-        "MONSTER Drum v3",
         "MONSTER Drums v3",
+        "MONSTER Drum v3",
         "Monster Drum v3",
         "Monster Drums v3",
         "MONSTER Drum",
