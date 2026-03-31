@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="ee087dedfb88ea3d00ed1c9797778e15863c029d">
+<index version="1" name="AHS_Music_Tech" commit="e70f7bed9c2bdce51b7cf99fa31a43e35ec4176c">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -1307,7 +1307,7 @@
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/fdda9d9e5a8e62caec890d6ff55e5c247e57b058/Scripts/FX_Graffiti.lua</source>
       </version>
     </reapack>
-    <reapack name="FX_Graffiti_Mac.lua" type="script" desc="FX Graffiti_Mac">
+    <reapack name="FX_Graffiti_Mac.lua" type="script" desc="FX Graffiti">
       <metadata>
         <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
@@ -1324,6 +1324,13 @@
 + Fixed transparent window focus trapping (invisible background fix)
 + Adjusted title bar hover detection for Mac OS decorations]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/faf56e4e0bb023e341901f1a2222e03974cfedc6/Scripts/FX_Graffiti_Mac.lua</source>
+      </version>
+      <version name="1.2.1" author="Rock Kennedy (Mac/Cross-Platform Refactor v1.2.1)" time="2026-03-31T23:47:38Z">
+        <changelog><![CDATA[+ Refactored for macOS and cross-platform compatibility
++ Fixed global modifier polling for Option/Cmd hover state
++ Fixed macOS screen coordinates vs ImGui viewport scaling
++ Restored correct Alt/Opt bitmask (32) and added Cmd support (16)]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/e70f7bed9c2bdce51b7cf99fa31a43e35ec4176c/Scripts/FX_Graffiti_Mac.lua</source>
       </version>
     </reapack>
     <reapack name="N2N Drum Layout Tool.lua" type="script" desc="N2N Drum Layout Tool">
