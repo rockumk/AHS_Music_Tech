@@ -1,4 +1,5 @@
-// @noindex
+// @version 1.2
+// @author Rock Kennedy
 
 35  KICK 1       //  Red
 36  KICK 2       //  Red
