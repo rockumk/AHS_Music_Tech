@@ -415,14 +415,20 @@ local function scan_tracks()
                 }
             )
 
-            local fx_b = get_best_matching_fx(
-                track,
-                "VST3i: MONSTER Drums v3",
-                {
-                    "Monster Drums v3",
-                    "Monster Drums"
-                }
-            )
+local fx_b = get_best_matching_fx(
+    track,
+    "VST3i: MONSTER Drums v3",
+    {
+        "MONSTER Drum v3",
+        "MONSTER Drums v3",
+        "Monster Drum v3",
+        "Monster Drums v3",
+        "MONSTER Drum",
+        "MONSTER Drums",
+        "Monster Drum",
+        "Monster Drums"
+    }
+)
 
             if fx_a ~= nil and fx_b ~= nil then
                 if watched_tracks[track_key] then
