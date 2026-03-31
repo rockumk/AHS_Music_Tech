@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="fdda9d9e5a8e62caec890d6ff55e5c247e57b058">
+<index version="1" name="AHS_Music_Tech" commit="8164018ec3c7c325e2760241bf6a76706595a989">
+  <category name="Data/DrumArranger">
+    <reapack name="Clear All.txt" type="midinotenames">
+      <version name="1.0.1" author="Rock Kennedy" time="2026-03-31T02:40:39Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/b58ac77bd413989b4465dc37e368b4c82f0f4dcc/Data/DrumArranger/Clear%20All.txt</source>
+      </version>
+      <version name="1.0.2" author="Rock Kennedy" time="2026-03-31T02:41:32Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/8164018ec3c7c325e2760241bf6a76706595a989/Data/DrumArranger/Clear%20All.txt</source>
+      </version>
+    </reapack>
+  </category>
   <category name="Effects">
     <reapack name="32_to_2_Downmix_N2N.jsfx" type="effect" desc="32_to_2_Downmix_N2N">
       <metadata>
