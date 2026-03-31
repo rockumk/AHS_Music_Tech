@@ -15,14 +15,10 @@
 43  TOM 4      //  Cyan
 41  TOM 5      //  Deep Orange
 49  CYMBAL 1   //  Blue
-51  RIDE CY    //  Amber
-53  RD BELL    //  Amber
-52  CYMBAL 2   //  Purple
-57  CYMBAL 3   //  Purple
-54  TAMB       //  Lime
+51  RIDE CYMBAL //  Amber
+54  TAMBOURINE //  Purple
 56  COWBELL    //  Lime
-62  CONGA HI   //  Magenta
-63  CONGA MID  //  Magenta
-64  CONGA LOW  //  Magenta
+52  CYMBAL 1   //  Magenta
+57  CYMBAL 2   //  Magenta
 69  CABASA     //  Mint
 

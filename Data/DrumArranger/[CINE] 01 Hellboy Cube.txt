@@ -1,23 +1,25 @@
 // @noindex
 
-35  KICK       //  Blue
-37  RIM SH     //  White
-38  SNARE 1    //  Indigo
-39  SNARE 2    //  Indigo
-42  HIHAT 1    //  White
-44  HIHAT 2    //  White
-46  OPEN HIHAT //  Purple
-48  TOM 1      //  White
-47  TOM 2      //  White
-45  TOM 3      //  Violet
-43  TOM 4      //  Violet
-49  FLOOR      //  White
-49  CRASH 1    //  Magenta
-52  CRASH 2    //  White
-57  CRASH 3    //  Rose
-60  SFX DRONE  //  White
-61  MUSIC SFX  //  Red
-62  FX HEART   //  White
-63  SFX FLASH BACK //  Deep Orange
-64  SFX HELL FIRE  //  White
+35  KICK 1     //  Red
+36  KICK 2     //  Red
+37  RIM SH     //  Sky
+39  RIM SH     //  Sky
+38  SNARE 1    //  Orange
+40  SNARE 2    //  Orange
+42  HIHAT 1    //  Indigo
+44  HIHAT 2    //  Indigo
+46  OPEN HIHAT //  Yellow
+48  TOM 1      //  Violet
+47  TOM 2      //  Violet
+45  TOM 3      //  Green
+43  TOM 4      //  Green
+49  FLOOR      //  Rose
+49  CRASH 1    //  Cyan
+52  CRASH 2    //  Deep Orange
+57  CRASH 3    //  Blue
+60  SFX DRONE  //  Amber
+61  MUSIC SFX  //  Purple
+62  FX HEART   //  Lime
+63  SFX FLASH BACK //  Magenta
+64  SFX HELL FIRE  //  Mint
 

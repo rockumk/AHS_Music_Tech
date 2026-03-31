@@ -1,0 +1,19 @@
+// @noindex
+
+35  DANG 1     //  Red
+36  DANG 2     //  Sky
+37  MUTE 1     //  Orange
+38  DUT 1      //  Indigo
+39  MUTE 2     //  Yellow
+40  DUT 2      //  Violet
+42  PUK        //  Green
+44  TUK        //  Rose
+46  TUNG       //  Cyan
+48  FILL 1     //  Deep Orange
+47  FILL 2     //  Blue
+45  FILL 3     //  Amber
+43  FILL 4     //  Purple
+41  FILL 5     //  Lime
+50  TAK        //  Magenta
+52  TANG       //  Mint
+

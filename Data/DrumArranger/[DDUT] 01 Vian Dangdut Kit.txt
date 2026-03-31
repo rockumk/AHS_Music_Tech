@@ -1,35 +1,35 @@
 // @noindex
 
-35  KICK 1     //  Blue
-36  KICK 2     //  Blue
-37  TANG       //  White
-39  PUK        //  White
-38  SNARE 1    //  Indigo
-40  SNARE 2    //  Indigo
-42  HIHAT 1    //  White
-44  HIHAT 2    //  White
-46  OPEN HH    //  Purple
-50  DUT 1      //  White
-48  DUT 2      //  White
-47  DUT 3      //  White
-45  DANG 1     //  Violet
-43  DANG 2     //  Violet
-41  DANG 3     //  Violet
-49  CRASH 1    //  White
-51  RIDE       //  Magenta
-53  BELL       //  Magenta
-52  CR2        //  White
-55  SPLS       //  White
-54  TAMB       //  Rose
-56  CAB        //  Rose
-57  CR3        //  White
-58  MAR        //  White
-59  TANG 1     //  Red
-60  TANG 2     //  Red
-61  TABLA 1    //  White
-62  TABLA 2    //  White
-63  TABLA 3    //  Deep Orange
-64  TABLA 4    //  Deep Orange
-65  TANG       //  White
-67  TAK        //  White
+35  KICK 1     //  Red
+36  KICK 2     //  Red
+37  TANG       //  Sky
+39  PUK        //  Sky
+38  SNARE 1    //  Orange
+40  SNARE 2    //  Orange
+42  HIHAT 1    //  Indigo
+44  HIHAT 2    //  Indigo
+46  OPEN HH    //  Yellow
+50  DUT 1      //  Violet
+48  DUT 2      //  Violet
+47  DUT 3      //  Violet
+45  DANG 1     //  Green
+43  DANG 2     //  Green
+41  DANG 3     //  Green
+49  CRASH 1    //  Rose
+51  RIDE       //  Cyan
+53  BELL       //  Cyan
+52  CR2        //  Deep Orange
+55  SPLS       //  Deep Orange
+54  TAMB       //  Blue
+56  CAB        //  Blue
+57  CR3        //  Amber
+58  MAR        //  Amber
+59  TANG 1     //  Purple
+60  TANG 2     //  Purple
+61  TABLA 1    //  Lime
+62  TABLA 2    //  Lime
+63  TABLA 3    //  Magenta
+64  TABLA 4    //  Magenta
+65  TANG       //  Mint
+67  TAK        //  Mint
 
