@@ -1,5 +1,5 @@
 -- @description N2N Drum System
--- @version 1.3
+-- @version 1.4
 
 local script_path = debug.getinfo(1, "S").source:match("@(.*[\\/])")
 package.path = package.path .. ";" .. script_path .. "?.lua"
