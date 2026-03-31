@@ -1,4 +1,4 @@
--- @description FX Graffiti
+-- @description FX Graffiti_Mac
 -- @author Rock Kennedy (Mac/Cross-Platform Refactor)
 -- @version 1.2.0
 -- @about
