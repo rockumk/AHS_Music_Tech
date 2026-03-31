@@ -1,16 +1,15 @@
--- @description FX Graffiti_Mac
--- @author Rock Kennedy (Mac/Cross-Platform Refactor)
--- @version 1.2.0
+-- @description FX Graffiti
+-- @author Rock Kennedy (Mac/Cross-Platform Refactor v1.2.1)
+-- @version 1.2.1
 -- @about
 --   A ReaScript to draw and overlay custom shapes/graffiti on FX windows.
 --   Features include importing/exporting overlays, customizable shapes (circles, squares, outlines),
 --   opacity controls, and dynamic window tracking.
 -- @changelog
 --   + Refactored for macOS and cross-platform compatibility
---   + Replaced JS_API inputs with native ReaImGui input handlers
---   + Fixed instant-delete bug on item selection
---   + Fixed transparent window focus trapping (invisible background fix)
---   + Adjusted title bar hover detection for Mac OS decorations
+--   + Fixed global modifier polling for Option/Cmd hover state
+--   + Fixed macOS screen coordinates vs ImGui viewport scaling
+--   + Restored correct Alt/Opt bitmask (32) and added Cmd support (16)
 
 --------------------------------------------------------------------------------
 -- INITIALIZATION & DEPENDENCIES
@@ -34,7 +33,7 @@ local marker_filename = data_folder .. "/FXGraffiti_Overlay_Data.txt"
 -- GLOBALS & STATE VARIABLES
 --------------------------------------------------------------------------------
 local colortable_row_count = 5
-local colortable_column_count = 13 -- 12 hues + 1 grayscale column
+local colortable_column_count = 13
 local UI_AREA_START_Y_REL = 40 
 local ui_area_start_y_abs = nil 
 local temp_hidden_fx = {}
@@ -334,7 +333,7 @@ local function GUI_Work(visible)
         end
         if reaper.ImGui_Button(ctx, "Quit") then quit_requested = true end
         reaper.ImGui_PushTextWrapPos(ctx, 0)
-        reaper.ImGui_Text(ctx, "Hover over an FX window title bar and hold down the 'ALT/OPT' key to get started.")
+        reaper.ImGui_Text(ctx, "Hover near an FX window title bar and hold down 'Opt/Alt' (or Cmd/Ctrl) to get started.")
         reaper.ImGui_PopTextWrapPos(ctx)
     end
 
@@ -413,7 +412,6 @@ local function Handle_Dot_Graffiti_Movement()
     local time_now = reaper.time_precise()
     local move_x, move_y = 0, 0
     
-    -- Mac/PC Safe Arrow Key Polling via ReaImGui
     if reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Key_LeftArrow()) then move_x = -1 end
     if reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Key_UpArrow()) then move_y = -1 end
     if reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Key_RightArrow()) then move_x = 1 end
@@ -449,9 +447,12 @@ function Open_The_Overlay_Window(track, index)
     local _, fx_name = reaper.TrackFX_GetFXName(track, index, "")
     local fx_data = Load_FX_Settings(track, index)
     
-    -- Cross Platform Inputs
-    local mouse_x, mouse_y = reaper.ImGui_GetMousePos(ctx)
-    local is_alt_down = reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Mod_Alt())
+    -- Mac/Win safe global polling for coordinates and modifiers when unfocused!
+    local mouse_x, mouse_y = reaper.GetMousePosition()
+    
+    -- Global JS_Mouse state bitmasks: 16 = Cmd(Mac)/Ctrl(Win), 32 = Opt(Mac)/Alt(Win)
+    local global_modifiers = reaper.JS_Mouse_GetState(0xFF)
+    local is_modifier_down = (global_modifiers & 16 == 16) or (global_modifiers & 32 == 32)
     
     if not track then return end
 
@@ -469,7 +470,6 @@ function Open_The_Overlay_Window(track, index)
         fx_data.fx_height = fx_height
     end
 
-    local title_bar_height = 35
     local overlay_left = left + 8
     local overlay_top = top + 30
     local overlay_width = fx_width - 16
@@ -506,8 +506,6 @@ function Open_The_Overlay_Window(track, index)
 
     local window_flags
     if edit_mode then
-        -- Invisible fix: Use an almost completely transparent background instead of NO BACKGROUND
-        -- This forces the Mac OS window manager to "trap" mouse clicks so you can draw immediately.
         reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_WindowBg(), 0x00000001) 
         
         window_flags = reaper.ImGui_WindowFlags_NoTitleBar() | reaper.ImGui_WindowFlags_NoMove() |
@@ -562,16 +560,17 @@ function Open_The_Overlay_Window(track, index)
     end
 
     if select_rect_active and reaper.ImGui_IsMouseDown(ctx, 0) then
-        select_rect_end_x, select_rect_end_y = mouse_x, mouse_y
+        local im_mx, im_my = reaper.ImGui_GetMousePos(ctx)
+        select_rect_end_x, select_rect_end_y = im_mx, im_my
         reaper.ImGui_DrawList_AddRect(draw_list, select_rect_start_x, select_rect_start_y, select_rect_end_x, select_rect_end_y, 0x00FF00FF, 0, 0, 2)
     end
 
     if not edit_mode then
-        -- Expanded mouse Y hover mapping for Mac OS bounding box differences
-        local mouse_in_title_bar = (mouse_y >= (top - 35) and mouse_y <= (top + title_bar_height))
+        -- X/Y Bounding box for Mac + PC Titlebars. 
+        local mouse_in_title_bar = (mouse_x >= left and mouse_x <= right and mouse_y >= (top - 35) and mouse_y <= (top + 35))
         local prompt_hovered = reaper.ImGui_IsWindowHovered(ctx)
 
-        if is_alt_down then
+        if is_modifier_down then
             if mouse_in_title_bar or prompt_hovered or edit_prompt_timer > 0 then
                 edit_prompt_timer = edit_prompt_hold_frames
             end
@@ -686,6 +685,9 @@ function Open_The_Overlay_Window(track, index)
     -- EDIT MODE UI
     ----------------------------------------------------------------------------
     if edit_mode then
+        -- Inside Edit Mode, we rely on ImGui coordinates natively
+        local im_mx, im_my = reaper.ImGui_GetMousePos(ctx)
+
         reaper.ImGui_SetCursorPosY(ctx, fx_height - 33)
         local recx, recy = reaper.ImGui_GetWindowPos(ctx)
         reaper.ImGui_DrawList_AddRectFilled(draw_list, recx, recy + (fx_height - 38), recx + overlay_width, recy + fx_height + 1000, 0x111111FF)
@@ -751,7 +753,7 @@ function Open_The_Overlay_Window(track, index)
         if reaper.ImGui_Button(ctx, "?", 27) then reaper.ImGui_OpenPopup(ctx, "FX Graffiti Help") end
 
         if reaper.ImGui_BeginPopupModal(ctx, "FX Graffiti Help", true, reaper.ImGui_WindowFlags_AlwaysAutoResize()) then
-            reaper.ImGui_Text(ctx, "FX Graffiti Help\n\n- Hold Alt over FX title bar to enter Edit Mode.\n- Middle click to draw.\n- Left click/drag to select and move.\n- Arrow keys nudge.\n- Delete key to remove.\n- Mouse wheel resizes (Shift=Height, Alt=Width).")
+            reaper.ImGui_Text(ctx, "FX Graffiti Help\n\n- Hold Opt/Cmd over FX title bar to enter Edit Mode.\n- Middle click to draw.\n- Left click/drag to select and move.\n- Arrow keys nudge.\n- Delete key to remove.\n- Mouse wheel resizes (Shift=Height, Alt=Width).")
             if reaper.ImGui_Button(ctx, "Close", 80, 24) then reaper.ImGui_CloseCurrentPopup(ctx) end
             reaper.ImGui_EndPopup(ctx)
         end
@@ -958,9 +960,9 @@ function Open_The_Overlay_Window(track, index)
 
         if mouse_left_clicked then
             ui_area_start_y_abs = win_y + (fx_height - UI_AREA_START_Y_REL)
-            local mouse_in_ui_area = (mouse_y >= ui_area_start_y_abs)
+            local mouse_in_ui_area = (im_my >= ui_area_start_y_abs)
             if not reaper.ImGui_IsAnyItemHovered(ctx) and not mouse_in_ui_area then
-                local rel_x, rel_y = mouse_x - win_x, mouse_y - win_y
+                local rel_x, rel_y = im_mx - win_x, im_my - win_y
                 local candidates = {}
                 for i, circle in ipairs(fx_data.circles) do
                     local left_bound = circle.x - (circle.width or default_width) / 2
@@ -982,20 +984,20 @@ function Open_The_Overlay_Window(track, index)
                     end
                     for _, sel_dot in ipairs(selected_dots) do sel_dot.orig_x, sel_dot.orig_y = nil, nil end
                     drag_active = false
-                    drag_start_x, drag_start_y = mouse_x, mouse_y
+                    drag_start_x, drag_start_y = im_mx, im_my
                 else
                     drag_active, select_rect_active = false, true
-                    select_rect_start_x, select_rect_start_y = mouse_x, mouse_y
-                    select_rect_end_x, select_rect_end_y = mouse_x, mouse_y
+                    select_rect_start_x, select_rect_start_y = im_mx, im_my
+                    select_rect_end_x, select_rect_end_y = im_mx, im_my
                     if not is_shift_down then selected_dots = {} end
                 end
             end
         end
 
         if #selected_dots > 0 and mouse_left_down and not select_rect_active then
-            if (mouse_y - win_y) < (fx_height - 38) then
+            if (im_my - win_y) < (fx_height - 38) then
                 if not drag_active and drag_start_x and drag_start_y then
-                    if math.sqrt((mouse_x - drag_start_x)^2 + (mouse_y - drag_start_y)^2) > 5 then drag_active = true end
+                    if math.sqrt((im_mx - drag_start_x)^2 + (im_my - drag_start_y)^2) > 5 then drag_active = true end
                 end
                 if drag_active then
                     if is_alt_down_edit and not selected_dots[1].duplicated then
@@ -1010,8 +1012,8 @@ function Open_The_Overlay_Window(track, index)
                     elseif drag_start_x and drag_start_y then
                         for _, sel_dot in ipairs(selected_dots) do
                             if not sel_dot.orig_x then sel_dot.orig_x, sel_dot.orig_y = sel_dot.dot.x, sel_dot.dot.y end
-                            sel_dot.dot.x = sel_dot.orig_x + (mouse_x - drag_start_x)
-                            sel_dot.dot.y = sel_dot.orig_y + (mouse_y - drag_start_y)
+                            sel_dot.dot.x = sel_dot.orig_x + (im_mx - drag_start_x)
+                            sel_dot.dot.y = sel_dot.orig_y + (im_my - drag_start_y)
                         end
                         Save_FX_Graffiti()
                     end
@@ -1019,9 +1021,9 @@ function Open_The_Overlay_Window(track, index)
             end
         end
 
-        if mouse_middle_clicked and (mouse_y - win_y) < (fx_height - 38) then
+        if mouse_middle_clicked and (im_my - win_y) < (fx_height - 38) then
             table.insert(fx_data.circles, {
-                x = mouse_x - win_x, y = mouse_y - win_y,
+                x = im_mx - win_x, y = im_my - win_y,
                 color = selected_color, shape = selected_shape,
                 width = default_width, height = default_height,
                 thickness = (selected_shape:match("outlined")) and 2 or nil
@@ -1033,7 +1035,6 @@ function Open_The_Overlay_Window(track, index)
         if #selected_dots > 0 then
             Handle_Dot_Graffiti_Movement()
             
-            -- Replaced JS API key hooks with native ImGui hook. Fixes the Mac Delete Bug!
             if reaper.ImGui_IsKeyPressed(ctx, reaper.ImGui_Key_Delete()) or reaper.ImGui_IsKeyPressed(ctx, reaper.ImGui_Key_Backspace()) then
                 local indices = {}
                 for _, sel_dot in ipairs(selected_dots) do table.insert(indices, sel_dot.index) end
