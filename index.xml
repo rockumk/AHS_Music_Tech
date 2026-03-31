@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="8164018ec3c7c325e2760241bf6a76706595a989">
+<index version="1" name="AHS_Music_Tech" commit="d98da1c5ad88ac0b2e35c5d8eee4918903329208">
   <category name="Data/DrumArranger">
+    <reapack name="[BEATBOX] 03 Disco Bee.txt" type="midinotenames">
+      <version name="1.0.2" author="Rock Kennedy" time="2026-03-31T02:47:27Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/d98da1c5ad88ac0b2e35c5d8eee4918903329208/Data/DrumArranger/%5BBEATBOX%5D%2003%20Disco%20Bee.txt</source>
+      </version>
+    </reapack>
     <reapack name="Clear All.txt" type="midinotenames">
       <version name="1.0.1" author="Rock Kennedy" time="2026-03-31T02:40:39Z">
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/b58ac77bd413989b4465dc37e368b4c82f0f4dcc/Data/DrumArranger/Clear%20All.txt</source>
