@@ -1,5 +1,507 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="a81a3438f3450653cbeeb5590ab67a6e7e147ddb">
+<index version="1" name="AHS_Music_Tech" commit="02e7e1004833cbd147817430c8e594cb71b94e88">
+  <category name="Data/DrumArranger">
+    <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5B8-BIT%5D%2001%20Game%20Over.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[8-BIT] 02 Krusty Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5B8-BIT%5D%2002%20Krusty%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[BEATBOX] 01 Street Jam.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BBEATBOX%5D%2001%20Street%20Jam.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[BEATBOX] 02 Humana Hit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BBEATBOX%5D%2002%20Humana%20Hit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[BEATBOX] 03 Disco Bee.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BBEATBOX%5D%2003%20Disco%20Bee.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[BEATBOX] 04 Big Badda Boom.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BBEATBOX%5D%2004%20Big%20Badda%20Boom.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[CINE] 01 Hellboy Cube.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BCINE%5D%2001%20Hellboy%20Cube.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[CINE] 02 CineFlix Perc.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BCINE%5D%2002%20CineFlix%20Perc.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[CINE] 03 Doomsday 2040.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BCINE%5D%2003%20Doomsday%202040.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DDUT] 01 Vian Dangdut Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDDUT%5D%2001%20Vian%20Dangdut%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DDUT] 02 Paralon Yona.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDDUT%5D%2002%20Paralon%20Yona.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DDUT] 03 Yonk Graffity Koplo.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDDUT%5D%2003%20Yonk%20Graffity%20Koplo.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DISCO] 01 Discoria.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDISCO%5D%2001%20Discoria.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DISCO] 02 Dance Club.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDISCO%5D%2002%20Dance%20Club.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 01 Roland R8.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2001%20Roland%20R8.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 02 Korg DDD-1.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2002%20Korg%20DDD-1.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 03 Casio VL-1.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2003%20Casio%20VL-1.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 04 Roland TR-606.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2004%20Roland%20TR-606.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 05 Roland TR-626.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2005%20Roland%20TR-626.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 06 Roland TR-707.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2006%20Roland%20TR-707.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 07 Roland TR-727.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2007%20Roland%20TR-727.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 08 Roland TR-808.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2008%20Roland%20TR-808.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 09 Roland TR-909.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2009%20Roland%20TR-909.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 10 Clavia Nord Drum.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2010%20Clavia%20Nord%20Drum.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 11 Linn LinnDrum.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2011%20Linn%20LinnDrum.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 12 Linn Linn9000.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2012%20Linn%20Linn9000.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 13 Alesis HR16.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2013%20Alesis%20HR16.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 14 E-mu Drumulator.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2014%20E-mu%20Drumulator.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 15 Yamaha RX5.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2015%20Yamaha%20RX5.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 16 Korg KR-55.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2016%20Korg%20KR-55.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 17 Oberheim DMX.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2017%20Oberheim%20DMX.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 18 Linn LM-1.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2018%20Linn%20LM-1.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 19 Boss DR-110.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2019%20Boss%20DR-110.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[DRUM MC] 20 SCI DrumTraks.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BDRUM%20MC%5D%2020%20SCI%20DrumTraks.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[ELECTRO] 01 Futura Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BELECTRO%5D%2001%20Futura%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[ELECTRO] 02 ElectroGroove.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BELECTRO%5D%2002%20ElectroGroove.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[ELECTRO] 03 Dream Catcher.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BELECTRO%5D%2003%20Dream%20Catcher.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[ELECTRO] 04 Techa Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BELECTRO%5D%2004%20Techa%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[ELECTRO] 05 Matrix Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BELECTRO%5D%2005%20Matrix%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[ELECTRO] 06 Trappa Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BELECTRO%5D%2006%20Trappa%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[FUNK] 01 Funk It.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BFUNK%5D%2001%20Funk%20It.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[FUNK] 02 SoulVibe.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BFUNK%5D%2002%20SoulVibe.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[FUNK] 03 FonkaWonka.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BFUNK%5D%2003%20FonkaWonka.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[FUNK] 04 Funky Flix.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BFUNK%5D%2004%20Funky%20Flix.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[HIP HOP] 01 CocaCola Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BHIP%20HOP%5D%2001%20CocaCola%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[HIP HOP] 02 Drop It, Hop It.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BHIP%20HOP%5D%2002%20Drop%20It,%20Hop%20It.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[HIP HOP] 03 Groove Ghetto.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BHIP%20HOP%5D%2003%20Groove%20Ghetto.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[INDUST] 01 Factory Reset.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BINDUST%5D%2001%20Factory%20Reset.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[INDUST] 02 Barrel Beater.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BINDUST%5D%2002%20Barrel%20Beater.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[JAZZ] 01 Tooth Brush Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BJAZZ%5D%2001%20Tooth%20Brush%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[JAZZ] 02 Jive Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BJAZZ%5D%2002%20Jive%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[JAZZ] 03 Jazz For You.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BJAZZ%5D%2003%20Jazz%20For%20You.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[LOFI] 01 Summer Picnic.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BLOFI%5D%2001%20Summer%20Picnic.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[METAL] 01 RacikSuara Metal.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BMETAL%5D%2001%20RacikSuara%20Metal.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[METAL] 02 Kalkal Tremor.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BMETAL%5D%2002%20Kalkal%20Tremor.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[METAL] 03 Caveman.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BMETAL%5D%2003%20Caveman.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[METAL] 04 Animus Monster.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BMETAL%5D%2004%20Animus%20Monster.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[METAL] 05 Metal Mayhem.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BMETAL%5D%2005%20Metal%20Mayhem.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[METAL] 06 Adun SG Djent Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BMETAL%5D%2006%20Adun%20SG%20Djent%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[ORCH] 01 Marching Ants.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BORCH%5D%2001%20Marching%20Ants.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[POP] 01 Acoustica Hits.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BPOP%5D%2001%20Acoustica%20Hits.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[POP] 02 Pidux Pop Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BPOP%5D%2002%20Pidux%20Pop%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[POP] 03 Pop Jam.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BPOP%5D%2003%20Pop%20Jam.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[POP] 04 eNKa Worship Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BPOP%5D%2004%20eNKa%20Worship%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[POP] 05 YPB Cajon Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BPOP%5D%2005%20YPB%20Cajon%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[POP] 06 Red Drums.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BPOP%5D%2006%20Red%20Drums.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[POP] 07 Pepadu Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BPOP%5D%2007%20Pepadu%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[POP] 08 Steven's LAS Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BPOP%5D%2008%20Steven's%20LAS%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[POP] 09 K Drum.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BPOP%5D%2009%20K%20Drum.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[POP] 10 Teffy's Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BPOP%5D%2010%20Teffy's%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[POP] 11 Emerald Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BPOP%5D%2011%20Emerald%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[PUNK] 01 Punkadelic Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BPUNK%5D%2001%20Punkadelic%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[PUNK] 02 Altanative Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BPUNK%5D%2002%20Altanative%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[REGGAE] 01 Adun SG Reggae Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BREGGAE%5D%2001%20Adun%20SG%20Reggae%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[REGGAE] 02 Reggae Cezzo Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BREGGAE%5D%2002%20Reggae%20Cezzo%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[REGGAE] 03 Zion Reggae Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BREGGAE%5D%2003%20Zion%20Reggae%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[RNB] 01 Groove Nation.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BRNB%5D%2001%20Groove%20Nation.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[RNB] 02 Soul N Joy.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BRNB%5D%2002%20Soul%20N%20Joy.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[ROCK] 01 Sonic Rock.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BROCK%5D%2001%20Sonic%20Rock.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[ROCK] 02 Dragon Yao Gun.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BROCK%5D%2002%20Dragon%20Yao%20Gun.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[ROCK] 03 Water Jug Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BROCK%5D%2003%20Water%20Jug%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[ROCK] 04 RacikSuara V-Rock.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BROCK%5D%2004%20RacikSuara%20V-Rock.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[ROCK] 05 Pulse Rock.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BROCK%5D%2005%20Pulse%20Rock.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[ROCK] 06 Heavy Hitter.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BROCK%5D%2006%20Heavy%20Hitter.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[ROCK] 07 Boom Bang Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BROCK%5D%2007%20Boom%20Bang%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[SYNWAV] 01 G-Linn Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BSYNWAV%5D%2001%20G-Linn%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[SYNWAV] 02 Groovebox Story.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BSYNWAV%5D%2002%20Groovebox%20Story.txt</source>
+      </version>
+    </reapack>
+    <reapack name="[SYNWAV] 03 Midnight Glow.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/%5BSYNWAV%5D%2003%20Midnight%20Glow.txt</source>
+      </version>
+    </reapack>
+    <reapack name="Clear All.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/Clear%20All.txt</source>
+      </version>
+    </reapack>
+    <reapack name="Drum8.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/Drum8.txt</source>
+      </version>
+    </reapack>
+    <reapack name="Drumtastic.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/Drumtastic.txt</source>
+      </version>
+    </reapack>
+    <reapack name="EZdrummer 2 Americana.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/EZdrummer%202%20Americana.txt</source>
+      </version>
+    </reapack>
+    <reapack name="Ezdrummer 2 Classic.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/Ezdrummer%202%20Classic.txt</source>
+      </version>
+    </reapack>
+    <reapack name="EZDrummer Default Kit.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/EZDrummer%20Default%20Kit.txt</source>
+      </version>
+    </reapack>
+    <reapack name="EZDrummer Nashville.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/EZDrummer%20Nashville.txt</source>
+      </version>
+    </reapack>
+    <reapack name="EZDrummer.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/EZDrummer.txt</source>
+      </version>
+    </reapack>
+    <reapack name="EzDrummer2.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/EzDrummer2.txt</source>
+      </version>
+    </reapack>
+    <reapack name="EZDrummer2_Hip-Hop.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/EZDrummer2_Hip-Hop.txt</source>
+      </version>
+    </reapack>
+    <reapack name="Funkbass.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/Funkbass.txt</source>
+      </version>
+    </reapack>
+    <reapack name="GMajor.txt" type="midinotenames">
+      <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/02e7e1004833cbd147817430c8e594cb71b94e88/Data/DrumArranger/GMajor.txt</source>
+      </version>
+    </reapack>
+  </category>
   <category name="Effects">
     <reapack name="32_to_2_Downmix_N2N.jsfx" type="effect" desc="32_to_2_Downmix_N2N">
       <metadata>
