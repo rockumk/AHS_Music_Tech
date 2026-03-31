@@ -2,13 +2,13 @@
 
 35  KICK 1     //  Red
 36  KICK 2     //  Red
-37  RIMSHOT    //  Sky
+37  RIM SHOT   //  Sky
 38  SNARE 1    //  Orange
 39  SNARE 2    //  Orange
 40  SNARE 3    //  Indigo
 42  HIHAT 1    //  Yellow
 44  HIHAT 2    //  Yellow
-46  OPEN HH    //  Violet
+46  OPEN HIHAT //  Violet
 48  TOM 1      //  Green
 47  TOM 2      //  Green
 45  TOM 3      //  Rose
@@ -16,9 +16,11 @@
 41  FLOOR TOM  //  Cyan
 49  CRASH 1    //  Deep Orange
 51  RIDE CY    //  Blue
-52  CHINA      //  Amber
-53  BELL CY    //  Purple
-55  SPLASH     //  Lime
-56  COWBELL    //  Magenta
-57  CRASH 2    //  Mint
+53  BELL       //  Blue
+52  CRASH 2    //  Amber
+57  CRASH 3    //  Amber
+55  SPLASH CYM //  Purple
+56  COW BELL   //  Lime
+65  TIMBA HIGH //  Magenta
+66  TIMBA LOW  //  Mint
 

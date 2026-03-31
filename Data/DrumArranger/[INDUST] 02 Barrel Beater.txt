@@ -1,24 +1,24 @@
 // @noindex
 
-35  KICK 1     //  Blue
-36  KICK 2     //  Blue
-37  RIM SHOT   //  White
-38  BARREL 1   //  Indigo
-39  BARREL HIT //  White
-40  BARREL 2   //  Purple
-42  TIN CAN 1  //  White
-44  TIN CAN 2  //  Violet
-46  TIN CAN 3  //  White
-48  TOM 1      //  Magenta
-47  TOM 2      //  Magenta
-45  TOM 3      //  White
-43  TOM 4      //  White
-41  FLOOR TOM  //  Rose
-49  CRASH CAN 1 //  White
-51  RIDE CY    //  Red
-53  BELL       //  Red
-52  CRASH CAN 2 //  White
-57  CRASH CAN 3 //  White
-59  STICK 1    //  Deep Orange
-60  STICK 2    //  White
+35  KICK 1     //  Red
+36  KICK 2     //  Red
+37  RIM SHOT   //  Sky
+38  BARREL 1   //  Orange
+39  BARREL HIT //  Indigo
+40  BARREL 2   //  Yellow
+42  TIN CAN 1  //  Violet
+44  TIN CAN 2  //  Green
+46  TIN CAN 3  //  Rose
+48  TOM 1      //  Cyan
+47  TOM 2      //  Cyan
+45  TOM 3      //  Deep Orange
+43  TOM 4      //  Deep Orange
+41  FLOOR TOM  //  Blue
+49  CRASH CAN 1 //  Amber
+51  RIDE CY    //  Purple
+53  BELL       //  Purple
+52  CRASH CAN 2 //  Lime
+57  CRASH CAN 3 //  Lime
+59  STICK 1    //  Magenta
+60  STICK 2    //  Mint
 

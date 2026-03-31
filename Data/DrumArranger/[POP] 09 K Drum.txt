@@ -1,22 +1,22 @@
 // @noindex
 
-35  KICK 1     //  Blue
-36  KICK 2     //  Blue
-37  SID STK    //  White
-38  SNARE 1    //  Indigo
-39  SNARE 2    //  White
-40  SNARE 3    //  Purple
-42  HIHAT 1    //  White
-44  HIHAT 2    //  Violet
-46  OPEN H     //  White
-48  TOM 1      //  Magenta
-47  TOM 2      //  Magenta
-45  TOM 3      //  White
-43  TOM 4      //  White
-41  FLOOR      //  Rose
-49  CYM 1      //  White
-51  RIDE CY    //  Red
-52  CHINA      //  White
-53  RD BELL    //  Deep Orange
-57  CYM 2      //  White
+35  KICK 1     //  Red
+36  KICK 2     //  Red
+37  SID STK    //  Sky
+38  SNARE 1    //  Orange
+39  SNARE 2    //  Indigo
+40  SNARE 3    //  Yellow
+42  HIHAT 1    //  Violet
+44  HIHAT 2    //  Green
+46  OPEN H     //  Rose
+48  TOM 1      //  Cyan
+47  TOM 2      //  Cyan
+45  TOM 3      //  Deep Orange
+43  TOM 4      //  Deep Orange
+41  FLOOR      //  Blue
+49  CYM 1      //  Amber
+51  RIDE CY    //  Purple
+52  CHINA      //  Lime
+53  RD BELL    //  Magenta
+57  CYM 2      //  Mint
 

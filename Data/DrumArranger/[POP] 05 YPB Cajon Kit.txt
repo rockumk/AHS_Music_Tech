@@ -1,20 +1,20 @@
 // @noindex
 
-35  BASS HIT 1 //  Blue
-36  BASS HIT 2 //  White
-37  SOFT HIT 1 //  Indigo
-38  SLAP 1     //  White
-39  SOFT HIT 2 //  Purple
-40  SLAP 2     //  White
-42  BRUSH 1    //  Violet
-44  BRUSH 2    //  White
-46  BRUSH 3    //  White
-48  FOOT TOM 1 //  Magenta
-47  FOOT TOM 2 //  White
-45  FOOT TOM 3 //  Rose
-43  FOOT TOM 4 //  White
-41  FOOT TOM 5 //  Red
-54  TAMB       //  White
-69  CABASA     //  Deep Orange
-70  MARACAS    //  White
+35  BASS HIT 1 //  Red
+36  BASS HIT 2 //  Sky
+37  SOFT HIT 1 //  Orange
+38  SLAP 1     //  Indigo
+39  SOFT HIT 2 //  Yellow
+40  SLAP 2     //  Violet
+42  BRUSH 1    //  Green
+44  BRUSH 2    //  Rose
+46  BRUSH 3    //  Rose
+48  FOOT TOM 1 //  Cyan
+47  FOOT TOM 2 //  Deep Orange
+45  FOOT TOM 3 //  Blue
+43  FOOT TOM 4 //  Amber
+41  FOOT TOM 5 //  Purple
+54  TAMB       //  Lime
+69  CABASA     //  Magenta
+70  MARACAS    //  Mint
 
