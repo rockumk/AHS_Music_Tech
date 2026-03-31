@@ -1,5 +1,5 @@
 -- @description N2N Drum System
--- @version 1.4
+-- @version 1.5
 
 local script_path = debug.getinfo(1, "S").source:match("@(.*[\\/])")
 package.path = package.path .. ";" .. script_path .. "?.lua"
@@ -105,12 +105,38 @@ local function ensure_folder(path)
     reaper.RecursiveCreateDirectory(path, 0)
 end
 
+
+
+
+
+local function strip_reapack_header_lines(data)
+    local lines = {}
+    local started_real_content = false
+
+    data = data:gsub("\r\n", "\n"):gsub("\r", "\n")
+
+    for line in data:gmatch("([^\n]*)\n?") do
+        if line == "" and not started_real_content then
+            -- skip leading blank lines
+        elseif line:match("^%s*//%s*@") and not started_real_content then
+            -- skip leading ReaPack-style header lines like // @version, // @author
+        else
+            started_real_content = true
+            lines[#lines + 1] = line
+        end
+    end
+
+    return table.concat(lines, "\n")
+end
+
 local function copy_file_binary(src, dst)
     local infile = io.open(src, "rb")
     if not infile then return false end
 
     local data = infile:read("*a")
     infile:close()
+
+    data = strip_reapack_header_lines(data)
 
     local outfile = io.open(dst, "wb")
     if not outfile then return false end
@@ -120,6 +146,21 @@ local function copy_file_binary(src, dst)
 
     return true
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 local function sync_midi_note_names_to_drum_map_folder()
     ensure_folder(DRUM_MAP_FOLDER)
