@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="f56871b9b34d792686aa716e7c06a8cce68dbd33">
+<index version="1" name="AHS_Music_Tech" commit="36025b74fb97747f4f08824cb877797145e9c04a">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -1343,6 +1343,11 @@
 + Massively expanded the Hover-Zone hit detection (top -45px to top +45px) so it's impossible to miss.
 + Hardened JS_Mouse_GetState global modifier bitmasks.]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/f56871b9b34d792686aa716e7c06a8cce68dbd33/Scripts/FX_Graffiti_Mac.lua</source>
+      </version>
+      <version name="1.2.4" author="Rock Kennedy (Mac/Cross-Platform Refactor v1.2.4)" time="2026-04-01T00:38:08Z">
+        <changelog><![CDATA[+ FIXED MACOS COORDINATE INVERSION! Dynamically converts Mac bottom-up OS coordinates to top-down screen coordinates.
++ Added OS-aware border math (Removes Windows invisible 8px borders when on Mac) for a perfect fit.]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/36025b74fb97747f4f08824cb877797145e9c04a/Scripts/FX_Graffiti_Mac.lua</source>
       </version>
     </reapack>
     <reapack name="N2N Drum Layout Tool.lua" type="script" desc="N2N Drum Layout Tool">
