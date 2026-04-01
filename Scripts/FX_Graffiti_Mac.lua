@@ -1,15 +1,14 @@
 -- @description FX Graffiti
--- @author Rock Kennedy (Mac/Cross-Platform Refactor v1.2.1)
--- @version 1.2.1
+-- @author Rock Kennedy (Mac/Cross-Platform Refactor v1.2.2)
+-- @version 1.2.2
 -- @about
 --   A ReaScript to draw and overlay custom shapes/graffiti on FX windows.
 --   Features include importing/exporting overlays, customizable shapes (circles, squares, outlines),
 --   opacity controls, and dynamic window tracking.
 -- @changelog
---   + Refactored for macOS and cross-platform compatibility
---   + Fixed global modifier polling for Option/Cmd hover state
---   + Fixed macOS screen coordinates vs ImGui viewport scaling
---   + Restored correct Alt/Opt bitmask (32) and added Cmd support (16)
+--   + Fixed ImGui GetCursorPos argument crash.
+--   + Anchored Prompt Menu and Hover Math to ImGui space to bypass macOS inverted OS coordinates.
+--   + Fixed hidden dot indicator placement on Mac.
 
 --------------------------------------------------------------------------------
 -- INITIALIZATION & DEPENDENCIES
@@ -447,10 +446,6 @@ function Open_The_Overlay_Window(track, index)
     local _, fx_name = reaper.TrackFX_GetFXName(track, index, "")
     local fx_data = Load_FX_Settings(track, index)
     
-    -- Mac/Win safe global polling for coordinates and modifiers when unfocused!
-    local mouse_x, mouse_y = reaper.GetMousePosition()
-    
-    -- Global JS_Mouse state bitmasks: 16 = Cmd(Mac)/Ctrl(Win), 32 = Opt(Mac)/Alt(Win)
     local global_modifiers = reaper.JS_Mouse_GetState(0xFF)
     local is_modifier_down = (global_modifiers & 16 == 16) or (global_modifiers & 32 == 32)
     
@@ -507,13 +502,11 @@ function Open_The_Overlay_Window(track, index)
     local window_flags
     if edit_mode then
         reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_WindowBg(), 0x00000001) 
-        
         window_flags = reaper.ImGui_WindowFlags_NoTitleBar() | reaper.ImGui_WindowFlags_NoMove() |
                        reaper.ImGui_WindowFlags_NoResize() | reaper.ImGui_WindowFlags_NoSavedSettings() |
                        reaper.ImGui_WindowFlags_NoNav()
     else
         reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_WindowBg(), 0x00000000)
-        
         window_flags = reaper.ImGui_WindowFlags_NoTitleBar() | reaper.ImGui_WindowFlags_NoFocusOnAppearing() |
                        reaper.ImGui_WindowFlags_NoInputs() | reaper.ImGui_WindowFlags_NoMove() |
                        reaper.ImGui_WindowFlags_NoResize() | reaper.ImGui_WindowFlags_NoSavedSettings() |
@@ -531,6 +524,7 @@ function Open_The_Overlay_Window(track, index)
 
     local win_x, win_y = reaper.ImGui_GetWindowPos(ctx)
     local draw_list = reaper.ImGui_GetWindowDrawList(ctx)
+    local im_mx, im_my = reaper.ImGui_GetMousePos(ctx)
 
     if FX_IsOverlayVisible(fx_name, fx_data) then
         for i, circle in ipairs(fx_data.circles) do
@@ -560,14 +554,13 @@ function Open_The_Overlay_Window(track, index)
     end
 
     if select_rect_active and reaper.ImGui_IsMouseDown(ctx, 0) then
-        local im_mx, im_my = reaper.ImGui_GetMousePos(ctx)
         select_rect_end_x, select_rect_end_y = im_mx, im_my
         reaper.ImGui_DrawList_AddRect(draw_list, select_rect_start_x, select_rect_start_y, select_rect_end_x, select_rect_end_y, 0x00FF00FF, 0, 0, 2)
     end
 
     if not edit_mode then
-        -- X/Y Bounding box for Mac + PC Titlebars. 
-        local mouse_in_title_bar = (mouse_x >= left and mouse_x <= right and mouse_y >= (top - 35) and mouse_y <= (top + 35))
+        -- Native ImGui coordinate math to totally bypass OS Y-inversions
+        local mouse_in_title_bar = (im_mx >= win_x and im_mx <= (win_x + overlay_width) and im_my >= (win_y - 45) and im_my <= (win_y + 10))
         local prompt_hovered = reaper.ImGui_IsWindowHovered(ctx)
 
         if is_modifier_down then
@@ -582,7 +575,8 @@ function Open_The_Overlay_Window(track, index)
             local has_overlay = FX_HasOverlay(fx_data)
             local overlay_visible = FX_IsOverlayVisible(fx_name, fx_data)
 
-            reaper.ImGui_SetNextWindowPos(ctx, left + 5, top - 2)
+            -- Spawn the Prompt dynamically relative to the ImGui Main window's top edge
+            reaper.ImGui_SetNextWindowPos(ctx, win_x + 5, win_y - 35)
             reaper.ImGui_SetNextWindowSize(ctx, has_overlay and 395 or 176, 35, reaper.ImGui_Cond_Always())
             reaper.ImGui_SetNextWindowBgAlpha(ctx, 1.0)
             reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_WindowBg(), 0x000000FF)
@@ -671,12 +665,13 @@ function Open_The_Overlay_Window(track, index)
                           reaper.ImGui_WindowFlags_NoBackground()
         if is_topmost then dot_flags = dot_flags | reaper.ImGui_WindowFlags_TopMost() end
 
-        reaper.ImGui_SetNextWindowPos(ctx, left + 7, top + 0)
+        reaper.ImGui_SetNextWindowPos(ctx, win_x - 1, win_y - 30)
         reaper.ImGui_SetNextWindowSize(ctx, 18, 18)
 
         local dot_visible = reaper.ImGui_Begin(ctx, "##HiddenOverlayDot_" .. tostring(fx_name), true, dot_flags)
         if dot_visible then
-            reaper.ImGui_DrawList_AddCircleFilled(reaper.ImGui_GetWindowDrawList(ctx), reaper.ImGui_GetWindowPos(ctx) + 6, reaper.ImGui_GetWindowPos(ctx, nil, 1) + 6, 5, 0x3FA9F5FF)
+            local hw_x, hw_y = reaper.ImGui_GetWindowPos(ctx)
+            reaper.ImGui_DrawList_AddCircleFilled(reaper.ImGui_GetWindowDrawList(ctx), hw_x + 6, hw_y + 6, 5, 0x3FA9F5FF)
             reaper.ImGui_End(ctx)
         end
     end
@@ -685,9 +680,6 @@ function Open_The_Overlay_Window(track, index)
     -- EDIT MODE UI
     ----------------------------------------------------------------------------
     if edit_mode then
-        -- Inside Edit Mode, we rely on ImGui coordinates natively
-        local im_mx, im_my = reaper.ImGui_GetMousePos(ctx)
-
         reaper.ImGui_SetCursorPosY(ctx, fx_height - 33)
         local recx, recy = reaper.ImGui_GetWindowPos(ctx)
         reaper.ImGui_DrawList_AddRectFilled(draw_list, recx, recy + (fx_height - 38), recx + overlay_width, recy + fx_height + 1000, 0x111111FF)
@@ -791,8 +783,8 @@ function Open_The_Overlay_Window(track, index)
 
         local function QuickAdjustBtn(label, cur_val, min_v, max_v, key)
             reaper.ImGui_SameLine(ctx)
-            local px, py = reaper.ImGui_GetCursorPos(ctx)
-            reaper.ImGui_SetCursorPos(ctx, px - 3, py)
+            local px_b, py_b = reaper.ImGui_GetCursorPos(ctx)
+            reaper.ImGui_SetCursorPos(ctx, px_b - 3, py_b)
             if reaper.ImGui_Button(ctx, label .. "##" .. key, 20, 20) then
                 local offset = (label == "-") and -1 or 1
                 return math.max(min_v, math.min(max_v, cur_val + offset)), true
@@ -887,6 +879,7 @@ function Open_The_Overlay_Window(track, index)
             end
         end
 
+        -- Safe Button Alignment Logic Fixes!
         if reaper.ImGui_Button(ctx, "Import Overlay") then
             if fx_data and fx_data.circles and #fx_data.circles > 0 then show_import_confirm = true else
                 pending_dialog = "import"
@@ -894,14 +887,16 @@ function Open_The_Overlay_Window(track, index)
             end
         end
         reaper.ImGui_SameLine(ctx)
-        reaper.ImGui_SetCursorPos(ctx, reaper.ImGui_GetCursorPos(ctx) - 3, reaper.ImGui_GetCursorPos(ctx, nil, 1))
+        local c1_x, c1_y = reaper.ImGui_GetCursorPos(ctx)
+        reaper.ImGui_SetCursorPos(ctx, c1_x - 3, c1_y)
         
         if reaper.ImGui_Button(ctx, "Import Multiple") then
             pending_dialog = "import_multiple"
             dialog_wait_frames = 2
         end
         reaper.ImGui_SameLine(ctx)
-        reaper.ImGui_SetCursorPos(ctx, reaper.ImGui_GetCursorPos(ctx) + 31, reaper.ImGui_GetCursorPos(ctx, nil, 1))
+        local c2_x, c2_y = reaper.ImGui_GetCursorPos(ctx)
+        reaper.ImGui_SetCursorPos(ctx, c2_x + 31, c2_y)
 
         if reaper.ImGui_Button(ctx, "Delete All Graffiti Objects") then
             fx_data.circles = {}
@@ -910,11 +905,14 @@ function Open_The_Overlay_Window(track, index)
 
         if reaper.ImGui_Button(ctx, "Export Overlay", 86) then pending_dialog = "export"; dialog_wait_frames = 2 end
         reaper.ImGui_SameLine(ctx)
-        reaper.ImGui_SetCursorPos(ctx, reaper.ImGui_GetCursorPos(ctx) - 3, reaper.ImGui_GetCursorPos(ctx, nil, 1))
+        local c3_x, c3_y = reaper.ImGui_GetCursorPos(ctx)
+        reaper.ImGui_SetCursorPos(ctx, c3_x - 3, c3_y)
+        
         if reaper.ImGui_Button(ctx, "Export All", 90) then pending_dialog = "export_all"; dialog_wait_frames = 2 end
         
         reaper.ImGui_SameLine(ctx)
-        reaper.ImGui_SetCursorPos(ctx, reaper.ImGui_GetCursorPos(ctx) + 31, reaper.ImGui_GetCursorPos(ctx, nil, 1))
+        local c4_x, c4_y = reaper.ImGui_GetCursorPos(ctx)
+        reaper.ImGui_SetCursorPos(ctx, c4_x + 31, c4_y)
 
         if reaper.ImGui_Button(ctx, "Save and Apply") then
             Save_FX_Graffiti()
@@ -923,7 +921,9 @@ function Open_The_Overlay_Window(track, index)
             selected_dots = {}
         end
         reaper.ImGui_SameLine(ctx)
-        reaper.ImGui_SetCursorPos(ctx, reaper.ImGui_GetCursorPos(ctx) - 3, reaper.ImGui_GetCursorPos(ctx, nil, 1))
+        local c5_x, c5_y = reaper.ImGui_GetCursorPos(ctx)
+        reaper.ImGui_SetCursorPos(ctx, c5_x - 3, c5_y)
+        
         if reaper.ImGui_Button(ctx, "Cancel", 46) then
             if backup_circles then fx_data.circles = backup_circles end
             edit_mode = false
