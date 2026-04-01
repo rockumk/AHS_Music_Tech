@@ -1,11 +1,12 @@
 -- @description FX Graffiti
--- @author Rock Kennedy
--- @version 1.3.0
+-- @author Rock Kennedy (Mac/Cross-Platform Refactor v1.3.2)
+-- @version 1.3.2
 -- @about
 --   A ReaScript to draw and overlay custom shapes/graffiti on FX windows.
 --   Features include importing/exporting overlays, customizable shapes (circles, squares, outlines),
 --   opacity controls, and dynamic window tracking.
 -- @changelog
+--   + Fixed my_getViewport API arguments error.
 --   + FIXED MACOS COORDINATE INVERSION! Dynamically converts Mac bottom-up OS coordinates to top-down screen coordinates.
 --   + Added OS-aware border math (Removes Windows invisible 8px borders when on Mac) for a perfect fit.
 
@@ -454,8 +455,8 @@ function Open_The_Overlay_Window(track, index)
     -- === THE MAGIC MACOS COORDINATE FIX ===
     if is_mac then
         -- JS_Window_GetRect on Mac returns bottom-up coordinates (0,0 is bottom-left).
-        -- We get the primary monitor's height to invert Y back to normal top-down coordinates.
-        local _, _, mt, _, mb = reaper.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, false)
+        -- We get the primary monitor's height by passing 8 zeroes (plus boolean) to my_getViewport.
+        local ml, mt, mr, mb = reaper.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, false)
         local primary_h = mb - mt
         local t1 = primary_h - top
         local t2 = primary_h - bottom
