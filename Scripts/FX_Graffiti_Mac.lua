@@ -1,6 +1,6 @@
 -- @description FX Graffiti
--- @author Rock Kennedy (Mac/Cross-Platform Refactor v1.2.5)
--- @version 1.2.4
+-- @author Rock Kennedy
+-- @version 1.2.5
 -- @about
 --   A ReaScript to draw and overlay custom shapes/graffiti on FX windows.
 --   Features include importing/exporting overlays, customizable shapes (circles, squares, outlines),
