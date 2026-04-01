@@ -1,14 +1,13 @@
 -- @description FX Graffiti
--- @author Rock Kennedy (Mac/Cross-Platform Refactor v1.2.3)
--- @version 1.2.3
+-- @author Rock Kennedy (Mac/Cross-Platform Refactor v1.2.4)
+-- @version 1.2.4
 -- @about
 --   A ReaScript to draw and overlay custom shapes/graffiti on FX windows.
 --   Features include importing/exporting overlays, customizable shapes (circles, squares, outlines),
 --   opacity controls, and dynamic window tracking.
 -- @changelog
---   + Moved Prompt and Hidden Dot to safely spawn *inside* the plugin bounds to prevent off-screen clipping on Mac.
---   + Massively expanded the Hover-Zone hit detection (top -45px to top +45px) so it's impossible to miss.
---   + Hardened JS_Mouse_GetState global modifier bitmasks.
+--   + FIXED MACOS COORDINATE INVERSION! Dynamically converts Mac bottom-up OS coordinates to top-down screen coordinates.
+--   + Added OS-aware border math (Removes Windows invisible 8px borders when on Mac) for a perfect fit.
 
 --------------------------------------------------------------------------------
 -- INITIALIZATION & DEPENDENCIES
@@ -31,9 +30,10 @@ local marker_filename = data_folder .. "/FXGraffiti_Overlay_Data.txt"
 --------------------------------------------------------------------------------
 -- GLOBALS & STATE VARIABLES
 --------------------------------------------------------------------------------
+local is_mac = reaper.GetOS():match("Mac") or reaper.GetOS():match("macOS") or reaper.GetOS():match("OSX")
+
 local colortable_row_count = 5
 local colortable_column_count = 13
-local UI_AREA_START_Y_REL = 40 
 local ui_area_start_y_abs = nil 
 local temp_hidden_fx = {}
 local colors = {
@@ -107,19 +107,6 @@ local function FX_IsOverlayHidden(fx_name, fx_data)
     return FX_HasOverlay(fx_data) and not FX_IsOverlayVisible(fx_name, fx_data)
 end
 
-function adjustOverlayBounds(overlay)
-    local fxWidth, fxHeight = 800, 600
-    if overlay and overlay.circles then
-        for i, dot in ipairs(overlay.circles) do
-            if dot.x > fxWidth or dot.y > fxHeight then
-                dot.x = 10
-                dot.y = 10
-            end
-        end
-    end
-    return overlay
-end
-
 function loadOverlayFromFile(filepath)
     local f = io.open(filepath, "r")
     if not f then return nil end
@@ -186,13 +173,19 @@ function Fix_Out_Of_Bounds(overlay_data, track, index)
     if not fx_window then return overlay_data end
     local ret, left, top, right, bottom = reaper.JS_Window_GetRect(fx_window)
     if not ret then return overlay_data end
-    local overlay_width = math.abs(right - left) - 16
-    local draw_height = (bottom - top) - 38
+    
+    local fx_width = math.abs(right - left)
+    local fx_height = math.abs(bottom - top)
+    local border_x = is_mac and 0 or 8
+    local border_top = is_mac and 28 or 30
+    local border_bottom = is_mac and 0 or 8
+    local plugin_draw_height = fx_height - border_top - border_bottom
+    local overlay_width = fx_width - (border_x * 2)
 
     for _, dot in ipairs(overlay_data.circles) do
         local w = dot.width or default_width
         local h = dot.height or default_height
-        if dot.x < 0 or dot.x + w / 2 > overlay_width or dot.y < 0 or dot.y + h / 2 > draw_height then
+        if dot.x < 0 or dot.x + w / 2 > overlay_width or dot.y < 0 or dot.y + h / 2 > plugin_draw_height then
             dot.x = 10
             dot.y = 10
         end
@@ -446,7 +439,6 @@ function Open_The_Overlay_Window(track, index)
     local _, fx_name = reaper.TrackFX_GetFXName(track, index, "")
     local fx_data = Load_FX_Settings(track, index)
     
-    -- Mac/Win safe global polling (-1 checks all bits)
     local global_modifiers = reaper.JS_Mouse_GetState(-1)
     local is_modifier_down = (global_modifiers & 16 == 16) or (global_modifiers & 32 == 32)
     local os_mx, os_my = reaper.GetMousePosition()
@@ -459,6 +451,19 @@ function Open_The_Overlay_Window(track, index)
     local ret, left, top, right, bottom = reaper.JS_Window_GetRect(fx_window)
     if not ret then return end
 
+    -- === THE MAGIC MACOS COORDINATE FIX ===
+    if is_mac then
+        -- JS_Window_GetRect on Mac returns bottom-up coordinates (0,0 is bottom-left).
+        -- We get the primary monitor's height to invert Y back to normal top-down coordinates.
+        local _, _, mt, _, mb = reaper.my_getViewport(0, 0, 0, 0, false)
+        local primary_h = mb - mt
+        local t1 = primary_h - top
+        local t2 = primary_h - bottom
+        top = math.min(t1, t2)
+        bottom = math.max(t1, t2)
+    end
+    -- =======================================
+
     local fx_width = math.abs(right - left)
     local fx_height = math.abs(bottom - top)
 
@@ -467,11 +472,18 @@ function Open_The_Overlay_Window(track, index)
         fx_data.fx_height = fx_height
     end
 
-    local overlay_left = left + 8
-    local overlay_top = top + 30
-    local overlay_width = fx_width - 16
+    -- OS-aware Border adjustments
+    local border_x = is_mac and 0 or 8
+    local border_top = is_mac and 28 or 30
+    local border_bottom = is_mac and 0 or 8
+
+    local plugin_draw_height = fx_height - border_top - border_bottom
     local extraUI = (edit_mode and 280) or 0
-    local overlay_height = fx_height + extraUI - 37
+
+    local overlay_left = left + border_x
+    local overlay_top = top + border_top
+    local overlay_width = fx_width - (border_x * 2)
+    local overlay_height = plugin_draw_height + extraUI
 
     reaper.ImGui_SetNextWindowPos(ctx, overlay_left, overlay_top)
     reaper.ImGui_SetNextWindowSize(ctx, overlay_width, overlay_height + 1)
@@ -561,7 +573,7 @@ function Open_The_Overlay_Window(track, index)
     end
 
     if not edit_mode then
-        -- Massive OS-level safe-zone for the hover detection. Hard to miss!
+        -- Hover zone math is completely fixed now that top/bottom coordinates align!
         local mouse_in_title_bar = (os_mx >= left and os_mx <= right and os_my >= (top - 45) and os_my <= (top + 45))
         local prompt_hovered = reaper.ImGui_IsWindowHovered(ctx)
 
@@ -577,7 +589,7 @@ function Open_The_Overlay_Window(track, index)
             local has_overlay = FX_HasOverlay(fx_data)
             local overlay_visible = FX_IsOverlayVisible(fx_name, fx_data)
 
-            -- Spawn safely *inside* the top-left of the plugin. Never goes off-screen!
+            -- Safely anchored inside the top-left bounds of the ImGui Window
             reaper.ImGui_SetNextWindowPos(ctx, win_x + 5, win_y + 5)
             reaper.ImGui_SetNextWindowSize(ctx, has_overlay and 395 or 176, 35, reaper.ImGui_Cond_Always())
             reaper.ImGui_SetNextWindowBgAlpha(ctx, 1.0)
@@ -667,7 +679,6 @@ function Open_The_Overlay_Window(track, index)
                           reaper.ImGui_WindowFlags_NoBackground()
         if is_topmost then dot_flags = dot_flags | reaper.ImGui_WindowFlags_TopMost() end
 
-        -- Spawns safely inside top-left bounds
         reaper.ImGui_SetNextWindowPos(ctx, win_x + 5, win_y + 5)
         reaper.ImGui_SetNextWindowSize(ctx, 18, 18)
 
@@ -683,11 +694,11 @@ function Open_The_Overlay_Window(track, index)
     -- EDIT MODE UI
     ----------------------------------------------------------------------------
     if edit_mode then
-        reaper.ImGui_SetCursorPosY(ctx, fx_height - 33)
+        reaper.ImGui_SetCursorPosY(ctx, plugin_draw_height + 5)
         local recx, recy = reaper.ImGui_GetWindowPos(ctx)
-        reaper.ImGui_DrawList_AddRectFilled(draw_list, recx, recy + (fx_height - 38), recx + overlay_width, recy + fx_height + 1000, 0x111111FF)
+        reaper.ImGui_DrawList_AddRectFilled(draw_list, recx, recy + plugin_draw_height, recx + overlay_width, recy + plugin_draw_height + 1000, 0x111111FF)
 
-        reaper.ImGui_SetCursorPosY(ctx, fx_height - 33)
+        reaper.ImGui_SetCursorPosY(ctx, plugin_draw_height + 5)
         local x, y = reaper.ImGui_GetCursorPos(ctx)
         reaper.ImGui_SetCursorPos(ctx, x, y + 3)
 
@@ -961,7 +972,7 @@ function Open_The_Overlay_Window(track, index)
         end
 
         if mouse_left_clicked then
-            ui_area_start_y_abs = win_y + (fx_height - UI_AREA_START_Y_REL)
+            ui_area_start_y_abs = win_y + plugin_draw_height
             local mouse_in_ui_area = (im_my >= ui_area_start_y_abs)
             if not reaper.ImGui_IsAnyItemHovered(ctx) and not mouse_in_ui_area then
                 local rel_x, rel_y = im_mx - win_x, im_my - win_y
@@ -997,7 +1008,7 @@ function Open_The_Overlay_Window(track, index)
         end
 
         if #selected_dots > 0 and mouse_left_down and not select_rect_active then
-            if (im_my - win_y) < (fx_height - 38) then
+            if (im_my - win_y) < plugin_draw_height then
                 if not drag_active and drag_start_x and drag_start_y then
                     if math.sqrt((im_mx - drag_start_x)^2 + (im_my - drag_start_y)^2) > 5 then drag_active = true end
                 end
@@ -1023,7 +1034,7 @@ function Open_The_Overlay_Window(track, index)
             end
         end
 
-        if mouse_middle_clicked and (im_my - win_y) < (fx_height - 38) then
+        if mouse_middle_clicked and (im_my - win_y) < plugin_draw_height then
             table.insert(fx_data.circles, {
                 x = im_mx - win_x, y = im_my - win_y,
                 color = selected_color, shape = selected_shape,
