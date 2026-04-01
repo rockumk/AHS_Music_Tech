@@ -1,14 +1,14 @@
 -- @description FX Graffiti
--- @author Rock Kennedy (Mac/Cross-Platform Refactor v1.2.2)
--- @version 1.2.2
+-- @author Rock Kennedy (Mac/Cross-Platform Refactor v1.2.3)
+-- @version 1.2.3
 -- @about
 --   A ReaScript to draw and overlay custom shapes/graffiti on FX windows.
 --   Features include importing/exporting overlays, customizable shapes (circles, squares, outlines),
 --   opacity controls, and dynamic window tracking.
 -- @changelog
---   + Fixed ImGui GetCursorPos argument crash.
---   + Anchored Prompt Menu and Hover Math to ImGui space to bypass macOS inverted OS coordinates.
---   + Fixed hidden dot indicator placement on Mac.
+--   + Moved Prompt and Hidden Dot to safely spawn *inside* the plugin bounds to prevent off-screen clipping on Mac.
+--   + Massively expanded the Hover-Zone hit detection (top -45px to top +45px) so it's impossible to miss.
+--   + Hardened JS_Mouse_GetState global modifier bitmasks.
 
 --------------------------------------------------------------------------------
 -- INITIALIZATION & DEPENDENCIES
@@ -446,8 +446,10 @@ function Open_The_Overlay_Window(track, index)
     local _, fx_name = reaper.TrackFX_GetFXName(track, index, "")
     local fx_data = Load_FX_Settings(track, index)
     
-    local global_modifiers = reaper.JS_Mouse_GetState(0xFF)
+    -- Mac/Win safe global polling (-1 checks all bits)
+    local global_modifiers = reaper.JS_Mouse_GetState(-1)
     local is_modifier_down = (global_modifiers & 16 == 16) or (global_modifiers & 32 == 32)
+    local os_mx, os_my = reaper.GetMousePosition()
     
     if not track then return end
 
@@ -559,8 +561,8 @@ function Open_The_Overlay_Window(track, index)
     end
 
     if not edit_mode then
-        -- Native ImGui coordinate math to totally bypass OS Y-inversions
-        local mouse_in_title_bar = (im_mx >= win_x and im_mx <= (win_x + overlay_width) and im_my >= (win_y - 45) and im_my <= (win_y + 10))
+        -- Massive OS-level safe-zone for the hover detection. Hard to miss!
+        local mouse_in_title_bar = (os_mx >= left and os_mx <= right and os_my >= (top - 45) and os_my <= (top + 45))
         local prompt_hovered = reaper.ImGui_IsWindowHovered(ctx)
 
         if is_modifier_down then
@@ -575,8 +577,8 @@ function Open_The_Overlay_Window(track, index)
             local has_overlay = FX_HasOverlay(fx_data)
             local overlay_visible = FX_IsOverlayVisible(fx_name, fx_data)
 
-            -- Spawn the Prompt dynamically relative to the ImGui Main window's top edge
-            reaper.ImGui_SetNextWindowPos(ctx, win_x + 5, win_y - 35)
+            -- Spawn safely *inside* the top-left of the plugin. Never goes off-screen!
+            reaper.ImGui_SetNextWindowPos(ctx, win_x + 5, win_y + 5)
             reaper.ImGui_SetNextWindowSize(ctx, has_overlay and 395 or 176, 35, reaper.ImGui_Cond_Always())
             reaper.ImGui_SetNextWindowBgAlpha(ctx, 1.0)
             reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_WindowBg(), 0x000000FF)
@@ -665,7 +667,8 @@ function Open_The_Overlay_Window(track, index)
                           reaper.ImGui_WindowFlags_NoBackground()
         if is_topmost then dot_flags = dot_flags | reaper.ImGui_WindowFlags_TopMost() end
 
-        reaper.ImGui_SetNextWindowPos(ctx, win_x - 1, win_y - 30)
+        -- Spawns safely inside top-left bounds
+        reaper.ImGui_SetNextWindowPos(ctx, win_x + 5, win_y + 5)
         reaper.ImGui_SetNextWindowSize(ctx, 18, 18)
 
         local dot_visible = reaper.ImGui_Begin(ctx, "##HiddenOverlayDot_" .. tostring(fx_name), true, dot_flags)
@@ -879,7 +882,6 @@ function Open_The_Overlay_Window(track, index)
             end
         end
 
-        -- Safe Button Alignment Logic Fixes!
         if reaper.ImGui_Button(ctx, "Import Overlay") then
             if fx_data and fx_data.circles and #fx_data.circles > 0 then show_import_confirm = true else
                 pending_dialog = "import"
