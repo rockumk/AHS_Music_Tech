@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="f48f88281374fbe35db0ceeea212a8c2c5e358ca">
+<index version="1" name="AHS_Music_Tech" commit="7aafabe5e685a548ab0655f3baa22066fd723af9">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -1384,6 +1384,12 @@
 + FIXED MACOS COORDINATE INVERSION! Dynamically converts Mac bottom-up OS coordinates to top-down screen coordinates.
 + Added OS-aware border math (Removes Windows invisible 8px borders when on Mac) for a perfect fit.]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/f48f88281374fbe35db0ceeea212a8c2c5e358ca/Scripts/FX_Graffiti_Mac.lua</source>
+      </version>
+      <version name="1.3.6" author="Rock Kennedy (Mac/Cross-Platform Refactor v1.3.6)" time="2026-04-01T01:55:18Z">
+        <changelog><![CDATA[+ Switched activation key to Shift to avoid native Apple window conflicts.
++ Massively improved coordinate tracking using JS_Window_ClientToScreen.
++ Eliminated Mac/Windows titlebar and border guesswork (Perfect fit on all OSs).]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/7aafabe5e685a548ab0655f3baa22066fd723af9/Scripts/FX_Graffiti_Mac.lua</source>
       </version>
     </reapack>
     <reapack name="N2N Drum Layout Tool.lua" type="script" desc="N2N Drum Layout Tool">
