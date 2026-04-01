@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="7aafabe5e685a548ab0655f3baa22066fd723af9">
+<index version="1" name="AHS_Music_Tech" commit="49062f9fa6cb3cf1ee562211370e88d233eff94c">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -1390,6 +1390,20 @@
 + Massively improved coordinate tracking using JS_Window_ClientToScreen.
 + Eliminated Mac/Windows titlebar and border guesswork (Perfect fit on all OSs).]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/7aafabe5e685a548ab0655f3baa22066fd723af9/Scripts/FX_Graffiti_Mac.lua</source>
+      </version>
+      <version name="1.3.7" author="Rock Kennedy (Mac/Cross-Platform Refactor v1.3.7)" time="2026-04-01T02:11:28Z">
+        <changelog><![CDATA[+ Switched activation key to Shift to avoid native Apple window conflicts.
++ Replaced crashing Mac JS APIs with Safe_GetRect dynamic unpacker.
++ Eliminated coordinate mirroring (Mac OS proved to be Top-Down natively here).
++ Anchored Prompt inside ImGui bounds to prevent OS-level clipping.]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/849a6958eb6615e1b9316529411cfdb5ddf57ce8/Scripts/FX_Graffiti_Mac.lua</source>
+      </version>
+      <version name="1.3.8" author="Rock Kennedy (Mac/Cross-Platform Refactor v1.3.8)" time="2026-04-01T02:13:08Z">
+        <changelog><![CDATA[+ Switched activation key to Shift to avoid native Apple window conflicts.
++ Replaced crashing Mac JS APIs with Safe_GetRect dynamic unpacker.
++ Eliminated coordinate mirroring (Mac OS proved to be Top-Down natively here).
++ Anchored Prompt inside ImGui bounds to prevent OS-level clipping.]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/49062f9fa6cb3cf1ee562211370e88d233eff94c/Scripts/FX_Graffiti_Mac.lua</source>
       </version>
     </reapack>
     <reapack name="N2N Drum Layout Tool.lua" type="script" desc="N2N Drum Layout Tool">
