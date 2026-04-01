@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="e70f7bed9c2bdce51b7cf99fa31a43e35ec4176c">
+<index version="1" name="AHS_Music_Tech" commit="613daa6469c02941ff4726422419e46201717526">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -1331,6 +1331,12 @@
 + Fixed macOS screen coordinates vs ImGui viewport scaling
 + Restored correct Alt/Opt bitmask (32) and added Cmd support (16)]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/e70f7bed9c2bdce51b7cf99fa31a43e35ec4176c/Scripts/FX_Graffiti_Mac.lua</source>
+      </version>
+      <version name="1.2.2" author="Rock Kennedy (Mac/Cross-Platform Refactor v1.2.2)" time="2026-04-01T00:02:06Z">
+        <changelog><![CDATA[+ Fixed ImGui GetCursorPos argument crash.
++ Anchored Prompt Menu and Hover Math to ImGui space to bypass macOS inverted OS coordinates.
++ Fixed hidden dot indicator placement on Mac.]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/613daa6469c02941ff4726422419e46201717526/Scripts/FX_Graffiti_Mac.lua</source>
       </version>
     </reapack>
     <reapack name="N2N Drum Layout Tool.lua" type="script" desc="N2N Drum Layout Tool">
