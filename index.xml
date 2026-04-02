@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="0c7cd494bd89b12efcced889cdc02ce366d1fa57">
+<index version="1" name="AHS_Music_Tech" commit="8e2fdca524b5ea6baec904ae3872487478a0465c">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -1404,6 +1404,12 @@
 + Eliminated coordinate mirroring (Mac OS proved to be Top-Down natively here).
 + Anchored Prompt inside ImGui bounds to prevent OS-level clipping.]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/49062f9fa6cb3cf1ee562211370e88d233eff94c/Scripts/FX_Graffiti_Mac.lua</source>
+      </version>
+      <version name="1.4.4" author="Rock Kennedy (Mac/Cross-Platform Refactor v1.2.4)" time="2026-04-02T01:11:36Z">
+        <changelog><![CDATA[+ Added dynamic Mac native Bottom-Left to Top-Left coordinate normalizer.
++ Uses my_getViewport to calculate exact monitor height to eliminate vertical offsets.
++ Anchored Prompt Menu and Hidden Dot safely inside plugin bounds to prevent clipping.]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/8e2fdca524b5ea6baec904ae3872487478a0465c/Scripts/FX_Graffiti_Mac.lua</source>
       </version>
     </reapack>
     <reapack name="mactest.lua" type="script" desc="mactest">
