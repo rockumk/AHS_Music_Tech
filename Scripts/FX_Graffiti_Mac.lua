@@ -1,14 +1,14 @@
 -- @description FX Graffiti
--- @author Rock Kennedy (Mac/Cross-Platform Refactor v1.2.4)
--- @version 1.4.4
+-- @author Rock Kennedy (Mac/Cross-Platform Refactor v1.4.5)
+-- @version 1.4.5
 -- @about
 --   A ReaScript to draw and overlay custom shapes/graffiti on FX windows.
 --   Features include importing/exporting overlays, customizable shapes (circles, squares, outlines),
 --   opacity controls, and dynamic window tracking.
 -- @changelog
---   + Added dynamic Mac native Bottom-Left to Top-Left coordinate normalizer.
---   + Uses my_getViewport to calculate exact monitor height to eliminate vertical offsets.
---   + Anchored Prompt Menu and Hidden Dot safely inside plugin bounds to prevent clipping.
+--   + Fixed my_getViewport unpacking crash (returns 4 values in Lua, not 5).
+--   + Perfected macOS dynamic Bottom-Left to Top-Left coordinate normalizer.
+--   + Prompt Menu and Hidden Dot spawn safely inside plugin bounds to prevent clipping.
 
 --------------------------------------------------------------------------------
 -- INITIALIZATION & DEPENDENCIES
@@ -106,6 +106,19 @@ end
 
 local function FX_IsOverlayHidden(fx_name, fx_data)
     return FX_HasOverlay(fx_data) and not FX_IsOverlayVisible(fx_name, fx_data)
+end
+
+function adjustOverlayBounds(overlay)
+    local fxWidth, fxHeight = 800, 600
+    if overlay and overlay.circles then
+        for i, dot in ipairs(overlay.circles) do
+            if dot.x > fxWidth or dot.y > fxHeight then
+                dot.x = 10
+                dot.y = 10
+            end
+        end
+    end
+    return overlay
 end
 
 function loadOverlayFromFile(filepath)
@@ -450,9 +463,11 @@ function Open_The_Overlay_Window(track, index)
     -- macOS DYNAMIC NORMALIZER: Converts Bottom-Left origin to Universal Top-Left
     local left, top, right, bottom = raw_left, raw_top, raw_right, raw_bottom
     if is_mac and raw_top > raw_bottom then
-        local _, _, _, _, p_bottom = reaper.my_getViewport(0,0,0,0, 0,0,0,0, false)
-        top = p_bottom - raw_top
-        bottom = p_bottom - raw_bottom
+        -- Fix: my_getViewport in Lua returns exactly 4 arguments!
+        local p_left, p_top, p_right, p_bottom = reaper.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, false)
+        local screen_h = (p_bottom or 1080) - (p_top or 0)
+        top = screen_h - raw_top
+        bottom = screen_h - raw_bottom
     end
 
     local fx_width = math.abs(right - left)
