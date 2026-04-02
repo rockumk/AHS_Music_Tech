@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="49062f9fa6cb3cf1ee562211370e88d233eff94c">
+<index version="1" name="AHS_Music_Tech" commit="205d82c22eb672f5597ed7290903b1402951ea03">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -1404,6 +1404,11 @@
 + Eliminated coordinate mirroring (Mac OS proved to be Top-Down natively here).
 + Anchored Prompt inside ImGui bounds to prevent OS-level clipping.]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/49062f9fa6cb3cf1ee562211370e88d233eff94c/Scripts/FX_Graffiti_Mac.lua</source>
+      </version>
+    </reapack>
+    <reapack name="mactest.lua" type="script" desc="mactest">
+      <version name="1.1" author="Rock Kennedy" time="2026-04-02T00:42:55Z">
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/205d82c22eb672f5597ed7290903b1402951ea03/Scripts/mactest.lua</source>
       </version>
     </reapack>
     <reapack name="N2N Drum Layout Tool.lua" type="script" desc="N2N Drum Layout Tool">
