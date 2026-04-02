@@ -1,3 +1,8 @@
+--desc:mactest
+--version: .1
+--author: Rock Kennedy
+--about:
+
 local reaper = reaper
 package.path = package.path .. ";" .. reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")
