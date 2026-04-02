@@ -1,7 +1,7 @@
 --desc:mactest
---version: .1
+--version: 1.1
 --author: Rock Kennedy
---about:
+
 
 local reaper = reaper
 package.path = package.path .. ";" .. reaper.ImGui_GetBuiltinPath() .. "/?.lua"
