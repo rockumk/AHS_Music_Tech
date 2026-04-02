@@ -187,8 +187,10 @@ function Fix_Out_Of_Bounds(overlay_data, track, index)
     if not fx_window then return overlay_data end
     local ret, left, top, right, bottom = reaper.JS_Window_GetRect(fx_window)
     if not ret then return overlay_data end
+    
+    -- FIX: Use math.abs to ensure positive width and height regardless of Mac/Win coordinates!
     local overlay_width = math.abs(right - left) - 16
-    local draw_height = (bottom - top) - 38
+    local draw_height = math.abs(bottom - top) - 38
 
     for _, dot in ipairs(overlay_data.circles) do
         local w = dot.width or default_width
