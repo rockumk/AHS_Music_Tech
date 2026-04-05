@@ -1,6 +1,6 @@
 -- @description FX Graffiti
 -- @author Rock Kennedy
--- @version 1.7.2
+-- @version 1.7.3
 -- @about
 --   A ReaScript to draw and overlay custom shapes/graffiti on FX windows.
 --   Features include importing/exporting overlays, customizable shapes (circles, squares, outlines),
@@ -604,7 +604,7 @@ function Open_The_Overlay_Window(track, index)
 
     if not edit_mode then
         -- Hover detection now uses normalized Top-Left space math for both OSes
-        local mouse_in_title_bar = (os_mx >= left and os_mx <= right and math.abs(os_my - top) <= 60)
+        local mouse_in_title_bar = (os_mx >= raw_left and os_mx <= raw_right and math.abs(os_my - raw_top) <= 60)
         local prompt_hovered = reaper.ImGui_IsWindowHovered(ctx)
 
         if is_modifier_down then
