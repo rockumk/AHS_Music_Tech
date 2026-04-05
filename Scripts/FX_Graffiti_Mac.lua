@@ -1,6 +1,6 @@
 -- @description FX Graffiti
 -- @author Rock Kennedy (Mac/Cross-Platform Refactor)
--- @version 1.5.7
+-- @version 1.5.8
 -- @about
 --   A ReaScript to draw and overlay custom shapes/graffiti on FX windows.
 --   Features include importing/exporting overlays, customizable shapes (circles, squares, outlines),
@@ -1003,7 +1003,7 @@ function Open_The_Overlay_Window(track, index)
             reaper.ImGui_End(ctx)
             reaper.ImGui_PopStyleColor(ctx)
         end
-
+    end
 if show_duplicate_confirm then
             reaper.ImGui_Begin(ctx, "Duplicate Found", true, confirm_flags)
             reaper.ImGui_Text(ctx, "This FX overlay already exists: " .. duplicateFXName)
