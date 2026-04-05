@@ -604,7 +604,7 @@ function Open_The_Overlay_Window(track, index)
 
     if not edit_mode then
         -- Hover detection now uses normalized Top-Left space math for both OSes
-        local mouse_in_title_bar = (im_mx >= left and im_mx <= right and im_my >= (top - 45) and im_my <= (top + 45))
+        local mouse_in_title_bar = (im_mx >= (win_x - 10) and im_mx <= (win_x + overlay_width + 10) and im_my >= (win_y - 75) and im_my <= (win_y + 15))
         local prompt_hovered = reaper.ImGui_IsWindowHovered(ctx)
 
         if is_modifier_down then
