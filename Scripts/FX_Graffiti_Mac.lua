@@ -15,9 +15,20 @@
 -- INITIALIZATION & DEPENDENCIES
 --------------------------------------------------------------------------------
 local reaper = reaper
+
+-- DEPENDENCY CHECKS
+if not reaper.ImGui_GetBuiltinPath then
+    reaper.MB("This script requires the ReaImGui extension.\n\nPlease install it via ReaPack using this repository link:\n\nhttps://github.com/ReaTeam/Extensions/blob/master/index.xml", "Missing Dependency", 0)
+    return
+end
+
+if not reaper.JS_Window_Find then                                                                                                        
+    reaper.MB("This script requires the JS_ReaScriptAPI extension.\n\nPlease install it via ReaPack using this repository link:\n\nhttps://github.com/ReaTeam/Extensions/blob/master/index.xml", "Missing Dependency", 0)
+    return
+end
+
 package.path = package.path .. ";" .. reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")
-
 local ctx = reaper.ImGui_CreateContext("FX-Graffiti")
 local is_mac = reaper.GetOS():match("OSX") or reaper.GetOS():match("macOS")
 
@@ -585,7 +596,7 @@ function Open_The_Overlay_Window(track, index)
     end
 
     if not edit_mode then
-        local mouse_in_title_bar = (os_mx >= left and os_mx <= right and os_my >= (top - 45) and os_my <= (top + 45))
+        local mouse_in_title_bar = (im_mx >= left and im_mx <= right and im_my >= (top - 45) and im_my <= (top + 45))
         local prompt_hovered = reaper.ImGui_IsWindowHovered(ctx)
 
         if is_modifier_down then
