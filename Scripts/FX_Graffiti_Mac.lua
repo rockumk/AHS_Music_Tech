@@ -1,23 +1,35 @@
 -- @description FX Graffiti
 -- @author Rock Kennedy (Mac/Cross-Platform Refactor)
--- @version 1.6.0
+-- @version 1.6.1
 -- @about
 --   A ReaScript to draw and overlay custom shapes/graffiti on FX windows.
 --   Features include importing/exporting overlays, customizable shapes (circles, squares, outlines),
 --   opacity controls, and dynamic window tracking.
 -- @changelog
---   + Added math.abs to Fix_Out_Of_Bounds to prevent upside-down coordinates forcing everything to 10x10 on import.
+--   + Complete seamless master merge (No missing blocks/ends).
+--   + Fixed silent crash caused by 9-argument my_getViewport Lua syntax.
+--   + Replaced flaky OS modifier check with 100% reliable ReaImGui Shift-key tracking.
 --   + Restored the missing Confirmation Modals for the Import functions.
 --   + Applied macOS normalizer to JS_Window_SetPosition to prevent spontaneous plugin teleportation.
---   + Replaced global hover modifier with Shift key.
 
 --------------------------------------------------------------------------------
 -- INITIALIZATION & DEPENDENCIES
 --------------------------------------------------------------------------------
 local reaper = reaper
+
+-- DEPENDENCY CHECKS
+if not reaper.ImGui_GetBuiltinPath then
+    reaper.MB("This script requires the ReaImGui extension.\n\nPlease install it via ReaPack using this repository link:\n\nhttps://github.com/ReaTeam/Extensions/blob/master/index.xml", "Missing Dependency", 0)
+    return
+end
+
+if not reaper.JS_Window_Find then                                                                                                        
+    reaper.MB("This script requires the JS_ReaScriptAPI extension.\n\nPlease install it via ReaPack using this repository link:\n\nhttps://github.com/ReaTeam/Extensions/blob/master/index.xml", "Missing Dependency", 0)
+    return
+end
+
 package.path = package.path .. ";" .. reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")
-
 local ctx = reaper.ImGui_CreateContext("FX-Graffiti")
 local is_mac = reaper.GetOS():match("OSX") or reaper.GetOS():match("macOS")
 
@@ -175,8 +187,6 @@ function Fix_Out_Of_Bounds(overlay_data, track, index)
     
     local overlay_width, draw_height = 0, 0
     
-    -- PREFER the saved dimensions from the imported layout so we don't squish things 
-    -- before the window has a chance to resize!
     if overlay_data.fx_width and overlay_data.fx_height then
         overlay_width = overlay_data.fx_width - 16
         draw_height = overlay_data.fx_height - 38
@@ -190,8 +200,6 @@ function Fix_Out_Of_Bounds(overlay_data, track, index)
         draw_height = math.abs(bottom - top) - 38
     end
     
-    -- MAC/API FAILSAFE: If the dimensions are impossibly small (e.g. window is hidden/minimized
-    -- during the file dialogue), abort the bounds check so we don't force everything to 10x10.
     if overlay_width <= 0 or draw_height <= 0 then
         return overlay_data
     end
@@ -325,8 +333,8 @@ local function GUI_Work(visible)
         if dialog_wait_frames <= 0 then Handle_Pending_Dialog() end
         if visible then
             if reaper.ImGui_Button(ctx, "Quit") then quit_requested = true end
-            reaper.ImGui_End(ctx)
         end
+        reaper.ImGui_End(ctx)
         return false
     end
 
@@ -377,10 +385,10 @@ function FX_Found_Prep_Overlay(track, index)
                     if fx_window then
                         local ret, raw_left, raw_top, raw_right, raw_bottom = reaper.JS_Window_GetRect(fx_window)
                         if ret then
-                            -- FIXED: Dynamically normalize the coordinates here too to prevent Mac teleporting!
                             local left, top, right, bottom = raw_left, raw_top, raw_right, raw_bottom
                             if is_mac and raw_top > raw_bottom then
-                                local p_left, p_top, p_right, p_bottom = reaper.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, false)
+                                -- Safe 5-argument syntax for Lua
+                                local retval, p_left, p_top, p_right, p_bottom = reaper.my_getViewport(0, 0, 0, 0, false)
                                 local screen_h = (p_bottom or 1080) - (p_top or 0)
                                 top = screen_h - raw_top
                                 bottom = screen_h - raw_bottom
@@ -461,9 +469,8 @@ function Open_The_Overlay_Window(track, index)
     local _, fx_name = reaper.TrackFX_GetFXName(track, index, "")
     local fx_data = Load_FX_Settings(track, index)
     
-    -- FIXED: Listen for the Shift Key instead of Cmd/Opt
-    local global_modifiers = reaper.JS_Mouse_GetState(-1)
-    local is_modifier_down = (global_modifiers & 8 == 8) 
+    -- Safe cross-platform modifier tracking using native ImGui!
+    local is_modifier_down = reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Mod_Shift()) 
     local os_mx, os_my = reaper.GetMousePosition()
     
     if not track then return end
@@ -474,10 +481,10 @@ function Open_The_Overlay_Window(track, index)
     local ret, raw_left, raw_top, raw_right, raw_bottom = reaper.JS_Window_GetRect(fx_window)
     if not ret then return end
 
-    -- macOS DYNAMIC NORMALIZER: Converts Bottom-Left origin to Universal Top-Left
     local left, top, right, bottom = raw_left, raw_top, raw_right, raw_bottom
     if is_mac and raw_top > raw_bottom then
-        local p_left, p_top, p_right, p_bottom = reaper.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, false)
+        -- Safe 5-argument syntax for Lua
+        local retval, p_left, p_top, p_right, p_bottom = reaper.my_getViewport(0, 0, 0, 0, false)
         local screen_h = (p_bottom or 1080) - (p_top or 0)
         top = screen_h - raw_top
         bottom = screen_h - raw_bottom
@@ -585,7 +592,7 @@ function Open_The_Overlay_Window(track, index)
     end
 
     if not edit_mode then
-        local mouse_in_title_bar = (os_mx >= left and os_mx <= right and os_my >= (top - 45) and os_my <= (top + 45))
+        local mouse_in_title_bar = (im_mx >= left and im_mx <= right and im_my >= (top - 45) and im_my <= (top + 45))
         local prompt_hovered = reaper.ImGui_IsWindowHovered(ctx)
 
         if is_modifier_down then
@@ -600,7 +607,7 @@ function Open_The_Overlay_Window(track, index)
             local has_overlay = FX_HasOverlay(fx_data)
             local overlay_visible = FX_IsOverlayVisible(fx_name, fx_data)
 
-            reaper.ImGui_SetNextWindowPos(ctx, left + 5, top + 5)
+            reaper.ImGui_SetNextWindowPos(ctx, left, top - 5)
             reaper.ImGui_SetNextWindowSize(ctx, has_overlay and 395 or 176, 35, reaper.ImGui_Cond_Always())
             reaper.ImGui_SetNextWindowBgAlpha(ctx, 1.0)
             reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_WindowBg(), 0x000000FF)
@@ -955,7 +962,6 @@ function Open_The_Overlay_Window(track, index)
             Save_FX_Graffiti()
         end
 
-        -- RESTORED IMPORT MODALS
         local confirm_flags = reaper.ImGui_WindowFlags_AlwaysAutoResize()
         if is_topmost then confirm_flags = confirm_flags | reaper.ImGui_WindowFlags_TopMost() end
 
@@ -991,3 +997,254 @@ function Open_The_Overlay_Window(track, index)
             end
             reaper.ImGui_End(ctx)
             reaper.ImGui_PopStyleColor(ctx)
+        end
+        
+        if show_duplicate_confirm then
+            reaper.ImGui_Begin(ctx, "Duplicate Found", true, confirm_flags)
+            reaper.ImGui_Text(ctx, "This FX overlay already exists: " .. duplicateFXName)
+            if reaper.ImGui_Button(ctx, "Skip Import") then
+                show_duplicate_confirm = false
+            end
+            reaper.ImGui_SameLine(ctx)
+            if reaper.ImGui_Button(ctx, "Overwrite with Import") then
+                fx_markers[duplicateFXName] = duplicateOverlay
+                show_duplicate_confirm = false
+            end
+            local changed, tick = reaper.ImGui_Checkbox(ctx, "Do this with all duplicates found?", duplicateAllFlag)
+            duplicateAllFlag = tick
+            reaper.ImGui_End(ctx)
+        end
+
+        ----------------------------------------------------------------------------
+        -- MOUSE LOGIC
+        ----------------------------------------------------------------------------
+        local mouse_left_down = reaper.ImGui_IsMouseDown(ctx, 0)
+        local mouse_left_clicked = reaper.ImGui_IsMouseClicked(ctx, 0)
+        local mouse_left_released = reaper.ImGui_IsMouseReleased(ctx, 0)
+        local mouse_middle_clicked = reaper.ImGui_IsMouseClicked(ctx, 2)
+
+        if mouse_left_released then
+            if select_rect_active then
+                local min_x = math.min(select_rect_start_x - win_x, select_rect_end_x - win_x)
+                local max_x = math.max(select_rect_start_x - win_x, select_rect_end_x - win_x)
+                local min_y = math.min(select_rect_start_y - win_y, select_rect_end_y - win_y)
+                local max_y = math.max(select_rect_start_y - win_y, select_rect_end_y - win_y)
+                for i, circle in ipairs(fx_data.circles) do
+                    if circle.x >= min_x and circle.x <= max_x and circle.y >= min_y and circle.y <= max_y then
+                        if not ContainsDot(selected_dots, i) then
+                            table.insert(selected_dots, {index = i, dot = circle, offset_x = 0, offset_y = 0})
+                        end
+                    end
+                end
+                select_rect_active = false
+            end
+            drag_active = false
+            drag_start_x, drag_start_y = nil, nil
+            for _, sel_dot in ipairs(selected_dots) do sel_dot.orig_x, sel_dot.orig_y = nil, nil end
+        end
+
+        if mouse_left_clicked then
+            ui_area_start_y_abs = win_y + (fx_height - UI_AREA_START_Y_REL)
+            local mouse_in_ui_area = (im_my >= ui_area_start_y_abs)
+            if not reaper.ImGui_IsAnyItemHovered(ctx) and not mouse_in_ui_area then
+                local rel_x, rel_y = im_mx - win_x, im_my - win_y
+                local candidates = {}
+                for i, circle in ipairs(fx_data.circles) do
+                    local left_bound = circle.x - (circle.width or default_width) / 2
+                    local right_bound = circle.x + (circle.width or default_width) / 2
+                    local top_bound = circle.y - (circle.height or default_height) / 2
+                    local bottom_bound = circle.y + (circle.height or default_height) / 2
+                    if rel_x >= left_bound and rel_x <= right_bound and rel_y >= top_bound and rel_y <= bottom_bound then
+                        table.insert(candidates, {index = i, dot = circle, distance = math.sqrt((circle.x - rel_x)^2 + (circle.y - rel_y)^2)})
+                    end
+                end
+                if #candidates > 0 then
+                    table.sort(candidates, function(a, b) return a.distance < b.distance end)
+                    local closest = candidates[1]
+                    closest.offset_x, closest.offset_y = rel_x - closest.dot.x, rel_y - closest.dot.y
+                    if is_shift_down then
+                        if not ContainsDot(selected_dots, closest.index) then table.insert(selected_dots, closest) end
+                    else
+                        selected_dots = {closest}
+                    end
+                    for _, sel_dot in ipairs(selected_dots) do sel_dot.orig_x, sel_dot.orig_y = nil, nil end
+                    drag_active = false
+                    drag_start_x, drag_start_y = im_mx, im_my
+                else
+                    drag_active, select_rect_active = false, true
+                    select_rect_start_x, select_rect_start_y = im_mx, im_my
+                    select_rect_end_x, select_rect_end_y = im_mx, im_my
+                    if not is_shift_down then selected_dots = {} end
+                end
+            end
+        end
+
+        if #selected_dots > 0 and mouse_left_down and not select_rect_active then
+            if (im_my - win_y) < (fx_height - 38) then
+                if not drag_active and drag_start_x and drag_start_y then
+                    if math.sqrt((im_mx - drag_start_x)^2 + (im_my - drag_start_y)^2) > 5 then drag_active = true end
+                end
+                if drag_active then
+                    if is_alt_down_edit and not selected_dots[1].duplicated then
+                        local new_dots = {}
+                        for _, sel_dot in ipairs(selected_dots) do
+                            local dup_dot = { x = sel_dot.dot.x, y = sel_dot.dot.y, color = sel_dot.dot.color, shape = sel_dot.dot.shape, width = sel_dot.dot.width, height = sel_dot.dot.height, thickness = sel_dot.dot.thickness }
+                            table.insert(fx_data.circles, dup_dot)
+                            table.insert(new_dots, {index = #fx_data.circles, dot = dup_dot, offset_x = sel_dot.offset_x, offset_y = sel_dot.offset_y, duplicated = true})
+                        end
+                        selected_dots = new_dots
+                        Save_FX_Graffiti()
+                    elseif drag_start_x and drag_start_y then
+                        for _, sel_dot in ipairs(selected_dots) do
+                            if not sel_dot.orig_x then sel_dot.orig_x, sel_dot.orig_y = sel_dot.dot.x, sel_dot.dot.y end
+                            sel_dot.dot.x = sel_dot.orig_x + (im_mx - drag_start_x)
+                            sel_dot.dot.y = sel_dot.orig_y + (im_my - drag_start_y)
+                        end
+                        Save_FX_Graffiti()
+                    end
+                end
+            end
+        end
+
+        if mouse_middle_clicked and (im_my - win_y) < (fx_height - 38) then
+            table.insert(fx_data.circles, {
+                x = im_mx - win_x, y = im_my - win_y,
+                color = selected_color, shape = selected_shape,
+                width = default_width, height = default_height,
+                thickness = (selected_shape:match("outlined")) and 2 or nil
+            })
+            if #selected_dots > 0 then selected_dots = {} end
+            Save_FX_Graffiti()
+        end
+
+        if #selected_dots > 0 then
+            Handle_Dot_Graffiti_Movement()
+            
+            if reaper.ImGui_IsKeyPressed(ctx, reaper.ImGui_Key_Delete()) or reaper.ImGui_IsKeyPressed(ctx, reaper.ImGui_Key_Backspace()) then
+                local indices = {}
+                for _, sel_dot in ipairs(selected_dots) do table.insert(indices, sel_dot.index) end
+                table.sort(indices, function(a, b) return a > b end)
+                for _, idx in ipairs(indices) do table.remove(fx_data.circles, idx) end
+                selected_dots = {}
+                Save_FX_Graffiti()
+            end
+            
+            local mouse_wheel = reaper.ImGui_GetMouseWheel(ctx) or 0
+            if mouse_wheel ~= 0 then
+                for _, sel_dot in ipairs(selected_dots) do
+                    if is_shift_down then sel_dot.dot.height = math.max(5, sel_dot.dot.height + mouse_wheel)
+                    elseif is_alt_down_edit then sel_dot.dot.width = math.max(5, sel_dot.dot.width + mouse_wheel)
+                    else
+                        sel_dot.dot.width = math.max(5, sel_dot.dot.width + mouse_wheel)
+                        sel_dot.dot.height = math.max(5, sel_dot.dot.height + mouse_wheel)
+                    end
+                end
+                Save_FX_Graffiti()
+            end
+        end
+    end
+
+    reaper.ImGui_End(ctx)
+    reaper.ImGui_PopStyleColor(ctx)
+    
+    local overlay_hwnd_again = reaper.JS_Window_Find("FX Overlay Window", true)
+    if overlay_hwnd_again and not overlay_initialized then
+        reaper.JS_Window_SetStyle(overlay_hwnd_again, "WS_EX_NOACTIVATE")
+        reaper.JS_Window_SetOpacity(overlay_hwnd_again, 0.8, 0)
+        overlay_initialized = true
+    end
+
+    if not open_state then
+        overlay_active, last_track, last_index, selected_dots = false, nil, nil, {}
+        overlay_initialized = false
+    end
+end
+
+--------------------------------------------------------------------------------
+-- FILE I/O & SERIALIZATION
+--------------------------------------------------------------------------------
+function Serialize_Table(val, name, skipnewlines, depth)
+    skipnewlines = skipnewlines or false
+    depth = depth or 0
+    local indent = string.rep(" ", depth)
+    local tmp = ""
+    if name then
+        if type(name) == "string" and string.match(name, "^[a-zA-Z_][a-zA-Z0-9_]*$") then
+            tmp = indent .. name .. " = "
+        elseif type(name) == "string" then
+            tmp = indent .. string.format("[%q] = ", name)
+        else
+            tmp = indent .. "[" .. tostring(name) .. "] = "
+        end
+    else
+        tmp = indent
+    end
+
+    if type(val) == "table" then
+        tmp = tmp .. "{" .. (not skipnewlines and "\n" or "")
+        for k, v in pairs(val) do
+            tmp = tmp .. Serialize_Table(v, k, skipnewlines, depth + 2) .. "," .. (not skipnewlines and "\n" or "")
+        end
+        tmp = tmp .. indent .. "}"
+    elseif type(val) == "number" or type(val) == "boolean" then
+        tmp = tmp .. tostring(val)
+    elseif type(val) == "string" then
+        tmp = tmp .. string.format("%q", val)
+    else
+        tmp = tmp .. '"[inserializeable datatype:' .. type(val) .. ']"'
+    end
+    return tmp
+end
+
+function Save_FX_Graffiti()
+    local file = io.open(marker_filename, "w")
+    if file then
+        file:write("return " .. Serialize_Table(fx_markers))
+        file:close()
+    end
+end
+
+--------------------------------------------------------------------------------
+-- STARTUP EXECUTION
+--------------------------------------------------------------------------------
+local function Check_For_Restart(restart_required)
+    if restart_required then
+        RestartScript()
+        return true
+    end
+    return false
+end
+
+local function Check_For_Continue(open_state)
+    if open_state then
+        reaper.defer(The_Main_Loop)
+    else
+        Cleanup()
+    end
+end
+
+function RestartScript()
+    local info = debug.getinfo(1, "S")
+    local source = info.source
+    if source:sub(1, 1) == "@" then
+        local script_path = source:sub(2)
+        reaper.defer(function()
+            dofile(script_path)
+        end)
+    end
+end
+
+function The_Main_Loop()
+    if Check_For_Quit() then return end
+    local visible, open_state = Initialize_Overlay_Window()
+    if not visible then reaper.ImGui_End(ctx); return end
+    local restart_required = GUI_Work(visible)
+    if Check_For_Restart(restart_required) then return end
+    Check_For_Continue(open_state)
+end
+
+reaper.RecursiveCreateDirectory(data_folder, 0)
+reaper.RecursiveCreateDirectory(overlays_folder, 0)
+Load_FX_Dots_and_Graffiti()
+reaper.atexit(Cleanup)
+The_Main_Loop()
