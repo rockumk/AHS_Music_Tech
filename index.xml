@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="b6852dab1c9d7d149d93f8d4e3d9f0b539f3f8b7">
+<index version="1" name="AHS_Music_Tech" commit="738746971fb2857a40307be3740599f4c8cf2fa2">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -1506,6 +1506,12 @@
 + Perfected macOS dynamic Bottom-Left to Top-Left coordinate normalizer.
 + Prompt Menu and Hidden Dot spawn safely inside plugin bounds to prevent clipping.]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/b6852dab1c9d7d149d93f8d4e3d9f0b539f3f8b7/Scripts/FX_Graffiti_Mac.lua</source>
+      </version>
+      <version name="1.6.4" author="Rock Kennedy" time="2026-04-05T06:04:54Z">
+        <changelog><![CDATA[+ Fixed my_getViewport unpacking crash (returns 4 values in Lua, not 5).
++ Perfected macOS dynamic Bottom-Left to Top-Left coordinate normalizer.
++ Prompt Menu and Hidden Dot spawn safely inside plugin bounds to prevent clipping.]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/738746971fb2857a40307be3740599f4c8cf2fa2/Scripts/FX_Graffiti_Mac.lua</source>
       </version>
     </reapack>
     <reapack name="mactest.lua" type="script" desc="mactest">
