@@ -1,22 +1,19 @@
 -- @description FX Graffiti
--- @author Rock Kennedy (Mac/Cross-Platform Refactor)
--- @version 1.6.1
+-- @author Rock Kennedy (Mac/Cross-Platform Refactor v1.4.5)
+-- @version 1.6.3
 -- @about
 --   A ReaScript to draw and overlay custom shapes/graffiti on FX windows.
 --   Features include importing/exporting overlays, customizable shapes (circles, squares, outlines),
 --   opacity controls, and dynamic window tracking.
 -- @changelog
---   + Complete seamless master merge (No missing blocks/ends).
---   + Fixed silent crash caused by 9-argument my_getViewport Lua syntax.
---   + Replaced flaky OS modifier check with 100% reliable ReaImGui Shift-key tracking.
---   + Restored the missing Confirmation Modals for the Import functions.
---   + Applied macOS normalizer to JS_Window_SetPosition to prevent spontaneous plugin teleportation.
+--   + Fixed my_getViewport unpacking crash (returns 4 values in Lua, not 5).
+--   + Perfected macOS dynamic Bottom-Left to Top-Left coordinate normalizer.
+--   + Prompt Menu and Hidden Dot spawn safely inside plugin bounds to prevent clipping.
 
 --------------------------------------------------------------------------------
 -- INITIALIZATION & DEPENDENCIES
 --------------------------------------------------------------------------------
 local reaper = reaper
-
 -- DEPENDENCY CHECKS
 if not reaper.ImGui_GetBuiltinPath then
     reaper.MB("This script requires the ReaImGui extension.\n\nPlease install it via ReaPack using this repository link:\n\nhttps://github.com/ReaTeam/Extensions/blob/master/index.xml", "Missing Dependency", 0)
@@ -28,8 +25,12 @@ if not reaper.JS_Window_Find then
     return
 end
 
+
+
+
 package.path = package.path .. ";" .. reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")
+
 local ctx = reaper.ImGui_CreateContext("FX-Graffiti")
 local is_mac = reaper.GetOS():match("OSX") or reaper.GetOS():match("macOS")
 
@@ -121,6 +122,19 @@ local function FX_IsOverlayHidden(fx_name, fx_data)
     return FX_HasOverlay(fx_data) and not FX_IsOverlayVisible(fx_name, fx_data)
 end
 
+function adjustOverlayBounds(overlay)
+    local fxWidth, fxHeight = 800, 600
+    if overlay and overlay.circles then
+        for i, dot in ipairs(overlay.circles) do
+            if dot.x > fxWidth or dot.y > fxHeight then
+                dot.x = 10
+                dot.y = 10
+            end
+        end
+    end
+    return overlay
+end
+
 function loadOverlayFromFile(filepath)
     local f = io.open(filepath, "r")
     if not f then return nil end
@@ -181,12 +195,13 @@ function importOverlay()
     end
 end
 
--- FIXED: Wrapped coordinates in math.abs() to handle Mac inversions!
 function Fix_Out_Of_Bounds(overlay_data, track, index)
     if not overlay_data or not overlay_data.circles or not track or not index then return overlay_data end
     
     local overlay_width, draw_height = 0, 0
     
+    -- PREFER the saved dimensions from the imported layout so we don't squish things 
+    -- before the window has a chance to resize!
     if overlay_data.fx_width and overlay_data.fx_height then
         overlay_width = overlay_data.fx_width - 16
         draw_height = overlay_data.fx_height - 38
@@ -200,6 +215,8 @@ function Fix_Out_Of_Bounds(overlay_data, track, index)
         draw_height = math.abs(bottom - top) - 38
     end
     
+    -- MAC/API FAILSAFE: If the dimensions are impossibly small (e.g. window is hidden/minimized
+    -- during the file dialogue), abort the bounds check so we don't force everything to 10x10.
     if overlay_width <= 0 or draw_height <= 0 then
         return overlay_data
     end
@@ -333,8 +350,8 @@ local function GUI_Work(visible)
         if dialog_wait_frames <= 0 then Handle_Pending_Dialog() end
         if visible then
             if reaper.ImGui_Button(ctx, "Quit") then quit_requested = true end
+            reaper.ImGui_End(ctx)
         end
-        reaper.ImGui_End(ctx)
         return false
     end
 
@@ -347,7 +364,7 @@ local function GUI_Work(visible)
         end
         if reaper.ImGui_Button(ctx, "Quit") then quit_requested = true end
         reaper.ImGui_PushTextWrapPos(ctx, 0)
-        reaper.ImGui_Text(ctx, "Hover near an FX window title bar and hold down 'Shift' to get started.")
+        reaper.ImGui_Text(ctx, "Hover near an FX window title bar and hold down 'Opt/Alt' (or Cmd/Ctrl) to get started.")
         reaper.ImGui_PopTextWrapPos(ctx)
     end
 
@@ -383,18 +400,11 @@ function FX_Found_Prep_Overlay(track, index)
                 if fx_data and fx_data.fx_width and fx_data.fx_height and not edit_mode then
                     local fx_window = reaper.TrackFX_GetFloatingWindow(track, index)
                     if fx_window then
-                        local ret, raw_left, raw_top, raw_right, raw_bottom = reaper.JS_Window_GetRect(fx_window)
+                        local ret, left, top, right, bottom = reaper.JS_Window_GetRect(fx_window)
                         if ret then
-                            local left, top, right, bottom = raw_left, raw_top, raw_right, raw_bottom
-                            if is_mac and raw_top > raw_bottom then
-                                -- Safe 5-argument syntax for Lua
-                                local retval, p_left, p_top, p_right, p_bottom = reaper.my_getViewport(0, 0, 0, 0, false)
-                                local screen_h = (p_bottom or 1080) - (p_top or 0)
-                                top = screen_h - raw_top
-                                bottom = screen_h - raw_bottom
-                            end
                             local cur_w, cur_h = math.abs(right - left), math.abs(bottom - top)
                             if math.abs(cur_w - fx_data.fx_width) > 2 or math.abs(cur_h - fx_data.fx_height) > 2 then
+                                -- Raw JS_Window coords are safe for internal JS resizing
                                 reaper.JS_Window_SetPosition(fx_window, left, top, fx_data.fx_width, fx_data.fx_height)
                             end
                         end
@@ -469,8 +479,8 @@ function Open_The_Overlay_Window(track, index)
     local _, fx_name = reaper.TrackFX_GetFXName(track, index, "")
     local fx_data = Load_FX_Settings(track, index)
     
-    -- Safe cross-platform modifier tracking using native ImGui!
-    local is_modifier_down = reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Mod_Shift()) 
+    local global_modifiers = reaper.JS_Mouse_GetState(0xFF)
+    local is_modifier_down = (global_modifiers & 8 == 8)
     local os_mx, os_my = reaper.GetMousePosition()
     
     if not track then return end
@@ -481,10 +491,11 @@ function Open_The_Overlay_Window(track, index)
     local ret, raw_left, raw_top, raw_right, raw_bottom = reaper.JS_Window_GetRect(fx_window)
     if not ret then return end
 
+    -- macOS DYNAMIC NORMALIZER: Converts Bottom-Left origin to Universal Top-Left
     local left, top, right, bottom = raw_left, raw_top, raw_right, raw_bottom
     if is_mac and raw_top > raw_bottom then
-        -- Safe 5-argument syntax for Lua
-        local retval, p_left, p_top, p_right, p_bottom = reaper.my_getViewport(0, 0, 0, 0, false)
+        -- Fix: my_getViewport in Lua returns exactly 4 arguments!
+        local p_left, p_top, p_right, p_bottom = reaper.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, false)
         local screen_h = (p_bottom or 1080) - (p_top or 0)
         top = screen_h - raw_top
         bottom = screen_h - raw_bottom
@@ -592,6 +603,7 @@ function Open_The_Overlay_Window(track, index)
     end
 
     if not edit_mode then
+        -- Hover detection now uses normalized Top-Left space math for both OSes
         local mouse_in_title_bar = (im_mx >= left and im_mx <= right and im_my >= (top - 45) and im_my <= (top + 45))
         local prompt_hovered = reaper.ImGui_IsWindowHovered(ctx)
 
@@ -607,6 +619,7 @@ function Open_The_Overlay_Window(track, index)
             local has_overlay = FX_HasOverlay(fx_data)
             local overlay_visible = FX_IsOverlayVisible(fx_name, fx_data)
 
+            -- Spawn Prompt safely inside top-left bounds to avoid clipping
             reaper.ImGui_SetNextWindowPos(ctx, left, top - 5)
             reaper.ImGui_SetNextWindowSize(ctx, has_overlay and 395 or 176, 35, reaper.ImGui_Cond_Always())
             reaper.ImGui_SetNextWindowBgAlpha(ctx, 1.0)
@@ -696,7 +709,8 @@ function Open_The_Overlay_Window(track, index)
                           reaper.ImGui_WindowFlags_NoBackground()
         if is_topmost then dot_flags = dot_flags | reaper.ImGui_WindowFlags_TopMost() end
 
-        reaper.ImGui_SetNextWindowPos(ctx, left + 5, top + 5)
+        -- Spawn hidden dot safely inside top-left bounds
+        reaper.ImGui_SetNextWindowPos(ctx, left, top - 5)
         reaper.ImGui_SetNextWindowSize(ctx, 18, 18)
 
         local dot_visible = reaper.ImGui_Begin(ctx, "##HiddenOverlayDot_" .. tostring(fx_name), true, dot_flags)
@@ -776,7 +790,7 @@ function Open_The_Overlay_Window(track, index)
         if reaper.ImGui_Button(ctx, "?", 27) then reaper.ImGui_OpenPopup(ctx, "FX Graffiti Help") end
 
         if reaper.ImGui_BeginPopupModal(ctx, "FX Graffiti Help", true, reaper.ImGui_WindowFlags_AlwaysAutoResize()) then
-            reaper.ImGui_Text(ctx, "FX Graffiti Help\n\n- Hold Shift over FX title bar to enter Edit Mode.\n- Middle click to draw.\n- Left click/drag to select and move.\n- Arrow keys nudge.\n- Delete key to remove.\n- Mouse wheel resizes (Shift=Height, Alt=Width).")
+            reaper.ImGui_Text(ctx, "FX Graffiti Help\n\n- Hold Opt/Cmd over FX title bar to enter Edit Mode.\n- Middle click to draw.\n- Left click/drag to select and move.\n- Arrow keys nudge.\n- Delete key to remove.\n- Mouse wheel resizes (Shift=Height, Alt=Width).")
             if reaper.ImGui_Button(ctx, "Close", 80, 24) then reaper.ImGui_CloseCurrentPopup(ctx) end
             reaper.ImGui_EndPopup(ctx)
         end
@@ -962,62 +976,7 @@ function Open_The_Overlay_Window(track, index)
             Save_FX_Graffiti()
         end
 
-        local confirm_flags = reaper.ImGui_WindowFlags_AlwaysAutoResize()
-        if is_topmost then confirm_flags = confirm_flags | reaper.ImGui_WindowFlags_TopMost() end
-
-        if show_import_confirm then
-            reaper.ImGui_Begin(ctx, "Confirm Import", true, confirm_flags)
-            reaper.ImGui_Text(ctx, "Your current overlay will be lost. Proceed?")
-            if reaper.ImGui_Button(ctx, "Yes") then
-                pending_dialog = "import"
-                dialog_wait_frames = 2
-                show_import_confirm = false
-            end
-            reaper.ImGui_SameLine(ctx)
-            if reaper.ImGui_Button(ctx, "Cancel") then show_import_confirm = false end
-            reaper.ImGui_End(ctx)
-        end
-
-        if show_overlay_choice then
-            reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_WindowBg(), 0x000000FF)
-            reaper.ImGui_Begin(ctx, "Select Overlay", true, confirm_flags)
-            reaper.ImGui_Text(ctx, "Choose a layout to import or cancel:")
-            for fxName, overlay in pairs(overlayChoiceData) do
-                if reaper.ImGui_Button(ctx, fxName) then
-                    fx_markers[currentFXName or "ImportedOverlay"] = Fix_Out_Of_Bounds(overlay, last_track, last_index)
-                    Save_FX_Graffiti()
-                    show_overlay_choice = false
-                    overlayChoiceData = nil
-                end
-            end
-            reaper.ImGui_Separator(ctx)
-            if reaper.ImGui_Button(ctx, "Cancel") then
-                show_overlay_choice = false
-                overlayChoiceData = nil
-            end
-            reaper.ImGui_End(ctx)
-            reaper.ImGui_PopStyleColor(ctx)
-        end
-        
-        if show_duplicate_confirm then
-            reaper.ImGui_Begin(ctx, "Duplicate Found", true, confirm_flags)
-            reaper.ImGui_Text(ctx, "This FX overlay already exists: " .. duplicateFXName)
-            if reaper.ImGui_Button(ctx, "Skip Import") then
-                show_duplicate_confirm = false
-            end
-            reaper.ImGui_SameLine(ctx)
-            if reaper.ImGui_Button(ctx, "Overwrite with Import") then
-                fx_markers[duplicateFXName] = duplicateOverlay
-                show_duplicate_confirm = false
-            end
-            local changed, tick = reaper.ImGui_Checkbox(ctx, "Do this with all duplicates found?", duplicateAllFlag)
-            duplicateAllFlag = tick
-            reaper.ImGui_End(ctx)
-        end
-
-        ----------------------------------------------------------------------------
         -- MOUSE LOGIC
-        ----------------------------------------------------------------------------
         local mouse_left_down = reaper.ImGui_IsMouseDown(ctx, 0)
         local mouse_left_clicked = reaper.ImGui_IsMouseClicked(ctx, 0)
         local mouse_left_released = reaper.ImGui_IsMouseReleased(ctx, 0)
@@ -1146,17 +1105,9 @@ function Open_The_Overlay_Window(track, index)
 
     reaper.ImGui_End(ctx)
     reaper.ImGui_PopStyleColor(ctx)
-    
-    local overlay_hwnd_again = reaper.JS_Window_Find("FX Overlay Window", true)
-    if overlay_hwnd_again and not overlay_initialized then
-        reaper.JS_Window_SetStyle(overlay_hwnd_again, "WS_EX_NOACTIVATE")
-        reaper.JS_Window_SetOpacity(overlay_hwnd_again, 0.8, 0)
-        overlay_initialized = true
-    end
 
     if not open_state then
         overlay_active, last_track, last_index, selected_dots = false, nil, nil, {}
-        overlay_initialized = false
     end
 end
 
@@ -1207,40 +1158,12 @@ end
 --------------------------------------------------------------------------------
 -- STARTUP EXECUTION
 --------------------------------------------------------------------------------
-local function Check_For_Restart(restart_required)
-    if restart_required then
-        RestartScript()
-        return true
-    end
-    return false
-end
-
-local function Check_For_Continue(open_state)
-    if open_state then
-        reaper.defer(The_Main_Loop)
-    else
-        Cleanup()
-    end
-end
-
-function RestartScript()
-    local info = debug.getinfo(1, "S")
-    local source = info.source
-    if source:sub(1, 1) == "@" then
-        local script_path = source:sub(2)
-        reaper.defer(function()
-            dofile(script_path)
-        end)
-    end
-end
-
 function The_Main_Loop()
     if Check_For_Quit() then return end
     local visible, open_state = Initialize_Overlay_Window()
-    if not visible then reaper.ImGui_End(ctx); return end
-    local restart_required = GUI_Work(visible)
-    if Check_For_Restart(restart_required) then return end
-    Check_For_Continue(open_state)
+    if not visible then return end
+    if GUI_Work(visible) then return The_Main_Loop() end
+    if open_state then reaper.defer(The_Main_Loop) else Cleanup() end
 end
 
 reaper.RecursiveCreateDirectory(data_folder, 0)
