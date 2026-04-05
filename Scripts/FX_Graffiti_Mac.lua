@@ -1,6 +1,6 @@
 -- @description FX Graffiti
 -- @author Rock Kennedy (Mac/Cross-Platform Refactor)
--- @version 1.4.8
+-- @version 1.4.9
 -- @about
 --   A ReaScript to draw and overlay custom shapes/graffiti on FX windows.
 --   Features include importing/exporting overlays, customizable shapes (circles, squares, outlines),
@@ -172,13 +172,29 @@ end
 -- FIXED: Wrapped coordinates in math.abs() to handle Mac inversions!
 function Fix_Out_Of_Bounds(overlay_data, track, index)
     if not overlay_data or not overlay_data.circles or not track or not index then return overlay_data end
-    local fx_window = reaper.TrackFX_GetFloatingWindow(track, index)
-    if not fx_window then return overlay_data end
-    local ret, left, top, right, bottom = reaper.JS_Window_GetRect(fx_window)
-    if not ret then return overlay_data end
     
-    local overlay_width = math.abs(right - left) - 16
-    local draw_height = math.abs(bottom - top) - 38
+    local overlay_width, draw_height = 0, 0
+    
+    -- PREFER the saved dimensions from the imported layout so we don't squish things 
+    -- before the window has a chance to resize!
+    if overlay_data.fx_width and overlay_data.fx_height then
+        overlay_width = overlay_data.fx_width - 16
+        draw_height = overlay_data.fx_height - 38
+    else
+        local fx_window = reaper.TrackFX_GetFloatingWindow(track, index)
+        if not fx_window then return overlay_data end
+        local ret, left, top, right, bottom = reaper.JS_Window_GetRect(fx_window)
+        if not ret then return overlay_data end
+        
+        overlay_width = math.abs(right - left) - 16
+        draw_height = math.abs(bottom - top) - 38
+    end
+    
+    -- MAC/API FAILSAFE: If the dimensions are impossibly small (e.g. window is hidden/minimized
+    -- during the file dialogue), abort the bounds check so we don't force everything to 10x10.
+    if overlay_width <= 0 or draw_height <= 0 then
+        return overlay_data
+    end
 
     for _, dot in ipairs(overlay_data.circles) do
         local w = dot.width or default_width
