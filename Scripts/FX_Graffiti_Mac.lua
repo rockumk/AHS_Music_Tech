@@ -1,14 +1,14 @@
 -- @description FX Graffiti
 -- @author Rock Kennedy
--- @version 1.6.5
+-- @version 1.6.6
 -- @about
 --   A ReaScript to draw and overlay custom shapes/graffiti on FX windows.
 --   Features include importing/exporting overlays, customizable shapes (circles, squares, outlines),
 --   opacity controls, and dynamic window tracking.
 -- @changelog
---   + Relaxed out-of-bounds checking to prevent unintentional layout resets.
---   + Fixed macOS mouse coordinate inversion causing the hover prompt to only trigger near screen center.
---   + Updated instructions to accurately reflect 'Shift' key requirement.
+--   + Fixed my_getViewport unpacking crash (returns 4 values in Lua, not 5).
+--   + Perfected macOS dynamic Bottom-Left to Top-Left coordinate normalizer.
+--   + Prompt Menu and Hidden Dot spawn safely inside plugin bounds to prevent clipping.
 
 --------------------------------------------------------------------------------
 -- INITIALIZATION & DEPENDENCIES
@@ -126,7 +126,7 @@ function adjustOverlayBounds(overlay)
     local fxWidth, fxHeight = 800, 600
     if overlay and overlay.circles then
         for i, dot in ipairs(overlay.circles) do
-            if dot.x < -150 or dot.x > fxWidth + 150 or dot.y < -150 or dot.y > fxHeight + 150 then
+            if dot.x < -250 or dot.x > fxWidth + 250 or dot.y < -250 or dot.y > fxHeight + 250 then
                 dot.x = 10
                 dot.y = 10
             end
@@ -224,7 +224,7 @@ function Fix_Out_Of_Bounds(overlay_data, track, index)
     for _, dot in ipairs(overlay_data.circles) do
         local w = dot.width or default_width
         local h = dot.height or default_height
-        if dot.x < -150 or dot.x > overlay_width + 150 or dot.y < -150 or dot.y > draw_height + 150 then
+        if dot.x < -250 or dot.x > overlay_width + 250 or dot.y < -250 or dot.y > draw_height + 250 then
             dot.x = 10
             dot.y = 10
         end
@@ -364,7 +364,7 @@ local function GUI_Work(visible)
         end
         if reaper.ImGui_Button(ctx, "Quit") then quit_requested = true end
         reaper.ImGui_PushTextWrapPos(ctx, 0)
-        reaper.ImGui_Text(ctx, "Hover near an FX window title bar and hold down 'Shift' to get started.")
+        reaper.ImGui_Text(ctx, "Hover near an FX window title bar and hold down 'Opt/Alt' (or Cmd/Ctrl) to get started.")
         reaper.ImGui_PopTextWrapPos(ctx)
     end
 
@@ -481,6 +481,7 @@ function Open_The_Overlay_Window(track, index)
     
     local global_modifiers = reaper.JS_Mouse_GetState(0xFF)
     local is_modifier_down = (global_modifiers & 8 == 8)
+    local os_mx, os_my = reaper.GetMousePosition()
     
     if not track then return end
 
@@ -603,7 +604,7 @@ function Open_The_Overlay_Window(track, index)
 
     if not edit_mode then
         -- Hover detection now uses normalized Top-Left space math for both OSes
-        local mouse_in_title_bar = (im_mx >= left and im_mx <= right and im_my >= (top - 45) and im_my <= (top + 45))
+        local mouse_in_title_bar = (os_mx >= left and os_mx <= right and os_my >= (top - 45) and os_my <= (top + 45))
         local prompt_hovered = reaper.ImGui_IsWindowHovered(ctx)
 
         if is_modifier_down then
@@ -789,7 +790,7 @@ function Open_The_Overlay_Window(track, index)
         if reaper.ImGui_Button(ctx, "?", 27) then reaper.ImGui_OpenPopup(ctx, "FX Graffiti Help") end
 
         if reaper.ImGui_BeginPopupModal(ctx, "FX Graffiti Help", true, reaper.ImGui_WindowFlags_AlwaysAutoResize()) then
-            reaper.ImGui_Text(ctx, "FX Graffiti Help\n\n- Hold Shift over FX title bar to enter Edit Mode.\n- Middle click to draw.\n- Left click/drag to select and move.\n- Arrow keys nudge.\n- Delete key to remove.\n- Mouse wheel resizes (Shift=Height, Alt=Width).")
+            reaper.ImGui_Text(ctx, "FX Graffiti Help\n\n- Hold Opt/Cmd over FX title bar to enter Edit Mode.\n- Middle click to draw.\n- Left click/drag to select and move.\n- Arrow keys nudge.\n- Delete key to remove.\n- Mouse wheel resizes (Shift=Height, Alt=Width).")
             if reaper.ImGui_Button(ctx, "Close", 80, 24) then reaper.ImGui_CloseCurrentPopup(ctx) end
             reaper.ImGui_EndPopup(ctx)
         end
