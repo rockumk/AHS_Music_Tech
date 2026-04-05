@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="e41014097d4fdda92e264de455eb458dd8f12804">
+<index version="1" name="AHS_Music_Tech" commit="2fa678afa3cbf8bee4a1bb9fbff715b6a751ab93">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -1471,6 +1471,13 @@
 + Applied macOS normalizer to JS_Window_SetPosition to prevent spontaneous plugin teleportation.
 + Replaced global hover modifier with Shift key.]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/e41014097d4fdda92e264de455eb458dd8f12804/Scripts/FX_Graffiti_Mac.lua</source>
+      </version>
+      <version name="1.5.8" author="Rock Kennedy (Mac/Cross-Platform Refactor)" time="2026-04-05T04:52:26Z">
+        <changelog><![CDATA[+ Added math.abs to Fix_Out_Of_Bounds to prevent upside-down coordinates forcing everything to 10x10 on import.
++ Restored the missing Confirmation Modals for the Import functions.
++ Applied macOS normalizer to JS_Window_SetPosition to prevent spontaneous plugin teleportation.
++ Replaced global hover modifier with Shift key.]]></changelog>
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/2fa678afa3cbf8bee4a1bb9fbff715b6a751ab93/Scripts/FX_Graffiti_Mac.lua</source>
       </version>
     </reapack>
     <reapack name="mactest.lua" type="script" desc="mactest">
