@@ -1,6 +1,6 @@
 -- @description FX Graffiti
 -- @author Rock Kennedy
--- @version 1.1.1
+-- @version 1.1.2
 -- @about
 --   A ReaScript to draw and overlay custom shapes/graffiti on FX windows.
 --   Features include importing/exporting overlays, customizable shapes (circles, squares, outlines),
@@ -14,6 +14,22 @@
 -- INITIALIZATION & DEPENDENCIES
 --------------------------------------------------------------------------------
 local reaper = reaper
+
+local reaper = reaper
+-- DEPENDENCY CHECKS
+if not reaper.ImGui_GetBuiltinPath then
+    reaper.MB("This script requires the ReaImGui extension.\n\nPlease install it via ReaPack using this repository link:\n\nhttps://github.com/ReaTeam/Extensions/blob/master/index.xml", "Missing Dependency", 0)
+    return
+end
+
+if not reaper.JS_Window_Find then                                                                                                        
+    reaper.MB("This script requires the JS_ReaScriptAPI extension.\n\nPlease install it via ReaPack using this repository link:\n\nhttps://github.com/ReaTeam/Extensions/blob/master/index.xml", "Missing Dependency", 0)
+    return
+end
+
+
+
+
 package.path = package.path .. ";" .. reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")
 
