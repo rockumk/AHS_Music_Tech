@@ -1,5 +1,5 @@
 -- @description N2N Drum System
--- @version 1.9
+-- @version 2.0
 
 local script_path = debug.getinfo(1, "S").source:match("@(.*[\\/])")
 package.path = package.path .. ";" .. script_path .. "?.lua"
@@ -21,9 +21,10 @@ local TXT_MATCH_THRESHOLD = 60
 local EXTSTATE_SECTION = "N2N_Drum_System"
 local EXTSTATE_OUTPUT_NAME = "MidiOutputName"
 local EXTSTATE_MANUAL_MODE = "ManualMode"
+local EXTSTATE_MODEL = "Model"
 
 local WINDOW_W = 700
-local WINDOW_H = 360
+local WINDOW_H = 410
 --------------------------------------------------
 
 local watched_tracks = {}
@@ -38,6 +39,7 @@ local trigger_device_init_sequence
 local MIDI_OUTPUT_INDEX = nil
 local MIDI_OUTPUT_NAME = nil
 local manual_midi_mode = false
+local selected_model = "M" -- Default to Mini
 
 local ui_state = "MAIN" -- "MAIN", "PROMPT", "CLOSED"
 local sysex_queue = {}
@@ -163,11 +165,22 @@ local function save_selected_output(name)
     reaper.SetExtState(EXTSTATE_SECTION, EXTSTATE_OUTPUT_NAME, name or "", true)
 end
 
+
+
 local function load_saved_output()
     local saved_mode = reaper.GetExtState(EXTSTATE_SECTION, EXTSTATE_MANUAL_MODE)
     manual_midi_mode = (saved_mode == "1")
 
+    local saved_model = reaper.GetExtState(EXTSTATE_SECTION, EXTSTATE_MODEL)
+    if saved_model == "M" or saved_model == "X" or saved_model == "P" or saved_model == "K" then
+        selected_model = saved_model
+    end
+
     local saved_name = reaper.GetExtState(EXTSTATE_SECTION, EXTSTATE_OUTPUT_NAME)
+    
+    
+    
+    
     
     if manual_midi_mode then
         if saved_name ~= "" then
@@ -328,25 +341,40 @@ local function process_sysex_queue()
             if f then
                 f:write(task.text)
                 f:close()
-                local pad_sysex = drum_map.GenerateSysexFromFile(tmp_path, CUSTOM_SLOT)
+                local pad_sysex = drum_map.GenerateSysexFromFile(tmp_path, CUSTOM_SLOT, selected_model)
                 if pad_sysex and MIDI_OUTPUT_INDEX then
                     reaper.SendMIDIMessageToHardware(MIDI_OUTPUT_INDEX, pad_sysex)
                 end
             end
         elseif task.type == "final" then
-            local pad_sysex = drum_map.GenerateSysexFromFile(task.path, CUSTOM_SLOT)
+            local pad_sysex = drum_map.GenerateSysexFromFile(task.path, CUSTOM_SLOT, selected_model)
             if pad_sysex and MIDI_OUTPUT_INDEX then
                 reaper.SendMIDIMessageToHardware(MIDI_OUTPUT_INDEX, pad_sysex)
                 table.insert(sysex_queue, 2, { time = now + 0.1, type = "switch" })
             else
                 console("Could not generate Launchpad SysEx from file: " .. tostring(task.path))
             end
+            
+            
+            
+            
         elseif task.type == "switch" then
             if MIDI_OUTPUT_INDEX then
-                local switch_to_custom_sysex = { 0xF0, 0x00, 0x20, 0x29, 0x02, 0x0D, 0x00, (0x03 + CUSTOM_SLOT), 0xF7 }
+                -- Dynamically select the correct Novation Device ID
+                local model_id = 0x0D -- Mini Mk3
+                if selected_model == "X" then model_id = 0x0C
+                elseif selected_model == "P" then model_id = 0x0E
+                elseif selected_model == "K" then model_id = 0x14 -- Launchkey Mk4
+                end
+                
+                local switch_to_custom_sysex = { 0xF0, 0x00, 0x20, 0x29, 0x02, model_id, 0x00, (0x03 + CUSTOM_SLOT), 0xF7 }
                 send_bytes_to_output(MIDI_OUTPUT_INDEX, switch_to_custom_sysex)
             end
         end
+        
+        
+        
+        
         table.remove(sysex_queue, 1)
     end
 end
@@ -532,6 +560,42 @@ local function draw_output_window()
     
     if visible then
         reaper.ImGui_Text(ctx, "Select or define a MIDI hardware output for your Launchpad.")
+        reaper.ImGui_SameLine(ctx)
+        reaper.ImGui_Dummy(ctx,245,10)
+        
+        reaper.ImGui_SameLine(ctx)
+        if reaper.ImGui_Button(ctx, "QUIT", 70, 25) then
+            ui_state = "CLOSED"
+        end
+        
+        reaper.ImGui_Separator(ctx)    
+        
+
+        
+        -- "Launchpad Mini Mk3" - M, "Launchpad X Mk3" - X, "Launchpad Pro Mk3" - P, "Launchkey Mk4" - K
+        
+        reaper.ImGui_Text(ctx, "Select Device Model:")
+                
+                local function SetModel(m)
+                    selected_model = m
+                    reaper.SetExtState(EXTSTATE_SECTION, EXTSTATE_MODEL, selected_model, true)
+                    if current_flashed_preset ~= "" then
+                        trigger_device_init_sequence(current_flashed_preset)
+                    end
+                end
+        
+                if reaper.ImGui_RadioButton(ctx, "Launchpad Mini Mk3", selected_model == "M") then SetModel("M") end
+                reaper.ImGui_SameLine(ctx)
+                
+                if reaper.ImGui_RadioButton(ctx, "Launchpad X Mk3", selected_model == "X") then SetModel("X") end
+                reaper.ImGui_SameLine(ctx)
+                
+                if reaper.ImGui_RadioButton(ctx, "Launchpad Pro Mk3", selected_model == "P") then SetModel("P") end
+                reaper.ImGui_SameLine(ctx)
+                
+                if reaper.ImGui_RadioButton(ctx, "Launchkey Mk4", selected_model == "K") then SetModel("K") end
+        
+        
         reaper.ImGui_Separator(ctx)
 
         local rv
@@ -548,13 +612,6 @@ local function draw_output_window()
             end
         end
 
-        reaper.ImGui_SameLine(ctx)
-        reaper.ImGui_Dummy(ctx,445,10)
-        
-        reaper.ImGui_SameLine(ctx)
-        if reaper.ImGui_Button(ctx, "QUIT", 70, 25) then
-            ui_state = "CLOSED"
-        end
 
         if manual_midi_mode then
             reaper.ImGui_Text(ctx, "Set MIDI Hardware Output ID (+ / -):")
