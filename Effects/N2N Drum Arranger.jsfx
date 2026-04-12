@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.7.2
+version: 7.7.3
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.7.2 -
+  # N2N Drum Arranger v7.7.3 -
   ADDED CUE SETTING
   ADDED PATTERN MUTE
   ADDED FALLBACK PATTERN SYSTEM
@@ -135,10 +135,10 @@ slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
 slider11:14<10,30,1>-Grid Row Height
 
 @init
-version_display = "v7.7.2";
+version_display = "v7.7.3";
 init_gate = 0;
-fontsize = 16; // use 16 for PC and 11 for Mac
-titlefontsize = 24;  // use 24 for PC and 20 for Mac
+fontsize = 12; // use 16 for PC and 11 for Mac
+titlefontsize = 20;  // use 24 for PC and 20 for Mac
 
 // =========================================================
 // REGISTRATION & GROOVE MEMORY
@@ -1775,14 +1775,20 @@ loop(128,
 
 
 @gfx 1383 780
-gfx_setfont(1, "Trebuchet MS", fontsize, 'b');
+gfx_setfont(1, "Helvetica", fontsize, 'b');
 gfx_measurestr("This is a test to determine if the text is being rendered on PC or Mac.", str_w, str_h);
 gfx_set(1,1,1,1); 
 gfx_x = draw_x; 
 gfx_y = draw_y + 2; 
-gfx_measurestr("This is a test to determine if the text is being rendered on PC or Mac.", str_w, str_h);
-str_w > 370 ? (fontsize = 11; titlefontsize = 20;); // use 16 for PC and 12 for mac
 
+str_w > 337 ? (fontsize = 11; titlefontsize = 20;); // use 16 for PC and 12 for mac
+
+
+//gfx_set(0.8,0.8,0.8,1); 
+//gfx_x = 1400; 
+//gfx_y = 5; 
+//sprintf(#str_w2, "%.1f", str_w);
+//gfx_drawstr(#str_w2);
 
 grid_height = slider11; 
 ext_noinit = 1.0;
@@ -1862,15 +1868,16 @@ function dr_glob(id_num, x, y, w, lab, val_in, min_v, max_v, is_subdiv, is_swing
             (is_signed && ov_val >= 0) || (!is_signed && ov_val > 0) ? ( is_ov = 1; curr_val = ov_val; );
         );
     );
+    gfx_setfont(1, "Helvetica", fontsize, 'b');
     rect(x, y, w, 20, 0.2, 0.2, 0.2, 1);
-    draw_text(x+5, y+2, lab, 0.7,0.7,0.7);
+    draw_text(x+5, y+3, lab, 0.7,0.7,0.7);
     is_subdiv ? (
         v = curr_val;
         v==0?strcpy(#s,"8"):v==1?strcpy(#s,"12"):v==2?strcpy(#s,"16"):v==3?strcpy(#s,"24"):strcpy(#s,"32");
     )
     : is_swing ? ( sprintf(#s, "%d%%", curr_val); )
     : ( sprintf(#s, "%d", curr_val); );
-    draw_text(x+w-35, y+2, #s, 1, 1, 1);
+    draw_text(x+w-35, y+3, #s, 1, 1, 1);
     (mb && p_mb == 0 && mx>=x && mx<x+w && my>=y && my<y+20) ? (
         capture_id = id_num; capture_min = min_v; capture_max = max_v; capture_is_signed = is_signed; capture_mode = 0;
         (rmb && active_tab > 0 && target_addr >= 0) ? (
@@ -1950,7 +1957,7 @@ function calc_vis_beat(t_in) (
 
 function btn(x,y,w,txt) (
     rect(x,y,w,BTN_H, 0.3,0.3,0.3,1);
-    draw_text(x+5,y+1,txt,1,1,1);
+    draw_text(x+5,y+3,txt,1,1,1);
     (mb && p_mb == 0 && mx>=x && mx<x+w && my>=y && my<y+BTN_H);
 );
 
@@ -1987,16 +1994,16 @@ function btn(x,y,w,txt) (
 );
 
 tx = UI_TOP_X; ty = UI_TOP_Y;
-gfx_setfont(1, "Trebuchet MS", titlefontsize, 'b');
+gfx_setfont(1, "Helvetica", titlefontsize, 'b');
 bri = .9;
 
 
-draw_text(HDR_X+2, HDR_Y-6 , "N2N Drum Arranger", 0.2*bri,  1.0*bri,  1.0*bri);
+draw_text(HDR_X+3, HDR_Y-3 , "N2N Drum Arranger", 0.2*bri,  1.0*bri,  1.0*bri);
 gfx_setfont(0);
 
 
 tx = UI_TOP_X; ty = UI_TOP_Y;
-gfx_setfont(1, "Trebuchet MS", 16  , 'b');
+gfx_setfont(1, "Helvetica", 16  , 'b');
 bri = .9;
 
 
@@ -2041,7 +2048,7 @@ track_num > 0 ? (
     gfx_measurestr(#trk_str, tw, th);
     gfx_x = x_start+943 + (60-tw)/2;
     gfx_y = row1_y-4 + (18-th)/2;
-    gfx_setfont(1, "Trebuchet MS", titlefontsize, 'b');
+    gfx_setfont(1, "Helvetica", titlefontsize, 'b');
     gfx_drawstr(#trk_str);
     gfx_setfont(0);
 
@@ -2049,7 +2056,7 @@ track_num > 0 ? (
     gfx_measurestr(#trk_str2, tw, th);
     gfx_x = x_start+989 + (60-tw)/2;
     gfx_y = row1_y-18 + (18-th)/2;
-    gfx_setfont(1, "Trebuchet MS", titlefontsize + 10, 'b');
+    gfx_setfont(1, "Helvetica", titlefontsize + 10, 'b');
     gfx_drawstr(#trk_str2);
     gfx_setfont(0);
 );
@@ -2058,11 +2065,12 @@ track_num > 0 ? (
 draw_x = HDR_X + HDR_W + UI_GAP_X - 29 - hw; // Start X for Flow
 draw_y = row1_y + 3;
 
-gfx_setfont(1, "Trebuchet MS", fontsize, 'b'); 
+gfx_setfont(0); 
+gfx_setfont(1, "Helvetica", fontsize, 'b'); 
 
 // Label
 gfx_set(0.8,0.8,0.8,1); 
-gfx_x = draw_x; gfx_y = draw_y + 2; 
+gfx_x = draw_x; gfx_y = draw_y + 3; 
 gfx_drawstr("GLOBAL SETTINGS:");
 draw_x += 95 + ui_gap_large; // Width of label + gap
 
@@ -2144,10 +2152,9 @@ loop(3,
         // ROW 3: FOLLOW MIDI LABEL
         mem[ui_locked_tab] == -1 ? mem[ui_edit_tab] = mem[ui_play_prog_tab]; 
         is_follow = (mem[ui_locked_tab] == -1);
-        gfx_setfont(1, "Trebuchet MS", fontsize, 'b'); 
-        draw_text(FOLLOW_LBL_X+8, draw_y+7, "FOLLOW", 0.8,0.8,0.8);
-        draw_text(FOLLOW_LBL_X+18, draw_y+18, "MIDI", 0.8,0.8,0.8); 
-        draw_text(FOLLOW_LBL_X+16, draw_y+29, "CUES:", 0.8,0.8,0.8); 
+        gfx_setfont(1, "Helvetica", fontsize-1, 'b'); 
+        draw_text(FOLLOW_LBL_X+11, draw_y+17, "FOLLOW", 0.8,0.8,0.8);
+        draw_text(FOLLOW_LBL_X+6, draw_y+27, "MIDI CUES:", 0.8,0.8,0.8); 
     ) : 
     current_tab_row == 3 ? (
         // ROW 4: FOLLOW MIDI LOCK BOX
@@ -2158,10 +2165,10 @@ loop(3,
         gfx_circle(FOLLOW_BOX_X+25, draw_y-12, 5.5, 0); 
         gfx_circle(FOLLOW_BOX_X+25, draw_y-13, 5, 0); 
         rect(FOLLOW_BOX_X+15, draw_y-10, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.5, 0.5, 0.5, 1);
-        gfx_setfont(1, "Trebuchet MS", 21, 'b');
+        gfx_setfont(1, "Helvetica", 21, 'b');
         is_follow ? draw_text(FOLLOW_BOX_X+21, draw_y-14, "X", 0,1,0);
         is_follow ? rect(FOLLOW_BOX_X+15, draw_y-10, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.2*bri, 1.0*bri, 1.0*bri, 1);
-        gfx_setfont(1, "Trebuchet MS", fontsize, 'b'); 
+        gfx_setfont(1, "Helvetica", fontsize, 'b'); 
         
         (mb && p_mb == 0 && !rec_hit && mx>=FOLLOW_BOX_X && mx<FOLLOW_BOX_X+FOLLOW_BOX_W+31 && my>=draw_y-33 && my<draw_y+FOLLOW_BOX_H+5) ? (
             rec_cues_active == 0 ? ( 
@@ -2190,7 +2197,7 @@ loop(3,
                   : ( rect(draw_x, draw_y, item_w-5, 26, t_r*0.4, t_g*0.4, t_b*0.4, 1); );
                   
             get_t_name(gui_t, #tn); 
-            gfx_setfont(1, "Trebuchet MS", fontsize, 'b'); 
+            gfx_setfont(1, "Helvetica", fontsize, 'b'); 
             is_ed ? draw_text(draw_x+3, draw_y+5, #tn, 0, 0, 0) : draw_text(draw_x+3, draw_y+4, #tn, 1, 1, 1);
             gfx_setfont(0);  
             
@@ -2260,11 +2267,11 @@ draw_x = tab_start_x - 112; // Reset cursor to tab line
 t_e = mem[ui_edit_tab];
 (t_e == 0) ? (
     gfx_set(1, 0.2, 0.2, 1);
-    gfx_setfont(1, "Trebuchet MS", 48, 'b');
+    gfx_setfont(1, "Helvetica", 48, 'b');
     gfx_x = (gfx_w/2) - 150; 
     gfx_y = (gfx_h/2) + 52; 
     gfx_drawstr("PATTERN OFF");
-    gfx_setfont(1, "Trebuchet MS", 18, 'b');
+    gfx_setfont(1, "Helvetica", 18, 'b');
 ) : (
     curr_pat_v_ptr = vel_base + t_e*vel_stride_tab; 
     curr_pat_g_ptr = grid_base + t_e*vel_stride_tab; 
@@ -2278,14 +2285,14 @@ t_e = mem[ui_edit_tab];
     fb_pat_l_ptr = step_len_base + fb_tab*vel_stride_tab; 
 
     // LABEL
-    gfx_setfont(1, "Trebuchet MS", fontsize, 'b'); 
+    gfx_setfont(1, "Helvetica", fontsize-1, 'b'); 
     gfx_set(0.8,0.8,0.8,1); 
-    gfx_x = draw_x; gfx_y = draw_y-3; 
+    gfx_x = draw_x + 5; gfx_y = draw_y; 
     gfx_drawstr("PATTERN");
-    gfx_x = draw_x; gfx_y = draw_y+8; 
+    gfx_x = draw_x + 2; gfx_y = draw_y+10; 
     gfx_drawstr("SETTINGS:");
     draw_x += 57;
-
+    gfx_setfont(1, "Helvetica", fontsize, 'b'); 
     // MUTE BUTTON (Added here to flow sequence)
     item_w = 50;
     is_p_muted = mem[tab_mute_base + t_e];
@@ -2538,9 +2545,9 @@ ty = draw_y;
         i_p+=1;
     );
     mb == 0 ? last_preview_note = -1;
-    ty+=38; 
+    ty+=40; 
     upser = 5;
-    gfx_setfont(1, "Trebuchet MS", fontsize, 'b'); 
+    gfx_setfont(1, "Helvetica", fontsize, 'b'); 
     draw_text(10, ty-upser, "DRUM:", 0.7,0.7,0.7); 
     strlen(row_name_str_base + sel_r * str_size) > 0 ? (
         strcpy(#dn_cur, row_name_str_base + sel_r * str_size);
@@ -2572,10 +2579,10 @@ ty = draw_y;
     gr_y = groovey;
     gfx_set(0.7, 0.7, 0.7, 1);
     gfx_x = gr_x; 
-    gfx_y = gr_y;
+    gfx_y = gr_y+2;
     gfx_drawstr("GRV:");
     gr_max == 0 ? gfx_set(0.7 ,0.7 ,0.7, 1) : (gr_max > 1.0 ? gfx_set(1, 0, 0, 1) : gfx_set(0, 1, 0, 1));
-    gfx_circle(gr_x+43, gr_y+6, 5, 1);
+    gfx_circle(gr_x+43, gr_y+8, 5, 1);
     
 
     ty+=12; 
@@ -2587,12 +2594,12 @@ ty = draw_y;
         play_step_idx = floor(vis_beat * (s_v/4)); 
     ) : play_step_idx = -1;
 
-    btn(10, ty+2, 77, "  Copy Row") ? ( 
+    btn(10, ty+2, 77, " COPY ROW") ? ( 
         memcpy(copy_row_v_buf, curr_pat_v_ptr + sel_r*vel_stride_row, MAX_STEPS); 
         memcpy(copy_row_g_buf, curr_pat_g_ptr + sel_r*vel_stride_row, MAX_STEPS); 
         memcpy(copy_row_l_buf, curr_pat_l_ptr + sel_r*vel_stride_row, MAX_STEPS); 
     );
-    btn(10, ty+26, 77, "  Paste Row") ? ( 
+    btn(10, ty+26, 77, " PASTE ROW") ? ( 
         memcpy(curr_pat_v_ptr + sel_r*vel_stride_row, copy_row_v_buf, MAX_STEPS); 
         memcpy(curr_pat_g_ptr + sel_r*vel_stride_row, copy_row_g_buf, MAX_STEPS); 
         memcpy(curr_pat_l_ptr + sel_r*vel_stride_row, copy_row_l_buf, MAX_STEPS);
@@ -2608,7 +2615,7 @@ ty = draw_y;
         gfx_y=ty+30; 
         gfx_drawstr("ALL"); 
     );
-    btn(10, ty+50, 77, "  Clear Row") ? ( 
+    btn(10, ty+50, 77, " CLEAR ROW") ? ( 
         memset(curr_pat_g_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); 
         memset(curr_pat_v_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); 
         memset(curr_pat_l_ptr + sel_r*vel_stride_row, 0, MAX_STEPS);
@@ -3325,7 +3332,7 @@ is_tab_muted_ui = mem[tab_mute_base + t_e];
     rect(ov_x, ov_y, ov_w, ov_h, 0, 0, 0, 0.6);
 
     // 2. Draw "MUTED" Warning Text
-    gfx_setfont(1, "Trebuchet MS", 35, 'b');
+    gfx_setfont(1, "Helvetica", 35, 'b');
     #mt_warn = "PATTERN MUTED";
     gfx_measurestr(#mt_warn, m_tw, m_th);
     
@@ -3362,7 +3369,7 @@ help_active ? (
     gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Tab's Lock Box: Black - Playback is not locked to the Tab");
     gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Double-Click Tab: View Pattern AND Lock tab to playback");
     gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Follow [x]:: View and playback follow incoming MIDI commands");
-    gfx_y += 25; gfx_x = help_x+20; gfx_drawstr("GRID EDITING:");
+    gfx_y += 25; gfx_x = help_x+20; gfx_drawstr("GRID EDITING (PC):");
     gfx_x = help_x+20; gfx_y += 20; gfx_drawstr(" - Click+Drag: Paint steps and velocity bars");
     gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - CTRL+Drag: Edit all pattern Bars simultaneously");
     gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - SHIFT+Drag: Edit all pattern Beats simultaneously");
@@ -3385,11 +3392,11 @@ help_active ? (
     gfx_x = help_x+20; 
     gfx_y += 16;
     gfx_drawstr(" - PUSH/PULL: Adjust timing per row (+ = Lag, - = Push)");
-    gfx_y += 25; gfx_x = help_x+20; gfx_drawstr("FILE OPERATIONS:");
-    gfx_x = help_x+20; gfx_y += 20; gfx_drawstr(" - <- : Import Single Pattern (.n2drumpat) to current Tab");
-    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - <= : Import Pattern Bank (.n2drumpats)");
-    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - -> : Export Single Pattern (.n2drumpat)");
-    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - => : Export Pattern Bank (.n2drumpats)");
+    //gfx_y += 25; gfx_x = help_x+20; gfx_drawstr("FILE OPERATIONS:");
+    //gfx_x = help_x+20; gfx_y += 20; gfx_drawstr(" - <- : Import Single Pattern (.n2drumpat) to current Tab");
+    //gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - <= : Import Pattern Bank (.n2drumpats)");
+    //gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - -> : Export Single Pattern (.n2drumpat)");
+    //gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - => : Export Pattern Bank (.n2drumpats)");
     
     // UPDATED THESE VARIABLES AS WELL
     ok_w = 60; ok_h = 25; ok_x = help_x + help_w - ok_w - 20; ok_y = help_y + help_h - ok_h - 20;
