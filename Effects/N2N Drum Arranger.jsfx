@@ -1,11 +1,123 @@
 desc: N2N Drum Arranger
-version: 7.1.1
+version: 7.5.0
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.1.1 -
+  # N2N Drum Arranger v7.5.0 -
   ADDED CUE SETTING
   ADDED PATTERN MUTE
   ADDED FALLBACK PATTERN SYSTEM
+provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
+provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
+provides:[data] ../Data/DrumArranger/[BEATBOX] 01 Street Jam.txt > AHS_Music_Tech/DrumArranger/[BEATBOX] 01 Street Jam.txt
+provides:[data] ../Data/DrumArranger/[BEATBOX] 02 Humana Hit.txt > AHS_Music_Tech/DrumArranger/[BEATBOX] 02 Humana Hit.txt
+provides:[data] ../Data/DrumArranger/[BEATBOX] 03 Disco Bee.txt > AHS_Music_Tech/DrumArranger/[BEATBOX] 03 Disco Bee.txt
+provides:[data] ../Data/DrumArranger/[BEATBOX] 04 Big Badda Boom.txt > AHS_Music_Tech/DrumArranger/[BEATBOX] 04 Big Badda Boom.txt
+provides:[data] ../Data/DrumArranger/[CINE] 01 Hellboy Cube.txt > AHS_Music_Tech/DrumArranger/[CINE] 01 Hellboy Cube.txt
+provides:[data] ../Data/DrumArranger/[CINE] 02 CineFlix Perc.txt > AHS_Music_Tech/DrumArranger/[CINE] 02 CineFlix Perc.txt
+provides:[data] ../Data/DrumArranger/[CINE] 03 Doomsday 2040.txt > AHS_Music_Tech/DrumArranger/[CINE] 03 Doomsday 2040.txt
+provides:[data] ../Data/DrumArranger/[DDUT] 01 Vian Dangdut Kit.txt > AHS_Music_Tech/DrumArranger/[DDUT] 01 Vian Dangdut Kit.txt
+provides:[data] ../Data/DrumArranger/[DDUT] 02 Paralon Yona.txt > AHS_Music_Tech/DrumArranger/[DDUT] 02 Paralon Yona.txt
+provides:[data] ../Data/DrumArranger/[DDUT] 03 Yonk Graffity Koplo.txt > AHS_Music_Tech/DrumArranger/[DDUT] 03 Yonk Graffity Koplo.txt
+provides:[data] ../Data/DrumArranger/[DISCO] 01 Discoria.txt > AHS_Music_Tech/DrumArranger/[DISCO] 01 Discoria.txt
+provides:[data] ../Data/DrumArranger/[DISCO] 02 Dance Club.txt > AHS_Music_Tech/DrumArranger/[DISCO] 02 Dance Club.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 01 Roland R8.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 01 Roland R8.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 02 Korg DDD-1.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 02 Korg DDD-1.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 03 Casio VL-1.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 03 Casio VL-1.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 04 Roland TR-606.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 04 Roland TR-606.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 05 Roland TR-626.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 05 Roland TR-626.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 06 Roland TR-707.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 06 Roland TR-707.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 07 Roland TR-727.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 07 Roland TR-727.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 08 Roland TR-808.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 08 Roland TR-808.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 09 Roland TR-909.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 09 Roland TR-909.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 10 Clavia Nord Drum.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 10 Clavia Nord Drum.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 11 Linn LinnDrum.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 11 Linn LinnDrum.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 12 Linn Linn9000.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 12 Linn Linn9000.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 13 Alesis HR16.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 13 Alesis HR16.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 14 E-mu Drumulator.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 14 E-mu Drumulator.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 15 Yamaha RX5.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 15 Yamaha RX5.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 16 Korg KR-55.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 16 Korg KR-55.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 17 Oberheim DMX.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 17 Oberheim DMX.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 18 Linn LM-1.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 18 Linn LM-1.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 19 Boss DR-110.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 19 Boss DR-110.txt
+provides:[data] ../Data/DrumArranger/[DRUM MC] 20 SCI DrumTraks.txt > AHS_Music_Tech/DrumArranger/[DRUM MC] 20 SCI DrumTraks.txt
+provides:[data] ../Data/DrumArranger/[ELECTRO] 01 Futura Kit.txt > AHS_Music_Tech/DrumArranger/[ELECTRO] 01 Futura Kit.txt
+provides:[data] ../Data/DrumArranger/[ELECTRO] 02 ElectroGroove.txt > AHS_Music_Tech/DrumArranger/[ELECTRO] 02 ElectroGroove.txt
+provides:[data] ../Data/DrumArranger/[ELECTRO] 03 Dream Catcher.txt > AHS_Music_Tech/DrumArranger/[ELECTRO] 03 Dream Catcher.txt
+provides:[data] ../Data/DrumArranger/[ELECTRO] 04 Techa Kit.txt > AHS_Music_Tech/DrumArranger/[ELECTRO] 04 Techa Kit.txt
+provides:[data] ../Data/DrumArranger/[ELECTRO] 05 Matrix Kit.txt > AHS_Music_Tech/DrumArranger/[ELECTRO] 05 Matrix Kit.txt
+provides:[data] ../Data/DrumArranger/[ELECTRO] 06 Trappa Kit.txt > AHS_Music_Tech/DrumArranger/[ELECTRO] 06 Trappa Kit.txt
+provides:[data] ../Data/DrumArranger/[FUNK] 01 Funk It.txt > AHS_Music_Tech/DrumArranger/[FUNK] 01 Funk It.txt
+provides:[data] ../Data/DrumArranger/[FUNK] 02 SoulVibe.txt > AHS_Music_Tech/DrumArranger/[FUNK] 02 SoulVibe.txt
+provides:[data] ../Data/DrumArranger/[FUNK] 03 FonkaWonka.txt > AHS_Music_Tech/DrumArranger/[FUNK] 03 FonkaWonka.txt
+provides:[data] ../Data/DrumArranger/[FUNK] 04 Funky Flix.txt > AHS_Music_Tech/DrumArranger/[FUNK] 04 Funky Flix.txt
+provides:[data] ../Data/DrumArranger/[HIP HOP] 01 CocaCola Kit.txt > AHS_Music_Tech/DrumArranger/[HIP HOP] 01 CocaCola Kit.txt
+provides:[data] ../Data/DrumArranger/[HIP HOP] 02 Drop It, Hop It.txt > AHS_Music_Tech/DrumArranger/[HIP HOP] 02 Drop It, Hop It.txt
+provides:[data] ../Data/DrumArranger/[HIP HOP] 03 Groove Ghetto.txt > AHS_Music_Tech/DrumArranger/[HIP HOP] 03 Groove Ghetto.txt
+provides:[data] ../Data/DrumArranger/[INDUST] 01 Factory Reset.txt > AHS_Music_Tech/DrumArranger/[INDUST] 01 Factory Reset.txt
+provides:[data] ../Data/DrumArranger/[INDUST] 02 Barrel Beater.txt > AHS_Music_Tech/DrumArranger/[INDUST] 02 Barrel Beater.txt
+provides:[data] ../Data/DrumArranger/[JAZZ] 01 Tooth Brush Kit.txt > AHS_Music_Tech/DrumArranger/[JAZZ] 01 Tooth Brush Kit.txt
+provides:[data] ../Data/DrumArranger/[JAZZ] 02 Jive Kit.txt > AHS_Music_Tech/DrumArranger/[JAZZ] 02 Jive Kit.txt
+provides:[data] ../Data/DrumArranger/[JAZZ] 03 Jazz For You.txt > AHS_Music_Tech/DrumArranger/[JAZZ] 03 Jazz For You.txt
+provides:[data] ../Data/DrumArranger/[LOFI] 01 Summer Picnic.txt > AHS_Music_Tech/DrumArranger/[LOFI] 01 Summer Picnic.txt
+provides:[data] ../Data/DrumArranger/[METAL] 01 RacikSuara Metal.txt > AHS_Music_Tech/DrumArranger/[METAL] 01 RacikSuara Metal.txt
+provides:[data] ../Data/DrumArranger/[METAL] 02 Kalkal Tremor.txt > AHS_Music_Tech/DrumArranger/[METAL] 02 Kalkal Tremor.txt
+provides:[data] ../Data/DrumArranger/[METAL] 03 Caveman.txt > AHS_Music_Tech/DrumArranger/[METAL] 03 Caveman.txt
+provides:[data] ../Data/DrumArranger/[METAL] 04 Animus Monster.txt > AHS_Music_Tech/DrumArranger/[METAL] 04 Animus Monster.txt
+provides:[data] ../Data/DrumArranger/[METAL] 05 Metal Mayhem.txt > AHS_Music_Tech/DrumArranger/[METAL] 05 Metal Mayhem.txt
+provides:[data] ../Data/DrumArranger/[METAL] 06 Adun SG Djent Kit.txt > AHS_Music_Tech/DrumArranger/[METAL] 06 Adun SG Djent Kit.txt
+provides:[data] ../Data/DrumArranger/[ORCH] 01 Marching Ants.txt > AHS_Music_Tech/DrumArranger/[ORCH] 01 Marching Ants.txt
+provides:[data] ../Data/DrumArranger/[POP] 01 Acoustica Hits.txt > AHS_Music_Tech/DrumArranger/[POP] 01 Acoustica Hits.txt
+provides:[data] ../Data/DrumArranger/[POP] 02 Pidux Pop Kit.txt > AHS_Music_Tech/DrumArranger/[POP] 02 Pidux Pop Kit.txt
+provides:[data] ../Data/DrumArranger/[POP] 03 Pop Jam.txt > AHS_Music_Tech/DrumArranger/[POP] 03 Pop Jam.txt
+provides:[data] ../Data/DrumArranger/[POP] 04 eNKa Worship Kit.txt > AHS_Music_Tech/DrumArranger/[POP] 04 eNKa Worship Kit.txt
+provides:[data] ../Data/DrumArranger/[POP] 05 YPB Cajon Kit.txt > AHS_Music_Tech/DrumArranger/[POP] 05 YPB Cajon Kit.txt
+provides:[data] ../Data/DrumArranger/[POP] 06 Red Drums.txt > AHS_Music_Tech/DrumArranger/[POP] 06 Red Drums.txt
+provides:[data] ../Data/DrumArranger/[POP] 07 Pepadu Kit.txt > AHS_Music_Tech/DrumArranger/[POP] 07 Pepadu Kit.txt
+provides:[data] ../Data/DrumArranger/[POP] 08 Steven's LAS Kit.txt > AHS_Music_Tech/DrumArranger/[POP] 08 Steven's LAS Kit.txt
+provides:[data] ../Data/DrumArranger/[POP] 09 K Drum.txt > AHS_Music_Tech/DrumArranger/[POP] 09 K Drum.txt
+provides:[data] ../Data/DrumArranger/[POP] 10 Teffy's Kit.txt > AHS_Music_Tech/DrumArranger/[POP] 10 Teffy's Kit.txt
+provides:[data] ../Data/DrumArranger/[POP] 11 Emerald Kit.txt > AHS_Music_Tech/DrumArranger/[POP] 11 Emerald Kit.txt
+provides:[data] ../Data/DrumArranger/[PUNK] 01 Punkadelic Kit.txt > AHS_Music_Tech/DrumArranger/[PUNK] 01 Punkadelic Kit.txt
+provides:[data] ../Data/DrumArranger/[PUNK] 02 Altanative Kit.txt > AHS_Music_Tech/DrumArranger/[PUNK] 02 Altanative Kit.txt
+provides:[data] ../Data/DrumArranger/[REGGAE] 01 Adun SG Reggae Kit.txt > AHS_Music_Tech/DrumArranger/[REGGAE] 01 Adun SG Reggae Kit.txt
+provides:[data] ../Data/DrumArranger/[REGGAE] 02 Reggae Cezzo Kit.txt > AHS_Music_Tech/DrumArranger/[REGGAE] 02 Reggae Cezzo Kit.txt
+provides:[data] ../Data/DrumArranger/[REGGAE] 03 Zion Reggae Kit.txt > AHS_Music_Tech/DrumArranger/[REGGAE] 03 Zion Reggae Kit.txt
+provides:[data] ../Data/DrumArranger/[RNB] 01 Groove Nation.txt > AHS_Music_Tech/DrumArranger/[RNB] 01 Groove Nation.txt
+provides:[data] ../Data/DrumArranger/[RNB] 02 Soul N Joy.txt > AHS_Music_Tech/DrumArranger/[RNB] 02 Soul N Joy.txt
+provides:[data] ../Data/DrumArranger/[ROCK] 01 Sonic Rock.txt > AHS_Music_Tech/DrumArranger/[ROCK] 01 Sonic Rock.txt
+provides:[data] ../Data/DrumArranger/[ROCK] 02 Dragon Yao Gun.txt > AHS_Music_Tech/DrumArranger/[ROCK] 02 Dragon Yao Gun.txt
+provides:[data] ../Data/DrumArranger/[ROCK] 03 Water Jug Kit.txt > AHS_Music_Tech/DrumArranger/[ROCK] 03 Water Jug Kit.txt
+provides:[data] ../Data/DrumArranger/[ROCK] 04 RacikSuara V-Rock.txt > AHS_Music_Tech/DrumArranger/[ROCK] 04 RacikSuara V-Rock.txt
+provides:[data] ../Data/DrumArranger/[ROCK] 05 Pulse Rock.txt > AHS_Music_Tech/DrumArranger/[ROCK] 05 Pulse Rock.txt
+provides:[data] ../Data/DrumArranger/[ROCK] 06 Heavy Hitter.txt > AHS_Music_Tech/DrumArranger/[ROCK] 06 Heavy Hitter.txt
+provides:[data] ../Data/DrumArranger/[ROCK] 07 Boom Bang Kit.txt > AHS_Music_Tech/DrumArranger/[ROCK] 07 Boom Bang Kit.txt
+provides:[data] ../Data/DrumArranger/[SYNWAV] 01 G-Linn Kit.txt > AHS_Music_Tech/DrumArranger/[SYNWAV] 01 G-Linn Kit.txt
+provides:[data] ../Data/DrumArranger/[SYNWAV] 02 Groovebox Story.txt > AHS_Music_Tech/DrumArranger/[SYNWAV] 02 Groovebox Story.txt
+provides:[data] ../Data/DrumArranger/[SYNWAV] 03 Midnight Glow.txt > AHS_Music_Tech/DrumArranger/[SYNWAV] 03 Midnight Glow.txt
+provides:[data] ../Data/DrumArranger/Clear All.txt > AHS_Music_Tech/DrumArranger/Clear All.txt
+provides:[data] ../Data/DrumArranger/Drum8.txt > AHS_Music_Tech/DrumArranger/Drum8.txt
+provides:[data] ../Data/DrumArranger/Drumtastic.txt > AHS_Music_Tech/DrumArranger/Drumtastic.txt
+provides:[data] ../Data/DrumArranger/EZdrummer 2 Americana.txt > AHS_Music_Tech/DrumArranger/EZdrummer 2 Americana.txt
+provides:[data] ../Data/DrumArranger/Ezdrummer 2 Classic.txt > AHS_Music_Tech/DrumArranger/Ezdrummer 2 Classic.txt
+provides:[data] ../Data/DrumArranger/EZDrummer Default Kit.txt > AHS_Music_Tech/DrumArranger/EZDrummer Default Kit.txt
+provides:[data] ../Data/DrumArranger/EZDrummer Nashville.txt > AHS_Music_Tech/DrumArranger/EZDrummer Nashville.txt
+provides:[data] ../Data/DrumArranger/EZDrummer.txt > AHS_Music_Tech/DrumArranger/EZDrummer.txt
+provides:[data] ../Data/DrumArranger/EzDrummer2.txt > AHS_Music_Tech/DrumArranger/EzDrummer2.txt
+provides:[data] ../Data/DrumArranger/EZDrummer2_Hip-Hop.txt > AHS_Music_Tech/DrumArranger/EZDrummer2_Hip-Hop.txt
+provides:[data] ../Data/DrumArranger/Funkbass.txt > AHS_Music_Tech/DrumArranger/Funkbass.txt
+provides:[data] ../Data/DrumArranger/GMajor.txt > AHS_Music_Tech/DrumArranger/GMajor.txt
+provides:[data] ../Data/DrumArranger/LilKit.txt > AHS_Music_Tech/DrumArranger/LilKit.txt
+provides:[data] ../Data/DrumArranger/MT-PowerDrumKit.txt > AHS_Music_Tech/DrumArranger/MT-PowerDrumKit.txt
+provides:[data] ../Data/DrumArranger/MultiKit.txt > AHS_Music_Tech/DrumArranger/MultiKit.txt
+provides:[data] ../Data/DrumArranger/Nashville Copy.txt > AHS_Music_Tech/DrumArranger/Nashville Copy.txt
+provides:[data] ../Data/DrumArranger/Note Names.txt > AHS_Music_Tech/DrumArranger/Note Names.txt
+provides:[data] ../Data/DrumArranger/One Based MIDI.txt > AHS_Music_Tech/DrumArranger/One Based MIDI.txt
+provides:[data] ../Data/DrumArranger/Pro Punk Drums.txt > AHS_Music_Tech/DrumArranger/Pro Punk Drums.txt
+provides:[data] ../Data/DrumArranger/Roland SRX.txt > AHS_Music_Tech/DrumArranger/Roland SRX.txt
+provides:[data] ../Data/DrumArranger/Spitfire-LABS.txt > AHS_Music_Tech/DrumArranger/Spitfire-LABS.txt
+provides:[data] ../Data/DrumArranger/SSD5 Frees.txt > AHS_Music_Tech/DrumArranger/SSD5 Frees.txt
+provides:[data] ../Data/DrumArranger/Zero Based MIDI.txt > AHS_Music_Tech/DrumArranger/Zero Based MIDI.txt
+
 
 options:maxmem=32000000
 options:gmem=N2N_Ecosystem_RSKennedy
@@ -24,7 +136,7 @@ slider11:14<10,30,1>-Grid Row Height
 
 @init
 init_gate = 0;
-fontsize = 13; // use 16 for PC and 13 for mac
+fontsize = 16; // use 16 for PC and 13 for mac
 version_display = "v5.8.9";
 
 // =========================================================
@@ -264,7 +376,7 @@ function t(id, r_ui, name, w, cr, cg, cb) (
   mem[tab_col_b + id] = cb;
 );
 
-ttabw = 45; hw = ttabw; sectw = ttabw * 2; ftabs = 60;
+ttabw = 39; hw = ttabw; sectw = ttabw * 2; ftabs = 51; hww = ttabw * 1.2;
 
 t(0,   1,   "Off",       ftabs,    0.5,  0.5,  0.5);
 t(1,   1,   "Intro",    hw *2,    0.2,  1.0,  1.0);
@@ -287,11 +399,11 @@ t(17,  1,   "Bridge",   sectw,    1.0,  0.9,  0.2);
 t(18,  1,   "B",        ttabw,    1.0,  0.9,  0.2);
 t(19,  1,   "C",        ttabw,    1.0,  0.9,  0.2);
 t(20,  1,   "D",        ttabw,    1.0,  0.9,  0.2);
-t(21,  1,   "H1",      hw,       0.8,  0.8,  0.8);
-t(22,  1,   "H2",      hw,       0.8,  0.8,  0.8);
-t(23,  1,   "1<",       hw,       0.8,  0.5,  1.0);
-t(24,  1,   "1=",       hw,       0.8,  0.5,  1.0);
-t(25,  1,   "1>",       hw,       0.8,  0.5,  1.0);
+t(21,  1,   "H1",      hww,       0.8,  0.8,  0.8);
+t(22,  1,   "H2",      hww,       0.8,  0.8,  0.8);
+t(23,  1,   "1<",       hww,       0.8,  0.5,  1.0);
+t(24,  1,   "1=",       hww,       0.8,  0.5,  1.0);
+t(25,  1,   "1>",       hww,       0.8,  0.5,  1.0);
 
 t(26,  2,   "Def",       ftabs,    0.7,  0.7,  0.9);
 t(27,  2,   "1",        hw,    0.8,  0.8,  0.8);
@@ -315,11 +427,11 @@ t(44,  2,   "Solo",       sectw,   1,  0.6,  0.3);
 t(45,  2,   "B",          ttabw,   1,  0.6,  0.3);
 t(46,  2,   "C",          ttabw,   1,  0.6,  0.3);
 t(47,  2,   "D",          ttabw,   1,  0.6,  0.3);
-t(48,  2,   "H3",    hw,    0.8,  0.8,  0.8);
-t(49,  2,   "H4",    hw,    0.8,  0.8,  0.8);
-t(50,  2,   "2<",   hw,     0.9,  0.4,  1);
-t(51,  2,   "2=",   hw,     0.9,  0.4,  1);
-t(52,  2,   "2>",   hw,     0.9,  0.4,  1);
+t(48,  2,   "H3",    hww,    0.8,  0.8,  0.8);
+t(49,  2,   "H4",    hww,    0.8,  0.8,  0.8);
+t(50,  2,   "2<",   hww,     0.9,  0.4,  1);
+t(51,  2,   "2=",   hww,     0.9,  0.4,  1);
+t(52,  2,   "2>",   hww,     0.9,  0.4,  1);
 
 t(53,  3,   "Min",       ftabs,    0.9,  0.7,  0.7);
 t(54,  3,   "6",   hw,    0.8,  0.8,  0.8);
@@ -343,11 +455,11 @@ t(71,  3,   "Outro",      sectw,   0.5,  0.8,  0.7);
 t(72,  3,   "B",          ttabw,   0.5,  0.8,  0.7);
 t(73,  3,   "C",          ttabw,   0.5,  0.8,  0.7);
 t(74,  3,   "D",          ttabw,   0.5,  0.8,  0.7);
-t(75,  3,   "rsv",    hw,    0.8,  0.8,  0.8);
-t(76,  3,   "rsv",    hw,    0.8,  0.8,  0.8);
-t(77,  3,   "rsv",   hw,     0.9,  0.4,  1);
-t(78,  3,   "rsv",   hw,     0.9,  0.4,  1);
-t(79,  3,   "rsv",   hw,     0.9,  0.4,  1);
+t(75,  3,   "rsv",    hww,    0.8,  0.8,  0.8);
+t(76,  3,   "rsv",    hww,    0.8,  0.8,  0.8);
+t(77,  3,   "rsv",   hww,     0.9,  0.4,  1);
+t(78,  3,   "rsv",   hww,     0.9,  0.4,  1);
+t(79,  3,   "rsv",   hww,     0.9,  0.4,  1);
 
 // =========================================================
 // GENERAL HELPER FUNCTIONS
@@ -851,6 +963,7 @@ local(tmp, t, basev, baseg, basel, i, offa, offb, va, vb, ga, gb, la, lb, slot_a
         );
         sel = mem[ui_selected_row];
         sel == a ? mem[ui_selected_row]=b : sel == b ? mem[ui_selected_row]=a : 0;
+        needs_tab_update = 1;
     );
 );
 
@@ -1160,6 +1273,7 @@ rec_cues_active = 0;
 @serialize
 preserved_id = slider5; 
 
+
 ui_header_size = 32; 
 row_settings_size = MAX_ROWS * 10; 
 tab_grid_size = vel_stride_tab; 
@@ -1283,6 +1397,15 @@ file_avail(0) > 0 ? (
     last_kit_idx = slider10;
     file_var(0, rec_cues_active);
 );
+load_kit_from_slider;
+
+
+@slider
+(init_gate >= 100 && slider10 != last_kit_idx) ? (
+    load_kit_from_slider();
+    last_kit_idx = slider10;
+    needs_tab_update = 1; // Ensures the engine knows the grid/kit changed
+);
 
 @block
 
@@ -1297,14 +1420,11 @@ midi_trigger_queued >= 0 ? (
 
 
 (slider9 == 0) ? ( slider6 = gmem[1]; );
+
 (init_gate < 100) ? (
-    // The first 100 blocks after a save, we just keep the tracker synced
+    // The first 100 blocks after a load, keep tracker synced while UI settles
     last_kit_idx = slider10;
     init_gate += 1;
-) : (slider10 != last_kit_idx) ? (
-    // Only allow loading after the "gate" is open
-    load_kit_from_slider();
-    last_kit_idx = slider10;
 );
 
 (slider5 != last_reported_id) ? (
@@ -1483,10 +1603,6 @@ preview_trig ? (
     preview_trig = 0;
 );
 
-(time_precise() - last_maint_time > 3.0) ? (
-    scan_all_tabs();
-    last_maint_time = time_precise();
-);
 
 (play_state == 0 && last_play_state != 0) ? (
     i_k=0; loop(128,
@@ -1657,7 +1773,7 @@ loop(128,
 
 
 
-@gfx 1618 780
+@gfx 1383 780
 grid_height = slider11; 
 ext_noinit = 1.0;
 ext_noundo = 1; 
@@ -1796,16 +1912,16 @@ help_active ? capture_id = 90000;
 UI_TOP_X=5; UI_TOP_Y=10; UI_GAP_X=40; UI_ROW_H=20;
 HDR_X=UI_TOP_X; HDR_Y=UI_TOP_Y; HDR_W=240; HDR_H=20;
 GLOB_LBL_W=180; GLOB_LBL_YOFF=0;
-GW_DEFVEL_W=150; GW_ROWS_W=180; GW_INST_W=130;
+GW_DEFVEL_W=150; GW_ROWS_W=180; GW_INST_W=90;
 
-ROW2_Y_OFFSET=30; ROW2_Y=UI_TOP_Y + ROW2_Y_OFFSET;
+ROW2_Y_OFFSET=24; ROW2_Y=UI_TOP_Y + ROW2_Y_OFFSET;
 FOLLOW_LBL_X=UI_TOP_X; FOLLOW_LBL_W=55;
 FOLLOW_BOX_X=UI_TOP_X + 60; FOLLOW_BOX_W=20; FOLLOW_BOX_H=16;
 
 BTN_H=20; BTN_Y=ROW2_Y; BTN_X0=UI_TOP_X + 120;
-BTN_W_ACCEPT=169;  BTN_W_COPY=109; BTN_W_PASTE=114; BTN_W_CLEAR=114; BTN_GAP=10;
+BTN_W_ACCEPT=142;  BTN_W_COPY=52; BTN_W_PASTE=94; BTN_W_CLEAR=94; BTN_GAP=10;
 
-PAT_LBL_W=190; PAT_BOX_H=20; PAT_BOX_W=120; PAT_BOX_GAP=70;
+PAT_LBL_W=190; PAT_BOX_H=20; PAT_BOX_W=90; PAT_BOX_GAP=70;
 HIT_PAD_L=2; HIT_PAD_R=2;
 
 function calc_vis_beat(t_in) (
@@ -1861,516 +1977,287 @@ function btn(x,y,w,txt) (
 );
 
 tx = UI_TOP_X; ty = UI_TOP_Y;
-gfx_setfont(1, "Arial", 30, 'b');
+gfx_setfont(1, "Trebuchet MS", 24, 'b');
 bri = .9;
+
+
 draw_text(HDR_X+2, HDR_Y-6 , "N2N Drum Arranger", 0.2*bri,  1.0*bri,  1.0*bri);
 gfx_setfont(0);
 
+
 tx = UI_TOP_X; ty = UI_TOP_Y;
-gfx_setfont(1, "Arial", 12  , 'b');
+gfx_setfont(1, "Trebuchet MS", 16  , 'b');
 bri = .9;
 
-row1_y = UI_TOP_Y -3; 
-x1 = HDR_X + HDR_W + UI_GAP_X - 10;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// -----------------------------------------------------------------------
+// 1. SETUP FLOW LAYOUT VARIABLES
+// These variables control the spacing. Tweak these to stretch/shrink the layout!
+// -----------------------------------------------------------------------
+ui_gap_small = 5;  // Gap between tightly packed buttons
+ui_gap_large = 15; // Gap between distinct sections (e.g., copying vs pattern settings)
+btn_h = 20;        // Standard button height
+tab_start_x = 120; // Where the Tabs and Pattern rows begin horizontally
+
+
+// =========================================================
+// ROW 1: GLOBAL SETTINGS (Flow Refactored)
+// =========================================================
+row1_y = UI_TOP_Y - 3; 
+
+// --- Draw Background for row 1 ---
+track_num > 0 ? (
+    x_start = HDR_X + HDR_W + UI_GAP_X - 10 + 180;
+    rect(x_start+39, row1_y-15, 1256, 44, track_r, track_g, track_b, 1);
+    rect(x_start+760, row1_y+4, 63, 20,.1,.1,.1,1);
+
+    lum = (track_r * 0.299) + (track_g * 0.587) + (track_b * 0.114);
+    lum > 0.5 ? gfx_set(0,0,0,1) : gfx_set(1,1,1,1);
+    sprintf(#trk_str, "Track");
+    gfx_measurestr(#trk_str, tw, th);
+    gfx_x = x_start+943 + (60-tw)/2;
+    gfx_y = row1_y-4 + (18-th)/2;
+    gfx_setfont(1, "Trebuchet MS", 22, 'b');
+    gfx_drawstr(#trk_str);
+    gfx_setfont(0);
+
+    sprintf(#trk_str2, "%d", track_num);
+    gfx_measurestr(#trk_str2, tw, th);
+    gfx_x = x_start+989 + (60-tw)/2;
+    gfx_y = row1_y-18 + (18-th)/2;
+    gfx_setfont(1, "Trebuchet MS", 48, 'b');
+    gfx_drawstr(#trk_str2);
+    gfx_setfont(0);
+);
+
+// --- Row 1 Flow Setup ---
+draw_x = HDR_X + HDR_W + UI_GAP_X - 29 - hw; // Start X for Flow
+draw_y = row1_y + 3;
+
+gfx_setfont(1, "Trebuchet MS", fontsize, 'b'); 
+
+// Label
 gfx_set(0.8,0.8,0.8,1); 
-gfx_x = x1 + 44; 
-gfx_y = row1_y + 5 + GLOB_LBL_YOFF; 
-gfx_setfont(1, "Arial", fontsize, 'b'); 
+gfx_x = draw_x; gfx_y = draw_y + 2; 
 gfx_drawstr("GLOBAL SETTINGS:");
-gfx_setfont(0);         
+draw_x += 95 + ui_gap_large; // Width of label + gap
+
+// Max Rows
+item_w = GW_ROWS_W + 11;
+dr_glob(16, draw_x, draw_y, item_w, "  MAX ROWS TO SHOW:", slider7, 1, 128, 0, 0, -1, 0, 7);  
+draw_x += item_w + ui_gap_small;
+
+// Height
+item_w = GW_HEIGHT_W + 111;
+dr_glob(17, draw_x, draw_y, item_w, "  HEIGHT:", slider11, 10, 30, 0, 0, -1, 0, 11); 
+draw_x += item_w + ui_gap_small;
+
+// Inst ID
+item_w = GW_INST_W + 23;
+dr_glob(15, draw_x, draw_y, item_w, "  INST ID:", slider5, 1, 512, 0, 0, -1, 0, 5); 
+draw_x += item_w + ui_gap_small;
+
+// Reload Kit
+item_w = 73;
+btn(draw_x, draw_y, item_w, "RELOAD KIT") ? ( load_kit_from_slider(); ); 
+draw_x += item_w + ui_gap_small;
+
+
+
+// GROOVE FOUND LATTER IN CODE
+item_w = 50;
+groovex = draw_x + 30;
+groovey = draw_y + 1;
+draw_x += item_w + ui_gap_small + 61;
+
+
+// Help
+item_w = 18;
+btn(draw_x, draw_y, item_w, "?") ? ( help_active = !help_active; );
+draw_x += item_w + ui_gap_small;
+
+// --- N2N IO BUTTONS (Maintained Flow Compatible, Commented Out) ---
+/*
+item_w = 27; btn(draw_x, draw_y, item_w, "<") ? ( gfx_set(1,0,0,1); import_n2n_data(0); ); draw_x += item_w + ui_gap_small;
+item_w = 27; btn(draw_x, draw_y, item_w, "<") ? ( gfx_set(1,0,0,1); import_n2n_data(1); ); draw_x += item_w + ui_gap_small;
+item_w = 29; btn(draw_x, draw_y, item_w, "   >") ? ( gfx_set(1,0,0,1); export_n2n_data(1); ); draw_x += item_w + ui_gap_small;
+item_w = 30; btn(draw_x, draw_y, item_w, "   >") ? ( gfx_set(1,0,0,1); export_n2n_data(0); ); draw_x += item_w + ui_gap_small;
+*/
+
+// =========================================================
+// ROWS 2, 3, 4: CONSOLIDATED TABS AND LEFT INFO COLUMN
+// =========================================================
+draw_y = ROW2_Y; // Advance Y to Tab Area
+
+current_tab_row = 1;
+loop(3,
+    // ------------------------------------------
+    // LEFT COLUMN (REC Cues & Follow MIDI)
+    // ------------------------------------------
+    current_tab_row == 1 ? (
+        // ROW 2: REC CUES
+        rec_x = 64; rec_y = draw_y-1;
+        rect(rec_x+1, rec_y+1, 50, 26, 0.2, 0.2, 0.2, 1);
+        rec_cues_active ? (
+            rect(rec_x+1, rec_y+1, 52, 26, 0.8, 0, 0, 1);
+            draw_text(rec_x+12, rec_y+1, " REC", 1, 1, 1);
+            draw_text(rec_x+9, rec_y+11, " CUES", 1, 1, 1);
+        ) : (
+            draw_text(rec_x+12, rec_y+1, " REC", 0.8, 0.8, 0.8);
+            draw_text(rec_x+9, rec_y+11, " CUES", 0.8, 0.8, 0.8);
+        );
+        rec_hit = (mx >= rec_x+1 && mx < rec_x + 53 && my >= rec_y+1 && my < rec_y + 27);
+        (mb && p_mb == 0 && rec_hit) ? (
+            rec_cues_active = !rec_cues_active;
+            rec_cues_active ? ( mem[ui_locked_tab] = -1; gmem[GM_BASE+1] = -1; gmem[GMEM_REC_FLAG_ADDR] = 1; ) 
+                            : ( gmem[GMEM_REC_FLAG_ADDR] = 0; mem[ui_locked_tab] = -1; gmem[GM_BASE+1] = -1; );
+            needs_tab_update = 1;
+        );
+    ) : 
+    current_tab_row == 2 ? (
+        // ROW 3: FOLLOW MIDI LABEL
+        mem[ui_locked_tab] == -1 ? mem[ui_edit_tab] = mem[ui_play_prog_tab]; 
+        is_follow = (mem[ui_locked_tab] == -1);
+        gfx_setfont(1, "Trebuchet MS", fontsize, 'b'); 
+        draw_text(FOLLOW_LBL_X+8, draw_y+7, "FOLLOW", 0.8,0.8,0.8);
+        draw_text(FOLLOW_LBL_X+18, draw_y+18, "MIDI", 0.8,0.8,0.8); 
+        draw_text(FOLLOW_LBL_X+16, draw_y+29, "CUES:", 0.8,0.8,0.8); 
+    ) : 
+    current_tab_row == 3 ? (
+        // ROW 4: FOLLOW MIDI LOCK BOX
+        gfx_set(0.9,0.9,0.9,1); 
+        gfx_circle(FOLLOW_BOX_X+25, draw_y-2, 7, 0); 
+        gfx_circle(FOLLOW_BOX_X+25, draw_y-12, 6.5, 0); 
+        gfx_circle(FOLLOW_BOX_X+25, draw_y-12, 6, 0); 
+        gfx_circle(FOLLOW_BOX_X+25, draw_y-12, 5.5, 0); 
+        gfx_circle(FOLLOW_BOX_X+25, draw_y-13, 5, 0); 
+        rect(FOLLOW_BOX_X+15, draw_y-10, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.5, 0.5, 0.5, 1);
+        gfx_setfont(1, "Trebuchet MS", 21, 'b');
+        is_follow ? draw_text(FOLLOW_BOX_X+21, draw_y-14, "X", 0,1,0);
+        is_follow ? rect(FOLLOW_BOX_X+15, draw_y-10, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.2*bri, 1.0*bri, 1.0*bri, 1);
+        gfx_setfont(1, "Trebuchet MS", fontsize, 'b'); 
         
-GW_ROWS_W = 170; 
-GW_HEIGHT_W = 100; 
-xfix = 180;
-x1 = x1 + xfix;
+        (mb && p_mb == 0 && !rec_hit && mx>=FOLLOW_BOX_X && mx<FOLLOW_BOX_X+FOLLOW_BOX_W+31 && my>=draw_y-33 && my<draw_y+FOLLOW_BOX_H+5) ? (
+            rec_cues_active == 0 ? ( 
+                mem[ui_locked_tab] == -1 ? mem[ui_locked_tab] = 26 : mem[ui_locked_tab] = -1; 
+                gmem[GM_BASE+1] = mem[ui_locked_tab]; 
+                needs_tab_update = 1;
+            );
+        );
+    );
 
-track_num > 0 ? (  // Background Box (Using Track Color)
-rect(x1+39, row1_y-15, 1256, 44, track_r, track_g, track_b, 1);
-rect(x1+760, row1_y+4, 63, 20,.1,.1,.1,1);
-
-lum = (track_r * 0.299) + (track_g * 0.587) + (track_b * 0.114);
-lum > 0.5 ? gfx_set(0,0,0,1) : gfx_set(1,1,1,1);
-sprintf(#trk_str, "Track");
-gfx_measurestr(#trk_str, tw, th);
-gfx_x = x1+943 + (60-tw)/2;
-gfx_y = row1_y-4 + (18-th)/2;
-gfx_setfont(1, "Arial", 22, 'b');
-gfx_drawstr(#trk_str);
-gfx_setfont(0);
-
-sprintf(#trk_str2, "%d", track_num);
-gfx_measurestr(#trk_str2, tw, th);
-gfx_x = x1+989 + (60-tw)/2;
-gfx_y = row1_y-18 + (18-th)/2;
-gfx_setfont(1, "Arial", 48, 'b');
-gfx_drawstr(#trk_str2);
-gfx_setfont(0);
-);
-
-gfx_setfont(1, "Arial", fontsize, 'b'); 
-
-dr_glob(16, x1+39, row1_y+3, GW_ROWS_W+51, "  MAX ROWS TO SHOW:", slider7, 1, 128,  0, 0, -1, 0, 7);  
-x1 += GW_ROWS_W + 33;
-dr_glob(17, x1+62, row1_y+3, GW_HEIGHT_W+30, "  HEIGHT:", slider11, 10, 30, 0, 0, -1, 0, 11); 
-x1 += GW_HEIGHT_W + UI_GAP_X;
-dr_glob(15, x1+ 57, row1_y+3, GW_INST_W+1, "  INST ID:", slider5, 1, 512,  0, 0, -1, 0, 5); 
-x1 += GW_INST_W + UI_GAP_X;
-
-btn(x1+22, row1_y+4, 85, "RELOAD KIT") ? ( load_kit_from_slider(); ); 
-btn(x1+314, row1_y+4, 18, "?") ? ( help_active = !help_active; );
-
-
-
-
-
-
-
-// --- N2N IO BUTTONS ---
-io_x = x1 + 112; gap = 33;
-//btn(io_x, row1_y+4, 27, "<") ? ( gfx_set(1,0,0,1); import_n2n_data(0); ); // Import Single
-//btn(io_x+gap, row1_y+4, 27, "<") ? ( gfx_set(1,0,0,1); import_n2n_data(1); ); // Import Bank
-//btn(io_x+gap*2, row1_y+4, 29, "   >") ? ( gfx_set(1,0,0,1); export_n2n_data(1); ); // Export Bank
-//btn(io_x+gap*3+1, row1_y+4, 30, "   >") ? ( gfx_set(1,0,0,1); export_n2n_data(0); ); // Export Single
-//rect(io_x+9, row1_y + 13, 13, 1, 1, 1, 1, 1);
-//rect(io_x+44, row1_y + 12, 12, 1, 1, 1, 1, 1);
-//rect(io_x+44, row1_y + 14, 12, 1, 1, 1, 1, 1);
-//rect(io_x+73, row1_y + 12, 12, 1, 1, 1, 1, 1);
-//rect(io_x+73, row1_y + 14, 12, 1, 1, 1, 1, 1);
-//rect(io_x+107, row1_y + 13, 13, 1, 1, 1, 1, 1);
-
-
- 
-gfx_setfont(0);       
-x1 = x1 - xfix;
-//rect(0, 37, gfx_w, 1, 0.25, 0.25, 0.25, 1);
-row2_y = ROW2_Y; 
-
-
-
-
-
-
-gfx_setfont(1, "Arial", fontsize, 'b');
-
-// --- REC CUES TOGGLE ---
-rec_x = 64; // Left edge of the UI
-rec_y = row2_y; 
-rect(rec_x+1, rec_y+1, 52, 26, 0.2, 0.2, 0.2, 1);
-
-
-// Red background if active, gray if not
-rec_cues_active ? (
-    rect(rec_x+1, rec_y+1, 52, 26, 0.8, 0, 0, 1);
-    draw_text(rec_x+12, rec_y+1, " REC\nCUES", 1, 1, 1);
-) : (
-    draw_text(rec_x+12, rec_y+1, " REC\nCUES", 0.8, 0.8, 0.8);
-);
-
-rec_hit = (mx >= rec_x && mx < rec_x + 45 && my >= rec_y && my < rec_y + 16);
-
-(mb && p_mb == 0 && rec_hit) ? (
-    rec_cues_active = !rec_cues_active;
+    // ------------------------------------------
+    // DRAW THE TABS FOR THIS ROW (Reusing Code)
+    // ------------------------------------------
+    draw_x = tab_start_x; // Reset cursor to tab start
+    gui_t = 0;
     
-    rec_cues_active ? (
-        // When REC turns ON: Force Follow Mode
-        mem[ui_locked_tab] = -1; 
-        gmem[GM_BASE+1] = -1;
-        gmem[GMEM_REC_FLAG_ADDR] = 1;
-    ) : (
-        // When REC turns OFF: Stop REC flag, and Force FOLLOW mode
-        gmem[GMEM_REC_FLAG_ADDR] = 0;
-        mem[ui_locked_tab] = -1; 
-        gmem[GM_BASE+1] = -1;
-    );
-    needs_tab_update = 1;
-);
-
-movedownbit = 15;
-row2_y = row2_y+=movedownbit;
-
-mem[ui_locked_tab] == -1 ? mem[ui_edit_tab] = mem[ui_play_prog_tab]; 
-is_follow = (mem[ui_locked_tab] == -1);
-gfx_setfont(1, "Arial", fontsize, 'b'); 
-draw_text(FOLLOW_LBL_X+5, row2_y+20, "FOLLOW\n   MIDI\n  CUES:", 0.8,0.8,0.8); 
-
-gfx_circle(FOLLOW_BOX_X+21, row2_y+46, 7, 0); // Outer
-gfx_circle(FOLLOW_BOX_X+21, row2_y+36, 6.5, 0); // Middle
-gfx_circle(FOLLOW_BOX_X+21, row2_y+36, 6, 0); // Middle
-gfx_circle(FOLLOW_BOX_X+21, row2_y+36, 5.5, 0); // Middle
-gfx_circle(FOLLOW_BOX_X+21, row2_y+35, 5, 0); // Inner
-rect(FOLLOW_BOX_X+11, row2_y+37, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.5, 0.5, 0.5, 1);
-gfx_setfont(1, "Arial", 21, 'b');
-is_follow ? draw_text(FOLLOW_BOX_X+15, row2_y+36, "X", 0,1,0);
-is_follow ? rect(FOLLOW_BOX_X+11, row2_y+37, FOLLOW_BOX_W+1, FOLLOW_BOX_H,0.2*bri,  1.0*bri,  1.0*bri, 1);
-gfx_setfont(1, "Arial", fontsize, 'b'); 
-(mb && p_mb == 0 && !rec_hit && mx>=FOLLOW_BOX_X && mx<FOLLOW_BOX_X+FOLLOW_BOX_W+20 && my>=row2_y+25 && my<row2_y+45+FOLLOW_BOX_H+4) ? (
-    rec_cues_active == 0 ? ( // ONLY ALLOW CLICKS IF REC CUES IS OFF
-        mem[ui_locked_tab] == -1 ? mem[ui_locked_tab] = 26 : mem[ui_locked_tab] = -1; 
-        gmem[GM_BASE+1] = mem[ui_locked_tab]; 
-        needs_tab_update = 1;
-    );
-);
-
-row2_y = row2_y-=movedownbit;
-
-
-// =========================================================
-// RE-ORDERED: TABS NOW DRAW FIRST (At Top)
-// =========================================================
-
-// --- TAB ROW 1 ---
-ty = row2_y; // Reset Y to top of section
-tx = 120;
-gui_t = 0;
-loop(TOTAL_TABS,
-    my_row = mem[tab_ui_row_base + gui_t];
-    (my_row == 1) ? (
-        tw = mem[tab_w_base + gui_t]; 
-        is_ed = (gui_t == mem[ui_edit_tab]);
-        t_r = mem[tab_col_r + gui_t];
-        t_g = mem[tab_col_g + gui_t];
-        t_b = mem[tab_col_b + gui_t];
-        is_ed ? (
-             rect(tx, ty, tw-5, 26, 1, 1, 1, 1); 
-             rect(tx+1, ty+1, tw-7, 24, t_r, t_g, t_b, 1);
-        ) : (
-             rect(tx, ty, tw-5, 26, t_r*0.4, t_g*0.4, t_b*0.4, 1);
-        );
-        get_t_name(gui_t, #tn); 
-        gfx_setfont(1, "Arial", fontsize, 'b'); 
-        is_ed ? ( draw_text(tx+5, ty+5, #tn, 0, 0, 0); ) : ( draw_text(tx+5, ty+4, #tn, 1, 1, 1); );
-        gfx_setfont(0);  
+    loop(TOTAL_TABS,
+        my_row = mem[tab_ui_row_base + gui_t];
         
-        
-        
-        
-        
-        
-        
-        
-        
-        
-(mb && p_mb == 0 && mx>=tx && mx<tx+tw-24 && my>=ty && my<ty+26) ? ( 
-    rec_cues_active ? (
-        // 1. REC CUES ON: Single click CUES the tab. Double clicks do nothing. No selecting.
-        send_tab_trigger(gui_t);
-        mem[tab_flash_base + gui_t] = 10;
-        mem[row_flash_base + 0] = 5; 
-    ) : (
-        // 2. REC CUES OFF: Normal Behavior (Select/Double-Click Lock)
-        (time_precise() - last_tab_clk < 0.3 && last_tab_idx == gui_t) ? (
-            mem[ui_locked_tab] = gui_t; 
-            mem[ui_edit_tab] = gui_t;   
-            gmem[GM_BASE+1] = mem[ui_locked_tab]; 
-            last_tab_clk = 0; 
-        ) : (
-            mem[ui_locked_tab] != -1 ? (
-                mem[ui_edit_tab] = gui_t; 
-                mem[ui_play_offset] = 0; 
-                playback_shift = 0; 
+        (my_row == current_tab_row) ? (
+            item_w = mem[tab_w_base + gui_t]; // Using item_w dynamically from tab width
+            is_ed = (gui_t == mem[ui_edit_tab]);
+            t_r = mem[tab_col_r + gui_t]; t_g = mem[tab_col_g + gui_t]; t_b = mem[tab_col_b + gui_t];
+            
+            is_ed ? ( rect(draw_x, draw_y, item_w-5, 26, 1, 1, 1, 1); rect(draw_x+1, draw_y+1, item_w-7, 24, t_r, t_g, t_b, 1); ) 
+                  : ( rect(draw_x, draw_y, item_w-5, 26, t_r*0.4, t_g*0.4, t_b*0.4, 1); );
+                  
+            get_t_name(gui_t, #tn); 
+            gfx_setfont(1, "Trebuchet MS", fontsize, 'b'); 
+            is_ed ? draw_text(draw_x+3, draw_y+5, #tn, 0, 0, 0) : draw_text(draw_x+3, draw_y+4, #tn, 1, 1, 1);
+            gfx_setfont(0);  
+            
+            // Tab Clicking
+            (mb && p_mb == 0 && mx>=draw_x && mx<draw_x+item_w-24 && my>=draw_y && my<draw_y+26) ? ( 
+                rec_cues_active ? (
+                    send_tab_trigger(gui_t);
+                    mem[tab_flash_base + gui_t] = 10;
+                    mem[row_flash_base + 0] = 5; 
+                ) : (
+                    (time_precise() - last_tab_clk < 0.3 && last_tab_idx == gui_t) ? (
+                        mem[ui_locked_tab] = gui_t; mem[ui_edit_tab] = gui_t;   
+                        gmem[GM_BASE+1] = mem[ui_locked_tab]; last_tab_clk = 0; 
+                    ) : (
+                        mem[ui_locked_tab] != -1 ? ( mem[ui_edit_tab] = gui_t; mem[ui_play_offset] = 0; playback_shift = 0; );
+                        mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
+                        last_tab_clk = time_precise(); last_tab_idx = gui_t;
+                        needs_tab_update = 1;
+                    );
+                );
             );
-            mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
-            last_tab_clk = time_precise(); 
-            last_tab_idx = gui_t;
-            needs_tab_update = 1;
-        );
-    );
-);
 
-gfx_set(0.0, 0.0, 0.0, 1); 
-gfx_circle(tx+tw-17, ly=ty+8, 6, 0); 
-gfx_circle(tx+tw-17, ly=ty+8, 5, 0); 
-gfx_circle(tx+tw-17, ly=ty+8, 4, 0); 
+            // Tab Sub-Lock UI
+            gfx_set(0.0, 0.0, 0.0, 1); 
+            gfx_circle(draw_x+item_w-17, ly=draw_y+8, 6, 0); 
+            gfx_circle(draw_x+item_w-17, ly=draw_y+8, 5, 0); 
+            gfx_circle(draw_x+item_w-17, ly=draw_y+8, 4, 0); 
 
-lx=tx+tw-25; ly=ty+9; lw=17; lh=14;   
-rect(lx,ly,lw,lh, 0.1,0.1,0.1,1); 
+            lx=draw_x+item_w-25; ly=draw_y+9; lw=17; lh=14;   
+            rect(lx,ly,lw,lh, 0.1,0.1,0.1,1); 
 
-(mb && p_mb == 0 && mx>=lx-3 && mx<lx+lw+3 && my>=ly-2 && my<ly+lh+2) ? ( 
-    rec_cues_active == 0 ? (
-        mem[ui_locked_tab]=(mem[ui_locked_tab]==gui_t?-1:gui_t); 
-        gmem[GM_BASE+1]=mem[ui_locked_tab]; 
-        mem[ui_play_offset] = 0; 
-        playback_shift = 0; 
-        needs_tab_update = 1;
-    );
-);
-
-(rmb && !p_rmb && mx>=lx-3 && mx<lx+lw+3 && my>=ly-2 && my<ly+lh+2) ? ( 
-    rec_cues_active == 0 ? (
-        mem[ui_edit_tab] = gui_t; 
-        mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
-    );
-);
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        mem[ui_locked_tab] == gui_t ? rect(lx+1,ly+2,lw-2,lh-3, 0.3,.9,.7,1);  
-        (mem[ui_play_prog_tab] == gui_t) ? (gfx_set(1,.5 ,0,1); gfx_circle(tx+tw-17, ty+16, 4, 1);); 
-        mem[LOC_TAB_POPULATED + gui_t] ? (
-            gfx_set(1, 1, 1, 1);
-            gfx_rect(tx-1, ty-1, 4, 24);
-            gfx_rect(tx-1, ty-2, 41, 4);
-            gfx_rect(tx-1, ty+23, 21, 4);
-        );
-        f_amt = mem[tab_flash_base + gui_t];
-        f_amt > 0 ? (
-            // Draw a bright white overlay if flashing
-            rect(tx, ty, tw-5, 26, 1, 1, 1, f_amt/10); 
-            mem[tab_flash_base + gui_t] -= 1; // Count down the timer
-        );
-        
-        tx+=tw;
-        
-    );
-    gui_t+=1;
-); 
-
-// --- TAB ROW 2 ---
-ty += 30; 
-tx = 120;
-gui_t = 0;
-loop(TOTAL_TABS,
-    my_row = mem[tab_ui_row_base + gui_t];
-    (my_row == 2) ? (
-        tw = mem[tab_w_base + gui_t]; 
-        is_ed = (gui_t == mem[ui_edit_tab]);
-        t_r = mem[tab_col_r + gui_t];
-        t_g = mem[tab_col_g + gui_t];
-        t_b = mem[tab_col_b + gui_t];
-        is_ed ? (
-             rect(tx, ty, tw-5, 26, 1, 1, 1, 1); 
-             rect(tx+1, ty+1, tw-7, 24, t_r, t_g, t_b, 1);
-        ) : (
-             rect(tx, ty, tw-5, 26, t_r*0.4, t_g*0.4, t_b*0.4, 1);
-        );
-        get_t_name(gui_t, #tn); 
-        gfx_setfont(1, "Arial", fontsize, 'b'); 
-        is_ed ? ( draw_text(tx+5, ty+5, #tn, 0, 0, 0); ) : ( draw_text(tx+5, ty+4, #tn, 1, 1, 1); );
-        gfx_setfont(0);    
-        
-        
-        
-        
-        
-        
-        
-(mb && p_mb == 0 && mx>=tx && mx<tx+tw-24 && my>=ty && my<ty+26) ? ( 
-    rec_cues_active ? (
-        // 1. REC CUES ON: Single click CUES the tab. Double clicks do nothing. No selecting.
-        send_tab_trigger(gui_t);
-        mem[tab_flash_base + gui_t] = 10;
-        mem[row_flash_base + 0] = 5; 
-    ) : (
-        // 2. REC CUES OFF: Normal Behavior (Select/Double-Click Lock)
-        (time_precise() - last_tab_clk < 0.3 && last_tab_idx == gui_t) ? (
-            mem[ui_locked_tab] = gui_t; 
-            mem[ui_edit_tab] = gui_t;   
-            gmem[GM_BASE+1] = mem[ui_locked_tab]; 
-            last_tab_clk = 0; 
-        ) : (
-            mem[ui_locked_tab] != -1 ? (
-                mem[ui_edit_tab] = gui_t; 
-                mem[ui_play_offset] = 0; 
-                playback_shift = 0; 
+            (mb && p_mb == 0 && mx>=lx-3 && mx<lx+lw+3 && my>=ly-2 && my<ly+lh+2) ? ( 
+                rec_cues_active == 0 ? (
+                    mem[ui_locked_tab]=(mem[ui_locked_tab]==gui_t?-1:gui_t); 
+                    gmem[GM_BASE+1]=mem[ui_locked_tab]; mem[ui_play_offset] = 0; playback_shift = 0; needs_tab_update = 1;
+                );
             );
-            mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
-            last_tab_clk = time_precise(); 
-            last_tab_idx = gui_t;
-            needs_tab_update = 1;
-        );
-    );
-);
 
-gfx_set(0.0, 0.0, 0.0, 1); 
-gfx_circle(tx+tw-17, ly=ty+8, 6, 0); 
-gfx_circle(tx+tw-17, ly=ty+8, 5, 0); 
-gfx_circle(tx+tw-17, ly=ty+8, 4, 0); 
-
-lx=tx+tw-25; ly=ty+9; lw=17; lh=14;   
-rect(lx,ly,lw,lh, 0.1,0.1,0.1,1); 
-
-(mb && p_mb == 0 && mx>=lx && mx<lx+lw && my>=ly && my<ly+lh) ? ( 
-    rec_cues_active == 0 ? ( // NO LOCKING IF REC CUES IS ON
-        mem[ui_locked_tab]=(mem[ui_locked_tab]==gui_t?-1:gui_t); 
-        gmem[GM_BASE+1]=mem[ui_locked_tab]; 
-        mem[ui_play_offset] = 0; 
-        playback_shift = 0; 
-        needs_tab_update = 1;
-    );
-);
-
-(rmb && !p_rmb && mx>=lx && mx<lx+lw && my>=ly && my<ly+lh) ? ( 
-    rec_cues_active == 0 ? ( // NO LOCKING IF REC CUES IS ON
-        mem[ui_edit_tab] = gui_t; 
-        mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
-    );
-);
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        mem[ui_locked_tab] == gui_t ? rect(lx+1,ly+2,lw-2,lh-3, 0.3,.9,.7,1);   
-        (mem[ui_play_prog_tab] == gui_t) ? (gfx_set(1,.5 ,0,1); gfx_circle(tx+tw-17, ty+16, 4, 1););  
-        mem[LOC_TAB_POPULATED + gui_t] ? (
-            gfx_set(1, 1, 1, 1);
-            gfx_rect(tx-1, ty-1, 4, 24);
-            gfx_rect(tx-1, ty-2, 41, 4);
-            gfx_rect(tx-1, ty+23, 21, 4);
-        );
-        f_amt = mem[tab_flash_base + gui_t];
-        f_amt > 0 ? (
-            // Draw a bright white overlay if flashing
-            rect(tx, ty, tw-5, 26, 1, 1, 1, f_amt/10); 
-            mem[tab_flash_base + gui_t] -= 1; // Count down the timer
-        );
-        tx+=tw;
-    );
-    gui_t+=1;
-);
-
-// --- TAB ROW 3 ---
-ty += 30; 
-tx = 120;
-gui_t = 0;
-loop(TOTAL_TABS,
-    my_row = mem[tab_ui_row_base + gui_t];
-    (my_row == 3) ? (
-        tw = mem[tab_w_base + gui_t]; 
-        is_ed = (gui_t == mem[ui_edit_tab]);
-        t_r = mem[tab_col_r + gui_t];
-        t_g = mem[tab_col_g + gui_t];
-        t_b = mem[tab_col_b + gui_t];
-        is_ed ? (
-             rect(tx, ty, tw-5, 26, 1, 1, 1, 1); 
-             rect(tx+1, ty+1, tw-7, 24, t_r, t_g, t_b, 1);
-        ) : (
-             rect(tx, ty, tw-5, 26, t_r*0.4, t_g*0.4, t_b*0.4, 1);
-        );
-        get_t_name(gui_t, #tn); 
-        gfx_setfont(1, "Arial", fontsize, 'b'); 
-        is_ed ? ( draw_text(tx+5, ty+5, #tn, 0, 0, 0); ) : ( draw_text(tx+5, ty+4, #tn, 1, 1, 1); );
-        gfx_setfont(0);    
-        
-        
-        
-        
-        
-        
-(mb && p_mb == 0 && mx>=tx && mx<tx+tw-24 && my>=ty && my<ty+26) ? ( 
-    rec_cues_active ? (
-        // 1. REC CUES ON: Single click CUES the tab. Double clicks do nothing. No selecting.
-        send_tab_trigger(gui_t);
-        mem[tab_flash_base + gui_t] = 10;
-        mem[row_flash_base + 0] = 5; 
-    ) : (
-        // 2. REC CUES OFF: Normal Behavior (Select/Double-Click Lock)
-        (time_precise() - last_tab_clk < 0.3 && last_tab_idx == gui_t) ? (
-            mem[ui_locked_tab] = gui_t; 
-            mem[ui_edit_tab] = gui_t;   
-            gmem[GM_BASE+1] = mem[ui_locked_tab]; 
-            last_tab_clk = 0; 
-        ) : (
-            mem[ui_locked_tab] != -1 ? (
-                mem[ui_edit_tab] = gui_t; 
-                mem[ui_play_offset] = 0; 
-                playback_shift = 0; 
+            (rmb && !p_rmb && mx>=lx-3 && mx<lx+lw+3 && my>=ly-2 && my<ly+lh+2) ? ( 
+                rec_cues_active == 0 ? ( mem[ui_edit_tab] = gui_t; mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; );
             );
-            mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
-            last_tab_clk = time_precise(); 
-            last_tab_idx = gui_t;
-            needs_tab_update = 1;
+            
+            mem[ui_locked_tab] == gui_t ? rect(lx+1,ly+2,lw-2,lh-3, 0.3,.9,.7,1);  
+            (mem[ui_play_prog_tab] == gui_t) ? (gfx_set(1,.5 ,0,1); gfx_circle(draw_x+item_w-17, draw_y+16, 4, 1);); 
+            mem[LOC_TAB_POPULATED + gui_t] ? (
+                gfx_set(1, 1, 1, 1);
+                gfx_rect(draw_x-1, draw_y-1, 4, 24); gfx_rect(draw_x-1, draw_y-2, 41, 4); gfx_rect(draw_x-1, draw_y+23, 21, 4);
+            );
+            
+            f_amt = mem[tab_flash_base + gui_t];
+            f_amt > 0 ? ( rect(draw_x, draw_y, item_w-5, 26, 1, 1, 1, f_amt/10); mem[tab_flash_base + gui_t] -= 1; );
+            
+            draw_x += item_w; // FLOW: Advance cursor by tab width
         );
+        gui_t += 1;
     );
-);
-
-gfx_set(0.0, 0.0, 0.0, 1); 
-gfx_circle(tx+tw-17, ly=ty+8, 6, 0); 
-gfx_circle(tx+tw-17, ly=ty+8, 5, 0); 
-gfx_circle(tx+tw-17, ly=ty+8, 4, 0); 
-
-lx=tx+tw-25; ly=ty+9; lw=17; lh=14;   
-rect(lx,ly,lw,lh, 0.1,0.1,0.1,1); 
-
-(mb && p_mb == 0 && mx>=lx && mx<lx+lw && my>=ly && my<ly+lh) ? ( 
-    rec_cues_active == 0 ? ( // NO LOCKING IF REC CUES IS ON
-        mem[ui_locked_tab]=(mem[ui_locked_tab]==gui_t?-1:gui_t); 
-        gmem[GM_BASE+1]=mem[ui_locked_tab]; 
-        mem[ui_play_offset] = 0; 
-        playback_shift = 0; 
-        needs_tab_update = 1;
-    );
-);
-
-(rmb && !p_rmb && mx>=lx && mx<lx+lw && my>=ly && my<ly+lh) ? ( 
-    rec_cues_active == 0 ? ( // NO LOCKING IF REC CUES IS ON
-        mem[ui_edit_tab] = gui_t; 
-        mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
-    );
-);
-        
-        
-        
-        
-        
-        
-        
-        mem[ui_locked_tab] == gui_t ? rect(lx+1,ly+2,lw-2,lh-3, 0.3,.9,.7,1);   
-        (mem[ui_play_prog_tab] == gui_t) ? (gfx_set(1,.5 ,0,1); gfx_circle(tx+tw-17, ty+16, 4, 1););  
-        mem[LOC_TAB_POPULATED + gui_t] ? (
-            gfx_set(1, 1, 1, 1);
-            gfx_rect(tx-1, ty-1, 4, 24);
-            gfx_rect(tx-1, ty-2, 41, 4);
-            gfx_rect(tx-1, ty+23, 21, 4);
-        );
-        f_amt = mem[tab_flash_base + gui_t];
-        f_amt > 0 ? (
-            // Draw a bright white overlay if flashing
-            rect(tx, ty, tw-5, 26, 1, 1, 1, f_amt/10); 
-            mem[tab_flash_base + gui_t] -= 1; // Count down the timer
-        );
-        tx+=tw;
-    );
-    gui_t+=1;
+    
+    draw_y += 30; // Move down for the next row of tabs
+    current_tab_row += 1;
 );
 
 // =========================================================
-// PATTERN SETTINGS NOW DRAW BELOW TABS
+// ROW 5: PATTERN SETTINGS (Flow Refactored)
 // =========================================================
-
-row2_y = ty + 30; // Update Y for Pattern Settings to be below the Tabs
+draw_x = tab_start_x - 112; // Reset cursor to tab line
 
 t_e = mem[ui_edit_tab];
 (t_e == 0) ? (
     gfx_set(1, 0.2, 0.2, 1);
-    gfx_setfont(1, "Arial", 48, 'b');
+    gfx_setfont(1, "Trebuchet MS", 48, 'b');
     gfx_x = (gfx_w/2) - 150; 
     gfx_y = (gfx_h/2) + 52; 
     gfx_drawstr("PATTERN OFF");
-    gfx_setfont(1, "Arial", 18, 'b');
+    gfx_setfont(1, "Trebuchet MS", 18, 'b');
 ) : (
-    // Unified pointers for edit tab (Corrected: using sequential memory arrays for all 80 tabs)
     curr_pat_v_ptr = vel_base + t_e*vel_stride_tab; 
     curr_pat_g_ptr = grid_base + t_e*vel_stride_tab; 
     curr_pat_l_ptr = step_len_base + t_e*vel_stride_tab; 
     
-    // --- SET UP GHOST / FALLBACK POINTERS ---
     fb_tab = get_active_fallback(t_e);
     is_ghosting = (t_e != fb_tab);
     
@@ -2378,188 +2265,161 @@ t_e = mem[ui_edit_tab];
     fb_pat_g_ptr = grid_base + fb_tab*vel_stride_tab; 
     fb_pat_l_ptr = step_len_base + fb_tab*vel_stride_tab; 
 
-    bx = BTN_X0;
-    extrascoot = 10;
-    gfx_setfont(1, "Arial", fontsize, 'b'); 
-    btn(bx-15+extrascoot, row2_y, BTN_W_ACCEPT+21, "  ACCEPT SUGGESTED PATTERN") ? ( 
+    // LABEL
+    gfx_setfont(1, "Trebuchet MS", fontsize, 'b'); 
+    gfx_set(0.8,0.8,0.8,1); 
+    gfx_x = draw_x; gfx_y = draw_y-3; 
+    gfx_drawstr("PATTERN");
+    gfx_x = draw_x; gfx_y = draw_y+8; 
+    gfx_drawstr("SETTINGS:");
+    draw_x += 57;
+
+    // MUTE BUTTON (Added here to flow sequence)
+    item_w = 50;
+    is_p_muted = mem[tab_mute_base + t_e];
+    is_p_muted ? rect(draw_x, draw_y, item_w, btn_h, 1, .4, .4, .6) : rect(draw_x, draw_y, item_w, btn_h, 0.4, 0.3, 0.3, 1);
+    gfx_set(1,1,1,1); gfx_x = draw_x + 9; gfx_y = draw_y + 2; gfx_drawstr("MUTE");
+    (mb && p_mb == 0 && mx >= draw_x && mx < draw_x + item_w && my >= draw_y && my < draw_y + btn_h) ? (
+        mem[tab_mute_base + t_e] = !mem[tab_mute_base + t_e];
+        needs_tab_update = 1;
+    );
+    draw_x += item_w + ui_gap_small;
+
+    // ACCEPT SUGGESTED
+    item_w = BTN_W_ACCEPT + 21;
+    btn(draw_x, draw_y, item_w, "ACCEPT SUGGESTED PATTERN") ? ( 
         is_ghosting ? (
-            // 1. Copy the Data
             memcpy(curr_pat_v_ptr, fb_pat_v_ptr, vel_stride_tab);
             memcpy(curr_pat_g_ptr, fb_pat_g_ptr, vel_stride_tab);
             memcpy(curr_pat_l_ptr, fb_pat_l_ptr, vel_stride_tab);
-            
-            mem[tab_mute_base + t_e] = 0;
-            
-            // 2. Scan to alert Lua/Inventory that this pattern is now permanently written
-            scan_active_tab();
-            
-            // (Optional) Automatically update the 'is_ghosting' flag so the UI refreshes instantly
-            is_ghosting = 0; 
-            needs_tab_update = 1;
+            mem[tab_mute_base + t_e] = 0; scan_active_tab(); is_ghosting = 0; needs_tab_update = 1;
         );
     ); 
+    draw_x += item_w + ui_gap_small;
 
-    bx += BTN_W_ACCEPT + BTN_GAP+16;
-    gfx_setfont(1, "Arial", fontsize, 'b'); 
-    btn(bx-15+extrascoot, row2_y, BTN_W_COPY+21, "  COPY PATTERN") ? ( 
+    // COPY
+    item_w = BTN_W_COPY + 21 + 39;
+    btn(draw_x, draw_y, item_w, "   COPY PATTERN") ? ( 
         memcpy(copy_tab_v_buf, curr_pat_v_ptr, vel_stride_tab); 
         memcpy(copy_tab_g_buf, curr_pat_g_ptr, vel_stride_tab); 
         memcpy(copy_tab_l_buf, curr_pat_l_ptr, vel_stride_tab);
-        cp_valid = 1;
-        cp_mute = mem[tab_mute_base + t_e];
-        cp_bars = eff_bars(mem[ui_edit_tab]);
-        cp_sub = eff_sub(mem[ui_edit_tab]);
-        cp_hum = eff_hum(mem[ui_edit_tab]);
-        cp_sw = eff_swing(mem[ui_edit_tab]);
-        cp_half = eff_half(mem[ui_edit_tab]);
+        cp_valid = 1; cp_mute = mem[tab_mute_base + t_e]; cp_bars = eff_bars(mem[ui_edit_tab]);
+        cp_sub = eff_sub(mem[ui_edit_tab]); cp_hum = eff_hum(mem[ui_edit_tab]);
+        cp_sw = eff_swing(mem[ui_edit_tab]); cp_half = eff_half(mem[ui_edit_tab]);
     ); 
-    bx += BTN_W_COPY + BTN_GAP;
-    btn(bx+1+extrascoot, row2_y, BTN_W_PASTE+16, " PASTE PATTERN") ? ( 
+    draw_x += item_w + ui_gap_small;
+
+    // PASTE
+    item_w = BTN_W_PASTE + 18;
+    btn(draw_x, draw_y, item_w, "  PASTE PATTERN") ? ( 
         memcpy(curr_pat_v_ptr, copy_tab_v_buf, vel_stride_tab); 
         memcpy(curr_pat_g_ptr, copy_tab_g_buf, vel_stride_tab); 
         memcpy(curr_pat_l_ptr, copy_tab_l_buf, vel_stride_tab); 
         cp_valid ? (
             act_t = mem[ui_edit_tab];
-            mem[tab_mute_base + act_t] = cp_mute;
-            mem[bars_ov_base+act_t] = cp_bars;
+            mem[tab_mute_base + act_t] = cp_mute; mem[bars_ov_base+act_t] = cp_bars;
             mem[subdiv_ov_base+act_t] = (cp_sub==8?0:cp_sub==12?1:cp_sub==16?2:cp_sub==24?3:4);
-            mem[hum_ov_base+act_t] = cp_hum;
-            mem[swing_ov_base+act_t] = cp_sw;
-            mem[half_speed_ov_base+act_t] = cp_half;
-            scan_active_tab();
-            needs_tab_update = 1;
+            mem[hum_ov_base+act_t] = cp_hum; mem[swing_ov_base+act_t] = cp_sw; mem[half_speed_ov_base+act_t] = cp_half;
+            scan_active_tab(); needs_tab_update = 1;
         );
     ); 
-    bx += BTN_W_PASTE + BTN_GAP;
-    btn(bx+12+extrascoot, row2_y, BTN_W_CLEAR+16, " CLEAR PATTERN") ? ( 
-        memset(curr_pat_g_ptr, 0, vel_stride_tab); 
-        memset(curr_pat_v_ptr, 0, vel_stride_tab); 
-        memset(curr_pat_l_ptr, 0, vel_stride_tab);
-        mem[tab_mute_base + t_e] = 0;
-        scan_active_tab();
-        needs_tab_update = 1;
+    draw_x += item_w + ui_gap_small;
+
+    // CLEAR
+    item_w = BTN_W_CLEAR + 18;
+    btn(draw_x, draw_y, item_w, "  CLEAR PATTERN") ? ( 
+        memset(curr_pat_g_ptr, 0, vel_stride_tab); memset(curr_pat_v_ptr, 0, vel_stride_tab); memset(curr_pat_l_ptr, 0, vel_stride_tab);
+        mem[tab_mute_base + t_e] = 0; scan_active_tab(); needs_tab_update = 1;
     ); 
-    bx += BTN_W_CLEAR + BTN_GAP;
-    pat_lbl_x = bx; 
-    gfx_set(0.8,0.8,0.8,1); 
-    gfx_x = pat_lbl_x -679; 
-    gfx_y = row2_y -3; 
-    gfx_drawstr(" PATTERN\nSETTINGS:"); 
-    pat_x = pat_lbl_x + PAT_LBL_W;
-    pat_y = row2_y - 0; 
-    box_w = PAT_BOX_W; 
-    box_h = PAT_BOX_H; 
-    gap_w = PAT_BOX_GAP;
-    bars_x = pat_x -195; 
+    draw_x += item_w + ui_gap_small; // Extra gap before grid settings
+
     active_tab = mem[ui_edit_tab]; 
-    
-    // Unified Override Access
-    bars_addr = -1; 
-    (active_tab > 0) ? ( bars_addr = bars_ov_base + active_tab; );
-    
+
+    // BARS
+    item_w = PAT_BOX_W + 22;
+    bars_addr = (active_tab > 0) ? (bars_ov_base + active_tab) : -1;
     curr_bars = eff_bars(active_tab); 
-    rect(bars_x+37, pat_y, box_w+11, box_h, 0.2,0.2,0.2,1); 
-    draw_text(bars_x+52, pat_y+2, "BARS:", 0.7,0.7,0.7); 
+    rect(draw_x, draw_y, item_w, btn_h, 0.2,0.2,0.2,1); 
+    draw_text(draw_x + 15, draw_y+2, "BARS:", 0.7,0.7,0.7); 
     sprintf(#s, "%d", curr_bars); 
-    draw_text(bars_x+box_w+12, pat_y+2, #s, 1,1,1);
-    bars_hit_l = bars_x + 71; 
-    bars_hit_r = bars_x + box_w + 92; 
-    (mx>=bars_hit_l && mx<bars_hit_r && my>=pat_y && my<pat_y+box_h && mb && p_mb==0) ? ( capture_id = 12; drag_accum = 0; );
+    draw_text(draw_x + item_w - 30, draw_y+2, #s, 1,1,1);
+    
+    (mx>=draw_x && mx<draw_x+item_w && my>=draw_y && my<draw_y+btn_h && mb && p_mb==0) ? ( capture_id = 12; drag_accum = 0; );
     (mb && capture_id == 12) ? ( 
         drag_accum += (mx - p_mx); 
         abs(drag_accum) > 8 ? ( 
-            step_dir = drag_accum > 0 ? 1 : -1; 
-            drag_accum = 0; 
-            target_addr = bars_addr; 
-            (active_tab > 0 && target_addr >= 0) ? ( 
-                mem[target_addr] <= 0 ? mem[target_addr] = slider4; 
-                mem[target_addr] = clamp(mem[target_addr] + step_dir, 1, 4); 
+            step_dir = drag_accum > 0 ? 1 : -1; drag_accum = 0; 
+            (active_tab > 0 && bars_addr >= 0) ? ( 
+                mem[bars_addr] <= 0 ? mem[bars_addr] = slider4; 
+                mem[bars_addr] = clamp(mem[bars_addr] + step_dir, 1, 4); 
             ); 
         ); 
     );
-    sub_x = bars_x + box_w + gap_w; 
+    draw_x += item_w + ui_gap_small;
+
+    // SUBDIV
+    item_w = PAT_BOX_W + 22;
     ov_s = eff_sub(active_tab); 
     curr_s = (ov_s==8?0:ov_s==12?1:ov_s==16?2:ov_s==24?3:4);
-    rect(sub_x-17, pat_y, box_w+11, box_h, 0.2,0.2,0.2,1); 
-    rect(sub_x-17, pat_y, box_w+8, box_h, 0.2,0.2,0.2,1); 
-    draw_text(sub_x-3, pat_y+2, "SUBDIV:", 0.7,0.7,0.7); 
+    rect(draw_x, draw_y, item_w, btn_h, 0.2,0.2,0.2,1); 
+    draw_text(draw_x + 10, draw_y+2, "SUBDIV:", 0.7,0.7,0.7); 
     v=curr_s; v==0?strcpy(#s,"8"):v==1?strcpy(#s,"12"):v==2?strcpy(#s,"16"):v==3?strcpy(#s,"24"):strcpy(#s,"32"); 
-    draw_text(sub_x+box_w-43, pat_y+2, #s, 1,1,1);
-    sub_hit_l = sub_x -17 ; 
-    sub_hit_r = sub_x + box_w; 
-    (mx>=sub_hit_l && mx<sub_hit_r && my>=pat_y && my<pat_y+box_h && mb && p_mb==0) ? ( capture_id = 13; drag_accum = 0; );
+    draw_text(draw_x + item_w - 30, draw_y+2, #s, 1,1,1);
+    
+    (mx>=draw_x && mx<draw_x+item_w && my>=draw_y && my<draw_y+btn_h && mb && p_mb==0) ? ( capture_id = 13; drag_accum = 0; );
     (mb && capture_id == 13) ? ( 
         drag_accum += (mx - p_mx); 
         abs(drag_accum) > 8 ? ( 
-            step_dir = drag_accum > 0 ? 1 : -1; 
-            drag_accum = 0; 
+            step_dir = drag_accum > 0 ? 1 : -1; drag_accum = 0; 
             target_addr = subdiv_ov_base + active_tab; 
             mem[target_addr] < 0 ? mem[target_addr] = slider3; 
             mem[target_addr] = clamp(mem[target_addr] + step_dir, 0, 4); 
         ); 
     );
-    sw_x = sub_x + box_w + gap_w -47; 
-    rect(sw_x-25, pat_y, box_w+55, box_h, 0.2,0.2,0.2,1); 
-    draw_text(sw_x-12, pat_y+2, "SWING:", 0.7,0.7,0.7);
-    sw_addr = -1; 
-    (active_tab > 0) ? ( sw_addr = swing_ov_base + active_tab; );
+    draw_x += item_w + ui_gap_small;
+
+    // SWING (Combined with M/P Box)
+    item_w = PAT_BOX_W + 61;
+    rect(draw_x, draw_y, item_w, btn_h, 0.2,0.2,0.2,1); 
+    draw_text(draw_x + 10, draw_y+2, "SWING:", 0.7,0.7,0.7);
+    
+    sw_addr = (active_tab > 0) ? (swing_ov_base + active_tab) : -1;
     curr_sw = eff_swing(active_tab); 
     sprintf(#s, "%d%%", curr_sw); 
     is_sw_local = (sw_addr >= 0 && mem[sw_addr] >= 0);
-    pl_x = sw_x + 55;
-    rect(pl_x, pat_y, 15, 16, 0.2,0.2,0.2,1);
-    is_sw_local ? draw_text(pl_x-4, pat_y+2, "M", 1,0.5,0) : draw_text(pl_x-4, pat_y+2, "P", 0,1,1);
-    (mb && p_mb==0 && mx>=pl_x-12 && mx<pl_x+15 && my>=pat_y-1 && my<pat_y-1+box_h) ? (
-        is_sw_local ? ( mem[sw_addr] = -1; ) : ( mem[sw_addr] = clamp(eff_swing(active_tab), 0, 100); )
+    
+    // The M/P Box embedded inside Swing
+    pl_x = draw_x + item_w - 20;
+    rect(pl_x, draw_y, 15, 16, 0.2,0.2,0.2,1);
+    is_sw_local ? draw_text(pl_x+3, draw_y+2, "M", 1,0.5,0) : draw_text(pl_x+3, draw_y+2, "P", 0,1,1);
+    (mb && p_mb==0 && mx>=pl_x && mx<pl_x+15 && my>=draw_y && my<draw_y+btn_h) ? (
+        is_sw_local ? mem[sw_addr] = -1 : mem[sw_addr] = clamp(eff_swing(active_tab), 0, 100);
     );
-    draw_text(sw_x+box_w-20, pat_y+2, #s, 1,1,1);
-    sw_hit_l = pl_x + 15; 
-    sw_hit_r = sw_x + box_w +15;
-    (mb && p_mb==0 && mx>=sw_hit_l && mx<sw_hit_r && my>=pat_y && my<pat_y+box_h) ? (
-        (is_sw_local) ? (
-            capture_id = 12012;
-            capture_min = 0;
-            capture_max = 100;
-            capture_is_signed = 0;
+    draw_text(draw_x + item_w - 60, draw_y+2, #s, 1,1,1);
+    
+    (mb && p_mb==0 && mx>=draw_x && mx<pl_x && my>=draw_y && my<draw_y+btn_h) ? (
+        is_sw_local ? (
+            capture_id = 12012; capture_min = 0; capture_max = 100; capture_is_signed = 0;
             sw_addr >= 0 ? (
                 mem[sw_addr] < 0 ? mem[sw_addr] = clamp(eff_swing(active_tab), 0, 100);
-                capture_ptr = sw_addr;
-                capture_slider_idx = 0;
+                capture_ptr = sw_addr; capture_slider_idx = 0;
             );
         );
     );
-    (mb && capture_id == 12012) ? ( 
-        d_delta = (mx - p_mx); 
-        mv = mem[capture_ptr]; 
-        nv = clamp(mv + d_delta, 0, 100); 
-        mem[capture_ptr] = nv; 
-    ); 
-    hum_x = sw_x + box_w + gap_w; 
-    dr_glob(11, hum_x-36, pat_y, box_w+11, "HUMANIZE:", slider2, 0, 25, 0, 0, hum_ov_base, 1, 2);
-    curr_sub_val = eff_sub(mem[ui_edit_tab]);
-    st_v = eff_bars(mem[ui_edit_tab]) * curr_sub_val; // Re-calc stride for later use
-    st_x = hum_x + box_w + gap_w; 
-    (curr_sub_val == 24 || curr_sub_val == 32) ? (
-        hf_x = st_x-30; 
-        st_x = hf_x + 14 + gap_w; 
-        hf_act = eff_half(mem[ui_edit_tab]);
-        (mb && p_mb == 0 && mx>=hf_x-60 && mx<hf_x+20 && my>=pat_y && my<pat_y+box_h) ? (
-            t_addr = half_speed_ov_base + mem[ui_edit_tab];
-            mem[t_addr] = !mem[t_addr];
-        );
-        rect(hf_x-61, pat_y, 86, box_h, 0.2, 0.2, 0.2, 1);
-        !hf_act ? ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(hf_x-61, pat_y, 43, box_h); ); 
-        hf_act  ? ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(hf_x-16, pat_y, 43, box_h); ); 
-        !hf_act ? gfx_set(0,0,0,1) : gfx_set(0.5,0.5,0.5,1);
-        draw_text(hf_x-48, pat_y+2, "1x", 0,0,0); 
-        hf_act ? gfx_set(0,0,0,1) : gfx_set(0.5,0.5,0.5,1);
-        draw_text(hf_x-7, pat_y+2, "1/2", 0,0,0);
-        gfx_set(0,0,0,1); 
-        gfx_line(hf_x-18, pat_y, hf_x-18, pat_y+box_h);
-    );
-    btn(1395, pat_y, 86, "  STRETCH") ? ( 
-        gfx_x = st_x; 
-        gfx_y = pat_y + 20;
+    (mb && capture_id == 12012) ? ( d_delta = (mx - p_mx); mem[capture_ptr] = clamp(mem[capture_ptr] + d_delta, 0, 100); ); 
+    draw_x += item_w + ui_gap_small;
+
+    // HUMANIZE
+    item_w = PAT_BOX_W + 22;
+    dr_glob(11, draw_x, draw_y, item_w, "HUMANIZE:", slider2, 0, 25, 0, 0, hum_ov_base, 1, 2);
+    draw_x += item_w + ui_gap_small;
+
+
+    // STRETCH
+    item_w = 87;
+    btn(draw_x, draw_y, item_w, "   STRETCH") ? ( 
+        gfx_x = draw_x; 
+        gfx_y = draw_y + 20;
         sel_stretch = gfx_showmenu("Stretch Pattern 2x (Short)|Stretch Pattern 2x (Long)|Stretch Pattern 4x (Short)|Stretch Pattern 4x (Long)||Stretch Selected Row 2x (Short)|Stretch Selected Row 2x (Long)|Stretch Selected Row 4x (Short)|Stretch Selected Row 4x (Long)");
         sel_stretch > 0 ? (
             (sel_stretch <= 4) ? ( is_pattern = 1; base_s = sel_stretch; ) : ( is_pattern = 0; base_s = sel_stretch - 4; );
@@ -2577,31 +2437,64 @@ t_e = mem[ui_edit_tab];
                 memcpy(copy_row_v_buf, basev + row_offset, st_cnt);
                 memcpy(copy_row_g_buf, baseg + row_offset, st_cnt);
                 memcpy(copy_row_l_buf, basel + row_offset, st_cnt);
-                memset(basev + row_offset, 0, st_cnt);
-                memset(baseg + row_offset, 0, st_cnt);
-                memset(basel + row_offset, 0, st_cnt);
-                s_idx = 0; 
-                loop_limit = ceil(st_cnt / factor);
+                memset(basev + row_offset, 0, st_cnt); memset(baseg + row_offset, 0, st_cnt); memset(basel + row_offset, 0, st_cnt);
+                s_idx = 0; loop_limit = ceil(st_cnt / factor);
                 loop(loop_limit,
                     target_idx = s_idx * factor;
                     (target_idx < st_cnt) ? (
                         mem[basev + row_offset + target_idx] = mem[copy_row_v_buf + s_idx];
                         mem[baseg + row_offset + target_idx] = mem[copy_row_g_buf + s_idx];
                         raw_len = mem[copy_row_l_buf + s_idx];
-                        new_len = raw_len;
-                        is_long ? ( new_len = (raw_len < 1 ? 1 : raw_len) * factor; );
+                        new_len = raw_len; is_long ? ( new_len = (raw_len < 1 ? 1 : raw_len) * factor; );
                         mem[basel + row_offset + target_idx] = new_len;
                     );
                     s_idx += 1;
                 );
                 r_iter += 1;
             );
+            scan_active_tab(); needs_tab_update = 1;
         );
     );
+    draw_x += item_w + ui_gap_small;
+    
+    
+    // HALF SPEED (Conditional)
+    curr_sub_val = eff_sub(mem[ui_edit_tab]);
+    st_v = eff_bars(mem[ui_edit_tab]) * curr_sub_val; 
+    (curr_sub_val == 24 || curr_sub_val == 32) ? (
+        item_w = 90;
+        hf_act = eff_half(mem[ui_edit_tab]);
+        (mb && p_mb == 0 && mx>=draw_x && mx<draw_x+item_w && my>=draw_y && my<draw_y+btn_h) ? (
+            t_addr = half_speed_ov_base + mem[ui_edit_tab];
+            mem[t_addr] = !mem[t_addr];
+        );
+        rect(draw_x, draw_y, item_w, btn_h, 0.2, 0.2, 0.2, 1);
+        !hf_act ? ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(draw_x, draw_y, item_w/2, btn_h); ) 
+                : ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(draw_x + item_w/2, draw_y, item_w/2, btn_h); ); 
+        !hf_act ? gfx_set(0,0,0,1) : gfx_set(0.5,0.5,0.5,1);
+        draw_text(draw_x + 13, draw_y+2, "1x", 0,0,0); 
+        hf_act ? gfx_set(0,0,0,1) : gfx_set(0.5,0.5,0.5,1);
+        draw_text(draw_x + 55, draw_y+2, "1/2", 0,0,0);
+        gfx_set(0,0,0,1); 
+        gfx_line(draw_x + item_w/2, draw_y, draw_x + item_w/2, draw_y+btn_h);
+        draw_x += item_w + ui_gap_small;
+    );
 
-    // Set ty for the Grid to continue below settings
-    ty = row2_y;
 );
+
+// Set ty for the bottom grid to continue properly
+ty = draw_y;
+
+
+
+
+
+
+
+
+
+
+
 
 (t_e != 0) ? (
     t_e = mem[ui_edit_tab]; 
@@ -2635,7 +2528,7 @@ t_e = mem[ui_edit_tab];
     mb == 0 ? last_preview_note = -1;
     ty+=38; 
     upser = 5;
-    gfx_setfont(1, "Arial", fontsize, 'b'); 
+    gfx_setfont(1, "Trebuchet MS", fontsize, 'b'); 
     draw_text(10, ty-upser, "DRUM:", 0.7,0.7,0.7); 
     strlen(row_name_str_base + sel_r * str_size) > 0 ? (
         strcpy(#dn_cur, row_name_str_base + sel_r * str_size);
@@ -2661,15 +2554,17 @@ t_e = mem[ui_edit_tab];
     dr_p(980, ty-upser, "HUM:", row_human_base+sel_r, -1, 100, 75);
     dr_p(1180, ty-upser, "PUSH/PULL:", row_offs_base+sel_r, -50, 60, 125); 
     
+    
     gr_max = mem[LOCAL_GROOVE_DB + 32];
-    gr_x = 1242; 
-    gr_y = ty-118;
+    gr_x = groovex; 
+    gr_y = groovey;
     gfx_set(0.7, 0.7, 0.7, 1);
-    gfx_x = gr_x + -20; 
-    gfx_y = gr_y - 62; 
+    gfx_x = gr_x; 
+    gfx_y = gr_y;
     gfx_drawstr("GRV:");
     gr_max == 0 ? gfx_set(0.7 ,0.7 ,0.7, 1) : (gr_max > 1.0 ? gfx_set(1, 0, 0, 1) : gfx_set(0, 1, 0, 1));
-    gfx_circle(gr_x+21, gr_y-54, 4, 1);
+    gfx_circle(gr_x+43, gr_y+6, 5, 1);
+    
 
     ty+=12; 
     s_v=eff_sub(t_e); 
@@ -2680,31 +2575,33 @@ t_e = mem[ui_edit_tab];
         play_step_idx = floor(vis_beat * (s_v/4)); 
     ) : play_step_idx = -1;
 
-    btn(10, ty+2, 95, "  Copy Row") ? ( 
+    btn(10, ty+2, 77, "  Copy Row") ? ( 
         memcpy(copy_row_v_buf, curr_pat_v_ptr + sel_r*vel_stride_row, MAX_STEPS); 
         memcpy(copy_row_g_buf, curr_pat_g_ptr + sel_r*vel_stride_row, MAX_STEPS); 
         memcpy(copy_row_l_buf, curr_pat_l_ptr + sel_r*vel_stride_row, MAX_STEPS); 
     );
-    btn(10, ty+26, 95, "  Paste Row") ? ( 
+    btn(10, ty+26, 77, "  Paste Row") ? ( 
         memcpy(curr_pat_v_ptr + sel_r*vel_stride_row, copy_row_v_buf, MAX_STEPS); 
         memcpy(curr_pat_g_ptr + sel_r*vel_stride_row, copy_row_g_buf, MAX_STEPS); 
         memcpy(curr_pat_l_ptr + sel_r*vel_stride_row, copy_row_l_buf, MAX_STEPS);
         scan_active_tab();
+        needs_tab_update = 1;
     );
-    btn(130, ty+28, 35, "ALL") ? ( mem[ui_vel_edit_all] = !mem[ui_vel_edit_all]; );
+    btn(124, ty+28, 30, "ALL") ? ( mem[ui_vel_edit_all] = !mem[ui_vel_edit_all]; );
     mem[ui_vel_edit_all] ? ( 
         gfx_set(1, 0.8, 0.2, 1); 
-        gfx_rect(130, ty+28, 35, 18); 
+        gfx_rect(124, ty+28, 30, 18); 
         gfx_set(0,0,0,1); 
-        gfx_x=135;
+        gfx_x=129;
         gfx_y=ty+30; 
         gfx_drawstr("ALL"); 
     );
-    btn(10, ty+50, 95, "  Clear Row") ? ( 
+    btn(10, ty+50, 77, "  Clear Row") ? ( 
         memset(curr_pat_g_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); 
         memset(curr_pat_v_ptr + sel_r*vel_stride_row, 0, MAX_STEPS); 
         memset(curr_pat_l_ptr + sel_r*vel_stride_row, 0, MAX_STEPS);
         scan_active_tab();
+        needs_tab_update = 1;
     );
 
     gx_s=220; 
@@ -2867,35 +2764,7 @@ t_e = mem[ui_edit_tab];
 
 
 
-//-----------------------------------------
 
-
-// --- PATTERN MUTE BUTTON ---
-mute_x = def_x -124;
-mute_y = ruler_y - 148; // Aligned with the "1, 2, 3, 4" bar markers
-mute_w = def_w+ 25;
-mute_h = ruler_h+06;
-
-is_p_muted = mem[tab_mute_base + t_e];
-
-// Draw the button
-is_p_muted ? (
-    rect(mute_x, mute_y, mute_w, mute_h, 1, .4, .4, .6); // Red if muted
-) : (
-    rect(mute_x, mute_y, mute_w, mute_h, 0.4, 0.3, 0.3, 1); // Dark if active
-);
-
-gfx_set(1,1,1,1);
-gfx_x = mute_x +10; gfx_y = mute_y+2;
-gfx_drawstr("MUTE"); // "MUTE PATTERN" for Mute
-
-// Handle Click
-(mb && p_mb == 0 && mx >= mute_x && mx < mute_x + mute_w && my >= mute_y && my < mute_y + mute_h) ? (
-    mem[tab_mute_base + t_e] = !mem[tab_mute_base + t_e];
-    needs_tab_update = 1; // Trigger the audio engine to notice the change
-);
-
-//------------------------------------------
 
 
 
@@ -2943,6 +2812,8 @@ gfx_drawstr("MUTE"); // "MUTE PATTERN" for Mute
                     memcpy(curr_pat_l_ptr + dst_offset, bar_copy_base + src_offset + 80, op_len);
                     r_it += 1;
                 );
+                scan_active_tab();
+                needs_tab_update = 1;
             );
             sel_menu == 3 ? ( 
                 r_it = 0; 
@@ -2953,6 +2824,8 @@ gfx_drawstr("MUTE"); // "MUTE PATTERN" for Mute
                     memset(curr_pat_l_ptr + dst_offset, 0, op_len);
                     r_it += 1;
                 );
+                scan_active_tab();
+                needs_tab_update = 1;
             );
         );
         
@@ -3019,7 +2892,12 @@ gfx_drawstr("MUTE"); // "MUTE PATTERN" for Mute
     gfx_set(0,0,0,1); 
     gfx_rect(0, grid_y, gfx_w, gfx_h - grid_y);
     r_v = 0; 
-    gfx_setfont(0);
+    rowfontsize = grid_height - 1;
+    rowfontsize > 17 ? ( rowfontsize = 17; textoffset = (grid_height * .45) - 7; ) : (textoffset = (grid_height * .12) - 1) ;
+    
+    gfx_setfont(1, "Helvetica", rowfontsize, 'b') ;    
+    
+    circleoffset = .45 * grid_height;
     loop(visible_rows,
         r_g = r_v + scroll_offset; 
         ry = grid_y + r_v*row_h;
@@ -3027,19 +2905,26 @@ gfx_drawstr("MUTE"); // "MUTE PATTERN" for Mute
             rect(10, ry, gx_w+gx_s-10, row_h-1, 0.12, 0.12, 0.12, 1) : 
             rect(10, ry, gx_w+gx_s-10, row_h-1, 0, 0, 0, 1);
         mem[row_mute_base+r_g]?
-            draw_text(15,ry+3,"M",1,0,0):
-            draw_text(15,ry+3,"M",0.4,0.4,0.4);
+            draw_text(15,ry+textoffset,"M",1,0,0):
+            draw_text(15,ry+textoffset,"M",0.4,0.4,0.4);
         mem[row_solo_base+r_g]?
-            draw_text(32,ry+3,"S",0,1,1):
-            draw_text(32,ry+3,"S",0.4,0.4,0.4);
+            draw_text(32,ry+textoffset,"S",0,1,1):
+            draw_text(32,ry+textoffset,"S",0.4,0.4,0.4);
         STRING_SLOT_ID = row_name_str_base + r_g; 
         strlen(STRING_SLOT_ID) > 0 ? ( strcpy(#gn_row, STRING_SLOT_ID); ) : ( get_d_name(mem[row_name_idx+r_g], #gn_row); );
         set_ui_color(mem[row_color_base+r_g]); 
-        gfx_x=53; 
-        gfx_y=ry+6; 
-        gfx_circle(gfx_x, gfx_y, 4, 1); 
+        circle_x = 53;
+        circle_y = ry + circleoffset;
+        circle_r = 4;
+        
+        gfx_x = circle_x;
+        gfx_y = circle_y;
+        gfx_circle(circle_x, circle_y, circle_r, 1);
+        
+
+
         gfx_x=65; 
-        gfx_y=ry+3; 
+        gfx_y=ry+textoffset; 
         gfx_drawstr(#gn_row);
         (mb && p_mb==0 && mx>=65 && mx<165 && my>=ry+3 && my<ry+18) ? ( 
             preview_note = mem[row_note_base+r_g]; 
@@ -3049,12 +2934,25 @@ gfx_drawstr("MUTE"); // "MUTE PATTERN" for Mute
             mem[ui_selected_row] = r_g; 
             mem[ui_vel_edit_all] = 0; 
         ); 
-            (mb && p_mb==0 && mx>=48 && mx<58 && my>=ry+1 && my<ry+11) ? (
-            color_popup_active = 1;
-            color_popup_x = mx;
-            color_popup_y = my;
-            color_popup_row = r_g;
-            );
+        
+        
+        
+        
+circle_hit = (
+    (mx-circle_x)*(mx-circle_x) + (my-circle_y)*(my-circle_y)
+    <= (circle_r+4)*(circle_r+4)
+);
+
+(mb && p_mb==0 && circle_hit) ? (
+    color_popup_active = 1;
+    color_popup_x = mx;
+    color_popup_y = my;
+    color_popup_row = r_g;
+);
+            
+            
+            
+            
             // FIX: Added p_rmb==0 and capture_id==0 protection
             (rmb && p_rmb==0 && capture_id==0 && mx>=60 && mx<gx_s && my>=ry && my<ry+row_h) ? (
             c_sel = gfx_showmenu(#name_menu);
@@ -3246,6 +3144,7 @@ gfx_drawstr("MUTE"); // "MUTE PATTERN" for Mute
                 mem[curr_pat_v_ptr+idx] <= 0 ? mem[curr_pat_v_ptr+idx] = slider1; 
                 len_drag_cell_idx = idx; 
                 scan_active_tab(); 
+                needs_tab_update = 1;
             );
             capture_id = 88888; 
         );
@@ -3414,7 +3313,7 @@ is_tab_muted_ui = mem[tab_mute_base + t_e];
     rect(ov_x, ov_y, ov_w, ov_h, 0, 0, 0, 0.6);
 
     // 2. Draw "MUTED" Warning Text
-    gfx_setfont(1, "Arial", 35, 'b');
+    gfx_setfont(1, "Trebuchet MS", 35, 'b');
     #mt_warn = "PATTERN MUTED";
     gfx_measurestr(#mt_warn, m_tw, m_th);
     
