@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="f792b1f8be9da87d324a474b8aee64150f29c60d">
+<index version="1" name="AHS_Music_Tech" commit="64bb1eaafee42cba43ac0cb5b038b34342b55f03">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -760,7 +760,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Drum Arranger v7.1.1 -\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 N2N Drum Arranger v7.5.0 -\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 ADDED CUE SETTING ADDED PATTERN MUTE ADDED FALLBACK PATTERN SYSTEM\par}
 }
 ]]></description>
@@ -1018,6 +1018,10 @@
       </version>
       <version name="7.1.1" author="Rock Kennedy" time="2026-03-31T03:57:39Z">
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/975593d90c608d3b8d1781a0aa0b71266aafc643/Effects/N2N%20Drum%20Arranger.jsfx</source>
+      </version>
+      <version name="7.5.0" author="Rock Kennedy" time="2026-04-12T00:43:35Z">
+        <source>https://github.com/rockumk/AHS_Music_Tech/raw/64bb1eaafee42cba43ac0cb5b038b34342b55f03/Effects/N2N%20Drum%20Arranger.jsfx</source>
+        <source type="data" file="AHS_Music_Tech/DrumArranger/Zero Based MIDI.txt">https://github.com/rockumk/AHS_Music_Tech/raw/64bb1eaafee42cba43ac0cb5b038b34342b55f03/Data/DrumArranger/Zero%20Based%20MIDI.txt</source>
       </version>
     </reapack>
     <reapack name="N2N Scale Drone.jsfx" type="effect" desc="N2N Scale Drone">
