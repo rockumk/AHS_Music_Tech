@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.7.4
+version: 7.7.5
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.7.4 -
+  # N2N Drum Arranger v7.7.5 -
   ADDED CUE SETTING
   ADDED PATTERN MUTE
   ADDED FALLBACK PATTERN SYSTEM
@@ -135,10 +135,12 @@ slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
 slider11:14<10,30,1>-Grid Row Height
 
 @init
-version_display = "v7.7.4";
+version_display = "v7.7.5";
 init_gate = 0;
 fontsize = 12; // use 16 for PC and 11 for Mac
+osfont = "Helvetica";
 titlefontsize = 20;  // use 24 for PC and 20 for Mac
+
 
 // =========================================================
 // REGISTRATION & GROOVE MEMORY
@@ -1780,7 +1782,7 @@ gfx_measurestr("This is a test to determine if the text is being rendered on PC 
 gfx_set(1,1,1,1); 
 gfx_x = draw_x; 
 gfx_y = draw_y + 2; 
-str_w > 230 ? (fontsize = 10; titlefontsize = 20;); // use 16 for PC and 12 for mac
+str_w > 230 ? (fontsize = 11; titlefontsize = 20; os_font = "Trebuchet "); // use 16 for PC and 12 for mac
 
 
 //gfx_set(0.8,0.8,0.8,1); 
@@ -1867,7 +1869,7 @@ function dr_glob(id_num, x, y, w, lab, val_in, min_v, max_v, is_subdiv, is_swing
             (is_signed && ov_val >= 0) || (!is_signed && ov_val > 0) ? ( is_ov = 1; curr_val = ov_val; );
         );
     );
-    gfx_setfont(1, "Helvetica", fontsize, 'b');
+    gfx_setfont(1, os_font, fontsize, 'b');
     rect(x, y, w, 20, 0.2, 0.2, 0.2, 1);
     draw_text(x+5, y+3, lab, 0.7,0.7,0.7);
     is_subdiv ? (
@@ -1993,7 +1995,7 @@ function btn(x,y,w,txt) (
 );
 
 tx = UI_TOP_X; ty = UI_TOP_Y;
-gfx_setfont(1, "Helvetica", titlefontsize, 'b');
+gfx_setfont(1, os_font, titlefontsize, 'b');
 bri = .9;
 
 
@@ -2002,7 +2004,7 @@ gfx_setfont(0);
 
 
 tx = UI_TOP_X; ty = UI_TOP_Y;
-gfx_setfont(1, "Helvetica", 16  , 'b');
+gfx_setfont(1, os_font, 16  , 'b');
 bri = .9;
 
 
@@ -2047,7 +2049,7 @@ track_num > 0 ? (
     gfx_measurestr(#trk_str, tw, th);
     gfx_x = x_start+943 + (60-tw)/2;
     gfx_y = row1_y-4 + (18-th)/2;
-    gfx_setfont(1, "Helvetica", titlefontsize, 'b');
+    gfx_setfont(1, os_font, titlefontsize, 'b');
     gfx_drawstr(#trk_str);
     gfx_setfont(0);
 
@@ -2055,7 +2057,7 @@ track_num > 0 ? (
     gfx_measurestr(#trk_str2, tw, th);
     gfx_x = x_start+989 + (60-tw)/2;
     gfx_y = row1_y-18 + (18-th)/2;
-    gfx_setfont(1, "Helvetica", titlefontsize + 10, 'b');
+    gfx_setfont(1, os_font, titlefontsize + 10, 'b');
     gfx_drawstr(#trk_str2);
     gfx_setfont(0);
 );
@@ -2065,7 +2067,7 @@ draw_x = HDR_X + HDR_W + UI_GAP_X - 29 - hw; // Start X for Flow
 draw_y = row1_y + 3;
 
 gfx_setfont(0); 
-gfx_setfont(1, "Helvetica", fontsize, 'b'); 
+gfx_setfont(1, os_font, fontsize, 'b'); 
 
 // Label
 gfx_set(0.8,0.8,0.8,1); 
@@ -2151,7 +2153,7 @@ loop(3,
         // ROW 3: FOLLOW MIDI LABEL
         mem[ui_locked_tab] == -1 ? mem[ui_edit_tab] = mem[ui_play_prog_tab]; 
         is_follow = (mem[ui_locked_tab] == -1);
-        gfx_setfont(1, "Helvetica", fontsize-1, 'b'); 
+        gfx_setfont(1, os_font, fontsize-1, 'b'); 
         draw_text(FOLLOW_LBL_X+11, draw_y+17, "FOLLOW", 0.8,0.8,0.8);
         draw_text(FOLLOW_LBL_X+6, draw_y+27, "MIDI CUES:", 0.8,0.8,0.8); 
     ) : 
@@ -2164,10 +2166,10 @@ loop(3,
         gfx_circle(FOLLOW_BOX_X+25, draw_y-12, 5.5, 0); 
         gfx_circle(FOLLOW_BOX_X+25, draw_y-13, 5, 0); 
         rect(FOLLOW_BOX_X+15, draw_y-10, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.5, 0.5, 0.5, 1);
-        gfx_setfont(1, "Helvetica", 21, 'b');
+        gfx_setfont(1, os_font, 21, 'b');
         is_follow ? draw_text(FOLLOW_BOX_X+21, draw_y-14, "X", 0,1,0);
         is_follow ? rect(FOLLOW_BOX_X+15, draw_y-10, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.2*bri, 1.0*bri, 1.0*bri, 1);
-        gfx_setfont(1, "Helvetica", fontsize, 'b'); 
+        gfx_setfont(1, os_font, fontsize, 'b'); 
         
         (mb && p_mb == 0 && !rec_hit && mx>=FOLLOW_BOX_X && mx<FOLLOW_BOX_X+FOLLOW_BOX_W+31 && my>=draw_y-33 && my<draw_y+FOLLOW_BOX_H+5) ? (
             rec_cues_active == 0 ? ( 
@@ -2196,7 +2198,7 @@ loop(3,
                   : ( rect(draw_x, draw_y, item_w-5, 26, t_r*0.4, t_g*0.4, t_b*0.4, 1); );
                   
             get_t_name(gui_t, #tn); 
-            gfx_setfont(1, "Helvetica", fontsize, 'b'); 
+            gfx_setfont(1, os_font, fontsize, 'b'); 
             is_ed ? draw_text(draw_x+3, draw_y+5, #tn, 0, 0, 0) : draw_text(draw_x+3, draw_y+4, #tn, 1, 1, 1);
             gfx_setfont(0);  
             
@@ -2266,11 +2268,11 @@ draw_x = tab_start_x - 112; // Reset cursor to tab line
 t_e = mem[ui_edit_tab];
 (t_e == 0) ? (
     gfx_set(1, 0.2, 0.2, 1);
-    gfx_setfont(1, "Helvetica", 48, 'b');
+    gfx_setfont(1, os_font, 48, 'b');
     gfx_x = (gfx_w/2) - 150; 
     gfx_y = (gfx_h/2) + 52; 
     gfx_drawstr("PATTERN OFF");
-    gfx_setfont(1, "Helvetica", 18, 'b');
+    gfx_setfont(1, os_font, 18, 'b');
 ) : (
     curr_pat_v_ptr = vel_base + t_e*vel_stride_tab; 
     curr_pat_g_ptr = grid_base + t_e*vel_stride_tab; 
@@ -2284,14 +2286,14 @@ t_e = mem[ui_edit_tab];
     fb_pat_l_ptr = step_len_base + fb_tab*vel_stride_tab; 
 
     // LABEL
-    gfx_setfont(1, "Helvetica", fontsize-1, 'b'); 
+    gfx_setfont(1, os_font, fontsize-1, 'b'); 
     gfx_set(0.8,0.8,0.8,1); 
     gfx_x = draw_x + 5; gfx_y = draw_y; 
     gfx_drawstr("PATTERN");
     gfx_x = draw_x + 2; gfx_y = draw_y+10; 
     gfx_drawstr("SETTINGS:");
     draw_x += 57;
-    gfx_setfont(1, "Helvetica", fontsize, 'b'); 
+    gfx_setfont(1, os_font, fontsize, 'b'); 
     // MUTE BUTTON (Added here to flow sequence)
     item_w = 50;
     is_p_muted = mem[tab_mute_base + t_e];
@@ -2546,7 +2548,7 @@ ty = draw_y;
     mb == 0 ? last_preview_note = -1;
     ty+=40; 
     upser = 5;
-    gfx_setfont(1, "Helvetica", fontsize, 'b'); 
+    gfx_setfont(1, os_font, fontsize, 'b'); 
     draw_text(10, ty-upser, "DRUM:", 0.7,0.7,0.7); 
     strlen(row_name_str_base + sel_r * str_size) > 0 ? (
         strcpy(#dn_cur, row_name_str_base + sel_r * str_size);
@@ -2913,7 +2915,7 @@ ty = draw_y;
     rowfontsize = grid_height - 1;
     rowfontsize > 17 ? ( rowfontsize = 17; textoffset = (grid_height * .45) - 7; ) : (textoffset = (grid_height * .12) - 1) ;
     
-    gfx_setfont(1, "Helvetica", rowfontsize, 'b') ;    
+    gfx_setfont(1, os_font, rowfontsize, 'b') ;    
     
     circleoffset = .45 * grid_height;
     loop(visible_rows,
@@ -3331,7 +3333,7 @@ is_tab_muted_ui = mem[tab_mute_base + t_e];
     rect(ov_x, ov_y, ov_w, ov_h, 0, 0, 0, 0.6);
 
     // 2. Draw "MUTED" Warning Text
-    gfx_setfont(1, "Helvetica", 35, 'b');
+    gfx_setfont(1, os_font, 35, 'b');
     #mt_warn = "PATTERN MUTED";
     gfx_measurestr(#mt_warn, m_tw, m_th);
     
