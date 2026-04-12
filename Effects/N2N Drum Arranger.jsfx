@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.7.1
+version: 7.7.2
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.7.1 -
+  # N2N Drum Arranger v7.7.2 -
   ADDED CUE SETTING
   ADDED PATTERN MUTE
   ADDED FALLBACK PATTERN SYSTEM
@@ -135,7 +135,7 @@ slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
 slider11:14<10,30,1>-Grid Row Height
 
 @init
-version_display = "v7.7.1";
+version_display = "v7.7.2";
 init_gate = 0;
 fontsize = 16; // use 16 for PC and 11 for Mac
 titlefontsize = 24;  // use 24 for PC and 20 for Mac
@@ -3344,50 +3344,55 @@ is_tab_muted_ui = mem[tab_mute_base + t_e];
 
 help_active ? (
     gfx_set(0,0,0,0.85); gfx_rect(0,0,gfx_w,gfx_h);
-    hw = 550; hh = 570; hx = (gfx_w-hw)/2; hy = (gfx_h-hh)/2;
-    rect(hx, hy, hw, hh, 0.2, 0.2, 0.2, 1);
+    
+    // RENAMED VARIABLES HERE TO PREVENT COLLISION
+    help_w = 550; help_h = 570; help_x = (gfx_w-help_w)/2; help_y = (gfx_h-help_h)/2;
+    
+    rect(help_x, help_y, help_w, help_h, 0.2, 0.2, 0.2, 1);
     gfx_set(0.2*bri,  1.0*bri,  1.0*bri,1);
-    gfx_x = hx+430; gfx_y = hy+20; gfx_drawstr(version_display);
+    gfx_x = help_x+430; gfx_y = help_y+20; gfx_drawstr(version_display);
     gfx_set(1,1,1,1);
-    gfx_x = hx+20; gfx_y = hy+20; gfx_drawstr("SCOPE OF SETTINGS:");
-    gfx_x = hx+20; gfx_y += 20; gfx_drawstr(" - GLOBAL SETTINGS: Affect all Patterns (Tabs)");
-    gfx_x = hx+20; gfx_y += 16; gfx_drawstr(" - PATTERN SETTINGS: Affect only the viewed Pattern");
-    gfx_x = hx+20; gfx_y += 16; gfx_drawstr(" - ROW SETTINGS: Affect only the selected Row");
-    gfx_y += 25; gfx_x = hx+20; gfx_drawstr("TAB & VIEW FUNCTIONS:");
-    gfx_x = hx+20; gfx_y += 20; gfx_drawstr(" - Select Tab: Views the Tab's Pattern");
-    gfx_x = hx+20; gfx_y += 16; gfx_drawstr(" - Tab's Lock Box: Green - Playback is locked to the Tab");
-    gfx_x = hx+20; gfx_y += 16; gfx_drawstr(" - Tab's Lock Box: Black - Playback is not locked to the Tab");
-    gfx_x = hx+20; gfx_y += 16; gfx_drawstr(" - Double-Click Tab: View Pattern AND Lock tab to playback");
-    gfx_x = hx+20; gfx_y += 16; gfx_drawstr(" - Follow [x]:: View and playback follow incoming MIDI commands");
-    gfx_y += 25; gfx_x = hx+20; gfx_drawstr("GRID EDITING:");
-    gfx_x = hx+20; gfx_y += 20; gfx_drawstr(" - Click+Drag: Paint steps and velocity bars");
-    gfx_x = hx+20; gfx_y += 16; gfx_drawstr(" - CTRL+Drag: Edit all pattern Bars simultaneously");
-    gfx_x = hx+20; gfx_y += 16; gfx_drawstr(" - SHIFT+Drag: Edit all pattern Beats simultaneously");
-    gfx_x = hx+20; gfx_y += 16; gfx_drawstr(" - Right-Click Drag: Set Note Durations (create long notes)");
-    gfx_y += 25; gfx_x = hx+20; gfx_drawstr("ROW OPERATIONS:");
-    gfx_x = hx+20; gfx_y += 20; gfx_drawstr(" - ALT+Drag Name: Move/Swap Rows");
-    gfx_x = hx+20; gfx_y += 16; gfx_drawstr(" - Click Color Dot: Change Row Color");
+    gfx_x = help_x+20; gfx_y = help_y+20; gfx_drawstr("SCOPE OF SETTINGS:");
+    gfx_x = help_x+20; gfx_y += 20; gfx_drawstr(" - GLOBAL SETTINGS: Affect all Patterns (Tabs)");
+    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - PATTERN SETTINGS: Affect only the viewed Pattern");
+    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - ROW SETTINGS: Affect only the selected Row");
+    gfx_y += 25; gfx_x = help_x+20; gfx_drawstr("TAB & VIEW FUNCTIONS:");
+    gfx_x = help_x+20; gfx_y += 20; gfx_drawstr(" - Select Tab: Views the Tab's Pattern");
+    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Tab's Lock Box: Green - Playback is locked to the Tab");
+    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Tab's Lock Box: Black - Playback is not locked to the Tab");
+    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Double-Click Tab: View Pattern AND Lock tab to playback");
+    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Follow [x]:: View and playback follow incoming MIDI commands");
+    gfx_y += 25; gfx_x = help_x+20; gfx_drawstr("GRID EDITING:");
+    gfx_x = help_x+20; gfx_y += 20; gfx_drawstr(" - Click+Drag: Paint steps and velocity bars");
+    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - CTRL+Drag: Edit all pattern Bars simultaneously");
+    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - SHIFT+Drag: Edit all pattern Beats simultaneously");
+    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Right-Click Drag: Set Note Durations (create long notes)");
+    gfx_y += 25; gfx_x = help_x+20; gfx_drawstr("ROW OPERATIONS:");
+    gfx_x = help_x+20; gfx_y += 20; gfx_drawstr(" - ALT+Drag Name: Move/Swap Rows");
+    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Click Color Dot: Change Row Color");
     gfx_y += 25; 
-    gfx_x = hx+20;
+    gfx_x = help_x+20;
     gfx_drawstr("SETTINGS:");
-    gfx_x = hx+20; 
+    gfx_x = help_x+20; 
     gfx_y += 20;
     gfx_drawstr(" - HUM: -1 follows Global Slider");
-    gfx_x = hx+20; 
+    gfx_x = help_x+20; 
     gfx_y += 16;
     gfx_drawstr(" - Swing P: Uses Project Swing (Numbers2Notes)");
-    gfx_x = hx+20; 
+    gfx_x = help_x+20; 
     gfx_y += 16;
     gfx_drawstr(" -[1x | 1/2]: Playback speed for 24/32 SubDivs");
-    gfx_x = hx+20; 
+    gfx_x = help_x+20; 
     gfx_y += 16;
     gfx_drawstr(" - PUSH/PULL: Adjust timing per row (+ = Lag, - = Push)");
-    gfx_y += 25; gfx_x = hx+20; gfx_drawstr("FILE OPERATIONS:");
-    gfx_x = hx+20; gfx_y += 20; gfx_drawstr(" - <- : Import Single Pattern (.n2drumpat) to current Tab");
-    gfx_x = hx+20; gfx_y += 16; gfx_drawstr(" - <= : Import Pattern Bank (.n2drumpats)");
-    gfx_x = hx+20; gfx_y += 16; gfx_drawstr(" - -> : Export Single Pattern (.n2drumpat)");
-    gfx_x = hx+20; gfx_y += 16; gfx_drawstr(" - => : Export Pattern Bank (.n2drumpats)");
-    ok_w = 60; ok_h = 25; ok_x = hx + hw - ok_w - 20; ok_y = hy + hh - ok_h - 20;
+    gfx_y += 25; gfx_x = help_x+20; gfx_drawstr("FILE OPERATIONS:");
+    gfx_x = help_x+20; gfx_y += 20; gfx_drawstr(" - <- : Import Single Pattern (.n2drumpat) to current Tab");
+    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - <= : Import Pattern Bank (.n2drumpats)");
+    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - -> : Export Single Pattern (.n2drumpat)");
+    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - => : Export Pattern Bank (.n2drumpats)");
+    
+    // UPDATED THESE VARIABLES AS WELL
+    ok_w = 60; ok_h = 25; ok_x = help_x + help_w - ok_w - 20; ok_y = help_y + help_h - ok_h - 20;
     rect(ok_x, ok_y, ok_w, ok_h, 0.4, 0.4, 0.4, 1);
     gfx_set(1,1,1,1); gfx_x = ok_x + 18; gfx_y = ok_y + 5; gfx_drawstr("OK");
     mb ? (
