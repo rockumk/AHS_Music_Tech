@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.7.5
+version: 7.7.6
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.7.5 -
+  # N2N Drum Arranger v7.7.6 -
   ADDED CUE SETTING
   ADDED PATTERN MUTE
   ADDED FALLBACK PATTERN SYSTEM
@@ -135,7 +135,7 @@ slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
 slider11:14<10,30,1>-Grid Row Height
 
 @init
-version_display = "v7.7.5";
+version_display = "v7.7.6";
 init_gate = 0;
 fontsize = 12; // use 16 for PC and 11 for Mac
 osfont = "Helvetica";
@@ -1782,7 +1782,7 @@ gfx_measurestr("This is a test to determine if the text is being rendered on PC 
 gfx_set(1,1,1,1); 
 gfx_x = draw_x; 
 gfx_y = draw_y + 2; 
-str_w > 230 ? (fontsize = 11; titlefontsize = 20; os_font = "Trebuchet "); // use 16 for PC and 12 for mac
+str_w > 230 ? (fontsize = 11; titlefontsize = 20; os_font = "Trebuchet MS"); // use 16 for PC and 12 for mac
 
 
 //gfx_set(0.8,0.8,0.8,1); 
@@ -2915,7 +2915,7 @@ ty = draw_y;
     rowfontsize = grid_height - 1;
     rowfontsize > 17 ? ( rowfontsize = 17; textoffset = (grid_height * .45) - 7; ) : (textoffset = (grid_height * .12) - 1) ;
     
-    gfx_setfont(1, os_font, rowfontsize, 'b') ;    
+    gfx_setfont(1, "Helvetica", rowfontsize, 'b') ;    
     
     circleoffset = .45 * grid_height;
     loop(visible_rows,
