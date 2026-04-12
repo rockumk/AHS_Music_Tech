@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.5.0
+version: 7.7.0
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.5.0 -
+  # N2N Drum Arranger v7.7.0 -
   ADDED CUE SETTING
   ADDED PATTERN MUTE
   ADDED FALLBACK PATTERN SYSTEM
@@ -137,7 +137,8 @@ slider11:14<10,30,1>-Grid Row Height
 @init
 init_gate = 0;
 fontsize = 16; // use 16 for PC and 13 for mac
-version_display = "v5.8.9";
+titlefontsize = 24;
+version_display = "v7.7.0";
 
 // =========================================================
 // REGISTRATION & GROOVE MEMORY
@@ -1774,6 +1775,15 @@ loop(128,
 
 
 @gfx 1383 780
+gfx_setfont(1, "Trebuchet MS", fontsize, 'b');
+gfx_measurestr("This is a test to determine if the text is being rendered on PC or Mac.", str_w, str_h);
+gfx_set(1,1,1,1); 
+gfx_x = draw_x; 
+gfx_y = draw_y + 2; 
+gfx_measurestr("This is a test to determine if the text is being rendered on PC or Mac.", str_w, str_h);
+str_w > 370 ? (fontsize = 12; titlefontsize = 20;); // use 16 for PC and 12 for mac
+
+
 grid_height = slider11; 
 ext_noinit = 1.0;
 ext_noundo = 1; 
@@ -1977,7 +1987,7 @@ function btn(x,y,w,txt) (
 );
 
 tx = UI_TOP_X; ty = UI_TOP_Y;
-gfx_setfont(1, "Trebuchet MS", 24, 'b');
+gfx_setfont(1, "Trebuchet MS", titlefontsize, 'b');
 bri = .9;
 
 
@@ -2031,7 +2041,7 @@ track_num > 0 ? (
     gfx_measurestr(#trk_str, tw, th);
     gfx_x = x_start+943 + (60-tw)/2;
     gfx_y = row1_y-4 + (18-th)/2;
-    gfx_setfont(1, "Trebuchet MS", 22, 'b');
+    gfx_setfont(1, "Trebuchet MS", titlefontsize, 'b');
     gfx_drawstr(#trk_str);
     gfx_setfont(0);
 
@@ -2039,7 +2049,7 @@ track_num > 0 ? (
     gfx_measurestr(#trk_str2, tw, th);
     gfx_x = x_start+989 + (60-tw)/2;
     gfx_y = row1_y-18 + (18-th)/2;
-    gfx_setfont(1, "Trebuchet MS", 48, 'b');
+    gfx_setfont(1, "Trebuchet MS", titlefontsize + 10, 'b');
     gfx_drawstr(#trk_str2);
     gfx_setfont(0);
 );
@@ -2089,6 +2099,8 @@ draw_x += item_w + ui_gap_small + 61;
 item_w = 18;
 btn(draw_x, draw_y, item_w, "?") ? ( help_active = !help_active; );
 draw_x += item_w + ui_gap_small;
+
+
 
 // --- N2N IO BUTTONS (Maintained Flow Compatible, Commented Out) ---
 /*
