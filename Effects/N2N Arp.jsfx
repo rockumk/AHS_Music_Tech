@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.2.3
+version: 12.2.4
 author: Rock Kennedy
 about:
-  # N2N Arp v12.2.3
+  # N2N Arp v12.2.4
   - FEATURE: Velocity Scaling
 provides:
   [main] .
@@ -26,7 +26,7 @@ slider14:0<0,2,1{Chords,Split (Chords and Bass),Bass}>-Input Mode
 
 @init
 scale_dirty = 0;
-thisversion = "v12.2.3";
+thisversion = "v12.2.4";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -1145,7 +1145,11 @@ function recalc_scale() local(i, max_v, best_tonic) (
 
 mem[ui_init_done] == 0 ? (
     // --- FIX: SET DEFAULTS HERE ---
+    
     mem[ui_follow_mode] = 1; // Default Follow: ON
+    mem[ui_edit_tab] = 26;      // Start on Def instead of Off
+    mem[ui_play_prog_tab] = 26; // Optional, but keeps things visually consistent
+    
     mem[ui_locked_tab] = -1; // Default Lock: OFF
     mem[ui_tab_view_mode] = 1; // Default to Sections Mode
     // ------------------------------
