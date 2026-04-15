@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.7.6
+version: 7.7.7
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.7.6 -
+  # N2N Drum Arranger v7.7.7 -
   ADDED CUE SETTING
   ADDED PATTERN MUTE
   ADDED FALLBACK PATTERN SYSTEM
@@ -135,7 +135,7 @@ slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
 slider11:14<10,30,1>-Grid Row Height
 
 @init
-version_display = "v7.7.6";
+version_display = "v7.7.7";
 init_gate = 0;
 fontsize = 12; // use 16 for PC and 11 for Mac
 osfont = "Helvetica";
@@ -1995,11 +1995,11 @@ function btn(x,y,w,txt) (
 );
 
 tx = UI_TOP_X; ty = UI_TOP_Y;
-gfx_setfont(1, os_font, titlefontsize, 'b');
+gfx_setfont(1, os_font, titlefontsize + 3, 'b');
 bri = .9;
 
 
-draw_text(HDR_X+3, HDR_Y-3 , "N2N Drum Arranger", 0.2*bri,  1.0*bri,  1.0*bri);
+draw_text(HDR_X+3, HDR_Y-5 , "N2N Drum Arranger", 0.2*bri,  1.0*bri,  1.0*bri);
 gfx_setfont(0);
 
 
@@ -2040,24 +2040,24 @@ row1_y = UI_TOP_Y - 3;
 // --- Draw Background for row 1 ---
 track_num > 0 ? (
     x_start = HDR_X + HDR_W + UI_GAP_X - 10 + 180;
-    rect(x_start+39, row1_y-15, 1256, 44, track_r, track_g, track_b, 1);
-    rect(x_start+760, row1_y+4, 63, 20,.1,.1,.1,1);
+    rect(x_start+574, row1_y, 345, 22, track_r, track_g, track_b, 1);
+    //rect(x_start+760, row1_y+4, 63, 20,.1,.1,.1,1);
 
     lum = (track_r * 0.299) + (track_g * 0.587) + (track_b * 0.114);
     lum > 0.5 ? gfx_set(0,0,0,1) : gfx_set(1,1,1,1);
-    sprintf(#trk_str, "Track");
+    sprintf(#trk_str, "TRACK");
     gfx_measurestr(#trk_str, tw, th);
-    gfx_x = x_start+943 + (60-tw)/2;
-    gfx_y = row1_y-4 + (18-th)/2;
+    gfx_x = x_start+681 + (60-tw)/2;
+    gfx_y = row1_y+ 1 + (18-th)/2;
     gfx_setfont(1, os_font, titlefontsize, 'b');
     gfx_drawstr(#trk_str);
-    gfx_setfont(0);
+
 
     sprintf(#trk_str2, "%d", track_num);
     gfx_measurestr(#trk_str2, tw, th);
-    gfx_x = x_start+989 + (60-tw)/2;
-    gfx_y = row1_y-18 + (18-th)/2;
-    gfx_setfont(1, os_font, titlefontsize + 10, 'b');
+    gfx_x = x_start + 692 + (60-tw)/2 + 40;
+    gfx_y = row1_y + 1 +(18-th)/2;
+    gfx_setfont(1, os_font, titlefontsize+3, 'b');
     gfx_drawstr(#trk_str2);
     gfx_setfont(0);
 );
@@ -2607,12 +2607,13 @@ ty = draw_y;
         scan_active_tab();
         needs_tab_update = 1;
     );
-    btn(124, ty+28, 30, "ALL") ? ( mem[ui_vel_edit_all] = !mem[ui_vel_edit_all]; );
+    
+    btn(122, ty+28, 30, "ALL") ? ( mem[ui_vel_edit_all] = !mem[ui_vel_edit_all]; );
     mem[ui_vel_edit_all] ? ( 
         gfx_set(1, 0.8, 0.2, 1); 
-        gfx_rect(124, ty+28, 30, 18); 
+        gfx_rect(122, ty+28, 30, 18); 
         gfx_set(0,0,0,1); 
-        gfx_x=129;
+        gfx_x=127;
         gfx_y=ty+30; 
         gfx_drawstr("ALL"); 
     );
@@ -2624,45 +2625,126 @@ ty = draw_y;
         needs_tab_update = 1;
     );
 
-    gx_s=220; 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+gx_s=220; 
     sb_w = 20; 
     gx_w = gfx_w - gx_s - sb_w - 5; 
     cw_v=gx_w/st_v;
     
-    def_w = 28; 
+    def_w = 28; scale_w = 28; 
     def_x = gx_s - def_w - 4; 
+    scale_x = def_x - scale_w - 4;
     def_h = 70;
+
+    // --- 1. SCALE BAR (Left) ---
+    rect(scale_x, ty, scale_w, def_h, 0.2, 0.2, 0.2, 1);
+    
+    // Calculate visual height and percentage for SCL
+    capture_id == 11212 ? (
+        // 1.0 is 100%. Divide by (def_h / 2) so a half-box drag = +/- 100%
+        scale_factor = 1.0 + ((capture_start_y - my) / (def_h / 2)); 
+        scale_factor < 0.0 ? scale_factor = 0.0;
+        scale_factor > 4.0 ? scale_factor = 4.0; // Max 400% scale
+        
+        // Visual bar height (centered, follows mouse)
+        val_h = floor((def_h / 2) + (capture_start_y - my));
+    ) : (
+        scale_factor = 1.0;
+        val_h = floor(def_h / 2); // Rests perfectly in the center
+    );
+
+    val_h = clamp(val_h, 2, def_h - 2);
+    
+    gfx_set(0.8, 0.5, 0.1, 1); // Amber color for SCL
+    gfx_rect(scale_x + 1, ty + def_h - val_h - 1, scale_w - 2, val_h);
+    
+    // Draw center anchor line
+    gfx_set(1.0, 0.8, 0.2, 1); 
+    gfx_rect(scale_x + 1, ty + (def_h / 2) - 1, scale_w - 2, 2);
+
+    gfx_set(1, 1, 1, 0.8); gfx_x = scale_x + 3; gfx_y = ty + 5; gfx_drawstr("SCL");
+    sprintf(#sv, "%d%%", floor(scale_factor * 100)); 
+    gfx_measurestr(#sv, tw, th);
+    gfx_x = scale_x + (scale_w/2) - (tw/2); gfx_y = ty + def_h - 15; gfx_drawstr(#sv);
+
+    (mb && mx >= scale_x && mx < scale_x + scale_w && my >= ty && my < ty + def_h && capture_id == 0) ? ( 
+        capture_id = 11212; 
+        capture_start_y = my;
+        
+        // Take a SNAPSHOT of the real velocities to preserve resolution during drag
+        all_mode = mem[ui_vel_edit_all];
+        r_start = all_mode ? 0 : sel_r;
+        r_end = all_mode ? MAX_ROWS : sel_r + 1;
+        r_iter = r_start;
+        loop(r_end - r_start,
+            memcpy(copy_tab_v_buf + r_iter*vel_stride_row, curr_pat_v_ptr + r_iter*vel_stride_row, MAX_STEPS);
+            r_iter += 1;
+        );
+    );
+
+    (capture_id == 11212) ? (
+        all_mode = mem[ui_vel_edit_all];
+        r_start = all_mode ? 0 : sel_r;
+        r_end = all_mode ? MAX_ROWS : sel_r + 1;
+        r_iter = r_start;
+        loop(r_end - r_start,
+            s_iter = 0;
+            loop(st_v,
+                idx = r_iter * vel_stride_row + s_iter;
+                mem[curr_pat_g_ptr + idx] ? (
+                    // Multiply against the SNAPSHOT, but write to the REAL array
+                    orig_v = mem[copy_tab_v_buf + idx]; 
+                    new_v = clamp(floor(orig_v * scale_factor), 1, 127);
+                    mem[curr_pat_v_ptr + idx] = new_v;
+                );
+                s_iter += 1;
+            );
+            r_iter += 1;
+        );
+    );
+
+    // --- 2. DEF BAR (Right) ---
     rect(def_x, ty, def_w, def_h, 0.2, 0.2, 0.2, 1);
     gfx_set(0.08, 0.4, 0.4, 1);
-    val_h = floor((slider1 / 127) * (def_h - 2));
-    val_h < 2 ? val_h = 2;
+    val_h = floor((slider1 / 127) * (def_h - 2)); val_h < 2 ? val_h = 2;
     gfx_rect(def_x + 1, ty + def_h - val_h - 1, def_w - 2, val_h);
-    gfx_set(1, 1, 1, 0.8);
-    gfx_x = def_x + 3; 
-    gfx_y = ty ; 
-    
-    
+    gfx_set(1, 1, 1, 0.8); gfx_x = def_x + 3; gfx_y = ty; gfx_drawstr("DEF");
+    sprintf(#dv, "%d", slider1); gfx_measurestr(#dv, tw, th);
+    gfx_x = def_x + (def_w/2) - (tw/2); gfx_y = ty + def_h - 15; gfx_drawstr(#dv);
 
-    gfx_drawstr("DEF");
-    sprintf(#dv, "%d", slider1);
-    gfx_x = def_x + 3; 
-    gfx_y = ty + def_h - 15; 
-    gfx_drawstr(#dv);
     (mb && mx >= def_x && mx < def_x + def_w && my >= ty && my < ty + def_h && capture_id == 0) ? ( capture_id = 11111; );
     (capture_id == 11111) ? (
         new_val = 127 - floor( ( (my - ty) / def_h ) * 127 );
-        new_val = clamp(new_val, 1, 127);
-        slider1 = new_val;
-        slider_automate(slider1);
-        i_rst = 0;
-        loop(MAX_ROWS * MAX_STEPS,
-             mem[curr_pat_g_ptr + i_rst] == 0 ? mem[curr_pat_v_ptr + i_rst] = 0;
-             i_rst += 1;
-        );
+        new_val = clamp(new_val, 1, 127); slider1 = new_val; slider_automate(1);
+        i_rst = 0; loop(MAX_ROWS * MAX_STEPS, mem[curr_pat_g_ptr + i_rst] == 0 ? mem[curr_pat_v_ptr + i_rst] = 0; i_rst += 1; );
     );
 
     rect(gx_s, ty, gx_w, 70, 0.2, 0.2, 0.2, 1);
     !mb ? vel_drag_mods = 0;
+
+
+
+
+
+
+
+
+
 
 
 
