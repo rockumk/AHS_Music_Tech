@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="734a9de0b1107a085d1349112a3369a289b23ca8">
+<index version="1" name="AHS_Music_Tech" commit="4bd8317b9efe690aee7540de458b321ed9c45117">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -1675,6 +1675,9 @@
       </version>
       <version name="3.5.6" author="Rock Kennedy" time="2026-02-06T04:57:32Z">
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/f5df7abfec0a2904a4c43bf46a6a3462e4ec8799/Scripts/N2NCue.lua</source>
+      </version>
+      <version name="4.0.0" author="Rock Kennedy" time="2026-04-16T02:23:50Z">
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/4bd8317b9efe690aee7540de458b321ed9c45117/Scripts/N2NCue.lua</source>
       </version>
     </reapack>
     <reapack name="RSK - Full Spectrum.lua" type="script" desc="RSK_Full_Spectrum">
