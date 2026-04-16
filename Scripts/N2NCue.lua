@@ -1,5 +1,5 @@
 --desc:N2NCue
---version: 3.5.6
+--version: 4.0.0
 --author: Rock Kennedy
 --about:
 -- # N2NCue
@@ -14,7 +14,7 @@ local GMEM_NAMESPACE = "N2N_Ecosystem_RSKennedy"
 local GMEM_BASE_ADDR = 7500000
 local GMEM_SLOTS_PER_INSTANCE = 4
 local GMEM_CUE_INST_BASE = 7100500
-local GMEM_INFO_BASE = 8200000  -- MOVED: Was inside function, now constant
+local GMEM_INFO_BASE = 8200000
 
 ----------------------------------------------------------------
 -- CONFIG
@@ -24,7 +24,7 @@ local TARGET_FX_NAMES = {
   ["N2N Arp.jsfx"] = "Arp"
 }
 
-local TRACK_SWING = "Absolute Grid & Reverb"
+local TRACK_SWING = "N2N Nashville # Chart"
 
 local CH_PC   = 15
 local CH_SWNG = 15
@@ -34,14 +34,7 @@ local DEFAULT_SWING = 0
 
 local GAP = 6
 local BTN_H = 20
-local SMALL_W = 28
-local SECT_W  = (SMALL_W * 2) + GAP
 local HEADER_WIDTH = 140
-local GAP_CONTROL_TO_ROW1 = 0
-local GAP_ROW1_TO_ROW2    = 0
-local W_CLEAR   = 97
-local W_SET_SW  = 94
-local W_PROCESS = 144
 local UI_MUTE = 0.55
 local UI_GRAY = 0.25
 local SWING_SLIDER_W = 130
@@ -54,18 +47,15 @@ local live_mode = true
 local g_tracks = {}
 local gmem_step = 0
 local gmem_cycle = 0
-local last_full_refresh_time = 0  -- timestamp of last full track scan/validate
-local debug_printed = false
+local last_full_refresh_time = 0
 
--- ADDED: Performance caches (update throttling)
-local cache_active_tabs = {}  -- [track_key] = {tab_id, time}
-local CACHE_DURATION = 0.1    -- active tab cache valid for 100ms
-local last_dup_check = 0      -- throttle duplicate ID checks
-local last_gmem_write = 0     -- throttle GMEM writes
-local pending_gmem_write = false  -- flag when track data changes
+local cache_active_tabs = {}
+local CACHE_DURATION = 0.1
+local last_dup_check = 0
+local last_gmem_write = 0
+local pending_gmem_write = false
 
--- CLEANED UP: Removed duplicate declarations (were declared again below)
-local dup_ids = {}      -- [id] = count
+local dup_ids = {}
 local has_dup_ids = false
 local dup_popup_open = false
 local dup_popup_track = nil
@@ -79,14 +69,6 @@ local dup_popup_center_next = false
 ----------------------------------------------------------------
 local function clamp01(x)
   return (x < 0) and 0 or ((x > 1) and 1 or x)
-end
-
-local function draw_blinking_bold_text(x, y, text, col_u32, blink_on)
-  if not blink_on then return end
-  local dl = r.ImGui_GetWindowDrawList(ctx)
-  -- Fake "bold": draw text twice with a 1px offset
-  r.ImGui_DrawList_AddText(dl, x, y, col_u32, text)
-  r.ImGui_DrawList_AddText(dl, x+1, y, col_u32, text)
 end
 
 local function mute_rgb(rr,gg,bb)
@@ -116,80 +98,44 @@ end
 
 local function get_track_color_data(track)
   if not track then return 0.4, 0.4, 0.4, 1, 1, 1 end
-  
   local native = r.GetTrackColor(track)
-  
   if not native or native == 0 then
     return 0.4, 0.4, 0.4, 1, 1, 1
   end
   
-  -- Use REAPER's native function instead of manual bit math
   local ok, r_val, g_val, b_val = pcall(r.ColorFromNative, native)
-  
   if ok and r_val and g_val and b_val then
     local rr = r_val / 255
     local gg = g_val / 255
     local bb = b_val / 255
-    
     local lum = 0.299*rr + 0.587*gg + 0.114*bb
     local tr, tg, tb = 1, 1, 1
-    if lum > 0.6 then
-      tr, tg, tb = 0, 0, 0
-    end
-    
+    if lum > 0.6 then tr, tg, tb = 0, 0, 0 end
     return rr, gg, bb, tr, tg, tb
   end
   
-  -- Fallback to manual extraction if ColorFromNative fails
   native = tonumber(native) or 0
-  if native == 0 then
-    return 0.4, 0.4, 0.4, 1, 1, 1
-  end
-  
-  -- Mask out the custom color flag if present
+  if native == 0 then return 0.4, 0.4, 0.4, 1, 1, 1 end
   native = native & 0xFFFFFF
-  
   local rr = (native % 256) / 255
   local gg = (math.floor(native / 256) % 256) / 255
   local bb = (math.floor(native / 65536) % 256) / 255
-  
   local lum = 0.299*rr + 0.587*gg + 0.114*bb
-  
   local tr, tg, tb = 1, 1, 1
-  if lum > 0.6 then
-    tr, tg, tb = 0, 0, 0
-  end
-  
+  if lum > 0.6 then tr, tg, tb = 0, 0, 0 end
   return rr, gg, bb, tr, tg, tb
 end
 
 ----------------------------------------------------------------
 -- TIME
 ----------------------------------------------------------------
-local function qn64()
-  return 1/16
-end
+local function qn64() return 1/16 end
 
 local function get_timesig_at_time(t)
   if r.TimeMap2_GetTimeSigAtTime then
     local ok, rv, num, den = pcall(r.TimeMap2_GetTimeSigAtTime, 0, t)
-    if ok and num and den and den ~= 0 then
-      return num, den
-    end
+    if ok and num and den and den ~= 0 then return num, den end
   end
-
-  if r.TimeMap_GetTimeSigAtTime then
-    local ok, a, b = pcall(r.TimeMap_GetTimeSigAtTime, 0, t)
-    if ok and a and b and b ~= 0 then
-      return a, b
-    end
-
-    local ok2, c, d = pcall(r.TimeMap_GetTimeSigAtTime, t)
-    if ok2 and c and d and d ~= 0 then
-      return c, d
-    end
-  end
-
   return 4, 4
 end
 
@@ -199,7 +145,7 @@ local function beats_to_qn_at_time(t, beats)
   return (beats or 4) * beat_qn
 end
  
-local PC_PREROLL_64THS = 8  -- 4 = 1/16 note, 2 = 1/32, 1 = 1/64
+local PC_PREROLL_64THS = 8
 
 local function stamp_time_64_or_zero(cursor_time)
   local preroll_qn = (PC_PREROLL_64THS or 1) * qn64()
@@ -210,134 +156,122 @@ local function stamp_time_64_or_zero(cursor_time)
 end
 
 ----------------------------------------------------------------
--- TAB DEFINITIONS (DRUM LAYOUT)
+-- TAB DEFINITIONS (UNIFIED FOR 3 ROWS)
 ----------------------------------------------------------------
-local tabs = {}
-local function t(id, row, name, w, rr, gg, bb, prog)
-  tabs[#tabs+1] = {id=id,row=row,name=name,w=w,r=rr,g=gg,b=bb,prog=prog}
+local W_TAB = 36
+local W_SECT = (W_TAB * 2) + GAP
+local W_OFF = 48
+local W_HWW = 44
+
+local tabs_drum = {}
+local tabs_arp = {}
+
+local function td(id, row, name, w, rr, gg, bb, prog)
+  table.insert(tabs_drum, {id=id, row=row, name=name, w=w, r=rr, g=gg, b=bb, prog=prog})
 end
 
--- ROW 0 (Off/Default)
-t(0,0,"Off",SECT_W,0.4,0.4,0.4,0)
-t(29,0,"Def",SECT_W,0.8,0.8,0.8,101)
+local function ta(id, row, name, w, rr, gg, bb, prog)
+  table.insert(tabs_arp, {id=id, row=row, name=name, w=w, r=rr, g=gg, b=bb, prog=prog})
+end
+
+local function add_tab(id, row, d_name, a_name, d_w, a_w, rr, gg, bb, prog)
+  td(id, row, d_name, d_w, rr, gg, bb, prog)
+  ta(id, row, a_name, a_w, rr, gg, bb, prog)
+end
 
 -- ROW 1
-t(1,1,"Intro",SECT_W,0.2,1.0,1.0,11)
-t(2,1,"2",SMALL_W,0.2,1.0,1.0,12)
-t(3,1,"3",SMALL_W,0.2,1.0,1.0,13)
-
-t(4,1,"Verse",SECT_W,0.4,0.6,1.0,21)
-t(5,1,"2",SMALL_W,0.4,0.6,1.0,22)
-t(6,1,"3",SMALL_W,0.4,0.6,1.0,23)
-
-t(7,1,"Pre",SECT_W,0.7,0.4,1.0,31)
-t(8,1,"2",SMALL_W,0.7,0.4,1.0,32)
-t(9,1,"3",SMALL_W,0.7,0.4,1.0,33)
-
-t(10,1,"Chorus",SECT_W,1.0,0.4,0.4,41)
-t(11,1,"2",SMALL_W,1.0,0.4,0.4,42)
-t(12,1,"3",SMALL_W,1.0,0.4,0.4,43)
-
-t(13,1,"Bridge",SECT_W,1.0,0.9,0.2,51)
-t(14,1,"2",SMALL_W,1.0,0.9,0.2,52)
-t(15,1,"3",SMALL_W,1.0,0.9,0.2,53)
-
-t(16,1,"Outro",SECT_W,0.5,0.8,0.7,61)
-t(17,1,"2",SMALL_W,0.5,0.8,0.7,62)
-t(18,1,"3",SMALL_W,0.5,0.8,0.7,63)
-
-t(19,1,"Hit 1",44,0.8,0.8,0.8,71)
-t(20,1,"Hit 2",44,0.8,0.8,0.8,72)
-
-t(21,1,"Fill 1<",44,0.7,0.4,1.0,81)
-t(22,1,"Fill 1=",44,0.7,0.4,1.0,82)
-t(23,1,"Fill 1>",44,0.7,0.4,1.0,83)
-
-t(24,1,"Flex 1",44,0.8,0.8,0.8,91)
-t(25,1,"Flex 2",44,0.8,0.8,0.8,92)
-t(26,1,"Flex 3",44,0.8,0.8,0.8,93)
-t(27,1,"Flex 4",44,0.8,0.8,0.8,94)
-t(28,1,"Flex 5",44,0.8,0.8,0.8,95)
+add_tab( 0, 1, "Off", "Off", W_OFF, W_OFF, 0.5, 0.5, 0.5, 24)
+add_tab( 1, 1, "Intro", "Intro", W_SECT, W_SECT, 0.2, 1.0, 1.0, 32)
+add_tab( 2, 1, "B", "B", W_TAB, W_TAB, 0.2, 1.0, 1.0, 33)
+add_tab( 3, 1, "C", "C", W_TAB, W_TAB, 0.2, 1.0, 1.0, 34)
+add_tab( 4, 1, "D", "D", W_TAB, W_TAB, 0.2, 1.0, 1.0, 35)
+add_tab( 5, 1, "Verse 1", "Verse 1", W_SECT, W_SECT, 0.5, 0.7, 1.0, 36)
+add_tab( 6, 1, "B", "B", W_TAB, W_TAB, 0.5, 0.7, 1.0, 37)
+add_tab( 7, 1, "C", "C", W_TAB, W_TAB, 0.5, 0.7, 1.0, 38)
+add_tab( 8, 1, "D", "D", W_TAB, W_TAB, 0.5, 0.7, 1.0, 39)
+add_tab( 9, 1, "Pre 1", "Pre 1", W_SECT, W_SECT, 0.8, 0.5, 1.0, 48)
+add_tab(10, 1, "B", "B", W_TAB, W_TAB, 0.8, 0.5, 1.0, 49)
+add_tab(11, 1, "C", "C", W_TAB, W_TAB, 0.8, 0.5, 1.0, 50)
+add_tab(12, 1, "D", "D", W_TAB, W_TAB, 0.8, 0.5, 1.0, 51)
+add_tab(13, 1, "Chorus 1", "Chorus 1", W_SECT, W_SECT, 1.0, 0.4, 0.4, 60)
+add_tab(14, 1, "B", "B", W_TAB, W_TAB, 1.0, 0.4, 0.4, 61)
+add_tab(15, 1, "C", "C", W_TAB, W_TAB, 1.0, 0.4, 0.4, 62)
+add_tab(16, 1, "D", "D", W_TAB, W_TAB, 1.0, 0.4, 0.4, 63)
+add_tab(17, 1, "Bridge", "Bridge", W_SECT, W_SECT, 1.0, 0.9, 0.2, 72)
+add_tab(18, 1, "B", "B", W_TAB, W_TAB, 1.0, 0.9, 0.2, 73)
+add_tab(19, 1, "C", "C", W_TAB, W_TAB, 1.0, 0.9, 0.2, 74)
+add_tab(20, 1, "D", "D", W_TAB, W_TAB, 1.0, 0.9, 0.2, 75)
+add_tab(21, 1, "H1", "21", W_HWW, W_TAB, 0.8, 0.8, 0.8, 20)
+add_tab(22, 1, "H2", "22", W_HWW, W_TAB, 0.8, 0.8, 0.8, 21)
+add_tab(23, 1, "1<", "23", W_HWW, W_TAB, 0.8, 0.5, 1.0, 26)
+add_tab(24, 1, "1=", "24", W_HWW, W_TAB, 0.8, 0.5, 1.0, 27)
+add_tab(25, 1, "1>", "25", W_HWW, W_TAB, 0.8, 0.5, 1.0, 28)
 
 -- ROW 2
-t(30,2,"4",SMALL_W,0.2,1.0,1.0,14)
-t(31,2,"5",SMALL_W,0.2,1.0,1.0,15)
-t(32,2,"6",SMALL_W,0.2,1.0,1.0,16)
-t(33,2,"7",SMALL_W,0.2,1.0,1.0,17)
+add_tab(26, 2, "Def", "Def", W_OFF, W_OFF, 0.7, 0.7, 0.9, 25)
+add_tab(27, 2, "1", "1", W_TAB, W_TAB, 0.8, 0.8, 0.8, 1)
+add_tab(28, 2, "2", "2", W_TAB, W_TAB, 0.8, 0.8, 0.8, 2)
+add_tab(29, 2, "3", "3", W_TAB, W_TAB, 0.8, 0.8, 0.8, 3)
+add_tab(30, 2, "4", "4", W_TAB, W_TAB, 0.8, 0.8, 0.8, 4)
+add_tab(31, 2, "5", "5", W_TAB, W_TAB, 0.8, 0.8, 0.8, 5)
+add_tab(32, 2, "Verse 2", "Verse 2", W_SECT, W_SECT, 0.5, 0.7, 1.0, 40)
+add_tab(33, 2, "B", "B", W_TAB, W_TAB, 0.5, 0.7, 1.0, 41)
+add_tab(34, 2, "C", "C", W_TAB, W_TAB, 0.5, 0.7, 1.0, 42)
+add_tab(35, 2, "D", "D", W_TAB, W_TAB, 0.5, 0.7, 1.0, 43)
+add_tab(36, 2, "Pre 2", "Pre 2", W_SECT, W_SECT, 0.8, 0.5, 1.0, 52)
+add_tab(37, 2, "B", "B", W_TAB, W_TAB, 0.8, 0.5, 1.0, 53)
+add_tab(38, 2, "C", "C", W_TAB, W_TAB, 0.8, 0.5, 1.0, 54)
+add_tab(39, 2, "D", "D", W_TAB, W_TAB, 0.8, 0.5, 1.0, 55)
+add_tab(40, 2, "Chorus 2", "Chorus 2", W_SECT, W_SECT, 1.0, 0.4, 0.4, 64)
+add_tab(41, 2, "B", "B", W_TAB, W_TAB, 1.0, 0.4, 0.4, 65)
+add_tab(42, 2, "C", "C", W_TAB, W_TAB, 1.0, 0.4, 0.4, 66)
+add_tab(43, 2, "D", "D", W_TAB, W_TAB, 1.0, 0.4, 0.4, 67)
+add_tab(44, 2, "Solo", "Solo", W_SECT, W_SECT, 1.0, 0.6, 0.3, 76)
+add_tab(45, 2, "B", "B", W_TAB, W_TAB, 1.0, 0.6, 0.3, 77)
+add_tab(46, 2, "C", "C", W_TAB, W_TAB, 1.0, 0.6, 0.3, 78)
+add_tab(47, 2, "D", "D", W_TAB, W_TAB, 1.0, 0.6, 0.3, 79)
+add_tab(48, 2, "H3", "48", W_HWW, W_TAB, 0.8, 0.8, 0.8, 22)
+add_tab(49, 2, "H4", "49", W_HWW, W_TAB, 0.8, 0.8, 0.8, 23)
+add_tab(50, 2, "2<", "50", W_HWW, W_TAB, 0.9, 0.4, 1.0, 29)
+add_tab(51, 2, "2=", "51", W_HWW, W_TAB, 0.9, 0.4, 1.0, 30)
+add_tab(52, 2, "2>", "52", W_HWW, W_TAB, 0.9, 0.4, 1.0, 31)
 
-t(34,2,"4",SMALL_W,0.4,0.6,1.0,24)
-t(35,2,"5",SMALL_W,0.4,0.6,1.0,25)
-t(36,2,"6",SMALL_W,0.4,0.6,1.0,26)
-t(37,2,"7",SMALL_W,0.4,0.6,1.0,27)
-
-t(38,2,"4",SMALL_W,0.7,0.4,1.0,34)
-t(39,2,"5",SMALL_W,0.7,0.4,1.0,35)
-t(40,2,"6",SMALL_W,0.7,0.4,1.0,36)
-t(41,2,"7",SMALL_W,0.7,0.4,1.0,37)
-
-t(42,2,"4",SMALL_W,1.0,0.4,0.4,44)
-t(43,2,"5",SMALL_W,1.0,0.4,0.4,45)
-t(44,2,"6",SMALL_W,1.0,0.4,0.4,46)
-t(45,2,"7",SMALL_W,1.0,0.4,0.4,47)
-
-t(46,2,"4",SMALL_W,1.0,0.9,0.2,54)
-t(47,2,"5",SMALL_W,1.0,0.9,0.2,55)
-t(48,2,"6",SMALL_W,1.0,0.9,0.2,56)
-t(49,2,"7",SMALL_W,1.0,0.9,0.2,57)
-
-t(50,2,"4",SMALL_W,0.5,0.8,0.7,64)
-t(51,2,"5",SMALL_W,0.5,0.8,0.7,65)
-t(52,2,"6",SMALL_W,0.5,0.8,0.7,66)
-t(53,2,"7",SMALL_W,0.5,0.8,0.7,67)
-
-t(54,2,"Hit 3",44,0.8,0.8,0.8,73)
-t(55,2,"Hit 4",44,0.8,0.8,0.8,74)
-
-t(56,2,"Fill 2<",44,0.8,0.3,0.9,84)
-t(57,2,"Fill 2=",44,0.8,0.3,0.9,85)
-t(58,2,"Fill 2>",44,0.8,0.3,0.9,86)
-
-t(59,2,"Flex 6",44,0.8,0.8,0.8,96)
-t(60,2,"Flex 7",44,0.8,0.8,0.8,97)
-t(61,2,"Flex 8",44,0.8,0.8,0.8,98)
-t(62,2,"Flex 9",44,0.8,0.8,0.8,99)
-t(63,2,"Flex 10",44,0.8,0.8,0.8,100)
+-- ROW 3
+add_tab(53, 3, "Min", "Min", W_OFF, W_OFF, 0.9, 0.7, 0.7, 19)
+add_tab(54, 3, "6", "6", W_TAB, W_TAB, 0.8, 0.8, 0.8, 6)
+add_tab(55, 3, "7", "7", W_TAB, W_TAB, 0.8, 0.8, 0.8, 7)
+add_tab(56, 3, "8", "8", W_TAB, W_TAB, 0.8, 0.8, 0.8, 8)
+add_tab(57, 3, "9", "9", W_TAB, W_TAB, 0.8, 0.8, 0.8, 9)
+add_tab(58, 3, "10", "10", W_TAB, W_TAB, 0.8, 0.8, 0.8, 10)
+add_tab(59, 3, "Verse 3", "Verse 3", W_SECT, W_SECT, 0.5, 0.7, 1.0, 44)
+add_tab(60, 3, "B", "B", W_TAB, W_TAB, 0.5, 0.7, 1.0, 45)
+add_tab(61, 3, "C", "C", W_TAB, W_TAB, 0.5, 0.7, 1.0, 46)
+add_tab(62, 3, "D", "D", W_TAB, W_TAB, 0.5, 0.7, 1.0, 47)
+add_tab(63, 3, "Pre 3", "Pre 3", W_SECT, W_SECT, 0.8, 0.5, 1.0, 56)
+add_tab(64, 3, "B", "B", W_TAB, W_TAB, 0.8, 0.5, 1.0, 57)
+add_tab(65, 3, "C", "C", W_TAB, W_TAB, 0.8, 0.5, 1.0, 58)
+add_tab(66, 3, "D", "D", W_TAB, W_TAB, 0.8, 0.5, 1.0, 59)
+add_tab(67, 3, "Chorus 3", "Chorus 3", W_SECT, W_SECT, 1.0, 0.4, 0.4, 68)
+add_tab(68, 3, "B", "B", W_TAB, W_TAB, 1.0, 0.4, 0.4, 69)
+add_tab(69, 3, "C", "C", W_TAB, W_TAB, 1.0, 0.4, 0.4, 70)
+add_tab(70, 3, "D", "D", W_TAB, W_TAB, 1.0, 0.4, 0.4, 71)
+add_tab(71, 3, "Outro", "Outro", W_SECT, W_SECT, 0.5, 0.8, 0.7, 80)
+add_tab(72, 3, "B", "B", W_TAB, W_TAB, 0.5, 0.8, 0.7, 81)
+add_tab(73, 3, "C", "C", W_TAB, W_TAB, 0.5, 0.8, 0.7, 82)
+add_tab(74, 3, "D", "D", W_TAB, W_TAB, 0.5, 0.8, 0.7, 83)
+add_tab(75, 3, "rsv", "75", W_HWW, W_TAB, 0.8, 0.8, 0.8, 84)
+add_tab(76, 3, "rsv", "76", W_HWW, W_TAB, 0.8, 0.8, 0.8, 85)
+add_tab(77, 3, "rsv", "77", W_HWW, W_TAB, 0.9, 0.4, 1.0, 86)
+add_tab(78, 3, "rsv", "78", W_HWW, W_TAB, 0.9, 0.4, 1.0, 87)
+add_tab(79, 3, "rsv", "79", W_HWW, W_TAB, 0.9, 0.4, 1.0, 88)
 
 local prog_to_tabid = {}
 local prog_to_color = {}
-for _,tb in ipairs(tabs) do
+local prog_to_name  = {}
+for _,tb in ipairs(tabs_drum) do
   prog_to_tabid[tb.prog] = tb.id
   prog_to_color[tb.prog] = {tb.r, tb.g, tb.b}
-end
-
-local function find_first_unused_id()
-  local used = {}
-
-  for _, td in ipairs(g_tracks) do
-    if td.is_alive and td.inst_id and td.inst_id > 0 then
-      used[td.inst_id] = true
-    end
-  end
-
-  local id = 1
-  while used[id] do id = id + 1 end
-  return id
-end
-
-local function set_jsfx_slider5_instance_id(tr_data, new_id)
-  if not tr_data or not tr_data.is_alive then return false end
-  if not r.ValidatePtr(tr_data.track, "MediaTrack*") then return false end
-
-  local param_idx = 4 -- slider 5 (0-based)
-  new_id = math.floor(tonumber(new_id) or 0)
-
-  local ok = r.TrackFX_SetParam(tr_data.track, tr_data.fx_idx, param_idx, new_id)
-  tr_data.inst_id = new_id
-
-  r.TrackList_AdjustWindows(false)
-  r.UpdateArrange()
-
-  return ok ~= false
+  prog_to_name[tb.prog]  = tb.name
 end
 
 ----------------------------------------------------------------
@@ -371,7 +305,6 @@ end
 ----------------------------------------------------------------
 -- TRACK HELPERS & GMEM STATE MACHINE
 ----------------------------------------------------------------
-
 local function compute_duplicate_ids()
   dup_ids = {}
   has_dup_ids = false
@@ -405,20 +338,14 @@ local function scan_project_tracks()
     for fx = 0, fx_count - 1 do
       local retval, buf = r.TrackFX_GetFXName(tr, fx, "")
       if retval and buf then
-        -- Normalize the buffer: lowercase and extract just the filename if it's a path
         local normalized = buf:lower()
-        
-        -- Check if it's a JSFX by looking for the name (with or without .jsfx extension)
         for fx_name, track_type in pairs(TARGET_FX_NAMES) do
-          -- Strip .jsfx for comparison if present
           local name_without_ext = fx_name:gsub("%.jsfx$", ""):lower()
           local name_with_ext = fx_name:lower()
-          
-          -- Check multiple patterns that might appear on different platforms
           local matches = (
-            normalized:find(name_with_ext, 1, true) or           -- Full name with extension
-            normalized:find(name_without_ext, 1, true) or        -- Name without extension
-            normalized:find("js: " .. name_without_ext, 1, true) -- REAPER's JS: prefix
+            normalized:find(name_with_ext, 1, true) or
+            normalized:find(name_without_ext, 1, true) or
+            normalized:find("js: " .. name_without_ext, 1, true)
           )
           
           if matches then
@@ -456,18 +383,15 @@ local function validate_existing_tracks()
     local retval, buf = r.TrackFX_GetFXName(gt.track, gt.fx_idx, "")
     
     if not retval then
-      -- FX no longer at expected index, scan track to find it
       local found = false
       local fx_count = r.TrackFX_GetCount(gt.track)
       for fx = 0, fx_count - 1 do
         local rv, name = r.TrackFX_GetFXName(gt.track, fx, "")
         if rv and name then
           local normalized = name:lower()
-          -- Use same matching logic as scan_project_tracks
           for fx_name, _ in pairs(TARGET_FX_NAMES) do
             local name_without_ext = fx_name:gsub("%.jsfx$", ""):lower()
             local name_with_ext = fx_name:lower()
-            
             local matches = (
               normalized:find(name_with_ext, 1, true) or
               normalized:find(name_without_ext, 1, true) or
@@ -489,20 +413,17 @@ local function validate_existing_tracks()
         gt.inst_id = 0
       end
     else
-      -- FX still there, verify it's still the right type
       local correct_fx = false
       local normalized = buf:lower()
       
       for fx_name, _ in pairs(TARGET_FX_NAMES) do
         local name_without_ext = fx_name:gsub("%.jsfx$", ""):lower()
         local name_with_ext = fx_name:lower()
-        
         local matches = (
           normalized:find(name_with_ext, 1, true) or
           normalized:find(name_without_ext, 1, true) or
           normalized:find("js: " .. name_without_ext, 1, true)
         )
-        
         if matches then
           correct_fx = true
           break
@@ -510,7 +431,6 @@ local function validate_existing_tracks()
       end
       
       if not correct_fx then
-        -- Wrong FX type, try to find correct one elsewhere on track
         local found = false
         local fx_count = r.TrackFX_GetCount(gt.track)
         for fx = 0, fx_count - 1 do
@@ -520,13 +440,11 @@ local function validate_existing_tracks()
             for fx_name, _ in pairs(TARGET_FX_NAMES) do
               local name_without_ext = fx_name:gsub("%.jsfx$", ""):lower()
               local name_with_ext = fx_name:lower()
-              
               local matches = (
                 norm:find(name_with_ext, 1, true) or
                 norm:find(name_without_ext, 1, true) or
                 norm:find("js: " .. name_without_ext, 1, true)
               )
-              
               if matches then
                 gt.fx_idx = fx
                 found = true
@@ -536,31 +454,23 @@ local function validate_existing_tracks()
           end
           if found then break end
         end
-        
         if not found then
           gt.is_alive = false
           gt.inst_id = 0
         end
       end
     end
-    
     ::continue::
   end
 end
 
 local function step_validate_and_refresh(check_colors)
   validate_existing_tracks()
-  
   local current_tracks = scan_project_tracks()
-
   local current_keys = {}
-  for _, ct in ipairs(current_tracks) do
-    current_keys[ct.key] = true
-  end
+  for _, ct in ipairs(current_tracks) do current_keys[ct.key] = true end
   for key, _ in pairs(cache_active_tabs) do
-    if not current_keys[key] then
-      cache_active_tabs[key] = nil
-    end
+    if not current_keys[key] then cache_active_tabs[key] = nil end
   end
 
   local old_g_tracks = g_tracks
@@ -636,10 +546,6 @@ local function step_read_gmem_packet(packet_idx)
   end
 end
 
-----------------------------------------------------------------
--- GMEM to JSFX TRACK # COLOR
-----------------------------------------------------------------
-
 local function write_track_info_to_gmem()
   r.gmem_attach(GMEM_NAMESPACE)
   
@@ -647,19 +553,13 @@ local function write_track_info_to_gmem()
     if tr_data.is_alive and r.ValidatePtr(tr_data.track, "MediaTrack*") and tr_data.inst_id >= 1 and tr_data.inst_id <= 512 then
       local track_num = math.floor(r.GetMediaTrackInfo_Value(tr_data.track, "IP_TRACKNUMBER"))
       local native_col = r.GetTrackColor(tr_data.track)
-      
       local col_r, col_g, col_b = 0.5, 0.5, 0.5
       
       if native_col and native_col ~= 0 then
-        -- FIX: Use ColorFromNative for cross-platform byte order
         local ok, r_val, g_val, b_val = pcall(r.ColorFromNative, native_col)
-        
         if ok and r_val and g_val and b_val then
-          col_r = r_val / 255
-          col_g = g_val / 255
-          col_b = b_val / 255
+          col_r = r_val / 255; col_g = g_val / 255; col_b = b_val / 255
         else
-          -- Fallback to manual with mask (shouldn't happen)
           native_col = native_col & 0xFFFFFF
           col_r = (native_col % 256) / 255
           col_g = (math.floor(native_col / 256) % 256) / 255
@@ -668,7 +568,6 @@ local function write_track_info_to_gmem()
       end
       
       local base_addr = GMEM_INFO_BASE + ((tr_data.inst_id - 1) * 4)
-      
       r.gmem_write(base_addr + 0, track_num)
       r.gmem_write(base_addr + 1, col_r)
       r.gmem_write(base_addr + 2, col_g)
@@ -700,27 +599,13 @@ local function process_gmem_state_machine()
 
   r.gmem_attach(GMEM_NAMESPACE)
   
-  if gmem_step == 0 then
-    step_validate_and_refresh(false)
-    gmem_step = 1
-  elseif gmem_step == 1 then
-    step_read_instance_ids()
-    gmem_step = 2
-  elseif gmem_step == 2 then
-    step_read_gmem_packet(0)
-    gmem_step = 3
-  elseif gmem_step == 3 then
-    step_read_gmem_packet(1)
-    gmem_step = 4
-  elseif gmem_step == 4 then
-    step_read_gmem_packet(2)
-    gmem_step = 5
-  elseif gmem_step == 5 then
-    step_read_gmem_packet(3)
-    gmem_step = 6
-  elseif gmem_step == 6 then
-    step_finalize()
-  end
+  if gmem_step == 0 then step_validate_and_refresh(false); gmem_step = 1
+  elseif gmem_step == 1 then step_read_instance_ids(); gmem_step = 2
+  elseif gmem_step == 2 then step_read_gmem_packet(0); gmem_step = 3
+  elseif gmem_step == 3 then step_read_gmem_packet(1); gmem_step = 4
+  elseif gmem_step == 4 then step_read_gmem_packet(2); gmem_step = 5
+  elseif gmem_step == 5 then step_read_gmem_packet(3); gmem_step = 6
+  elseif gmem_step == 6 then step_finalize() end
 end
 
 local function find_track(name)
@@ -742,51 +627,29 @@ end
 -- LABEL HELPERS
 ----------------------------------------------------------------
 local function tab_label_from_prog(prog)
-  if not prog then return nil end
-  if prog == 0 then return "Drums Off" end
-  if prog == 101 then return "Drums Default" end
-  if prog >= 11 and prog <= 17 then
-    local v = prog - 10
-    return (v == 1) and "Intro" or ("Intro " .. v)
-  end
-  if prog >= 21 and prog <= 27 then
-    local v = prog - 20
-    return (v == 1) and "Verse" or ("Verse " .. v)
-  end
-  if prog >= 31 and prog <= 37 then
-    local v = prog - 30
-    return (v == 1) and "Pre" or ("Pre " .. v)
-  end
-  if prog >= 41 and prog <= 47 then
-    local v = prog - 40
-    return (v == 1) and "Chorus" or ("Chorus " .. v)
-  end
-  if prog >= 51 and prog <= 57 then
-    local v = prog - 50
-    return (v == 1) and "Bridge" or ("Bridge " .. v)
-  end
-  if prog >= 61 and prog <= 67 then
-    local v = prog - 60
-    return (v == 1) and "Outro" or ("Outro " .. v)
-  end
-  if prog >= 71 and prog <= 74 then
-    return "Hit " .. tostring(prog - 70)
-  end
-  if prog == 81 then return "Fill 1<" end
-  if prog == 82 then return "Fill 1=" end
-  if prog == 83 then return "Fill 1>" end
-  if prog == 84 then return "Fill 2<" end
-  if prog == 85 then return "Fill 2=" end
-  if prog == 86 then return "Fill 2>" end
-  if prog >= 91 and prog <= 100 then
-    return "Flex " .. tostring(prog - 90)
-  end
-  return "Arp Pattern # " .. tostring(prog)
+  return prog_to_name[prog] or ("Pattern " .. tostring(prog))
 end
 
 ----------------------------------------------------------------
 -- ITEM HELPERS
 ----------------------------------------------------------------
+
+local function force_focus_fx(track, fx_idx)
+  if not track or not r.ValidatePtr(track, "MediaTrack*") or fx_idx < 0 then return end
+  
+  -- Force the plugin to be enabled just in case it was bypassed
+  r.TrackFX_SetEnabled(track, fx_idx, true)
+  
+  -- If it's already floating, close it first. 
+  -- Reopening it instantly forces the OS to pull it to the absolute front.
+  if r.TrackFX_GetFloatingWindow(track, fx_idx) then
+    r.TrackFX_Show(track, fx_idx, 2) -- Hide floating window
+  end
+  
+  -- Show floating window (gains focus)
+  r.TrackFX_Show(track, fx_idx, 3) 
+end
+
 local function ensure_midi_item_at(track, t_start, t_end)
   return r.CreateNewMIDIItemInProj(track, t_start, t_end, false)
 end
@@ -828,28 +691,27 @@ local function insert_swing_cc(take, ppq, value)
 end
 
 ----------------------------------------------------------------
--- SCAN: nearest preceding Program Change (for highlight)
+-- SCAN: nearest preceding Program Change (Unified for Drum & Arp)
 ----------------------------------------------------------------
-local function find_active_tab(track, cursor)
+local function find_active_prog(track, cursor)
   if not track or not r.ValidatePtr(track, "MediaTrack*") then return nil end
   
   local track_key = tostring(track)
   local now = r.time_precise()
   local cached = cache_active_tabs[track_key]
   if cached and (now - cached.time) < CACHE_DURATION then
-    return cached.tab_id
+    return cached.prog
   end
   
   local best_ppq, best_prog
-
-  for i=0,r.CountTrackMediaItems(track)-1 do
+  for i=0, r.CountTrackMediaItems(track)-1 do
     local it = r.GetTrackMediaItem(track,i)
     local tk = r.GetActiveTake(it)
     if tk and r.TakeIsMIDI(tk) then
       local _, notecnt, cccnt, _ = r.MIDI_CountEvts(tk)
       if cccnt > 0 then
         local cur_ppq = r.MIDI_GetPPQPosFromProjTime(tk, cursor)
-        for j=0,cccnt-1 do
+        for j=0, cccnt-1 do
           local ok,_,_,ppq,chanmsg,chan,msg2,msg3 = r.MIDI_GetCC(tk,j)
           local is_pc = (chanmsg >= 0xC0 and chanmsg <= 0xCF)
           if ok and is_pc and chan == CH_PC and ppq <= cur_ppq then
@@ -862,35 +724,7 @@ local function find_active_tab(track, cursor)
     end
   end
 
-  local result = best_prog and prog_to_tabid[best_prog]
-  cache_active_tabs[track_key] = {tab_id = result, time = now}
-  return result
-end
-
--- ADDED: ARP version returns raw program 0-127
-local function find_active_prog(track, cursor)
-  if not track or not r.ValidatePtr(track, "MediaTrack*") then return nil end
-  
-  local best_ppq, best_prog
-  for i=0,r.CountTrackMediaItems(track)-1 do
-    local it = r.GetTrackMediaItem(track,i)
-    local tk = r.GetActiveTake(it)
-    if tk and r.TakeIsMIDI(tk) then
-      local _, notecnt, cccnt, _ = r.MIDI_CountEvts(tk)
-      if cccnt > 0 then
-        local cur_ppq = r.MIDI_GetPPQPosFromProjTime(tk, cursor)
-        for j=0,cccnt-1 do
-          local ok,_,_,ppq,chanmsg,chan,msg2,msg3 = r.MIDI_GetCC(tk,j)
-          local is_pc = (chanmsg >= 0xC0 and chanmsg <= 0xCF)
-          if ok and is_pc and chan == CH_PC and ppq <= cur_ppq then
-            if (not best_ppq) or (ppq > best_ppq) then
-              best_ppq, best_prog = ppq, msg2
-            end
-          end
-        end
-      end
-    end
-  end
+  cache_active_tabs[track_key] = {prog = best_prog, time = now}
   return best_prog
 end
 
@@ -986,16 +820,8 @@ local function clear_all_on_track(tr)
           if ok then
             local is_pc = (chanmsg >= 0xC0 and chanmsg <= 0xCF)
             local is_cc = (chanmsg >= 0xB0 and chanmsg <= 0xBF)
-          
-            if is_pc and chan == CH_PC then
-              should_delete = true
-              break
-            end
-          
-            if is_cc and (msg2 == CC_BANK_MSB) then
-              should_delete = true
-              break
-            end
+            if is_pc and chan == CH_PC then should_delete = true; break end
+            if is_cc and (msg2 == CC_BANK_MSB) then should_delete = true; break end
           end
         end
       end
@@ -1018,16 +844,12 @@ local function clear_all_drums_stamps(tracks_table)
 end
 
 local function open_all_targeted_fx_windows()
-for _, tr_data in ipairs(g_tracks) do
-if tr_data.is_alive and r.ValidatePtr(tr_data.track, "MediaTrack*") then
--- Enable the FX first (in case it's bypassed)
-r.TrackFX_SetEnabled(tr_data.track, tr_data.fx_idx, true)
--- 3 = show floating window
-r.TrackFX_Show(tr_data.track, tr_data.fx_idx, 3)
+  for _, tr_data in ipairs(g_tracks) do
+    if tr_data.is_alive and r.ValidatePtr(tr_data.track, "MediaTrack*") then
+      force_focus_fx(tr_data.track, tr_data.fx_idx)
+    end
+  end
 end
-end
-end
-
 
 ----------------------------------------------------------------
 -- REGIONS: Process Regions
@@ -1118,9 +940,6 @@ local function process_regions_all(tracks_table, bank)
       if tr_data.type == "Drum" then
         process_regions_for_track(tr_data.track, bank)
       end
-      -- if tr_data.type == "Arp" then
-      --   (do nothing, or call an arp-specific region processor later)
-      -- end
     end
   end
   r.Undo_EndBlock("N2N Multi-Track: Process Regions", -1)
@@ -1131,12 +950,8 @@ end
 ----------------------------------------------------------------
 local ctx = r.ImGui_CreateContext("N2N Multi-Track Layout Tool")
 
--- Font (create once, attach once)
 local font = r.ImGui_CreateFont("Arial", 18)
 r.ImGui_Attach(ctx, font)
-
-local font_small = r.ImGui_CreateFont("Arial", 12)  -- Smaller font for ARP buttons
-r.ImGui_Attach(ctx, font_small)
 
 local measure_bank = 1
 local swing_value = DEFAULT_SWING
@@ -1156,8 +971,6 @@ local function draw_pattern_indicator(tr_data, prog)
       x + INDICATOR_MARGIN + INDICATOR_SIZE, 
       y + INDICATOR_MARGIN + INDICATOR_SIZE +13,
       rgba_u32(1, 1, 1, 1))
-    local x, y = r.ImGui_GetItemRectMin(ctx)
-    local draw_list = r.ImGui_GetWindowDrawList(ctx)
     r.ImGui_DrawList_AddRectFilled(
       draw_list, 
       x + INDICATOR_MARGIN, 
@@ -1165,8 +978,6 @@ local function draw_pattern_indicator(tr_data, prog)
       x + INDICATOR_MARGIN + INDICATOR_SIZE + 5, 
       y + INDICATOR_MARGIN + INDICATOR_SIZE,
       rgba_u32(1, 1, 1, 1))    
-    local x, y = r.ImGui_GetItemRectMin(ctx)
-    local draw_list = r.ImGui_GetWindowDrawList(ctx)
     r.ImGui_DrawList_AddRectFilled(
       draw_list, 
       x + INDICATOR_MARGIN, 
@@ -1174,223 +985,50 @@ local function draw_pattern_indicator(tr_data, prog)
       x + INDICATOR_MARGIN + INDICATOR_SIZE + 5, 
       y + INDICATOR_MARGIN + INDICATOR_SIZE + 14,
       rgba_u32(1, 1, 1, 1))     
-      
-      
-      
-
   end
 end
 
-local function draw_partial_row_0(active, tr_data, cursor, track_idx)
+local function draw_tab_row(row, active_prog, tr_data, cursor, track_idx, tabs_array)
   local first = true
   local tr = tr_data.track
   
-  for _,tb in ipairs(tabs) do
-    if tb.id==0 or tb.id==29 then
+  for _,tb in ipairs(tabs_array) do
+    if tb.row == row then
       if not first then
         r.ImGui_SameLine(ctx, nil, GAP)
       else
         first = false
       end
       
-      local r0,g0,b0 = mute_rgb(tb.r,tb.g,tb.b)
-
-      
+      local r0,g0,b0 = mute_rgb(tb.r, tb.g, tb.b)
       if not tr_data.is_alive then
         r0,g0,b0 = UI_GRAY, UI_GRAY, UI_GRAY
+      end
+
+      local is_active = (active_prog == tb.prog)
+      local txt_col = is_active and rgba_u32(0,0,0,1) or rgba_u32(1,1,1,1)
+      if is_active then
+        r0, g0, b0 = brighten_rgb(r0, g0, b0, 0.4)
       end
 
       r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(),        rgba_u32(r0,g0,b0,1))
       r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonHovered(), rgba_u32(brighten_rgb(r0,g0,b0,0.20)))
       r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonActive(),  rgba_u32(brighten_rgb(r0,g0,b0,0.30)))
-      r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(),          (active==tb.id) and rgba_u32(0,0,0,1) or rgba_u32(1,1,1,1))
+      r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(),          txt_col)
 
       local clicked = r.ImGui_Button(ctx, tb.name.."##tab"..tb.id.."##t"..track_idx, tb.w, BTN_H)
-      
-      draw_pattern_indicator(tr_data, tb.prog)
-      
-      
-      if clicked and tr_data.is_alive then
-      if live_mode then
-      send_live_cue(tr_data.inst_id, tb.prog)
-      else
-      stamp_pc(tr, tb.prog, measure_bank, cursor)
-      end
-      end
-
-
-
-      r.ImGui_PopStyleColor(ctx, 4)
-    end
-  end
-end
-
-local function draw_tab_row(row, active, tr_data, cursor, track_idx)
-  local first = true
-  local tr = tr_data.track
-  
-  for _,tb in ipairs(tabs) do
-    if tb.row==row then
-      if not first then
-        r.ImGui_SameLine(ctx, nil, GAP)
-      else
-        first = false
-      end
-      
-      local r0,g0,b0 = mute_rgb(tb.r,tb.g,tb.b)
-
-      
-      if not tr_data.is_alive then
-        r0,g0,b0 = UI_GRAY, UI_GRAY, UI_GRAY
-      end
-
-      r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(),        rgba_u32(r0,g0,b0,1))
-      r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonHovered(), rgba_u32(brighten_rgb(r0,g0,b0,0.20)))
-      r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonActive(),  rgba_u32(brighten_rgb(r0,g0,b0,0.30)))
-r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), rgba_u32(1,1,1,1))
-
-
-
-
-      local clicked = r.ImGui_Button(ctx, tb.name.."##tab"..tb.id.."##t"..track_idx, tb.w, BTN_H)
-      
       draw_pattern_indicator(tr_data, tb.prog)
       
       if clicked and tr_data.is_alive then
-      if live_mode then
-      send_live_cue(tr_data.inst_id, tb.prog)
-      else
-      stamp_pc(tr, tb.prog, measure_bank, cursor)
+        if live_mode then
+          send_live_cue(tr_data.inst_id, tb.prog)
+        else
+          stamp_pc(tr, tb.prog, measure_bank, cursor)
+        end
       end
-      end
-
       r.ImGui_PopStyleColor(ctx, 4)
     end
   end
-end
-
--- ADDED: ARP Layout Function
-local function draw_arp_interface(active_prog, tr_data, cursor, track_idx)
-  local tr = tr_data.track
-  local ARP_BTN_W = 17  -- narrow for 64 buttons
-  local ARP_GAP = 4     -- slightly tighter spacing
-  
-  -- Color lookup: groups of 8, cycling through Drum colors
-  local function get_arp_color(prog)
-    local group = math.floor(prog / 8) % 8
-    if group == 0 or group == 7 then return 0.8, 0.8, 0.8 end  -- Grey (Hit)
-    if group == 1 then return 0.2, 1.0, 1.0 end  -- Intro Cyan
-    if group == 2 then return 0.4, 0.6, 1.0 end  -- Verse Blue  
-    if group == 3 then return 0.7, 0.4, 1.0 end  -- Pre Purple
-    if group == 4 then return 1.0, 0.4, 0.4 end  -- Chorus Red
-    if group == 5 then return 1.0, 0.9, 0.2 end  -- Bridge Yellow
-    if group == 6 then return 0.5, 0.8, 0.7 end  -- Outro Teal
-    return 0.5, 0.5, 0.5
-  end
-  
-  -- Clear button (first item, no SameLine before)
-  local blue_r, blue_g, blue_b = 0.25, 0.55, 1.0
-  if not tr_data.is_alive then
-    blue_r, blue_g, blue_b = UI_GRAY, UI_GRAY, UI_GRAY
-  end
-  r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), rgba_u32(blue_r, blue_g, blue_b, 1))
-  r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonHovered(), rgba_u32(brighten_rgb(blue_r, blue_g, blue_b, 0.15)))
-  r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonActive(), rgba_u32(brighten_rgb(blue_r, blue_g, blue_b, 0.25)))
-  r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), rgba_u32(1,1,1,1))
-  
-  if r.ImGui_Button(ctx, "Clear##clr"..track_idx, SECT_W, BTN_H) then
-    r.Undo_BeginBlock()
-    clear_all_on_track(tr_data.track)
-    r.Undo_EndBlock("N2N: Clear " .. tr_data.name, -1)
-  end
-  r.ImGui_PopStyleColor(ctx, 4)
-  
-  -- Process R button
-  r.ImGui_SameLine(ctx, nil, GAP)
-  r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), rgba_u32(blue_r, blue_g, blue_b, 1))
-  r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonHovered(), rgba_u32(brighten_rgb(blue_r, blue_g, blue_b, 0.15)))
-  r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonActive(), rgba_u32(brighten_rgb(blue_r, blue_g, blue_b, 0.25)))
-  r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), rgba_u32(1,1,1,1))
-  
-  if r.ImGui_Button(ctx, "Process R##prc"..track_idx, SECT_W, BTN_H) then
-    r.Undo_BeginBlock()
-    process_regions_for_track(tr_data.track, measure_bank)
-    r.Undo_EndBlock("N2N: Process " .. tr_data.name, -1)
-  end
-  r.ImGui_PopStyleColor(ctx, 4)
-  
-  -- Row 1: Program buttons 0-63
-  r.ImGui_PushFont(ctx, font_small, 12)
-  for prog = 0, 63 do
-    if prog > 0 then r.ImGui_SameLine(ctx, nil, ARP_GAP) end
-    
-    local rr, gg, bb = get_arp_color(prog)
-    if not tr_data.is_alive then
-      rr, gg, bb = UI_GRAY, UI_GRAY, UI_GRAY
-    end
-    
-    local is_active = (active_prog == prog)
-    local display_rr, display_gg, display_bb = rr, gg, bb
-    if is_active then
-      display_rr, display_gg, display_bb = brighten_rgb(rr, gg, bb, 0.4)
-    end
-    
-    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), rgba_u32(mute_rgb(display_rr, display_gg, display_bb)))
-    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonHovered(), rgba_u32(brighten_rgb(rr, gg, bb, 0.2)))
-    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonActive(), rgba_u32(brighten_rgb(rr, gg, bb, 0.3)))
-    
-    local lum = 0.299*rr + 0.587*gg + 0.114*bb
-    local txt_col = (lum > 0.6) and rgba_u32(0,0,0,1) or rgba_u32(1,1,1,1)
-    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), txt_col)
-    
-    if r.ImGui_Button(ctx, tostring(prog).."##arp"..prog.."t"..track_idx, ARP_BTN_W, BTN_H) and tr_data.is_alive then
-      if live_mode then
-        send_live_cue(tr_data.inst_id, prog)
-      else
-        stamp_pc(tr, prog, measure_bank, cursor)
-      end
-    end
-    
-    draw_pattern_indicator(tr_data, prog)
-    r.ImGui_PopStyleColor(ctx, 4)
-  end
-  -- Row 2: Program buttons 64-127 (starts on new line)
-  for prog = 64, 127 do
-    if prog > 64 then
-      r.ImGui_SameLine(ctx, nil, ARP_GAP)
-    end
-    
-    local rr, gg, bb = get_arp_color(prog)
-    if not tr_data.is_alive then
-      rr, gg, bb = UI_GRAY, UI_GRAY, UI_GRAY
-    end
-    
-    local is_active = (active_prog == prog)
-    local display_rr, display_gg, display_bb = rr, gg, bb
-    if is_active then
-      display_rr, display_gg, display_bb = brighten_rgb(rr, gg, bb, 0.4)
-    end
-    
-    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), rgba_u32(mute_rgb(display_rr, display_gg, display_bb)))
-    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonHovered(), rgba_u32(brighten_rgb(rr, gg, bb, 0.2)))
-    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonActive(), rgba_u32(brighten_rgb(rr, gg, bb, 0.3)))
-    
-    local lum = 0.299*rr + 0.587*gg + 0.114*bb
-    local txt_col = (lum > 0.6) and rgba_u32(0,0,0,1) or rgba_u32(1,1,1,1)
-    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), txt_col)
-    
-    if r.ImGui_Button(ctx, (prog < 100) and tostring(prog) or tostring(prog):sub(2) .."##arp"..prog.."t"..track_idx, ARP_BTN_W, BTN_H) and tr_data.is_alive then
-      if live_mode then
-        send_live_cue(tr_data.inst_id, prog)
-      else
-        stamp_pc(tr, prog, measure_bank, cursor)
-      end
-    end
-    
-    draw_pattern_indicator(tr_data, prog)
-    r.ImGui_PopStyleColor(ctx, 4)
-  end
-    r.ImGui_PopFont(ctx)
 end
 
 local function loop()
@@ -1405,17 +1043,17 @@ local function loop()
   
   if r.ImGui_IsKeyPressed(ctx, r.ImGui_Key_Space()) then
     step_validate_and_refresh(true)
-    print("Manual refresh triggered via SPACE")
   end
   
-  r.ImGui_SetNextWindowSize(ctx, 1488, 500, r.ImGui_Cond_Appearing())
-  r.ImGui_SetNextWindowSizeConstraints(ctx, 1488, 202, 9999, 9999) 
+  r.ImGui_SetNextWindowSize(ctx, 1510, 500, r.ImGui_Cond_Appearing())
+  r.ImGui_SetNextWindowSizeConstraints(ctx, 1510, 202, 9999, 9999) 
   local vis,open = r.ImGui_Begin(ctx,"N2N Multi-Track Layout Tool",true)
   
   if dup_popup_request then
     r.ImGui_OpenPopup(ctx, "N2N ID Conflict")
     dup_popup_request = false
   end
+
   if vis then
     r.ImGui_PushFont(ctx, font,15)
     local tr_swing = find_track(TRACK_SWING)
@@ -1439,16 +1077,14 @@ local function loop()
       r.ImGui_PopStyleColor(ctx,2)
       r.ImGui_SameLine(ctx,nil,GAP)
 
-      local rr,gg,bb = mute_rgb(0.45,0.45,0.45)
-      r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), rgba_u32(rr,gg,bb,1))
+      local rr2,gg2,bb2 = mute_rgb(0.45,0.45,0.45)
+      r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), rgba_u32(rr2,gg2,bb2,1))
       r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), rgba_u32(1,1,1,1))
       if ui_btn("Open FX Windows", HEADER_WIDTH-10, BTN_H, "ctl_openfx") then
-      open_all_targeted_fx_windows()
+        open_all_targeted_fx_windows()
       end
       r.ImGui_PopStyleColor(ctx,2)
       r.ImGui_SameLine(ctx,nil,GAP*4)
-
-
 
       r.ImGui_Text(ctx,"Measure offset:")
       for i=1,4 do
@@ -1473,7 +1109,7 @@ local function loop()
         local rr,gg,bb = mute_rgb(0.35,0.35,0.35)
         r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), rgba_u32(rr,gg,bb,1))
         r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), rgba_u32(1,1,1,1))
-        if ui_btn("Set Swing", W_SET_SW, BTN_H, "ctl_sw") then
+        if ui_btn("Set Swing", 94, BTN_H, "ctl_sw") then
           stamp_swing(tr_swing, swing_value, cur)
         end
         r.ImGui_PopStyleColor(ctx,2)
@@ -1485,16 +1121,15 @@ local function loop()
         local rr,gg,bb = mute_rgb(0.30,0.30,0.30)
         r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), rgba_u32(rr,gg,bb,1))
         r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), rgba_u32(1,1,1,1))
-        if ui_btn("Process Regions", W_PROCESS, BTN_H, "ctl_pr") then
+        if ui_btn("Process Regions", 144, BTN_H, "ctl_pr") then
           process_regions_all(g_tracks, measure_bank)
         end
         r.ImGui_PopStyleColor(ctx,2)
       end
-      
     end
 
     r.ImGui_Separator(ctx)
-    r.ImGui_Text(ctx, string.format("Found %d N2N instrument(s)", #g_tracks, gmem_cycle, gmem_step))
+    r.ImGui_Text(ctx, string.format("Found %d N2N instrument(s)", #g_tracks))
     
     if has_dup_ids then
       r.ImGui_SameLine(ctx, nil, GAP*3)
@@ -1524,69 +1159,109 @@ local function loop()
         local header_col = rgba_u32(header_r, header_g, header_b, 1)
         local text_col = rgba_u32(txt_r, txt_g, txt_b, 1)
         
-        local row_height = BTN_H * 3 + GAP_CONTROL_TO_ROW1 + GAP_ROW1_TO_ROW2 + 8
+        local row_height = BTN_H * 4 + GAP * 3 + 8 -- Increased to 4 rows
         
+        -- LEFT COLUMN / HEADER
         r.ImGui_PushStyleColor(ctx, r.ImGui_Col_WindowBg(), header_col)
         if r.ImGui_BeginChild(ctx, "Header"..idx, HEADER_WIDTH, row_height) then
           if not tr_data.is_alive then
             r.ImGui_BeginDisabled(ctx, true)
           end
           
-          do
-            local btn_col = header_col
-            local btn_hover = rgba_u32(brighten_rgb(header_r, header_g, header_b, 0.15))
-            local btn_active = rgba_u32(brighten_rgb(header_r, header_g, header_b, 0.25))
-            
-            r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), btn_col)
-            r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonHovered(), btn_hover)
-            r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonActive(), btn_active)
-            r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), text_col)
-            
-            local display_name = tr_data.name
-            if #display_name > 18 then display_name = display_name:sub(1,15).."..." end
-            if r.ImGui_Button(ctx, display_name, HEADER_WIDTH-10, BTN_H) and tr_data.is_alive then
-              r.SetOnlyTrackSelected(tr_data.track)
-              r.TrackList_AdjustWindows(false)
-            end
-            local type_label = tr_data.type
-            
-            if r.ImGui_Button(ctx, type_label, HEADER_WIDTH-10, BTN_H) and tr_data.is_alive then
-              if tr_data.type == "Drum" then
-                r.TrackFX_SetEnabled(tr_data.track, tr_data.fx_idx, true)
-                r.TrackFX_Show(tr_data.track, tr_data.fx_idx, 3)
-              else
-                r.TrackFX_Show(tr_data.track, tr_data.fx_idx, 3)
-              end
-            end
-            
-            local id_text = tr_data.is_alive and ("ID: "..tostring(tr_data.inst_id)) or "OFFLINE"
-            local dup = tr_data.is_alive and is_dup_id(tr_data.inst_id)
-
-            if dup then
-              local tnow = r.time_precise()
-              local on = (math.floor(tnow * 5) % 2) == 0
-              local col = on and rgba_u32(1, 0, 0, 1) or btn_col
-
-              r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), col)
-              r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonHovered(), col)
-              r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonActive(), col)
-              r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), rgba_u32(1,1,1,1))
-
-              if r.ImGui_Button(ctx, id_text.."##dup_idbtn"..idx, HEADER_WIDTH-10, BTN_H) then
-                dup_popup_track = tr_data
-                dup_popup_id = tr_data.inst_id
-                dup_popup_center_next = true
-                dup_popup_request = true
-              end
-
-              r.ImGui_PopStyleColor(ctx, 4)
-            else
-              r.ImGui_Button(ctx, id_text.."##idbtn"..idx, HEADER_WIDTH-10, BTN_H)
-            end
-
-            r.ImGui_PopStyleColor(ctx, 4)
+          local btn_hover = rgba_u32(brighten_rgb(header_r, header_g, header_b, 0.15))
+          local btn_active = rgba_u32(brighten_rgb(header_r, header_g, header_b, 0.25))
+          
+          r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), header_col)
+          r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonHovered(), btn_hover)
+          r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonActive(), btn_active)
+          r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), text_col)
+          
+          -- ROW 1: Track Name
+          local display_name = tr_data.name
+          if #display_name > 18 then display_name = display_name:sub(1,15).."..." end
+          if r.ImGui_Button(ctx, display_name, HEADER_WIDTH-10, BTN_H) and tr_data.is_alive then
+            r.SetOnlyTrackSelected(tr_data.track)
+            r.TrackList_AdjustWindows(false)
           end
           
+-- ROW 2: Type and Inst
+          local half_w = (HEADER_WIDTH - 10 - GAP) / 2
+          
+          -- The Arp / Drum Button
+          if r.ImGui_Button(ctx, tr_data.type, half_w, BTN_H) and tr_data.is_alive then
+            force_focus_fx(tr_data.track, tr_data.fx_idx)
+          end
+          
+          r.ImGui_SameLine(ctx, nil, GAP)
+          
+          -- The Inst Button
+          if r.ImGui_Button(ctx, "Inst", half_w, BTN_H) and tr_data.is_alive then
+             local inst_idx = r.TrackFX_GetInstrument(tr_data.track)
+             
+             if inst_idx >= 0 and inst_idx ~= tr_data.fx_idx then
+                 -- If there is a dedicated VSTi instrument, focus it
+                 force_focus_fx(tr_data.track, inst_idx)
+             else
+                 -- Otherwise, just grab the next plugin in the chain
+                 local count = r.TrackFX_GetCount(tr_data.track)
+                 for i = tr_data.fx_idx + 1, count - 1 do
+                     force_focus_fx(tr_data.track, i)
+                     break
+                 end
+             end
+          end
+          if r.ImGui_IsItemHovered(ctx) then
+             r.ImGui_SetTooltip(ctx, "Open/Focus Next Instrument/FX Plugin")
+          end
+          
+          -- ROW 3: ID
+          local id_text = tr_data.is_alive and ("ID: "..tostring(tr_data.inst_id)) or "OFFLINE"
+          local dup = tr_data.is_alive and is_dup_id(tr_data.inst_id)
+
+          if dup then
+            local tnow = r.time_precise()
+            local on = (math.floor(tnow * 5) % 2) == 0
+            local col = on and rgba_u32(1, 0, 0, 1) or header_col
+            r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), col)
+            r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonHovered(), col)
+            r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonActive(), col)
+            r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), rgba_u32(1,1,1,1))
+            if r.ImGui_Button(ctx, id_text.."##dup_idbtn"..idx, HEADER_WIDTH-10, BTN_H) then
+              dup_popup_track = tr_data
+              dup_popup_id = tr_data.inst_id
+              dup_popup_center_next = true
+              dup_popup_request = true
+            end
+            r.ImGui_PopStyleColor(ctx, 4)
+          else
+            r.ImGui_Button(ctx, id_text.."##idbtn"..idx, HEADER_WIDTH-10, BTN_H)
+          end
+          r.ImGui_PopStyleColor(ctx, 4)
+
+          -- ROW 4: Clear and Process R
+          local blue_r, blue_g, blue_b = 0.25, 0.55, 1.0
+          if not tr_data.is_alive then blue_r, blue_g, blue_b = UI_GRAY, UI_GRAY, UI_GRAY end
+          r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), rgba_u32(blue_r, blue_g, blue_b, 1))
+          r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonHovered(), rgba_u32(brighten_rgb(blue_r, blue_g, blue_b, 0.15)))
+          r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonActive(), rgba_u32(brighten_rgb(blue_r, blue_g, blue_b, 0.25)))
+          r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), rgba_u32(1,1,1,1))
+          
+          if r.ImGui_Button(ctx, "Clear", half_w, BTN_H) and tr_data.is_alive then
+             r.Undo_BeginBlock()
+             clear_all_on_track(tr_data.track)
+             r.Undo_EndBlock("N2N: Clear " .. tr_data.name, -1)
+          end
+          r.ImGui_SameLine(ctx, nil, GAP)
+          if r.ImGui_Button(ctx, "Proc R", half_w, BTN_H) and tr_data.is_alive then
+             r.Undo_BeginBlock()
+             process_regions_for_track(tr_data.track, measure_bank)
+             r.Undo_EndBlock("N2N: Process " .. tr_data.name, -1)
+          end
+          if r.ImGui_IsItemHovered(ctx) then
+             r.ImGui_SetTooltip(ctx, "Process Regions for this track")
+          end
+          r.ImGui_PopStyleColor(ctx, 4)
+
           if not tr_data.is_alive then
             r.ImGui_EndDisabled(ctx)
           end
@@ -1597,63 +1272,22 @@ local function loop()
         
         r.ImGui_SameLine(ctx, 0, GAP)
         
+        -- RIGHT COLUMN / TABS
         if r.ImGui_BeginChild(ctx, "Buttons"..idx, 0, row_height) then
-          -- Determine active state based on track type
-          local active_tab = nil
           local active_prog = nil
-          
           if tr_data.is_alive then
-            if tr_data.type == "Arp" then
-              active_prog = find_active_prog(tr_data.track, cur)
-            else
-              active_tab = find_active_tab(tr_data.track, cur)
-            end
+            active_prog = find_active_prog(tr_data.track, cur)
           end
           
           if not tr_data.is_alive then
             r.ImGui_BeginDisabled(ctx, true)
           end
           
-          -- Branch by instrument type
-          if tr_data.type == "Arp" then
-            -- ARP Layout: Sequential 0-127, 2 rows
-            draw_arp_interface(active_prog, tr_data, cur, idx)
-          else
-            -- DRUM Layout: Existing section-based layout
-            draw_partial_row_0(active_tab, tr_data, cur, idx)
-            r.ImGui_SameLine(ctx, nil, GAP)
-            
-            local blue_r, blue_g, blue_b = 0.25, 0.55, 1.0
-            if not tr_data.is_alive then
-              blue_r, blue_g, blue_b = UI_GRAY, UI_GRAY, UI_GRAY
-            end
-            local blue_col = rgba_u32(blue_r, blue_g, blue_b, 1)
-            local blue_hover = rgba_u32(brighten_rgb(blue_r, blue_g, blue_b, 0.15))
-            local blue_active = rgba_u32(brighten_rgb(blue_r, blue_g, blue_b, 0.25))
-            
-            r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), blue_col)
-            r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonHovered(), blue_hover)
-            r.ImGui_PushStyleColor(ctx, r.ImGui_Col_ButtonActive(), blue_active)
-            r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Text(), rgba_u32(1,1,1,1))
-            
-            if r.ImGui_Button(ctx, "Clear##clr"..idx, SECT_W, BTN_H) then
-              r.Undo_BeginBlock()
-              clear_all_on_track(tr_data.track)
-              r.Undo_EndBlock("N2N: Clear " .. tr_data.name, -1)
-            end
-            
-            r.ImGui_SameLine(ctx, nil, GAP)
-            
-            if r.ImGui_Button(ctx, "Process R##prc"..idx, SECT_W, BTN_H) then
-              r.Undo_BeginBlock()
-              process_regions_for_track(tr_data.track, measure_bank)
-              r.Undo_EndBlock("N2N: Process " .. tr_data.name, -1)
-            end
-            r.ImGui_PopStyleColor(ctx, 4)
-            
-            draw_tab_row(1, active_tab, tr_data, cur, idx)
-            draw_tab_row(2, active_tab, tr_data, cur, idx)
-          end
+          local tabs_array = (tr_data.type == "Arp") and tabs_arp or tabs_drum
+          
+          draw_tab_row(1, active_prog, tr_data, cur, idx, tabs_array)
+          draw_tab_row(2, active_prog, tr_data, cur, idx, tabs_array)
+          draw_tab_row(3, active_prog, tr_data, cur, idx, tabs_array)
           
           if not tr_data.is_alive then
             r.ImGui_EndDisabled(ctx)
