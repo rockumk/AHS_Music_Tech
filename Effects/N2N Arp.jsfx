@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.2.4
+version: 12.2.5
 author: Rock Kennedy
 about:
-  # N2N Arp v12.2.4
+  # N2N Arp v12.2.5
   - FEATURE: Velocity Scaling
 provides:
   [main] .
@@ -26,7 +26,7 @@ slider14:0<0,2,1{Chords,Split (Chords and Bass),Bass}>-Input Mode
 
 @init
 scale_dirty = 0;
-thisversion = "v12.2.4";
+thisversion = "v12.2.5";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -1228,7 +1228,7 @@ file_var(0, global_out_mask);
 @block
 // --- SEND QUEUED RECORDING NOTES ---
 midi_trigger_queued >= 0 ? (
-    midisend(0, 0x9F, midi_trigger_queued | (127 << 8)); // Note On Ch 16
+    midisend(0, 0x9F, midi_trigger_queued | (1 << 8));   // Note On Ch 16 at Velocity 1
     midisend(100, 0x8F, midi_trigger_queued);            // Note Off 100 samples later
     midi_trigger_queued = -1; // Reset
 );
