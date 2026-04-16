@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.7.7
+version: 7.7.8
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.7.7 -
+  # N2N Drum Arranger v7.7.8 -
   ADDED CUE SETTING
   ADDED PATTERN MUTE
   ADDED FALLBACK PATTERN SYSTEM
@@ -135,8 +135,9 @@ slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
 slider11:14<10,30,1>-Grid Row Height
 
 @init
-version_display = "v7.7.7";
+version_display = "v7.7.8";
 init_gate = 0;
+
 fontsize = 12; // use 16 for PC and 11 for Mac
 osfont = "Helvetica";
 titlefontsize = 20;  // use 24 for PC and 20 for Mac
@@ -1416,7 +1417,7 @@ load_kit_from_slider;
 midi_trigger_queued >= 0 ? (
     // Send 128 samples (approx a 128th note) before the end of the block 
     // to give Reaper time to "see" it before the bar line.
-    midisend(0, 0x9F, midi_trigger_queued | (127 << 8)); // Note On Ch 16
+    midisend(0, 0x9F, midi_trigger_queued | (1 << 8));   // Note On Ch 16 at Velocity 1
     midisend(100, 0x8F, midi_trigger_queued);            // Note Off 100 samples later
     midi_trigger_queued = -1; // Reset
 );
