@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.7.8
+-- @version  1.8.0
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.7.8
+--   # Numbers2Notes 1.8.0
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -16,7 +16,7 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
---   # Major Update 1.7.8
+--   # Major Update 1.8.0
 --   + Added Groove
 --   + Changed N2N Drum Arranger to N2N Drum Arranger.jsfx
 --   + Changed gmem name
@@ -664,14 +664,18 @@ local main_viewport = r.ImGui_GetMainViewport(ctx)
 local os_name = reaper.GetOS()
 local font_name = "Consolas" -- Windows Default
 local font_size = 15
+local font_small_size = 10
 
 if os_name:match("OSX") or os_name:match("macOS") then
     -- Mac Settings: Bolder, two-word font
     font_name = "Andale Mono"
     font_size = 14
+    font_small_size = 9
 end
 
+
 local font = r.ImGui_CreateFont(font_name, font_size)
+local fontsmall = r.ImGui_CreateFont(font_name, font_small_size)
 r.ImGui_Attach(ctx, font)
 
 local click_count, text = 0, ""
@@ -1327,6 +1331,108 @@ local function Pop_N2N_Styles(context)
     reaper.ImGui_PopStyleColor(context, #n2n_styles)
 end
 -----------------------------------------------                 IMGUI LOOP FUNCTION
+
+
+local function Draw_Sticky_Mini_Chord_Bar(context)
+    local is_ctrl_down = reaper.ImGui_IsKeyDown(context, reaper.ImGui_Mod_Ctrl())
+    
+    -- Helper text with custom fonts
+    reaper.ImGui_SameLine(context, 190)
+    reaper.ImGui_PopFont(ctx)
+    reaper.ImGui_PushFont(ctx, fontsmall)
+    reaper.ImGui_TextDisabled(context, "Use \"Entry\" tab for less common chords.")
+    reaper.ImGui_PopFont(ctx)
+    reaper.ImGui_PushFont(ctx, font)
+    
+    -- Start buttons cleanly on the right
+    reaper.ImGui_SameLine(context, 435)
+    
+    local quick_chords = {
+        {label="1",  val={"", "       ", {0, 4, 7}}}, 
+        {label="2m", val={"m", "m      ", {0, 3, 7}}},
+        {label="3m", val={"m", "m      ", {0, 3, 7}}},
+        {label="4",  val={"", "       ", {0, 4, 7}}},
+        {label="5",  val={"", "       ", {0, 4, 7}}},
+        {label="6m", val={"m", "m      ", {0, 3, 7}}}
+    }
+    local quick_roots = {"1", "2", "3", "4", "5", "6"}
+    
+    for i, c in ipairs(quick_chords) do
+        local current_root = quick_roots[i]
+        local display_label = c.label
+        
+        local root_colors = musictheory.root_colors[current_root] or {200,200,200}
+        local thecolor = reaper.ImGui_ColorConvertDouble4ToU32(
+            root_colors[1]/255, root_colors[2]/255, root_colors[3]/255, 1
+        )
+        
+        -- Push the solid background color
+        reaper.ImGui_PushStyleColor(context, reaper.ImGui_Col_Button(), thecolor)
+        
+        -- Push the pulsing white border (Thickness 3.0)
+        reaper.ImGui_PushStyleVar(context, reaper.ImGui_StyleVar_FrameBorderSize(), 0.0)
+        reaper.ImGui_PushStyleColor(context, reaper.ImGui_Col_Border(), reaper.ImGui_ColorConvertDouble4ToU32(1, 1, 1, transpar or 0.8))
+        
+        reaper.ImGui_Button(context, display_label, 35, 18)
+        
+        -- Pop Border styles
+        reaper.ImGui_PopStyleColor(context, 1)
+        reaper.ImGui_PopStyleVar(context, 1)
+        
+        -- MOUSE DOWN
+        if reaper.ImGui_IsItemActivated(context) then
+            if is_ctrl_down then
+                chord_charting_area = chord_charting_area .. current_root .. c.val[1] .. "  "
+            end
+            
+            play_root = current_root
+            last_play_root = current_root
+            current_playing_tone_array = musictheory.type_table[(c.val[1] == "" and "z" or c.val[1])] or c.val[3]
+            
+            local root_val = musictheory.root_table[play_root] or 0
+            local total_shift = (root_val + audition_key_shift) % 12
+            
+            if audition_track and reaper.ValidatePtr(audition_track, "MediaTrack*") then
+                reaper.SetMediaTrackInfo_Value(audition_track, "B_MUTE", 0)
+            end
+            for _, v in pairs(current_playing_tone_array) do
+                local pitch = (v + total_shift > 10) and (60 + total_shift + v - 12) or (60 + total_shift + v)
+                reaper.StuffMIDIMessage(0, 144, pitch, 111)
+                
+                -- Doubled heavy bass notes (-12 and -24)
+                if v == 0 then 
+                    reaper.StuffMIDIMessage(0, 144, pitch - 12, 115)
+                    reaper.StuffMIDIMessage(0, 144, pitch - 24, 120) 
+                end
+            end
+        end
+        
+        -- MOUSE UP
+        if reaper.ImGui_IsItemDeactivated(context) then
+            local root_val = musictheory.root_table[play_root] or 0
+            local total_shift = (root_val + audition_key_shift) % 12
+            
+            for _, v in pairs(current_playing_tone_array) do
+                local pitch = (v + total_shift > 10) and (60 + total_shift + v - 12) or (60 + total_shift + v)
+                reaper.StuffMIDIMessage(0, 128, pitch, 0)
+                
+                if v == 0 then 
+                    reaper.StuffMIDIMessage(0, 128, pitch - 12, 0)
+                    reaper.StuffMIDIMessage(0, 128, pitch - 24, 0) 
+                end
+            end
+            if audition_track and reaper.ValidatePtr(audition_track, "MediaTrack*") then
+                reaper.SetMediaTrackInfo_Value(audition_track, "B_MUTE", 1)
+            end
+        end
+
+        reaper.ImGui_PopStyleColor(context, 1) -- Pop the background color
+        if i < #quick_chords then reaper.ImGui_SameLine(context) end
+    end
+end
+
+
+
 function IM_GUI_Loop()
     local rv
     local rc
@@ -1351,26 +1457,7 @@ function IM_GUI_Loop()
     -- Safely ensure the audition track is built and mapped to the Global Variable
     Ensure_Audition_Track_Valid()
 
-    if liveMIDI_playing_timer > 1 and liveMIDI_playing_timer < 41 then
-        liveMIDI_playing_timer = liveMIDI_playing_timer - 1
-    elseif liveMIDI_playing_timer < 0 then
-        for i, v in pairs(current_playing_tone_array) do
-            reaper.StuffMIDIMessage(0, 128, 48 + v + musictheory.root_table[play_root] + audition_key_shift, 100)
-            reaper.StuffMIDIMessage(0, 128, 48 + v + musictheory.root_table[last_play_root] + audition_key_shift, 100)
-        end
-        liveMIDI_playing_timer = 0
-    else
-        for i, v in pairs(current_playing_tone_array) do
-            reaper.StuffMIDIMessage(0, 128, 48 + v + musictheory.root_table[play_root] + audition_key_shift, 100)
-            reaper.StuffMIDIMessage(0, 128, 48 + v + musictheory.root_table[last_play_root] + audition_key_shift, 100)
-        end
-        liveMIDI_playing_timer = 0
 
-        -- Safe Mute Call
-        if audition_track and reaper.ValidatePtr(audition_track, "MediaTrack*") then
-            reaper.SetMediaTrackInfo_Value(audition_track, "B_MUTE", 1)
-        end
-    end
 
     if visible then
         if modal_on == true then
@@ -1471,43 +1558,31 @@ function IM_GUI_Loop()
 
         -- Always center this window when appearing
 
-        reaper.ImGui_BeginGroup(ctx)
-        if r.ImGui_BeginTabBar(ctx, "Charting", r.ImGui_TabBarFlags_None()) then
-            if r.ImGui_BeginTabItem(ctx, "Chords") then
-                charting_tab_mode = 1
-                work_zone = chord_charting_area
-                r.ImGui_EndTabItem(ctx)
-            end
-            --[[
-      -- TABS
-            if r.ImGui_BeginTabItem(ctx, "Lead 1") then
-        charting_tab_mode = 2
-        work_zone = lead1_charting_area
-        r.ImGui_EndTabItem(ctx)
-            end
-      if r.ImGui_BeginTabItem(ctx, "Lead 2") then
-        charting_tab_mode = 3
-        work_zone = lead2_charting_area
-        r.ImGui_EndTabItem(ctx)
-      end          
-      if r.ImGui_BeginTabItem(ctx, "Bass") then
-        charting_tab_mode = 4
-        work_zone = bass_charting_area
-        r.ImGui_EndTabItem(ctx)  
-            end 
-      ]]
-            if r.ImGui_BeginTabItem(ctx, "Lyrics") then
-                charting_tab_mode = 5
-                work_zone = lyrics_charting_area
-                r.ImGui_EndTabItem(ctx)
-            end
-            if r.ImGui_BeginTabItem(ctx, "Notes") then
-                charting_tab_mode = 6
-                work_zone = notes_charting_area
-                r.ImGui_EndTabItem(ctx)
-            end
-            r.ImGui_EndTabBar(ctx)
+reaper.ImGui_BeginGroup(ctx)
+        
+        -- Start the tabs but DON'T wrap the whole block in the if-statement yet
+        r.ImGui_BeginTabBar(ctx, "Charting", r.ImGui_TabBarFlags_None())
+        
+        if r.ImGui_BeginTabItem(ctx, "Chords") then
+            charting_tab_mode = 1
+            work_zone = chord_charting_area
+            r.ImGui_EndTabItem(ctx)
         end
+        if r.ImGui_BeginTabItem(ctx, "Lyrics") then
+            charting_tab_mode = 5
+            work_zone = lyrics_charting_area
+            r.ImGui_EndTabItem(ctx)
+        end
+        if r.ImGui_BeginTabItem(ctx, "Notes") then
+            charting_tab_mode = 6
+            work_zone = notes_charting_area
+            r.ImGui_EndTabItem(ctx)
+        end
+
+        -- Draw the Sticky Chord Bar on the far right of the Tab Bar line!
+        Draw_Sticky_Mini_Chord_Bar(ctx)
+        
+        r.ImGui_EndTabBar(ctx)
 
         if charting_tab_mode == 1 then
             if show_headers == true then
@@ -2101,8 +2176,9 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.7.8")
-            reaper.ImGui_Text(ctx, "https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.8.0")
+            reaper.ImGui_Dummy(ctx, 0, 5) -- Add a tiny bit of vertical spacing
+            Link("https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
 
         if feedback_tab_mode == 0 then
@@ -2176,7 +2252,7 @@ Form: I V C V C B C O]]
                         play_root = "1"
                         the_root_colors = musictheory.root_colors[play_root]
                         if v[2] == "       " then
-                            thecolor = reaper.ImGui_ColorConvertDouble4ToU32(1, 1, 1, transpar)
+                            thecolor = Get_Pulsing_Color(the_root_colors, transpar)
                         else
                             if v[3][1] ~= nil then
                                 thecolor =
@@ -2234,7 +2310,7 @@ Form: I V C V C B C O]]
                         play_root = "4"
                         the_root_colors = musictheory.root_colors[play_root]
                         if v[2] == "       " then
-                            thecolor = reaper.ImGui_ColorConvertDouble4ToU32(1, 1, 1, transpar)
+                            thecolor = Get_Pulsing_Color(the_root_colors, transpar)
                         else
                             if v[3][4] ~= nil then
                                 thecolor =
@@ -2303,7 +2379,7 @@ Form: I V C V C B C O]]
                         play_root = "1"
                         the_root_colors = musictheory.root_colors[play_root]
                         if v[2] == "       " then
-                            thecolor = reaper.ImGui_ColorConvertDouble4ToU32(1, 1, 1, transpar)
+                            thecolor = Get_Pulsing_Color(the_root_colors, transpar)
                         else
                             if v[3][1] ~= nil then
                                 thecolor =
@@ -2331,7 +2407,7 @@ Form: I V C V C B C O]]
                         play_root = "2"
                         the_root_colors = musictheory.root_colors[play_root]
                         if v[2] == "m      " then
-                            thecolor = reaper.ImGui_ColorConvertDouble4ToU32(1, 1, 1, transpar)
+                            thecolor = Get_Pulsing_Color(the_root_colors, transpar)
                         else
                             if v[3][2] ~= nil then
                                 thecolor =
@@ -2359,7 +2435,7 @@ Form: I V C V C B C O]]
                         play_root = "3"
                         the_root_colors = musictheory.root_colors[play_root]
                         if v[2] == "m      " then
-                            thecolor = reaper.ImGui_ColorConvertDouble4ToU32(1, 1, 1, transpar)
+                            thecolor = Get_Pulsing_Color(the_root_colors, transpar)
                         else
                             if v[3][3] ~= nil then
                                 thecolor =
@@ -2388,7 +2464,7 @@ Form: I V C V C B C O]]
                         play_root = "4"
                         the_root_colors = musictheory.root_colors[play_root]
                         if v[2] == "       " then
-                            thecolor = reaper.ImGui_ColorConvertDouble4ToU32(1, 1, 1, transpar)
+                            thecolor = Get_Pulsing_Color(the_root_colors, transpar)
                         else
                             if v[3][4] ~= nil then
                                 thecolor =
@@ -2416,7 +2492,7 @@ Form: I V C V C B C O]]
                         play_root = "5"
                         the_root_colors = musictheory.root_colors[play_root]
                         if v[2] == "       " then
-                            thecolor = reaper.ImGui_ColorConvertDouble4ToU32(1, 1, 1, transpar)
+                            thecolor = Get_Pulsing_Color(the_root_colors, transpar)
                         else
                             if v[3][5] ~= nil then
                                 thecolor =
@@ -2444,7 +2520,7 @@ Form: I V C V C B C O]]
                         play_root = "6"
                         the_root_colors = musictheory.root_colors[play_root]
                         if v[2] == "m      " then
-                            thecolor = reaper.ImGui_ColorConvertDouble4ToU32(1, 1, 1, transpar)
+                            thecolor = Get_Pulsing_Color(the_root_colors, transpar)
                         else
                             if v[3][6] ~= nil then
                                 thecolor =
@@ -3709,6 +3785,65 @@ function Sync_Chart_Colors()
     -- This function is safely retired!
 end
 
+
+
+
+function Normalize_Form_Line(header_text)
+    local lines = {}
+    
+    -- Split the header line by line safely
+    for line in header_text:gmatch("[^\r\n]+") do
+        if line:match("^Form:") then
+            local prefix, form_string = line:match("^(Form:%s*)(.*)$")
+            if form_string then
+                -- 1. First, convert any {Custom Words} into "Custom Words"
+                form_string = form_string:gsub("%{(.-)%}", '"%1"')
+
+                -- 2. Read the line left-to-right, respecting quotes
+                local tokens = {}
+                local in_quotes = false
+                local current_token = ""
+
+                for i = 1, #form_string do
+                    local char = form_string:sub(i, i)
+                    if char == '"' then
+                        in_quotes = not in_quotes
+                        current_token = current_token .. char
+                    elseif char:match("%s") and not in_quotes then
+                        if current_token ~= "" then
+                            table.insert(tokens, current_token)
+                            current_token = ""
+                        end
+                    else
+                        current_token = current_token .. char
+                    end
+                end
+                if current_token ~= "" then table.insert(tokens, current_token) end
+
+                -- 3. Check each word. If it's not a standard single letter, quote it.
+                local standard = { I=true, V=true, C=true, B=true, O=true, P=true, M=true, S=true, R=true, F=true, D=true, ["#"]=true }
+                
+                for j, token in ipairs(tokens) do
+                    -- If it doesn't start and end with a quote, and isn't a standard letter
+                    if not token:match('^".*"$') and not standard[token] then
+                        tokens[j] = '"' .. token .. '"'
+                    end
+                end
+
+                line = prefix .. table.concat(tokens, " ")
+                
+                -- UNCOMMENT THIS LINE if you want to see the invisible translation in the console!
+                -- reaper.ShowConsoleMsg("DEBUG FORM TRANSLATOR:\nOriginal User Input: " .. form_string .. "\nSent to form.lua: " .. table.concat(tokens, " ") .. "\n\n")
+            end
+        end
+        table.insert(lines, line)
+    end
+    
+    return table.concat(lines, "\n")
+end
+
+
+
 function inital_swaps(chunky1)
     databoy = string.gsub(chunky1, "%^%^", "~")
     --[[
@@ -3961,23 +4096,37 @@ function orgainize_input_into_bars(oiib_error_log) -- PLACE ALL THE USER INPUT I
     j = 1
     ::testchar::
     for i = j, string.len(progression), 1 do -- PROCESS EACH CHARACTER OF USER INPUT
-        if string.sub(progression, i, i) == "{" and string.sub(progression, i + 1, i + 1) == "$" then
-            section_close_start, section_close_end = string.find(progression, "$}", i + 1)
-            section_name = string.sub(progression, i, section_close_end)
-            oiib_measurecount = oiib_measurecount + 1
-            oiib_measure_ticks = 0
-            measuremultiplelist[oiib_measurecount] = oiib_measure_ticks
-            table.insert(chord_table, oiib_measurecount, {0, 1, 0, section_name})
+    
 
-            table.insert(chord_table, oiib_measurecount, {0, 1, 0, section_name})
-            j = section_close_end + 1
-            --Show_To_Dev("THIS HAPPENED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" .. string.char(10))
-            --Show_To_Dev(section_name .. string.char(10))
-            goto testchar
-        elseif
-            string.byte(progression, i) == 32 or string.byte(progression, i) == 10 or string.byte(progression, i) == 13 or
-                string.byte(progression, i) == 9
-         then --  WHEN CHARACTER IS A SPACER (SPACE, TAB, RETURN)
+         
+         if string.sub(progression, i, i) == "{" then
+             -- Support both {$ $} from the form expander, and normal { }
+             local is_dollar = (string.sub(progression, i + 1, i + 1) == "$")
+             local end_char = is_dollar and "$}" or "}"
+             
+             -- 'true' disables Lua's regex, making the search completely safe
+             section_close_start, section_close_end = string.find(progression, end_char, i + 1, true)
+             
+             if section_close_end then
+                 section_name = string.sub(progression, i, section_close_end)
+                 oiib_measurecount = oiib_measurecount + 1
+                 oiib_measure_ticks = 0
+                 measuremultiplelist[oiib_measurecount] = oiib_measure_ticks
+                 table.insert(chord_table, oiib_measurecount, {0, 1, 0, section_name})
+                 table.insert(chord_table, oiib_measurecount, {0, 1, 0, section_name})
+                 j = section_close_end + 1
+                 goto testchar
+             end
+         elseif
+             string.byte(progression, i) == 32 or string.byte(progression, i) == 10 or string.byte(progression, i) == 13 or
+                 string.byte(progression, i) == 9
+          then --  WHEN CHARACTER IS A SPACER (SPACE, TAB, RETURN)
+          
+          
+          
+          
+          
+          
             if oiib_inmeasure == false then -- WHEN NOT WORKING WITH A SPLIT MEASURE
                 if oiib_last_char_is_space == false then -- WHEN NOT AFTER A SPACE
                     oiib_last_char_is_space = true
@@ -4952,68 +5101,54 @@ function Get_Drum_Visuals(pc)
     local name = "Section"
     local r, g, b = 0.7, 0.7, 0.7
 
-    -- Count-In (24)
     if pc == 24 then
-        -- Intro (32-35)
         name = "Count-In"
         r, g, b = 0.3, 0.3, 0.3
     elseif pc >= 32 and pc <= 35 then
-        -- Verse 1 (36-39)
         local letter = string.char(64 + (pc - 31))
         name = "Intro-" .. letter
         r, g, b = 0.2, 1.0, 1.0
     elseif pc >= 36 and pc <= 39 then
-        -- Verse 2 (40-43)
         local letter = string.char(64 + (pc - 35))
         name = "Verse 1-" .. letter
         r, g, b = 0.4, 0.6, 1.0
     elseif pc >= 40 and pc <= 43 then
-        -- Verse 3 (44-47)
         local letter = string.char(64 + (pc - 39))
         name = "Verse 2-" .. letter
         r, g, b = 0.4, 0.6, 1.0
     elseif pc >= 44 and pc <= 47 then
-        -- Pre-Chorus 1 (48-51)
         local letter = string.char(64 + (pc - 43))
         name = "Verse 3-" .. letter
         r, g, b = 0.4, 0.6, 1.0
     elseif pc >= 48 and pc <= 51 then
-        -- Pre-Chorus 2 (52-55)
         local letter = string.char(64 + (pc - 47))
         name = "Pre 1-" .. letter
         r, g, b = 0.7, 0.4, 1.0
     elseif pc >= 52 and pc <= 55 then
-        -- Pre-Chorus 3 (56-59)
         local letter = string.char(64 + (pc - 51))
         name = "Pre 2-" .. letter
         r, g, b = 0.7, 0.4, 1.0
     elseif pc >= 56 and pc <= 59 then
-        -- Chorus 1 (60-63)
         local letter = string.char(64 + (pc - 55))
         name = "Pre 3-" .. letter
         r, g, b = 0.7, 0.4, 1.0
     elseif pc >= 60 and pc <= 63 then
-        -- Chorus 2 (64-67)
         local letter = string.char(64 + (pc - 59))
         name = "Chorus 1-" .. letter
         r, g, b = 1.0, 0.4, 0.4
     elseif pc >= 64 and pc <= 67 then
-        -- Chorus 3 (68-71)
         local letter = string.char(64 + (pc - 63))
         name = "Chorus 2-" .. letter
         r, g, b = 1.0, 0.4, 0.4
     elseif pc >= 68 and pc <= 71 then
-        -- Bridge (72-75)
         local letter = string.char(64 + (pc - 67))
         name = "Chorus 3-" .. letter
         r, g, b = 1.0, 0.4, 0.4
     elseif pc >= 72 and pc <= 75 then
-        -- Solo (76-79)
         local letter = string.char(64 + (pc - 71))
         name = "Bridge-" .. letter
         r, g, b = 1.0, 0.9, 0.2
     elseif pc >= 76 and pc <= 79 then
-        -- Outro (80-83)
         local letter = string.char(64 + (pc - 75))
         name = "Solo-" .. letter
         r, g, b = 0.8, 0.5, 0.9
@@ -5128,46 +5263,28 @@ function Parse_Region_To_Base_PC(name)
 
     local upper = string.upper(name)
 
-    -- Count-In / Off
-    if upper:find("COUNT IN") or upper:find("COUNT%-IN") or upper:find("OFF") then
+    -- Support the explicit '#' symbol or the word 'count'
+    if upper == "#" or upper == "{#}" or upper:find("COUNT") or upper:find("OFF") then
         return 24
-    elseif upper:find("INTRO") then
+    elseif upper:find("INTRO") or upper:find("INTERLUDE") or upper:match("^I%d*$") or upper:match("^IN%d*$") then
         return 32
-    elseif upper:find("VERSE") then
+    elseif upper:find("VERSE") or upper:match("^V%d*$") then
         local instance = tonumber(name:match("%d+")) or 1
-        if instance == 1 then
-            return 36
-        elseif instance == 2 then
-            return 40
-        else
-            return 44
-        end
-    elseif upper:find("PRE") then
+        return 36 + (instance == 1 and 0 or (instance == 2 and 4 or 8))
+    elseif upper:find("PRE") or upper:match("^P%d*$") or upper:match("^PC%d*$") then
         local instance = tonumber(name:match("%d+")) or 1
-        if instance == 1 then
-            return 48
-        elseif instance == 2 then
-            return 52
-        else
-            return 56
-        end
-    elseif upper:find("CHORUS") then
+        return 48 + (instance == 1 and 0 or (instance == 2 and 4 or 8))
+    elseif upper:find("CHORUS") or upper:match("^C%d*$") then
         local instance = tonumber(name:match("%d+")) or 1
-        if instance == 1 then
-            return 60
-        elseif instance == 2 then
-            return 64
-        else
-            return 68
-        end
-    elseif upper:find("BRIDGE") then
+        return 60 + (instance == 1 and 0 or (instance == 2 and 4 or 8))
+    elseif upper:find("BRIDGE") or upper:match("^B%d*$") then
         return 72
-    elseif upper:find("SOLO") then
+    elseif upper:find("SOLO") or upper:match("^S%d*$") then
         return 76
-    elseif upper:find("OUTRO") then
+    elseif upper:find("OUTRO") or upper:find("CODA") or upper:match("^O%d*$") then
         return 80
     else
-        return nil
+        return nil -- Unrecognized words carry the previous groove gracefully
     end
 end
 
@@ -5582,29 +5699,79 @@ function place_special()
         local the_regions_name = v[2]
 
         -- Check if this region type should be numbered
+        
+        
+        
+        
+        
+        
         local should_number = false
-        local region_type_upper = string.upper(the_regions_name)
-
-        if
-            region_type_upper == "VERSE" or region_type_upper == "PRE" or string.find(region_type_upper, "^PRE[- ]?") or
-                region_type_upper == "CHORUS"
-         then
-            should_number = true
-        end
-
+local region_type_upper = string.upper(the_regions_name)
         local display_name = the_regions_name
+        local base_color_name = the_regions_name
 
-        if should_number then
-            region_counts[the_regions_name] = (region_counts[the_regions_name] or 0) + 1
-            display_name = the_regions_name .. " " .. region_counts[the_regions_name]
+        -- 1. Expand reserved shorthands dynamically! (e.g. V2 -> Verse 2, M2 -> Middle 8 2)
+        if region_type_upper:match("^V%d*$") or region_type_upper == "VERSE" then
+            local num = region_type_upper:match("%d+")
+            base_color_name = "Verse"
+            if num then display_name = "Verse " .. num else region_counts["Verse"] = (region_counts["Verse"] or 0) + 1; display_name = "Verse " .. region_counts["Verse"] end
+        elseif region_type_upper:match("^C%d*$") or region_type_upper == "CHORUS" then
+            local num = region_type_upper:match("%d+")
+            base_color_name = "Chorus"
+            if num then display_name = "Chorus " .. num else region_counts["Chorus"] = (region_counts["Chorus"] or 0) + 1; display_name = "Chorus " .. region_counts["Chorus"] end
+        elseif region_type_upper:match("^P%d*$") or region_type_upper:match("^PC%d*$") or region_type_upper:match("^PRE[- ]?") then
+            local num = region_type_upper:match("%d+")
+            base_color_name = "Pre-Chorus"
+            if num then display_name = "Pre-Chorus " .. num else region_counts["Pre-Chorus"] = (region_counts["Pre-Chorus"] or 0) + 1; display_name = "Pre-Chorus " .. region_counts["Pre-Chorus"] end
+        elseif region_type_upper:match("^B%d*$") or region_type_upper == "BRIDGE" then
+            local num = region_type_upper:match("%d+")
+            base_color_name = "Bridge"
+            if num then display_name = "Bridge " .. num end
+        elseif region_type_upper:match("^O%d*$") or region_type_upper == "OUTRO" then
+            local num = region_type_upper:match("%d+")
+            base_color_name = "Outro"
+            if num then display_name = "Outro " .. num end
+        elseif region_type_upper:match("^I%d*$") or region_type_upper:match("^IN%d*$") or region_type_upper == "INTRO" then
+            local num = region_type_upper:match("%d+")
+            base_color_name = "Intro"
+            if num then display_name = "Intro " .. num end
+        elseif region_type_upper:match("^M%d*$") or region_type_upper == "MIDDLE 8" then
+            local num = region_type_upper:match("%d+")
+            base_color_name = "Middle 8"
+            if num then display_name = "Middle 8 " .. num end
+        elseif region_type_upper:match("^R%d*$") or region_type_upper == "RAMP" then
+            local num = region_type_upper:match("%d+")
+            base_color_name = "Ramp"
+            if num then display_name = "Ramp " .. num end
+        elseif region_type_upper:match("^D%d*$") or region_type_upper == "DROP" then
+            local num = region_type_upper:match("%d+")
+            base_color_name = "Drop"
+            if num then display_name = "Drop " .. num end
+        elseif region_type_upper:match("^S%d*$") or region_type_upper == "SOLO" then
+            local num = region_type_upper:match("%d+")
+            base_color_name = "Solo"
+            if num then display_name = "Solo " .. num end
+        elseif region_type_upper:match("^F%d*$") or region_type_upper == "FADEOUT" then
+            local num = region_type_upper:match("%d+")
+            base_color_name = "Fadeout"
+            if num then display_name = "Fadeout " .. num end
         end
 
+        -- 2. Apply Colors using the expanded base_color_name!
         local region_item_color = reaper.ColorToNative(80, 80, 100) | 0x1000000
-        if form.sections_colors and form.sections_colors[the_regions_name] then
+        
+        -- Pull the color dictionary from form.lua
+        if form.sections_colors and form.sections_colors[base_color_name] then
+            local the_color_values = form.sections_colors[base_color_name]
+            region_item_color = reaper.ColorToNative(the_color_values[1], the_color_values[2], the_color_values[3]) | 0x1000000
+        elseif form.sections_colors and form.sections_colors[the_regions_name] then
             local the_color_values = form.sections_colors[the_regions_name]
-            region_item_color =
-                reaper.ColorToNative(the_color_values[1], the_color_values[2], the_color_values[3]) | 0x1000000
+            region_item_color = reaper.ColorToNative(the_color_values[1], the_color_values[2], the_color_values[3]) | 0x1000000
         end
+
+
+
+
 
         local starts_position = reaper.TimeMap2_beatsToTime(0, v[1] / 960)
 
@@ -5635,7 +5802,14 @@ function process_pushes()
         last_element = i
     end
     push_grab = 0
-    for i = last_element, 1, -1 do
+    
+    
+for i = last_element, 1, -1 do
+        -- SAFETY NET: Skip if the chord entry is blank or corrupted
+        if not chord_table[i] or type(chord_table[i][4]) ~= "string" then 
+            goto skip_push 
+        end
+
         chord_table[i][3] = chord_table[i][3] - push_grab
         if string.sub(chord_table[i][4], 1, 2) == "<." then
             --reaper.ShowConsoleMsg("Dottend 8th Push - " .. chord_table[i][4] .. "\n")
@@ -5661,7 +5835,16 @@ function process_pushes()
             push_grab = 0
         end
         chord_table[i][3] = chord_table[i][3] + push_grab
+        
+        ::skip_push::
     end
+    
+    
+    
+    
+    
+    
+     
 end
 
 function chords_to_onemotion()
@@ -5819,6 +6002,7 @@ function PreRender_Setup()
     final_ppqpos_total = 0
 
     chord_charting_area = inital_swaps(chord_charting_area)
+    local safe_header = Normalize_Form_Line(header_area)
     unfolded_user_data, error_zone = form.process_the_form(header_area, chord_charting_area)
     progression = Set_The_Current_Simulated_Userinput_Data(unfolded_user_data)
 end
@@ -5978,6 +6162,7 @@ function Render_Process_Routine()
 
     reaper.PreventUIRefresh(1)
     Organize_Tracks_And_Routing(G_DYNAMIC_TABLE)
+    Make_Monster_Drums_32_Chan() 
     reaper.PreventUIRefresh(-1)
 
     coroutine.yield("Generating MIDI Data...")
@@ -6289,40 +6474,99 @@ function letters_to_numbers(keysig, letters)
     return numbers_result
 end
 
-function play_button_midi(v_in, play_root_in)
-    if r.ImGui_Button(ctx, play_root_in .. v_in[2], wx, hx) then
-        if v_in[1] == "" then
-            this_type = "z"
-        else
-            this_type = v_in[1]
-        end
+function Get_Pulsing_Color(rgb_table, pulse_val)
+    -- We ignore pulse_val here so the background stays solid and beautiful!
+    return reaper.ImGui_ColorConvertDouble4ToU32(
+        rgb_table[1] / 255.0,
+        rgb_table[2] / 255.0,
+        rgb_table[3] / 255.0,
+        1.0
+    )
+end
 
-        -- NEW ROBUST CHECK: Is Control (or Command on Mac) held down?
+
+function play_button_midi(v_in, play_root_in)
+    local btn_label = play_root_in .. v_in[2]
+    local clean_name = v_in[2]:gsub("%s+", "")
+    
+    -- Detect if it's a popular diatonic chord (to draw the glowing border)
+    local is_popular = false
+    if not reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Mod_Shift()) then
+        if (play_root_in == "1" and clean_name == "") or
+           (play_root_in == "4" and clean_name == "") or
+           (play_root_in == "5" and clean_name == "") or
+           (play_root_in == "2" and clean_name == "m") or
+           (play_root_in == "3" and clean_name == "m") or
+           (play_root_in == "6" and clean_name == "m") then
+            is_popular = true
+        end
+    end
+    
+    -- Push the pulsing white border (Thickness increased to 3.0)
+    if is_popular then
+        reaper.ImGui_PushStyleVar(ctx, reaper.ImGui_StyleVar_FrameBorderSize(), 3.0)
+        reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Border(), reaper.ImGui_ColorConvertDouble4ToU32(1, 1, 1, transpar or 0.8))
+    end
+    
+    -- Draw the Button
+    r.ImGui_Button(ctx, btn_label, wx, hx)
+    
+    -- Pop border styles
+    if is_popular then
+        reaper.ImGui_PopStyleColor(ctx, 1)
+        reaper.ImGui_PopStyleVar(ctx, 1)
+    end
+    
+    -- MOUSE DOWN (Start playing & add to chart)
+    if r.ImGui_IsItemActivated(ctx) then
         local is_ctrl_down = reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Mod_Ctrl())
         if is_ctrl_down then
-            -- 1. Clean the button name (remove the extra visual spaces inside "sus    ")
-            local clean_chord_name = v_in[2]:gsub("%s+", "")
-
-            -- 2. Add the Root + Clean Name + TWO SPACES separator
-            -- This ensures you can click buttons 1, 4, 5 and get "1  4  5  "
-            chord_charting_area = chord_charting_area .. play_root_in .. clean_chord_name .. "  "
+            chord_charting_area = chord_charting_area .. play_root_in .. clean_name .. "  "
         end
 
-        -- MIDI Playback Logic (Unchanged)
-        for i, v in pairs(current_playing_tone_array) do
-            reaper.StuffMIDIMessage(0, 128, 48 + v + musictheory.root_table[last_play_root] + audition_key_shift, 111)
+        play_root = play_root_in
+        last_play_root = play_root_in
+        local this_type = (v_in[1] == "") and "z" or v_in[1]
+        current_playing_tone_array = musictheory.type_table[this_type] or v_in[3]
+        
+        local root_val = musictheory.root_table[play_root] or 0
+        local total_shift = (root_val + audition_key_shift) % 12
+        
+        if audition_track and reaper.ValidatePtr(audition_track, "MediaTrack*") then
+            reaper.SetMediaTrackInfo_Value(audition_track, "B_MUTE", 0)
         end
-        current_playing_tone_array = musictheory.type_table[this_type]
-        if liveMIDI_playing_timer == 0 then
-            for i, v in pairs(current_playing_tone_array) do
-                -- SAFETY WRAPPER ADDED HERE:
-                if audition_track and reaper.ValidatePtr(audition_track, "MediaTrack*") then
-                    reaper.SetMediaTrackInfo_Value(audition_track, "B_MUTE", 0)
-                end
-                reaper.StuffMIDIMessage(0, 144, 48 + v + musictheory.root_table[play_root_in] + audition_key_shift, 111)
-                last_play_root = play_root_in
+        
+        for _, v in pairs(current_playing_tone_array) do
+            -- Invert upper voices tightly
+            local pitch = (v + total_shift > 10) and (60 + total_shift + v - 12) or (60 + total_shift + v)
+            reaper.StuffMIDIMessage(0, 144, pitch, 111)
+            
+            -- Doubled heavy bass notes (-12 and -24)
+            if v == 0 then 
+                reaper.StuffMIDIMessage(0, 144, pitch - 12, 115) 
+                reaper.StuffMIDIMessage(0, 144, pitch - 24, 120) 
             end
-            liveMIDI_playing_timer = 24
+        end
+    end
+    
+    -- MOUSE UP (Stop playing notes)
+    if r.ImGui_IsItemDeactivated(ctx) then
+        local root_val = musictheory.root_table[play_root_in] or 0
+        local total_shift = (root_val + audition_key_shift) % 12
+        
+        for _, v in pairs(current_playing_tone_array) do
+            local pitch = (v + total_shift > 10) and (60 + total_shift + v - 12) or (60 + total_shift + v)
+            reaper.StuffMIDIMessage(0, 128, pitch, 0)
+            
+            -- Turn off both bass notes
+            if v == 0 then 
+                reaper.StuffMIDIMessage(0, 128, pitch - 12, 0)
+                reaper.StuffMIDIMessage(0, 128, pitch - 24, 0) 
+            end
+        end
+        
+        if audition_track and reaper.ValidatePtr(audition_track, "MediaTrack*") then
+            reaper.SetMediaTrackInfo_Value(audition_track, "B_MUTE", 1)
         end
     end
 end
@@ -6360,6 +6604,7 @@ function Process_OM_bars()
     OM_ex_warning = ""
     measurechord_count = 0
     OM_rebuild = ""
+    local safe_header = Normalize_Form_Line(header_area)
     unfolded_OM_data, error_zone = form.process_the_form(header_area, chord_charting_area)
     unfolded_OM_data = inital_swaps(unfolded_OM_data)
 
@@ -6973,6 +7218,7 @@ ccc_ex_warning = ""
 function process_ccc_bars()
     thefail = ""
     chord_charting_area = inital_swaps(chord_charting_area)
+    local safe_header = Normalize_Form_Line(header_area)
     unfolded_ccc_data, error_zone = form.process_the_form(header_area, chord_charting_area)
     -- FORM     DEAL WITH UNFOLDING THE FORM
     unfolded_ccc_data = string.gsub(unfolded_ccc_data, "{", "=")
@@ -7659,6 +7905,7 @@ biab_ex_warning = ""
 function process_biab_bars()
     thefail = ""
     chord_charting_area = inital_swaps(chord_charting_area)
+    local safe_header = Normalize_Form_Line(header_area)
     unfolded_biab_data, error_zone = form.process_the_form(header_area, chord_charting_area)
     -- FORM     DEAL WITH UNFOLDING THE FORM
     unfolded_biab_data = string.gsub(unfolded_biab_data, "{$Intro$}", "Â")
@@ -8377,5 +8624,8 @@ local errors_found = Check_Plugins_On_Startup()
 if errors_found then
     modal_on = true -- Force the GUI to open the error popup immediately
 end
+
+
+
 
 IM_GUI_Loop()
