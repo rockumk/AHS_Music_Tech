@@ -1,14 +1,12 @@
 -- @description numbers2notes_help
--- @version 1.0.6
--- @noindex
+-- @version 1.0.7
 -- @author Rock Kennedy
+-- @noindex
 -- @about
 --   # numbers2notes_help
 --   Numbers2Notes Support File.
 -- @changelog
 --   + Removed indexing
---   + Forced Update
-
 
 
 local help =
@@ -100,6 +98,7 @@ Form: I V C V C C O
 
 
 ]],
+
 Codes_out = [[
 Title:		Title must be on it's own line
 BPM:		Tempo in Beats per minute
@@ -149,21 +148,24 @@ Key:		Major Keys only!
 				Key: C#
 
 Form:     	Song Form
-				- Separate sections with commas.
 				- In the song itself place sections in braces.
-				- Place custom quotes in quotes in the header.
-
+				- Sections with spaces must be quoted in the form.
+                - You can use indexes to make standard sections unique.
+				     So V2 would indicate a second verse if you need it 
+					 to have a different chord pattern than verse 1.
+					  
 				Common Form Examples:
 				Form: C V C V C C
 				Form: I C V C V C C O
 				Form: V C V C C
 				Form: I V C V C C O
-				Form: I V C V C B C O
+				Form: I V C V2 C2 B C3 O
 				
 				Other Examples
 				Form: 1 2 1 3 1 4 1 5 1
+				Form: I V Rap C V2 C C SoundFX
 				Form: "Spoken Intro" V C V C "Sax Solo" C
-				Form: I "Verse 1" C "Verse 2" C C "24 Bar Fadeout"
+
 ]],
 
 Section_out = [[
@@ -184,31 +186,37 @@ Section_out = [[
 Section_help = [[
 SECTIONS - Section heading codes must be on their own line!
 
-Single Character Sections
-	{A}			{N}			{X}
-	{E}			{Q}			{Y}
-	{J}			{T}			{Z}
-	{K}			{U}
-	{L}			{W}
-
 Special Single Character Sections - With autoreplaced names
-	{B} = {Bridge}
-	{C} = {Chorus}
-	{D} = {Drop}
-	{F} = {Fadeout}
-	{I} = {Intro}
-	{M} = {Middle 8}
-	{O} = {Outro}
-	{P} = {Pre-Chorus}
-	{R} = {Ramp}
-	{S} = {Solo}
-	{V} = {Verse}
+
+                        COLOR     N2N Arp and Drum Arr. Support
+						
+	{#} = Count In   	(Gray)     	Yes    1
+	{I} = Intro      	(Cyan)     	Yes    1
+	{V} = Verse      	(Blue)     	Yes    3
+	{P} = Pre-Chorus 	(Blue)     	Yes    3
+	{C} = Chorus     	(Red)      	Yes    3
+	{B} = Bridge     	(Yellow)   	Yes    1
+	{S} = Solo       	(Green)    	Yes    1
+	{O} = Outro      	(Teal)     	Yes    1
+	{M} = Middle 8   	(Magenta)	
+	{D} = Drop       	(Purple)		
+	{R} = Ramp       	(Purple)
+	{F} = Fadeout    	(Dark Gray)
+
+    {V2} = Verse 2					
+    {C3} = Chorus 3                 
+	                                
+	
+Single Character Sections
+
+    {A}  {E}  {J}  {K}  {L}  {N}  {Q}  {T}  {U}  {W}  {X}  {Y}  {Z}
 
 Single Digit Examples:		Custom Section Marks:
-	{1}							{Interlude}
-	{2}							{Half Verse}
-	{9}							{Anything you want}
 
+	{1}						{Sax} = Sax
+	{2}						{Interlude} = Interlude
+	{3}						{Half Verse} = "Half Verse"
+	{7}						{Anything at all} = "Anything at all"
 ]],
 Chord_out = [[
 
