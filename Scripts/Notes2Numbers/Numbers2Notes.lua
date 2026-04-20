@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.8.0
+-- @version  1.8.1
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.8.0
+--   # Numbers2Notes 1.8.1
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -16,7 +16,7 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
---   # Major Update 1.8.0
+--   # Major Update 1.8.1
 --   + Added Groove
 --   + Changed N2N Drum Arranger to N2N Drum Arranger.jsfx
 --   + Changed gmem name
@@ -2176,7 +2176,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.8.0")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.8.1")
             reaper.ImGui_Dummy(ctx, 0, 5) -- Add a tiny bit of vertical spacing
             Link("https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
@@ -5710,51 +5710,49 @@ local region_type_upper = string.upper(the_regions_name)
         local display_name = the_regions_name
         local base_color_name = the_regions_name
 
-        -- 1. Expand reserved shorthands dynamically! (e.g. V2 -> Verse 2, M2 -> Middle 8 2)
+        -- Tiny helper function to keep the counter perfectly synced with explicit numbers
+        local function update_section(base_name, num)
+            base_color_name = base_name
+            if num then
+                local n = tonumber(num)
+                -- If they typed C2, force the internal counter to catch up!
+                if n and n > (region_counts[base_name] or 0) then
+                    region_counts[base_name] = n
+                end
+                display_name = base_name .. " " .. num
+            else
+                region_counts[base_name] = (region_counts[base_name] or 0) + 1
+                if region_counts[base_name] == 1 then
+                    display_name = base_name -- Just "Chorus" for the first one
+                else
+                    display_name = base_name .. " " .. region_counts[base_name] -- "Chorus 2" for the next
+                end
+            end
+        end
+
+        -- 1. Expand reserved shorthands dynamically! 
         if region_type_upper:match("^V%d*$") or region_type_upper == "VERSE" then
-            local num = region_type_upper:match("%d+")
-            base_color_name = "Verse"
-            if num then display_name = "Verse " .. num else region_counts["Verse"] = (region_counts["Verse"] or 0) + 1; display_name = "Verse " .. region_counts["Verse"] end
+            update_section("Verse", region_type_upper:match("%d+"))
         elseif region_type_upper:match("^C%d*$") or region_type_upper == "CHORUS" then
-            local num = region_type_upper:match("%d+")
-            base_color_name = "Chorus"
-            if num then display_name = "Chorus " .. num else region_counts["Chorus"] = (region_counts["Chorus"] or 0) + 1; display_name = "Chorus " .. region_counts["Chorus"] end
+            update_section("Chorus", region_type_upper:match("%d+"))
         elseif region_type_upper:match("^P%d*$") or region_type_upper:match("^PC%d*$") or region_type_upper:match("^PRE[- ]?") then
-            local num = region_type_upper:match("%d+")
-            base_color_name = "Pre-Chorus"
-            if num then display_name = "Pre-Chorus " .. num else region_counts["Pre-Chorus"] = (region_counts["Pre-Chorus"] or 0) + 1; display_name = "Pre-Chorus " .. region_counts["Pre-Chorus"] end
+            update_section("Pre-Chorus", region_type_upper:match("%d+"))
         elseif region_type_upper:match("^B%d*$") or region_type_upper == "BRIDGE" then
-            local num = region_type_upper:match("%d+")
-            base_color_name = "Bridge"
-            if num then display_name = "Bridge " .. num end
+            update_section("Bridge", region_type_upper:match("%d+"))
         elseif region_type_upper:match("^O%d*$") or region_type_upper == "OUTRO" then
-            local num = region_type_upper:match("%d+")
-            base_color_name = "Outro"
-            if num then display_name = "Outro " .. num end
+            update_section("Outro", region_type_upper:match("%d+"))
         elseif region_type_upper:match("^I%d*$") or region_type_upper:match("^IN%d*$") or region_type_upper == "INTRO" then
-            local num = region_type_upper:match("%d+")
-            base_color_name = "Intro"
-            if num then display_name = "Intro " .. num end
+            update_section("Intro", region_type_upper:match("%d+"))
         elseif region_type_upper:match("^M%d*$") or region_type_upper == "MIDDLE 8" then
-            local num = region_type_upper:match("%d+")
-            base_color_name = "Middle 8"
-            if num then display_name = "Middle 8 " .. num end
+            update_section("Middle 8", region_type_upper:match("%d+"))
         elseif region_type_upper:match("^R%d*$") or region_type_upper == "RAMP" then
-            local num = region_type_upper:match("%d+")
-            base_color_name = "Ramp"
-            if num then display_name = "Ramp " .. num end
+            update_section("Ramp", region_type_upper:match("%d+"))
         elseif region_type_upper:match("^D%d*$") or region_type_upper == "DROP" then
-            local num = region_type_upper:match("%d+")
-            base_color_name = "Drop"
-            if num then display_name = "Drop " .. num end
+            update_section("Drop", region_type_upper:match("%d+"))
         elseif region_type_upper:match("^S%d*$") or region_type_upper == "SOLO" then
-            local num = region_type_upper:match("%d+")
-            base_color_name = "Solo"
-            if num then display_name = "Solo " .. num end
+            update_section("Solo", region_type_upper:match("%d+"))
         elseif region_type_upper:match("^F%d*$") or region_type_upper == "FADEOUT" then
-            local num = region_type_upper:match("%d+")
-            base_color_name = "Fadeout"
-            if num then display_name = "Fadeout " .. num end
+            update_section("Fadeout", region_type_upper:match("%d+"))
         end
 
         -- 2. Apply Colors using the expanded base_color_name!
