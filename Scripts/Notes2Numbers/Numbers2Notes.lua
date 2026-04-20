@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.8.1
+-- @version  1.8.2
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.8.1
+--   # Numbers2Notes 1.8.2
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -16,7 +16,7 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
---   # Major Update 1.8.1
+--   # Major Update 1.8.2
 --   + Added Groove
 --   + Changed N2N Drum Arranger to N2N Drum Arranger.jsfx
 --   + Changed gmem name
@@ -662,9 +662,9 @@ local main_viewport = r.ImGui_GetMainViewport(ctx)
 
 -- DETECT OS AND SET FONT
 local os_name = reaper.GetOS()
-local font_name = "Consolas" -- Windows Default
-local font_size = 15
-local font_small_size = 10
+font_name = "Consolas" -- Windows Default
+font_size = 15
+font_small_size = 10
 
 if os_name:match("OSX") or os_name:match("macOS") then
     -- Mac Settings: Bolder, two-word font
@@ -677,6 +677,7 @@ end
 local font = r.ImGui_CreateFont(font_name, font_size)
 local fontsmall = r.ImGui_CreateFont(font_name, font_small_size)
 r.ImGui_Attach(ctx, font)
+r.ImGui_Attach(ctx, fontsmall)
 
 local click_count, text = 0, ""
 local window_flags = r.ImGui_WindowFlags_NoResize() | r.ImGui_WindowFlags_MenuBar()
@@ -1334,15 +1335,17 @@ end
 
 
 local function Draw_Sticky_Mini_Chord_Bar(context)
-    local is_ctrl_down = reaper.ImGui_IsKeyDown(context, reaper.ImGui_Mod_Ctrl())
+local is_ctrl_down = reaper.ImGui_IsKeyDown(context, reaper.ImGui_Mod_Ctrl())
     
-    -- Helper text with custom fonts
+    -- Helper text with custom fonts (Properly stacked!)
     reaper.ImGui_SameLine(context, 190)
-    reaper.ImGui_PopFont(ctx)
-    reaper.ImGui_PushFont(ctx, fontsmall)
-    reaper.ImGui_TextDisabled(context, "Use \"Entry\" tab for less common chords.")
-    reaper.ImGui_PopFont(ctx)
-    reaper.ImGui_PushFont(ctx, font)
+    
+    -- We just Push the small font on top of the stack
+    reaper.ImGui_PushFont(context, fontsmall)
+    reaper.ImGui_TextDisabled(context, "See \"Entry\" tab for less common chords.")
+    
+    -- And Pop it off when we are done. (It instantly reverts to the normal font!)
+    reaper.ImGui_PopFont(context)
     
     -- Start buttons cleanly on the right
     reaper.ImGui_SameLine(context, 435)
@@ -2176,7 +2179,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.8.1")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.8.2")
             reaper.ImGui_Dummy(ctx, 0, 5) -- Add a tiny bit of vertical spacing
             Link("https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
