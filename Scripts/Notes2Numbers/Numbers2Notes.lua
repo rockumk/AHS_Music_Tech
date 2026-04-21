@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.8.2
+-- @version  1.8.3
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.8.2
+--   # Numbers2Notes 1.8.3
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -16,11 +16,12 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
---   # Major Update 1.8.2
---   + Added Groove
---   + Changed N2N Drum Arranger to N2N Drum Arranger.jsfx
---   + Changed gmem name
---   + N2N Drum Arranger search fixed for Mac
+--   # Added small chord audition buttons to left panel.
+--   + Improved warnings for missing sections.
+--   + Improved audition voicing quality.
+--   + Added "Classics" row of and better glowing.
+--   + Reduced instructions font size.
+--   + Fixed tempo stamping at cursor.
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require "imgui" "0.8.6" -- Version of IMGUI used during development.
@@ -72,6 +73,21 @@ the_itemOM = ""
 
 -- GLOBAL RENDER SETTINGS
 G_render_mode = 0 -- 0 = Relative (Default), 1 = Absolute
+
+
+
+local rv4, recipe_state = reaper.GetProjExtState(0, "N2N", "RecipeState")
+if rv4 > 0 and recipe_state ~= "" then
+    local idx = 1
+    for state in string.gmatch(recipe_state, "(%d)") do
+        if config.track_recipe[idx] then
+            config.track_recipe[idx].active = (state == "1")
+        end
+        idx = idx + 1
+    end
+end
+
+
 G_DRUM_CUE_PLACEMENT = "Every 4 Bars"
 G_ARP_CUE_PLACEMENT  = "Every Section"
 
@@ -1257,6 +1273,13 @@ function Draw_Track_Builder_Modal()
         reaper.ImGui_Dummy(ctx, 0, 5)
 
         if reaper.ImGui_Button(ctx, "Build Tracks & Render", 200, 35) then
+            -- Save the checkbox states to the project file!
+            local state_str = ""
+            for _, tr in ipairs(config.track_recipe) do
+                state_str = state_str .. (tr.active and "1" or "0")
+            end
+            reaper.SetProjExtState(0, "N2N", "RecipeState", state_str)
+            
             is_track_builder_open = false
             reaper.ImGui_CloseCurrentPopup(ctx)
             Start_Render_Coroutine()
@@ -1335,19 +1358,13 @@ end
 
 
 local function Draw_Sticky_Mini_Chord_Bar(context)
-local is_ctrl_down = reaper.ImGui_IsKeyDown(context, reaper.ImGui_Mod_Ctrl())
+    local is_ctrl_down = reaper.ImGui_IsKeyDown(context, reaper.ImGui_Mod_Ctrl())
     
-    -- Helper text with custom fonts (Properly stacked!)
     reaper.ImGui_SameLine(context, 190)
-    
-    -- We just Push the small font on top of the stack
     reaper.ImGui_PushFont(context, fontsmall)
     reaper.ImGui_TextDisabled(context, "See \"Entry\" tab for less common chords.")
-    
-    -- And Pop it off when we are done. (It instantly reverts to the normal font!)
     reaper.ImGui_PopFont(context)
     
-    -- Start buttons cleanly on the right
     reaper.ImGui_SameLine(context, 435)
     
     local quick_chords = {
@@ -1362,74 +1379,56 @@ local is_ctrl_down = reaper.ImGui_IsKeyDown(context, reaper.ImGui_Mod_Ctrl())
     
     for i, c in ipairs(quick_chords) do
         local current_root = quick_roots[i]
-        local display_label = c.label
+        local clean_name = c.val[1]
         
         local root_colors = musictheory.root_colors[current_root] or {200,200,200}
-        local thecolor = reaper.ImGui_ColorConvertDouble4ToU32(
-            root_colors[1]/255, root_colors[2]/255, root_colors[3]/255, 1
-        )
+        local thecolor = reaper.ImGui_ColorConvertDouble4ToU32(root_colors[1]/255, root_colors[2]/255, root_colors[3]/255, 1)
         
-        -- Push the solid background color
         reaper.ImGui_PushStyleColor(context, reaper.ImGui_Col_Button(), thecolor)
+
         
-        -- Push the pulsing white border (Thickness 3.0)
-        reaper.ImGui_PushStyleVar(context, reaper.ImGui_StyleVar_FrameBorderSize(), 0.0)
-        reaper.ImGui_PushStyleColor(context, reaper.ImGui_Col_Border(), reaper.ImGui_ColorConvertDouble4ToU32(1, 1, 1, transpar or 0.8))
+        reaper.ImGui_Button(context, c.label, 35, 18)
         
-        reaper.ImGui_Button(context, display_label, 35, 18)
-        
-        -- Pop Border styles
-        reaper.ImGui_PopStyleColor(context, 1)
-        reaper.ImGui_PopStyleVar(context, 1)
+
         
         -- MOUSE DOWN
         if reaper.ImGui_IsItemActivated(context) then
             if is_ctrl_down then
-                chord_charting_area = chord_charting_area .. current_root .. c.val[1] .. "  "
+                chord_charting_area = chord_charting_area .. current_root .. clean_name .. "  "
             end
             
-            play_root = current_root
-            last_play_root = current_root
-            current_playing_tone_array = musictheory.type_table[(c.val[1] == "" and "z" or c.val[1])] or c.val[3]
+            Kill_All_Audition_Notes()
             
-            local root_val = musictheory.root_table[play_root] or 0
+            local this_type = (c.val[1] == "") and "z" or c.val[1]
+            local tones = musictheory.type_table[this_type] or c.val[3]
+            
+            local root_val = musictheory.root_table[current_root] or 0
             local total_shift = (root_val + audition_key_shift) % 12
             
             if audition_track and reaper.ValidatePtr(audition_track, "MediaTrack*") then
                 reaper.SetMediaTrackInfo_Value(audition_track, "B_MUTE", 0)
             end
-            for _, v in pairs(current_playing_tone_array) do
+            
+            for _, v in pairs(tones) do
                 local pitch = (v + total_shift > 10) and (60 + total_shift + v - 12) or (60 + total_shift + v)
                 reaper.StuffMIDIMessage(0, 144, pitch, 111)
+                table.insert(N2N_Playing_Notes, pitch)
                 
-                -- Doubled heavy bass notes (-12 and -24)
                 if v == 0 then 
                     reaper.StuffMIDIMessage(0, 144, pitch - 12, 115)
-                    reaper.StuffMIDIMessage(0, 144, pitch - 24, 120) 
+                    table.insert(N2N_Playing_Notes, pitch - 12)
+                    reaper.StuffMIDIMessage(0, 144, pitch - 24, 120)
+                    table.insert(N2N_Playing_Notes, pitch - 24)
                 end
             end
         end
         
         -- MOUSE UP
         if reaper.ImGui_IsItemDeactivated(context) then
-            local root_val = musictheory.root_table[play_root] or 0
-            local total_shift = (root_val + audition_key_shift) % 12
-            
-            for _, v in pairs(current_playing_tone_array) do
-                local pitch = (v + total_shift > 10) and (60 + total_shift + v - 12) or (60 + total_shift + v)
-                reaper.StuffMIDIMessage(0, 128, pitch, 0)
-                
-                if v == 0 then 
-                    reaper.StuffMIDIMessage(0, 128, pitch - 12, 0)
-                    reaper.StuffMIDIMessage(0, 128, pitch - 24, 0) 
-                end
-            end
-            if audition_track and reaper.ValidatePtr(audition_track, "MediaTrack*") then
-                reaper.SetMediaTrackInfo_Value(audition_track, "B_MUTE", 1)
-            end
+            Kill_All_Audition_Notes()
         end
 
-        reaper.ImGui_PopStyleColor(context, 1) -- Pop the background color
+        reaper.ImGui_PopStyleColor(context, 1)
         if i < #quick_chords then reaper.ImGui_SameLine(context) end
     end
 end
@@ -1644,22 +1643,22 @@ reaper.ImGui_BeginGroup(ctx)
 
             r.ImGui_SameLine(ctx)
             if r.ImGui_Button(ctx, "Update", nil, nil) then
-                -- Smart Update Logic
-                Scan_Existing_Tracks()
-                local has_tracks = false
-                for k, v in pairs(FOUND_TRACKS) do
-                    if #v > 0 then
-                        has_tracks = true
+                -- Smart Update Logic: Check if the recipe actually HAS active tracks!
+                local has_active_tracks = false
+                for _, tr in ipairs(config.track_recipe) do
+                    if tr.active then
+                        has_active_tracks = true
                         break
                     end
                 end
 
-                -- If they hit Quick Render but have no tracks, force open the Builder!
-                if has_tracks then
+                -- If they want to build tracks (or meta-regions), just render!
+                if has_active_tracks then
                     if not render_co then
                         Start_Render_Coroutine()
                     end
                 else
+                    -- Only open the builder if absolutely nothing is checked
                     is_track_builder_open = true
                 end
             end
@@ -2179,7 +2178,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.8.2")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.8.3")
             reaper.ImGui_Dummy(ctx, 0, 5) -- Add a tiny bit of vertical spacing
             Link("https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
@@ -2197,8 +2196,28 @@ Form: I V C V C B C O]]
         end
 
         wx = 77
-        hx = 19
+        hx = 17
+        
+        
+        
         if feedback_tab_mode == 1 then
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
             -- Check specifically if SHIFT is held down (returns true/false)
             local is_shift_down = reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Mod_Shift())
 
@@ -2227,12 +2246,84 @@ Form: I V C V C B C O]]
             r.ImGui_PopStyleColor(ctx, 1)
             reaper.ImGui_EndGroup(ctx)
             r.ImGui_SameLine(ctx)
+            reaper.ImGui_Dummy(ctx, 55, 5)
+            r.ImGui_SameLine(ctx)
+            reaper.ImGui_PopFont(ctx)
+            reaper.ImGui_PushFont(ctx, fontsmall)
             reaper.ImGui_Text(
                 ctx,
-                "Hold Shift for Flat Roots / Ctrl to place in chart.\nGlowing = Very Popular / Bright = In Diatonic Scale"
+                "Hold Shift for Flat Roots / Ctrl to place in chart.\nGlowing = Very Popular / Bright = In Key"
             )
+            reaper.ImGui_PopFont(ctx)
+            reaper.ImGui_PushFont(ctx, font)
+
 
             --r.ImGui_Separator(ctx)
+
+
+
+                    
+                    reaper.ImGui_Separator(ctx)
+                    
+                    
+                 
+                 local is_shift_down = reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Mod_Shift())
+                 
+                 reaper.ImGui_Dummy(ctx, 0, 5) 
+                 reaper.ImGui_SameLine(ctx, 97)
+                 reaper.ImGui_Text(ctx, "Classics")
+                 
+                 
+local classics = {
+                {r="1", t="",   display="       ", t_arr={0,4,7}},
+                {r="2", t="m",  display="m      ", t_arr={0,3,7}},
+                {r="3", t="m",  display="m      ", t_arr={0,3,7}},
+                {r="4", t="",   display="       ", t_arr={0,4,7}},
+                {r="5", t="",   display="       ", t_arr={0,4,7}},
+                {r="6", t="m",  display="m      ", t_arr={0,3,7}},
+                {r="7", t="dim",display="dim    ", t_arr={0,3,6}}
+            }
+            
+            for i, c in ipairs(classics) do
+                local play_r = c.r
+                local v_in = {c.t, c.display, c.t_arr}
+                local do_glow = true
+                
+                -- Shift Logic: No glow for ANY shifted chords.
+                if is_shift_down then
+                    do_glow = false
+                    if c.r == "7" then
+                        play_r = "b7"
+                        v_in = {"", "       ", {0,4,7}} -- Changes to b7 Major!
+                    elseif c.r ~= "1" and c.r ~= "4" then
+                        play_r = "b" .. c.r
+                    end
+                else
+                    -- Natural Logic: 7dim never glows
+                    if c.r == "7" then do_glow = false end
+                end
+                
+                local root_colors = musictheory.root_colors[play_r] or {200,200,200}
+                local thecolor = reaper.ImGui_ColorConvertDouble4ToU32(root_colors[1]/255, root_colors[2]/255, root_colors[3]/255, 1)
+                
+                reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Button(), thecolor)
+                
+                play_button_midi(v_in, play_r, do_glow) 
+                
+                reaper.ImGui_PopStyleColor(ctx, 1)
+                
+                if i < #classics then reaper.ImGui_SameLine(ctx) end
+            end
+                    
+                    
+                    reaper.ImGui_Dummy(ctx, 0, 5)
+        
+        
+
+
+
+
+
 
             for i, v in pairs(musictheory.button_table) do
                 if v[1] == "L" then
@@ -4867,6 +4958,22 @@ function place_MIDI_data(
 
                 local end_ticks_shift = math.floor((groove_data[end_step_idx] or 0.0) * 60)
 
+
+                local final_start = pmd_running_ppqpos_total + start_ticks_shift
+                local raw_end = pmd_note_end_ppqpos + end_ticks_shift
+
+                local grooved_duration = raw_end - final_start
+                
+                -- A tiny 10-tick gap to separate chords (keeps notes long and legato!)
+                local trim_amount = 10 
+                if grooved_duration <= 20 then
+                    trim_amount = math.floor(grooved_duration * 0.1)
+                end
+
+                local final_end = raw_end - trim_amount
+
+
+--[[
                 local final_start = pmd_running_ppqpos_total + start_ticks_shift
                 local raw_end = pmd_note_end_ppqpos + end_ticks_shift
 
@@ -4878,6 +4985,10 @@ function place_MIDI_data(
                 end
 
                 local final_end = raw_end - trim_amount
+   ]]             
+                
+                
+                
                 if final_start < 0 then
                     final_start = 0
                 end
@@ -6006,6 +6117,9 @@ function PreRender_Setup()
     local safe_header = Normalize_Form_Line(header_area)
     unfolded_user_data, error_zone = form.process_the_form(header_area, chord_charting_area)
     progression = Set_The_Current_Simulated_Userinput_Data(unfolded_user_data)
+    if error_zone and error_zone ~= "" then
+            render_feedback = render_feedback .. "\n[FORM WARNINGS]:\n" .. error_zone .. "\n"
+    end
 end
 
 function Apply_Project_Settings()
@@ -6027,7 +6141,14 @@ function Apply_Project_Settings()
     G_time_signature_top = ts_num
 
     -- CORRECTED: Use SetTempoTimeSigMarker at time 0.0 to set project default
-    reaper.SetTempoTimeSigMarker(0, -1, 0.0, -1, -1, current_bpm, ts_num, ts_denom, false)
+    local num_tempo = reaper.CountTempoTimeSigMarkers(0)
+        for i = num_tempo - 1, 1, -1 do
+            reaper.DeleteTempoTimeSigMarker(0, i)
+        end
+        
+        -- 2. Modify the base project tempo (index 0) instead of inserting a new marker (-1)
+        reaper.SetTempoTimeSigMarker(0, 0, 0.0, -1, -1, current_bpm, ts_num, ts_denom, false)
+        reaper.UpdateTimeline()
     set_the_swing(header_area)
 end
 
@@ -6486,89 +6607,90 @@ function Get_Pulsing_Color(rgb_table, pulse_val)
 end
 
 
-function play_button_midi(v_in, play_root_in)
+-- GLOBAL MIDI STATE (Guarantees no stuck notes!)
+N2N_Playing_Notes = {}
+
+function Kill_All_Audition_Notes()
+    for _, pitch in ipairs(N2N_Playing_Notes) do
+        reaper.StuffMIDIMessage(0, 128, pitch, 0)
+    end
+    N2N_Playing_Notes = {} -- Clear the list
+    if audition_track and reaper.ValidatePtr(audition_track, "MediaTrack*") then
+        reaper.SetMediaTrackInfo_Value(audition_track, "B_MUTE", 1)
+    end
+end
+
+-- SMOOTH GLOW FUNCTION (Cycles Dark Gray to White)
+function Get_Glowing_Border_Color()
+    local time = reaper.time_precise()
+    local cycle_speed = 3.0 -- Seconds per cycle
+    
+    -- Creates a smooth wave from 0.0 to 1.0
+    local t = (math.sin(time * (math.pi * 2 / cycle_speed)) + 1) / 2
+    
+    local r1, g1, b1 = 0.2, 0.2, 0.2 -- Dark Gray
+    local r2, g2, b2 = 1.0, 1.0, 1.0 -- Bright White
+    
+    local r = r1 + (r2 - r1) * t
+    local g = g1 + (g2 - g1) * t
+    local b = b1 + (b2 - b1) * t
+    
+    return reaper.ImGui_ColorConvertDouble4ToU32(r, g, b, 1.0)
+end
+
+
+
+function play_button_midi(v_in, play_root_in, do_glow)
     local btn_label = play_root_in .. v_in[2]
     local clean_name = v_in[2]:gsub("%s+", "")
     
-    -- Detect if it's a popular diatonic chord (to draw the glowing border)
-    local is_popular = false
-    if not reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Mod_Shift()) then
-        if (play_root_in == "1" and clean_name == "") or
-           (play_root_in == "4" and clean_name == "") or
-           (play_root_in == "5" and clean_name == "") or
-           (play_root_in == "2" and clean_name == "m") or
-           (play_root_in == "3" and clean_name == "m") or
-           (play_root_in == "6" and clean_name == "m") then
-            is_popular = true
-        end
-    end
-    
-    -- Push the pulsing white border (Thickness increased to 3.0)
-    if is_popular then
+    if do_glow then
         reaper.ImGui_PushStyleVar(ctx, reaper.ImGui_StyleVar_FrameBorderSize(), 3.0)
-        reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Border(), reaper.ImGui_ColorConvertDouble4ToU32(1, 1, 1, transpar or 0.8))
+        reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Border(), Get_Glowing_Border_Color())
     end
     
-    -- Draw the Button
     r.ImGui_Button(ctx, btn_label, wx, hx)
     
-    -- Pop border styles
-    if is_popular then
+    if do_glow then
         reaper.ImGui_PopStyleColor(ctx, 1)
         reaper.ImGui_PopStyleVar(ctx, 1)
     end
     
-    -- MOUSE DOWN (Start playing & add to chart)
+    -- MOUSE DOWN
     if r.ImGui_IsItemActivated(ctx) then
-        local is_ctrl_down = reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Mod_Ctrl())
-        if is_ctrl_down then
+        if reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Mod_Ctrl()) then
             chord_charting_area = chord_charting_area .. play_root_in .. clean_name .. "  "
         end
 
-        play_root = play_root_in
-        last_play_root = play_root_in
+        Kill_All_Audition_Notes()
+
         local this_type = (v_in[1] == "") and "z" or v_in[1]
-        current_playing_tone_array = musictheory.type_table[this_type] or v_in[3]
+        local tones = musictheory.type_table[this_type] or v_in[3]
         
-        local root_val = musictheory.root_table[play_root] or 0
+        local root_val = musictheory.root_table[play_root_in] or 0
         local total_shift = (root_val + audition_key_shift) % 12
         
         if audition_track and reaper.ValidatePtr(audition_track, "MediaTrack*") then
             reaper.SetMediaTrackInfo_Value(audition_track, "B_MUTE", 0)
         end
         
-        for _, v in pairs(current_playing_tone_array) do
-            -- Invert upper voices tightly
+        for _, v in pairs(tones) do
             local pitch = (v + total_shift > 10) and (60 + total_shift + v - 12) or (60 + total_shift + v)
             reaper.StuffMIDIMessage(0, 144, pitch, 111)
+            table.insert(N2N_Playing_Notes, pitch)
             
-            -- Doubled heavy bass notes (-12 and -24)
             if v == 0 then 
-                reaper.StuffMIDIMessage(0, 144, pitch - 12, 115) 
+                reaper.StuffMIDIMessage(0, 144, pitch - 12, 115)
+                table.insert(N2N_Playing_Notes, pitch - 12)
                 reaper.StuffMIDIMessage(0, 144, pitch - 24, 120) 
+                table.insert(N2N_Playing_Notes, pitch - 24)
             end
         end
     end
     
-    -- MOUSE UP (Stop playing notes)
+    -- MOUSE UP
     if r.ImGui_IsItemDeactivated(ctx) then
-        local root_val = musictheory.root_table[play_root_in] or 0
-        local total_shift = (root_val + audition_key_shift) % 12
-        
-        for _, v in pairs(current_playing_tone_array) do
-            local pitch = (v + total_shift > 10) and (60 + total_shift + v - 12) or (60 + total_shift + v)
-            reaper.StuffMIDIMessage(0, 128, pitch, 0)
-            
-            -- Turn off both bass notes
-            if v == 0 then 
-                reaper.StuffMIDIMessage(0, 128, pitch - 12, 0)
-                reaper.StuffMIDIMessage(0, 128, pitch - 24, 0) 
-            end
-        end
-        
-        if audition_track and reaper.ValidatePtr(audition_track, "MediaTrack*") then
-            reaper.SetMediaTrackInfo_Value(audition_track, "B_MUTE", 1)
-        end
+        Kill_All_Audition_Notes()
     end
 end
 
