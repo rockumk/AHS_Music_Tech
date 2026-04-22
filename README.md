@@ -23,6 +23,10 @@ Before using the script, please check the list of required extensions and plugin
 
 EFFECTS
 
+- N2N Drum Arranger - Drum sequencer tied into N2N song layout, groove, and swing.
+
+- N2N Arp -  Advanced arpeggiator with full knowledge of your song's chord mapping, cued to the N2N song layout, groove, and swing.
+
 - MidiOnOff - Simple Effect to turn MIDI on and OFF via MIDI
 
 - ReaCenterMIDIpitch - Recenters MIDI pitches around a user definable center pitch.
@@ -34,3 +38,5 @@ EFFECTS
 - Swing Project MIDI - Applies swing to even eights from 0 to 100% across all tracks with the SwingTrackMIDI effect.
 
 - Wait-A-Moment - Sets a short delay compensation for MIDI arpeggiators.
+
+- Many more...
