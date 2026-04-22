@@ -69,6 +69,7 @@
     ul {
       list-style-type: none;
       padding: 0;
+      margin: 0;
     }
 
     li {
@@ -102,11 +103,6 @@
 
     .recommended {
       background-color: #1565c0;
-      color: white;
-    }
-
-    .dropped {
-      background-color: #666;
       color: white;
     }
 
@@ -145,6 +141,17 @@
       color: #bbb;
     }
 
+    .repo-list {
+      background-color: #303030;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+    }
+
+    .repo-list p {
+      margin: 6px 0;
+    }
+
     .footer {
       margin-top: 40px;
       text-align: center;
@@ -161,11 +168,10 @@
   <div class="intro">
     <p><strong>Welcome!</strong></p>
     <p>
-      This page shows what is <strong>required</strong> for Numbers2Notes to work,
-      what is <strong>recommended</strong>, and which older items are <strong>no longer needed</strong>.
+      This page shows the repositories and files needed for Numbers2Notes, followed by a few other recommended plugins.
     </p>
     <p>
-      Start with the Required section first.
+      Please begin by adding the repositories below into ReaPack, then install the required files and plugins.
     </p>
   </div>
 
@@ -176,28 +182,50 @@
     is an easy way to get started.
   </div>
 
-  <h2>1. Required</h2>
-  <p>These are the items users should install first.</p>
+  <h2>1. ReaPack Repositories</h2>
+  <p>
+    Please add all of the following repositories to ReaPack.
+  </p>
+
+  <div class="repo-list">
+    <p>ReaTeam Extensions</p>
+    <p>ReaTeam Scripts</p>
+    <p>AHS Music Tech</p>
+    <p>Geraint's JSFX</p>
+    <p>Tukan Studios</p>
+    <p>Saike Tools</p>
+    <p>StevieKeys JSFX</p>
+    <p>Chmaha's Airwindows Ports</p>
+    <p>Numbers2Notes - This Repository!</p>
+  </div>
+
+  <p>
+    You can copy the full repository URL list below and paste/import them into ReaPack:
+  </p>
+
+  <div class="code-box">https://github.com/ReaTeam/Extensions/raw/master/index.xml
+https://github.com/ReaTeam/ReaScripts/raw/master/index.xml
+https://github.com/rockumk/AHS_Music_Tech/raw/master/index.xml
+https://geraintluff.github.io/jsfx/index.xml
+https://raw.githubusercontent.com/TukanStudios/TUKAN_STUDIOS_PLUGINS/main/index2.xml
+https://raw.githubusercontent.com/JoepVanlier/JSFX/master/index.xml
+https://raw.githubusercontent.com/Steviekeys/StevieKeys_JSFX2/master/index.xml
+https://github.com/chmaha/airwindows-JSFX-ports/raw/main/index.xml
+https://github.com/rockumk/AHS_Music_Tech/raw/master/index.xml </div>
+
+  <h2>2. Required Files and Plugins</h2>
+  <p>
+    These are the required items users should install after adding the repositories above.
+  </p>
 
   <ul>
     <li>
       <div class="row-head">
-        <strong>ReaTeam Extensions</strong>
+        <strong>ReaTeam Extensions Components</strong>
         <span class="tag required">Required</span>
       </div>
       <div class="small">
         Must include: <strong>SWS</strong>, <strong>ReaImGui</strong>, and <strong>js_ReaScriptAPI</strong>.
-      </div>
-      <div class="code-box">https://github.com/ReaTeam/Extensions/raw/master/index.xml</div>
-    </li>
-
-    <li>
-      <div class="row-head">
-        <strong>ReaTeam Scripts Repository</strong>
-        <span class="tag required">Required</span>
-      </div>
-      <div class="small">
-        Install through ReaPack.
       </div>
     </li>
 
@@ -208,8 +236,9 @@
       </div>
       <div class="small">
         Import this repository into ReaPack to install the main Numbers2Notes scripts and included N2N JSFX.
+        The link is already included in the list of repositiories above.
       </div>
-      <div class="code-box" style="color:#4CAF50;">https://github.com/rockumk/AHS_Music_Tech/raw/master/index.xml</div>
+      
     </li>
 
     <li>
@@ -220,50 +249,6 @@
       <div class="small">
         Some required effects are already included with REAPER and do not need a separate download.
       </div>
-    </li>
-
-    <li>
-      <div class="row-head">
-        <strong>Geraint Luff / Geraint's JSFX</strong>
-        <span class="tag required">Required</span>
-      </div>
-      <div class="small">
-        Needed for Pad Synth related functions.
-      </div>
-      <div class="code-box">https://github.com/geraintluff/jsfx-pad-synth</div>
-    </li>
-
-    <li>
-      <div class="row-head">
-        <strong>Tukan Studios</strong>
-        <span class="tag required">Required</span>
-      </div>
-      <div class="small">
-        Install through ReaPack.
-      </div>
-      <div class="code-box">https://raw.githubusercontent.com/TukanStudios/TUKAN_STUDIOS_PLUGINS/main/index2.xml</div>
-    </li>
-
-    <li>
-      <div class="row-head">
-        <strong>Saike Tools</strong>
-        <span class="tag required">Required</span>
-      </div>
-      <div class="small">
-        Install through ReaPack.
-      </div>
-      <div class="code-box">https://raw.githubusercontent.com/JoepVanlier/JSFX/master/index.xml</div>
-    </li>
-
-    <li>
-      <div class="row-head">
-        <strong>Chmaha's Airwindows Ports</strong>
-        <span class="tag required">Required</span>
-      </div>
-      <div class="small">
-        Install through ReaPack.
-      </div>
-      <div class="code-box">https://github.com/chmaha/airwindows-JSFX-ports/raw/main/index.xml</div>
     </li>
 
     <li>
@@ -315,25 +300,18 @@
 
     <li>
       <div class="row-head">
-        <strong>N2N LibreArp Preset Library</strong>
-        <span class="tag required">Required</span>
+        <strong>N2N Preset Libraries</strong>
+        <span class="tag required">Required - Make sure you install the presets for each FX, and restart Reaper before starting your first project with Numbers2Notes.</span>
       </div>
-      <div class="small">Required support file.</div>
-      <a href="https://medmods.com/N2N_Librearp_Presets.RPL" target="_blank">Download N2N_Librearp_Presets.RPL →</a>
+      <a href="N2N_Presets.zip" target="_blank">Download N2N_Librearp_Presets.RPL →</a>
     </li>
 
-    <li>
-      <div class="row-head">
-        <strong>N2N Surge XT Preset Library</strong>
-        <span class="tag required">Required</span>
-      </div>
-      <div class="small">Required support file.</div>
-      <a href="https://medmods.com/N2N_SurgeXT_Presets.RPL" target="_blank">Download N2N_SurgeXT_Presets.RPL →</a>
-    </li>
   </ul>
 
-  <h2>2. Recommended</h2>
-  <p>These are not strictly required, but they are useful additions.</p>
+  <h2>3. Other Recommended Plugins</h2>
+  <p>
+    These are not required, but they may still be useful additions for some users.
+  </p>
 
   <ul>
     <li>
@@ -347,34 +325,14 @@
     <li>
       <div class="row-head">
         <strong>Keyzone Classic</strong>
-        <span class="tag recommended">Recommended</span>
+        <span class="tag recommended">Recommended - I've set it up to be the default piano for Numbers2Notes. Set it on Steinway, add a little reverb, and increase the release time a bit.</span>
       </div>
       <a href="https://plugins4free.com/plugin/2848/" target="_blank">Download Keyzone Classic →</a>
     </li>
   </ul>
 
-  <h2>3. ReaPack Repositories (Copyable List)</h2>
-  <p>Paste or import these into ReaPack as needed.</p>
-
-  <div class="code-box">ReaTeam Extensions
-https://github.com/ReaTeam/Extensions/raw/master/index.xml
-
-AHS Music Tech
-https://github.com/rockumk/AHS_Music_Tech/raw/master/index.xml
-
-Tukan Studios
-https://raw.githubusercontent.com/TukanStudios/TUKAN_STUDIOS_PLUGINS/main/index2.xml
-
-Saike Tools
-https://raw.githubusercontent.com/JoepVanlier/JSFX/master/index.xml
-
-Chmaha's Airwindows Ports
-https://github.com/chmaha/airwindows-JSFX-ports/raw/main/index.xml</div>
-
   <div class="note-box">
-    <strong>Possible extras:</strong><br>
-    StevieKeys JSFX and Justin Johnson / ReJJ are not currently listed as required here because you were not sure about them.
-    If you decide later that either is needed, they can be added back easily.
+    Thank you for taking the time to install the Numbers2Notes setup. We appreciate it very much.
   </div>
 
   <div class="footer">
