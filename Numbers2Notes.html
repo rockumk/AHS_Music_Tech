@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Numbers2Notes - Setup & Requirements</title>
+  <title>Numbers2Notes - Requirements</title>
   <style>
     body {
       font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      background: #1e1e1e;
-      color: #e6e6e6;
+      background-color: #1e1e1e;
+      color: #e0e0e0;
       line-height: 1.6;
       margin: 0;
       padding: 20px;
@@ -17,527 +17,370 @@
     .container {
       max-width: 950px;
       margin: 0 auto;
-      background: #252525;
-      padding: 36px;
-      border-radius: 10px;
-      box-shadow: 0 4px 18px rgba(0,0,0,0.45);
+      background-color: #252525;
+      padding: 40px;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     }
 
     h1 {
-      color: #4caf50;
-      border-bottom: 2px solid #4caf50;
+      color: #4CAF50;
+      border-bottom: 2px solid #4CAF50;
       padding-bottom: 10px;
       margin-top: 0;
     }
 
     h2 {
       color: #64b5f6;
+      margin-top: 40px;
       border-bottom: 1px solid #444;
       padding-bottom: 6px;
-      margin-top: 38px;
-    }
-
-    h3 {
-      color: #f1c40f;
-      margin-top: 28px;
-      margin-bottom: 10px;
     }
 
     p {
       margin: 10px 0;
     }
 
-    .intro, .note-box, .tip-box, .warn-box {
-      padding: 16px;
-      border-radius: 8px;
-      margin: 18px 0 26px 0;
-    }
-
     .intro {
-      background: #303030;
-      border-left: 4px solid #4caf50;
-    }
-
-    .tip-box {
-      background: #2c3e50;
-      border-left: 4px solid #f39c12;
-    }
-
-    .note-box {
-      background: #2d2d2d;
-      border-left: 4px solid #64b5f6;
-    }
-
-    .warn-box {
-      background: #3a2b1d;
-      border-left: 4px solid #ff9800;
-    }
-
-    .section-desc {
-      color: #bfbfbf;
-      margin-bottom: 16px;
-    }
-
-    ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-
-    li {
-      background: #303030;
-      margin-bottom: 12px;
-      padding: 16px;
+      font-size: 1.05em;
+      margin-bottom: 30px;
+      background-color: #333;
+      padding: 15px;
+      border-left: 4px solid #4CAF50;
       border-radius: 6px;
     }
 
-    .plugin-card {
-      display: block;
+    .tip-box {
+      background-color: #2c3e50;
+      padding: 15px;
+      border-radius: 6px;
+      border-left: 4px solid #f39c12;
+      margin-bottom: 30px;
     }
 
-    .plugin-header {
+    .note-box {
+      background-color: #2f2f2f;
+      padding: 15px;
+      border-radius: 6px;
+      border-left: 4px solid #64b5f6;
+      margin-top: 25px;
+    }
+
+    ul {
+      list-style-type: none;
+      padding: 0;
+    }
+
+    li {
+      background-color: #303030;
+      margin-bottom: 12px;
+      padding: 15px;
+      border-radius: 4px;
+    }
+
+    .row-head {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       gap: 12px;
       flex-wrap: wrap;
-      align-items: center;
       margin-bottom: 6px;
     }
 
-    .plugin-name {
-      font-weight: 700;
-      font-size: 1.03em;
-    }
-
     .tag {
-      font-size: 0.78em;
+      font-size: 0.8em;
       padding: 4px 8px;
       border-radius: 4px;
-      background: #444;
+      background-color: #444;
       color: #ddd;
-      white-space: nowrap;
     }
 
-    .tag.required {
-      background: #2e7d32;
-      color: #fff;
+    .required {
+      background-color: #2e7d32;
+      color: white;
     }
 
-    .tag.recommended {
-      background: #1565c0;
-      color: #fff;
+    .recommended {
+      background-color: #1565c0;
+      color: white;
     }
 
-    .tag.optional {
-      background: #666;
-      color: #fff;
+    .dropped {
+      background-color: #666;
+      color: white;
     }
 
-    .tag.alt {
-      background: #8e44ad;
-      color: #fff;
-    }
-
-    .desc {
-      color: #c8c8c8;
-      font-size: 0.95em;
-      margin-bottom: 10px;
-    }
-
-    .links a, .inline-link {
+    a {
       color: #81c784;
       text-decoration: none;
-      font-weight: 600;
+      font-weight: bold;
     }
 
-    .links a:hover, .inline-link:hover {
-      color: #a5d6a7;
+    a:hover {
       text-decoration: underline;
+      color: #a5d6a7;
     }
 
     .code-box {
-      background: #111;
-      border: 1px solid #444;
-      border-radius: 5px;
-      padding: 10px 12px;
-      margin-top: 8px;
-      color: #e6ce31;
+      background-color: #111;
+      padding: 10px;
       font-family: Consolas, Monaco, monospace;
+      border: 1px solid #444;
+      border-radius: 4px;
       word-break: break-all;
+      margin-top: 10px;
+      width: 100%;
       user-select: all;
-    }
-
-    .subtle {
-      color: #aaa;
-      font-size: 0.92em;
-    }
-
-    .footer {
-      text-align: center;
-      margin-top: 40px;
-      color: #777;
-      font-size: 0.9em;
+      color: #e6ce31;
+      white-space: pre-wrap;
     }
 
     .main-repo {
-      border: 2px solid #4caf50;
-      background: #1b2e1b;
+      border: 2px solid #4CAF50;
+      background-color: #1b2e1b;
+    }
+
+    .small {
+      font-size: 0.92em;
+      color: #bbb;
+    }
+
+    .footer {
+      margin-top: 40px;
+      text-align: center;
+      font-size: 0.9em;
+      color: #777;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Numbers2Notes Setup Guide</h1>
 
-    <div class="intro">
-      <p><strong>Welcome!</strong></p>
-      <p>
-        This page shows what is <strong>required</strong>, what is <strong>recommended</strong>,
-        and what is <strong>optional</strong> for Numbers2Notes.
-      </p>
-      <p>
-        Install the required items first. After that, add recommended plugins if you want the full intended experience.
-      </p>
-    </div>
+<div class="container">
+  <h1>Numbers2Notes Requirements</h1>
 
-    <div class="tip-box">
-      <strong>Starting from scratch?</strong><br>
-      If you do not already have <strong>ReaPack</strong> and <strong>SWS</strong> installed,
-      <a class="inline-link" href="https://reaboot.com" target="_blank">ReaBoot</a> is a simple way to get the basics in place.
-    </div>
-
-    <h2>1. Required for Numbers2Notes to Run</h2>
-    <p class="section-desc">
-      These are the core dependencies. Numbers2Notes may not run correctly without them.
+  <div class="intro">
+    <p><strong>Welcome!</strong></p>
+    <p>
+      This page shows what is <strong>required</strong> for Numbers2Notes to work,
+      what is <strong>recommended</strong>, and which older items are <strong>no longer needed</strong>.
     </p>
-
-    <ul>
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">ReaTeam Extensions</div>
-          <span class="tag required">Required</span>
-        </div>
-        <div class="desc">
-          Must include: <strong>ReaImGui</strong>, <strong>SWS</strong>, and <strong>js_ReaScriptAPI</strong>.
-        </div>
-        <div class="code-box">https://github.com/ReaTeam/Extensions/raw/master/index.xml</div>
-      </li>
-
-      <li class="plugin-card main-repo">
-        <div class="plugin-header">
-          <div class="plugin-name">AHS Music Tech (Rock Kennedy) - Main Numbers2Notes Repository</div>
-          <span class="tag required">Required</span>
-        </div>
-        <div class="desc">
-          Import this repository into ReaPack to install the main Numbers2Notes scripts and included N2N JSFX.
-        </div>
-        <div class="code-box">https://github.com/rockumk/AHS_Music_Tech/raw/master/index.xml</div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">Included with REAPER (Cockos / Stillwell)</div>
-          <span class="tag required">Required where referenced</span>
-        </div>
-        <div class="desc">
-          Some effects used by Numbers2Notes are included with REAPER itself and do not require any separate download.
-        </div>
-      </li>
-    </ul>
-
-    <h2>2. Recommended ReaPack Repositories</h2>
-    <p class="section-desc">
-      These repositories provide JSFX and tools used by parts of the Numbers2Notes ecosystem.
+    <p>
+      Start with the Required section first.
     </p>
-
-    <ul>
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">ReaTeam Scripts Repository</div>
-          <span class="tag recommended">Recommended</span>
-        </div>
-        <div class="desc">
-          Useful companion repository for additional REAPER scripts and support tools.
-        </div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">Geraint's JSFX</div>
-          <span class="tag recommended">Recommended</span>
-        </div>
-        <div class="desc">Includes pad-synth related JSFX.</div>
-        <div class="code-box">https://github.com/geraintluff/jsfx-pad-synth</div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">Saike Tools</div>
-          <span class="tag recommended">Recommended</span>
-        </div>
-        <div class="desc">Large collection of JSFX tools and processors.</div>
-        <div class="code-box">https://raw.githubusercontent.com/JoepVanlier/JSFX/master/index.xml</div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">StevieKeys JSFX</div>
-          <span class="tag recommended">Recommended</span>
-        </div>
-        <div class="desc">Additional JSFX tools used by some workflows.</div>
-        <div class="code-box">https://raw.githubusercontent.com/Steviekeys/StevieKeys_JSFX2/master/index.xml</div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">Tukan Studios</div>
-          <span class="tag recommended">Recommended</span>
-        </div>
-        <div class="desc">Useful mixing and utility tools.</div>
-        <div class="code-box">https://raw.githubusercontent.com/TukanStudios/TUKAN_STUDIOS_PLUGINS/main/index2.xml</div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">Chmaha's Airwindows JSFX Ports</div>
-          <span class="tag recommended">Recommended</span>
-        </div>
-        <div class="desc">JSFX ports of Airwindows-style processors.</div>
-        <div class="code-box">https://github.com/chmaha/airwindows-JSFX-ports/raw/main/index.xml</div>
-      </li>
-    </ul>
-
-    <h2>3. Recommended Plugin Downloads</h2>
-    <p class="section-desc">
-      These are not required for the script engine itself, but they are strongly recommended if you want the full intended sound set and example setups.
-    </p>
-
-    <ul>
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">Surge XT</div>
-          <span class="tag recommended">Recommended</span>
-        </div>
-        <div class="desc">Free synthesizer.</div>
-        <div class="links"><a href="https://surge-synthesizer.github.io/" target="_blank">Download Surge XT</a></div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">Vital</div>
-          <span class="tag recommended">Recommended</span>
-        </div>
-        <div class="desc">Free wavetable synthesizer.</div>
-        <div class="links"><a href="https://vital.audio/#getvital" target="_blank">Download Vital</a></div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">STFU</div>
-          <span class="tag recommended">Recommended</span>
-        </div>
-        <div class="desc">Volume shaper / gating effect.</div>
-        <div class="links"><a href="https://zeeks.app/" target="_blank">Download STFU</a></div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">Airwindows</div>
-          <span class="tag recommended">Recommended</span>
-        </div>
-        <div class="desc">Needed in some setups for processors such as Calibre, Isolator, Holt, Tube, and Drive.</div>
-        <div class="links"><a href="https://www.airwindows.com/" target="_blank">Visit Airwindows</a></div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">OMG Instruments BlueARP</div>
-          <span class="tag recommended">Recommended</span>
-        </div>
-        <div class="desc">Arpeggiator plugin.</div>
-        <div class="links"><a href="https://omg-instruments.com/wp/?page_id=46" target="_blank">Download BlueARP</a></div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">LibreArp</div>
-          <span class="tag recommended">Recommended</span>
-        </div>
-        <div class="desc">Alternative arpeggiator plugin.</div>
-        <div class="links"><a href="https://librearp.gitlab.io/download/" target="_blank">Download LibreArp</a></div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">Sixth Sample Deelay</div>
-          <span class="tag recommended">Recommended</span>
-        </div>
-        <div class="desc">Delay effect.</div>
-        <div class="links"><a href="https://sixthsample.com/deelay/" target="_blank">Download Deelay</a></div>
-      </li>
-    </ul>
-
-    <h2>4. MONSTER Drums v3</h2>
-    <p class="section-desc">
-      If you want the MONSTER Drums v3 setup, you need both the plugin files and the library files.
-    </p>
-
-    <div class="warn-box">
-      <strong>Important:</strong><br>
-      The plugin and the library are separate downloads. Users should install both if they want MONSTER Drums v3 to work correctly.
-    </div>
-
-    <h3>Plugin Files</h3>
-    <ul>
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">MONSTER Drums v3 - Google Drive Folder</div>
-          <span class="tag recommended">Recommended</span>
-        </div>
-        <div class="links">
-          <a href="https://drive.google.com/drive/folders/1z-N4sRaZBm2rlbc7fyfoCQB2Jkc57TNT?usp=sharing" target="_blank">
-            Open Google Drive Folder
-          </a>
-        </div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">MONSTER Drums v3 - PC VST3 Zip</div>
-          <span class="tag alt">Alternate Download</span>
-        </div>
-        <div class="links">
-          <a href="https://flat7studio.com/MONSTER_Drums_v3_VST3_PC.zip" target="_blank">Download PC VST3</a>
-        </div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">MONSTER Drums v3 - Mac VST3 Zip</div>
-          <span class="tag alt">Alternate Download</span>
-        </div>
-        <div class="links">
-          <a href="https://flat7studio.com/MONSTER_Drums_V3_VST3_Mac.zip" target="_blank">Download Mac VST3</a>
-        </div>
-      </li>
-    </ul>
-
-    <h3>Library Files</h3>
-    <ul>
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">MONSTER Drums v3 Library - Google Drive Folder</div>
-          <span class="tag recommended">Recommended</span>
-        </div>
-        <div class="links">
-          <a href="https://drive.google.com/drive/folders/1GnEYhEyXL7VYmq1IJ2xdkWSCI_HuEW9-?usp=sharing" target="_blank">
-            Open Google Drive Folder
-          </a>
-        </div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">MONSTER Drums v3 Library - Zip</div>
-          <span class="tag alt">Alternate Download</span>
-        </div>
-        <div class="links">
-          <a href="https://flat7studio.com/MONSTER_Drums_V3_Library.zip" target="_blank">Download Library Zip</a>
-        </div>
-      </li>
-    </ul>
-
-    <h2>5. Optional Alternate Instruments</h2>
-    <p class="section-desc">
-      These can be useful substitutes or extra sound sources, but they are not required.
-    </p>
-
-    <ul>
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">Pro Punk Drums</div>
-          <span class="tag optional">Optional</span>
-        </div>
-        <div class="links"><a href="https://www.propunkstudio.com/product/pro-punk-drums/" target="_blank">Open Pro Punk Drums</a></div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">Keyzone Classic</div>
-          <span class="tag optional">Optional</span>
-        </div>
-        <div class="links"><a href="https://plugins4free.com/plugin/2848/" target="_blank">Download Keyzone Classic</a></div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">Drum8</div>
-          <span class="tag optional">Optional</span>
-        </div>
-        <div class="links"><a href="https://audiolatry.gumroad.com/l/drum8" target="_blank">Download Drum8</a></div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">Drumtastic</div>
-          <span class="tag optional">Optional</span>
-        </div>
-        <div class="links"><a href="https://audiolatry.gumroad.com/l/drumtastic" target="_blank">Download Drumtastic</a></div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">MT Power Drumkit 2</div>
-          <span class="tag optional">Optional</span>
-        </div>
-        <div class="links"><a href="https://www.powerdrumkit.com/download76187.php" target="_blank">Download MT Power Drumkit 2</a></div>
-      </li>
-    </ul>
-
-    <h2>6. Preset Libraries</h2>
-    <p class="section-desc">
-      If you are using the supplied Surge XT and LibreArp presets, import these libraries inside the plugin preset browser.
-    </p>
-
-    <ul>
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">N2N LibreArp Preset Library</div>
-          <span class="tag recommended">Recommended if using LibreArp</span>
-        </div>
-        <div class="desc">Import the .RPL file from inside LibreArp.</div>
-        <div class="links"><a href="https://medmods.com/N2N_Librearp_Presets.RPL" target="_blank">Download N2N_Librearp_Presets.RPL</a></div>
-      </li>
-
-      <li class="plugin-card">
-        <div class="plugin-header">
-          <div class="plugin-name">N2N Surge XT Preset Library</div>
-          <span class="tag recommended">Recommended if using Surge XT</span>
-        </div>
-        <div class="desc">Import the .RPL file from inside Surge XT.</div>
-        <div class="links"><a href="https://medmods.com/N2N_SurgeXT_Presets.RPL" target="_blank">Download N2N_SurgeXT_Presets.RPL</a></div>
-      </li>
-    </ul>
-
-    <h2>7. Quick Setup Order</h2>
-    <ul>
-      <li>Install ReaPack, SWS, ReaImGui, and js_ReaScriptAPI.</li>
-      <li>Import the AHS Music Tech repository.</li>
-      <li>Add the recommended ReaPack repositories you want to use.</li>
-      <li>Install recommended plugins such as Surge XT, Vital, STFU, and Airwindows.</li>
-      <li>If using MONSTER Drums v3, install both the plugin files and the library files.</li>
-      <li>Import preset libraries for Surge XT and LibreArp if desired.</li>
-    </ul>
-
-    <div class="note-box">
-      <strong>Note:</strong><br>
-      Numbers2Notes can still warn users at startup when some optional or recommended plugins are missing.
-      If needed, that warning behavior can be adjusted in the script configuration.
-    </div>
-
-    <div class="footer">
-      &copy; 2026 Numbers2Notes
-    </div>
   </div>
+
+  <div class="tip-box">
+    <strong>New to REAPER customization?</strong><br>
+    If you do not already have <em>ReaPack</em> and <em>SWS</em> installed,
+    <strong><a href="https://reaboot.com" target="_blank">ReaBoot.com</a></strong>
+    is an easy way to get started.
+  </div>
+
+  <h2>1. Required</h2>
+  <p>These are the items users should install first.</p>
+
+  <ul>
+    <li>
+      <div class="row-head">
+        <strong>ReaTeam Extensions</strong>
+        <span class="tag required">Required</span>
+      </div>
+      <div class="small">
+        Must include: <strong>SWS</strong>, <strong>ReaImGui</strong>, and <strong>js_ReaScriptAPI</strong>.
+      </div>
+      <div class="code-box">https://github.com/ReaTeam/Extensions/raw/master/index.xml</div>
+    </li>
+
+    <li>
+      <div class="row-head">
+        <strong>ReaTeam Scripts Repository</strong>
+        <span class="tag required">Required</span>
+      </div>
+      <div class="small">
+        Install through ReaPack.
+      </div>
+    </li>
+
+    <li class="main-repo">
+      <div class="row-head">
+        <strong>AHS Music Tech (Rock Kennedy) - Numbers2Notes Main Repository</strong>
+        <span class="tag required">Required</span>
+      </div>
+      <div class="small">
+        Import this repository into ReaPack to install the main Numbers2Notes scripts and included N2N JSFX.
+      </div>
+      <div class="code-box" style="color:#4CAF50;">https://github.com/rockumk/AHS_Music_Tech/raw/master/index.xml</div>
+    </li>
+
+    <li>
+      <div class="row-head">
+        <strong>Included with REAPER (Cockos / Stillwell)</strong>
+        <span class="tag required">Required</span>
+      </div>
+      <div class="small">
+        Some required effects are already included with REAPER and do not need a separate download.
+      </div>
+    </li>
+
+    <li>
+      <div class="row-head">
+        <strong>Geraint Luff / Geraint's JSFX</strong>
+        <span class="tag required">Required</span>
+      </div>
+      <div class="small">
+        Needed for Pad Synth related functions.
+      </div>
+      <div class="code-box">https://github.com/geraintluff/jsfx-pad-synth</div>
+    </li>
+
+    <li>
+      <div class="row-head">
+        <strong>Tukan Studios</strong>
+        <span class="tag required">Required</span>
+      </div>
+      <div class="small">
+        Install through ReaPack.
+      </div>
+      <div class="code-box">https://raw.githubusercontent.com/TukanStudios/TUKAN_STUDIOS_PLUGINS/main/index2.xml</div>
+    </li>
+
+    <li>
+      <div class="row-head">
+        <strong>Saike Tools</strong>
+        <span class="tag required">Required</span>
+      </div>
+      <div class="small">
+        Install through ReaPack.
+      </div>
+      <div class="code-box">https://raw.githubusercontent.com/JoepVanlier/JSFX/master/index.xml</div>
+    </li>
+
+    <li>
+      <div class="row-head">
+        <strong>Chmaha's Airwindows Ports</strong>
+        <span class="tag required">Required</span>
+      </div>
+      <div class="small">
+        Install through ReaPack.
+      </div>
+      <div class="code-box">https://github.com/chmaha/airwindows-JSFX-ports/raw/main/index.xml</div>
+    </li>
+
+    <li>
+      <div class="row-head">
+        <strong>Vital</strong>
+        <span class="tag required">Required</span>
+      </div>
+      <a href="https://vital.audio/#getvital" target="_blank">Download Vital →</a>
+    </li>
+
+    <li>
+      <div class="row-head">
+        <strong>Surge XT</strong>
+        <span class="tag required">Required</span>
+      </div>
+      <a href="https://surge-synthesizer.github.io/" target="_blank">Download Surge XT →</a>
+    </li>
+
+    <li>
+      <div class="row-head">
+        <strong>Airwindows</strong>
+        <span class="tag required">Required</span>
+      </div>
+      <div class="small">
+        Needed effects include: Calibre, Isolator, Holt, Tube, and Drive.
+      </div>
+      <a href="https://www.airwindows.com/" target="_blank">Download / Visit Airwindows →</a>
+    </li>
+
+    <li>
+      <div class="row-head">
+        <strong>MONSTER Drums v3 Plugin Files</strong>
+        <span class="tag required">Required</span>
+      </div>
+      <div class="small">You need both the plugin files and the library files.</div>
+      <p><a href="https://drive.google.com/drive/folders/1z-N4sRaZBm2rlbc7fyfoCQB2Jkc57TNT?usp=sharing" target="_blank">Google Drive Folder →</a></p>
+      <p><a href="https://flat7studio.com/MONSTER_Drums_v3_VST3_PC.zip" target="_blank">Alternative PC Download →</a></p>
+      <p><a href="https://flat7studio.com/MONSTER_Drums_V3_VST3_Mac.zip" target="_blank">Alternative Mac Download →</a></p>
+    </li>
+
+    <li>
+      <div class="row-head">
+        <strong>MONSTER Drums v3 Library Files</strong>
+        <span class="tag required">Required</span>
+      </div>
+      <p><a href="https://drive.google.com/drive/folders/1GnEYhEyXL7VYmq1IJ2xdkWSCI_HuEW9-?usp=sharing" target="_blank">Google Drive Folder →</a></p>
+      <p><a href="https://flat7studio.com/MONSTER_Drums_V3_Library.zip" target="_blank">Alternative Library Download →</a></p>
+    </li>
+
+    <li>
+      <div class="row-head">
+        <strong>N2N LibreArp Preset Library</strong>
+        <span class="tag required">Required</span>
+      </div>
+      <div class="small">Required support file.</div>
+      <a href="https://medmods.com/N2N_Librearp_Presets.RPL" target="_blank">Download N2N_Librearp_Presets.RPL →</a>
+    </li>
+
+    <li>
+      <div class="row-head">
+        <strong>N2N Surge XT Preset Library</strong>
+        <span class="tag required">Required</span>
+      </div>
+      <div class="small">Required support file.</div>
+      <a href="https://medmods.com/N2N_SurgeXT_Presets.RPL" target="_blank">Download N2N_SurgeXT_Presets.RPL →</a>
+    </li>
+  </ul>
+
+  <h2>2. Recommended</h2>
+  <p>These are not strictly required, but they are useful additions.</p>
+
+  <ul>
+    <li>
+      <div class="row-head">
+        <strong>STFU</strong>
+        <span class="tag recommended">Recommended</span>
+      </div>
+      <a href="https://zeeks.app/" target="_blank">Download STFU →</a>
+    </li>
+
+    <li>
+      <div class="row-head">
+        <strong>Keyzone Classic</strong>
+        <span class="tag recommended">Recommended</span>
+      </div>
+      <a href="https://plugins4free.com/plugin/2848/" target="_blank">Download Keyzone Classic →</a>
+    </li>
+  </ul>
+
+  <h2>3. ReaPack Repositories (Copyable List)</h2>
+  <p>Paste or import these into ReaPack as needed.</p>
+
+  <div class="code-box">ReaTeam Extensions
+https://github.com/ReaTeam/Extensions/raw/master/index.xml
+
+AHS Music Tech
+https://github.com/rockumk/AHS_Music_Tech/raw/master/index.xml
+
+Tukan Studios
+https://raw.githubusercontent.com/TukanStudios/TUKAN_STUDIOS_PLUGINS/main/index2.xml
+
+Saike Tools
+https://raw.githubusercontent.com/JoepVanlier/JSFX/master/index.xml
+
+Chmaha's Airwindows Ports
+https://github.com/chmaha/airwindows-JSFX-ports/raw/main/index.xml</div>
+
+  <div class="note-box">
+    <strong>Possible extras:</strong><br>
+    StevieKeys JSFX and Justin Johnson / ReJJ are not currently listed as required here because you were not sure about them.
+    If you decide later that either is needed, they can be added back easily.
+  </div>
+
+  <div class="footer">
+    &copy; 2026 Numbers2Notes
+  </div>
+</div>
+
 </body>
 </html>
