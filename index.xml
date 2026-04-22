@@ -2149,12 +2149,15 @@ Numbers2Notes - View Details, Installation Guide & Requirements
 }\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab numbers2notes_spectrum - Creates a MIDI item containing the chord tones in all octaves.\sa180\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 EFFECTS\par}
+{\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab N2N Drum Arranger - Drum sequencer tied into N2N song layout, groove, and swing.\par}
+{\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab N2N Arp - Advanced arpeggiator with full knowledge of your song's chord mapping, cued to the N2N song layout, groove, and swing.\par}
 {\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab MidiOnOff - Simple Effect to turn MIDI on and OFF via MIDI\par}
 {\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab ReaCenterMIDIpitch - Recenters MIDI pitches around a user definable center pitch.\par}
 {\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab ReaPulse - A specialized version of RCJach's MIDI Note Beat Repeater effect.\par}
 {\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab Swing Track MIDI - Applies swing to even eights from 0 to 100% on individual MIDI tracks.\par}
 {\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab Swing Project MIDI - Applies swing to even eights from 0 to 100% across all tracks with the SwingTrackMIDI effect.\par}
-{\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab Wait-A-Moment - Sets a short delay compensation for MIDI arpeggiators.\sa180\par}
+{\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab Wait-A-Moment - Sets a short delay compensation for MIDI arpeggiators.\par}
+{\pard \ql \f0 \sa180 \li360 \fi-360 \bullet \tx360\tab Many more...\sa180\par}
 }
 ]]></description>
   </metadata>
