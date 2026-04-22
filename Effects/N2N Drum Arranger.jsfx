@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.7.8
+version: 7.7.9
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.7.8 -
+  # N2N Drum Arranger v7.7.9 -
   ADDED CUE SETTING
   ADDED PATTERN MUTE
   ADDED FALLBACK PATTERN SYSTEM
@@ -135,7 +135,7 @@ slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
 slider11:14<10,30,1>-Grid Row Height
 
 @init
-version_display = "v7.7.8";
+version_display = "v7.7.9";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -730,7 +730,7 @@ function eff_half(t) (
 );
 
 function parse_kit_line(line_slot_in, name_slot_out, note_out, chan_out, color_idx_out)
-local(line_len, i, k, note_val, chan_val, name_start_idx, name_end_idx, c_idx, found_channel, col_sep_idx, col_start, name_len, max_name_len)
+local(line_len, i, k, note_val, chan_val, name_start_idx, name_end_idx, col_sep_idx, col_start, name_len, max_name_len, first_char)
 (
     max_name_len = 20; 
     mem[note_out] = -1; 
@@ -738,26 +738,32 @@ local(line_len, i, k, note_val, chan_val, name_start_idx, name_end_idx, c_idx, f
     mem[color_idx_out] = -1; 
     strcpy(name_slot_out, ""); 
     line_len = strlen(line_slot_in);
-    c_idx = 0; found_channel = 0;
-    while (c_idx < line_len - 1 && !found_channel) (
-        (str_getchar(line_slot_in, c_idx) == '/' && str_getchar(line_slot_in, c_idx+1) == '/') ? (
-            k = c_idx + 2;
+
+    // Find the first meaningful character (skip spaces, tabs, and invisible formatting like UTF-8 BOMs)
+    i = 0;
+    while (i < line_len && (str_getchar(line_slot_in, i) <= 32 || str_getchar(line_slot_in, i) > 126)) ( i += 1; );
+    
+    (i < line_len) ? (
+        first_char = str_getchar(line_slot_in, i);
+
+        // CASE 1: Channel Directive (Starts with // and then a number)
+        (first_char == '/' && str_getchar(line_slot_in, i+1) == '/') ? (
+            k = i + 2;
             while (k < line_len && str_getchar(line_slot_in, k) <= 32) (k += 1;);
+            
+            // If it's followed by a number, parse the channel. Otherwise, ignore the line completely.
             (k < line_len && str_getchar(line_slot_in, k) >= '0' && str_getchar(line_slot_in, k) <= '9') ? (
                 chan_val = 0;
                 while (k < line_len && str_getchar(line_slot_in, k) >= '0' && str_getchar(line_slot_in, k) <= '9') (
                     chan_val = chan_val * 10 + (str_getchar(line_slot_in, k) - '0');
                     k += 1;
                 );
-                (chan_val >= 1 && chan_val <= 16) ? ( mem[chan_out] = chan_val; found_channel = 1; );
+                (chan_val >= 1 && chan_val <= 16) ? ( mem[chan_out] = chan_val; );
             );
-        );
-        c_idx += 1;
-    );
-    !found_channel ? (
-        i = 0;
-        while (i < line_len && (str_getchar(line_slot_in, i) < '0' || str_getchar(line_slot_in, i) > '9')) ( i += 1; );
-        (i < line_len) ? (
+        )
+        
+        // CASE 2: Drum Note (MUST start with a digit!)
+        : (first_char >= '0' && first_char <= '9') ? (
             note_val = 0;
             while (i < line_len && str_getchar(line_slot_in, i) >= '0' && str_getchar(line_slot_in, i) <= '9') (
                 note_val = note_val * 10 + (str_getchar(line_slot_in, i) - '0');
@@ -765,33 +771,42 @@ local(line_len, i, k, note_val, chan_val, name_start_idx, name_end_idx, c_idx, f
             );
             (note_val >= 0 && note_val <= 127) ? (
                 mem[note_out] = note_val;
+                
+                // Skip separators (spaces, colons, hyphens)
                 while (i < line_len && (str_getchar(line_slot_in, i) <= 32 || str_getchar(line_slot_in, i) == ':' || str_getchar(line_slot_in, i) == '-')) ( i += 1; );
                 name_start_idx = i;
                 name_end_idx = line_len - 1;
                 col_sep_idx = -1;
                 k = name_start_idx;
+                
+                // Look for color code // at the end of the line
                 while (k < line_len - 1) (
                     (str_getchar(line_slot_in, k) == '/' && str_getchar(line_slot_in, k+1) == '/') ? (
                         col_sep_idx = k; k = line_len; 
                     );
                     k += 1;
                 );
+                
                 col_sep_idx != -1 ? (
                     name_end_idx = col_sep_idx - 1; 
                     col_start = col_sep_idx + 2;
                     strcpy_substr(#color_tmp, line_slot_in, col_start, line_len - col_start);
                     mem[color_idx_out] = resolve_color_idx(#color_tmp);
                 );
+                
+                // Trim trailing spaces
                 while (name_end_idx >= name_start_idx && str_getchar(line_slot_in, name_end_idx) <= 32) ( name_end_idx -= 1; );
+                
                 name_end_idx >= name_start_idx ? (
                     name_len = name_end_idx - name_start_idx + 1;
                     name_len > max_name_len ? name_len = max_name_len;
                     strcpy_substr(name_slot_out, line_slot_in, name_start_idx, name_len);
                 );
-                1; 
             );
         );
-    ) : ( 1 );
+        // Any other starting character (Letters, #, @, etc.) automatically falls through and is safely ignored.
+    );
+    1; // Always return 1 to keep the file reading loop going
 );
 
 function load_kit_from_slider()
