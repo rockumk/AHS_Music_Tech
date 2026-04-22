@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.8.5
+-- @version  1.8.6
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.8.5
+--   # Numbers2Notes 1.8.6
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -382,7 +382,7 @@ function Check_Plugins_On_Startup()
         -- Added your bundled VSTis (Fallback strings will catch VST3 vs CLAP differences)
         {name = "CLAP: Surge XT", fallback = "VST3i: Surge XT", ext = "", source = 8},
         {name = "Monster Drums", fallback = "VSTi: MONSTER Drums v3", ext = "", source = 21},
-        {name = "Monster Drums", fallback = "VSTi: MONSTER Drums v3", ext = "", source = 21}
+        {name = "Monster Drums", fallback = "VSTi: MONSTER Drums v3", ext = "", source = 22}
     }
 
     local track_idx = reaper.CountTracks(0)
@@ -2179,7 +2179,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.8.5")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.8.6")
             reaper.ImGui_Dummy(ctx, 0, 5) -- Add a tiny bit of vertical spacing
             Link("https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
