@@ -31,6 +31,8 @@ config.pluginsources = {
     [18] = "Sixth Sample Deelay: https://sixthsample.com/deelay/",
     [19] = "OMG Instruments BlueARP: https://omg-instruments.com/wp/?page_id=46",
 	[20] = "Librearp: https://librearp.gitlab.io/download/",
+	[21] = "https://drive.google.com/drive/folders/1z-N4sRaZBm2rlbc7fyfoCQB2Jkc57TNT?usp=sharing",
+	[22] = "https://drive.google.com/drive/folders/1GnEYhEyXL7VYmq1IJ2xdkWSCI_HuEW9-?usp=sharing",
 	[99] = "Unknown Source."
 }
 
