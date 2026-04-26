@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.9.0
+-- @version  1.9.1
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.9.0
+--   # Numbers2Notes 1.9.1
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -2179,7 +2179,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.9.0")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.9.1")
             reaper.ImGui_Dummy(ctx, 0, 5) -- Add a tiny bit of vertical spacing
             Link("https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
@@ -5926,8 +5926,8 @@ function process_pushes()
     
     
 for i = last_element, 1, -1 do
-        -- SAFETY NET: Skip if the chord entry is blank or corrupted
-        if not chord_table[i] or type(chord_table[i][4]) ~= "string" then 
+        -- SAFETY NET: Skip if the chord entry is blank, corrupted, or a Meta Command (=)
+        if not chord_table[i] or type(chord_table[i][4]) ~= "string" or string.sub(chord_table[i][4], 1, 1) == "=" then
             goto skip_push 
         end
 
