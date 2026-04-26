@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.8.9
+-- @version  1.9.0
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.8.9
+--   # Numbers2Notes 1.9.0
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -2179,7 +2179,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.8.9")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.9.0")
             reaper.ImGui_Dummy(ctx, 0, 5) -- Add a tiny bit of vertical spacing
             Link("https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
@@ -4325,10 +4325,15 @@ function process_data_chunks(
                 pdc_current_chord = pdc_current_chord .. " " --  CONVERT TO SPACE
             elseif pdc_chord_in_progress == true then --  IF IT ISN'T A SPLIT SECTION, BUT OCCURS AFTER THE PROGRESS OF WORKING WITH A SINGLE CHORD
                 pdc_chord_splitsection_count = pdc_chord_splitsection_count + 1 --  THEN THERE A NEW CHORD HAS BEEN PROCESSED ADD IT TO THE COUNT
-                pdc_split = pdc_split + pdc_multiple --  CALCULATE HOW MANY PORTIONS THE TIME HAS BEEN SPLIT INTO BY ADDING THE NEW CHORD'S PORTION
-                table.insert(pdc_chord_table, pdc_chord_splitsection_count, {0, pdc_multiple, 1, pdc_current_chord})
-                --  INSERT THE NEW CHORD INTO THE TABLE OF CHORDS
-                --  {0 = NOT A SPLIT, MULTIPLE = 1 BECAUSE IT IS NOT SPLIT, 1 IS A PLACE HOLDER, THE CHORD)
+                if string.sub(pdc_current_chord, 1, 1) == "=" then
+                    -- Inline Meta Command: Do not increment pdc_split!
+                    table.insert(pdc_chord_table, pdc_chord_splitsection_count, {0, 0, 0, pdc_current_chord})    
+                else
+                    pdc_split = pdc_split + pdc_multiple --  CALCULATE HOW MANY PORTIONS THE TIME HAS BEEN SPLIT INTO BY ADDING THE NEW CHORD'S PORTION
+                    table.insert(pdc_chord_table, pdc_chord_splitsection_count, {0, pdc_multiple, 1, pdc_current_chord})
+                    --  INSERT THE NEW CHORD INTO THE TABLE OF CHORDS
+                    --  {0 = NOT A SPLIT, MULTIPLE = 1 BECAUSE IT IS NOT SPLIT, 1 IS A PLACE HOLDER, THE CHORD)
+                end
                 pdc_current_chord = "" --  CLEAR THE CURRENT CHORD VARIABLE SO IT'S READY FOR THE NEXT CHORD
                 pdc_chord_in_progress = false --  STARTING FRESH IN THE SEARCH FOR THE NEXT CHORD = THERE IS NO CURRENT CHORD STARTED
                 pdc_multiple = 1 --  THE MULTIPLE IS RESET TO 1 WHICH IS THE DEFAULT
