@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.9.1
+-- @version  1.9.2
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.9.1
+--   # Numbers2Notes 1.9.2
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -2179,7 +2179,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.9.1")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.9.2")
             reaper.ImGui_Dummy(ctx, 0, 5) -- Add a tiny bit of vertical spacing
             Link("https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
@@ -4527,7 +4527,12 @@ function place_TEXT_data(dynamic_table)
         else
             ptd_measure_start_point = ptd_updating_start_ppqpos / G_ticks_per_measure
         end
-
+        -- SKIP DRAWING TEXT FOR INLINE COMMANDS
+        local ptd_chord_entry_to_text = value[4]
+        if string.sub(ptd_chord_entry_to_text, 1, 1) == "=" then
+            ptd_updating_start_ppqpos = ptd_note_end_ppqpos
+            goto skip_text_gen
+        end
         if i == 1 then
             ptd_first_run_start_point = ptd_measure_start_point
         end
@@ -4617,6 +4622,8 @@ function place_TEXT_data(dynamic_table)
         ptd_text_item_count = ptd_text_item_count + 1
         ptd_updating_start_ppqpos = ptd_note_end_ppqpos
         ptd_last_end_point = ptd_measure_end_point
+        
+        ::skip_text_gen::
     end
 --[[
     if ptd_last_end_point <= ptd_first_run_start_point then
@@ -5926,11 +5933,10 @@ function process_pushes()
     
     
 for i = last_element, 1, -1 do
-        -- SAFETY NET: Skip if the chord entry is blank, corrupted, or a Meta Command (=)
+        -- SAFETY NET: Skip if the chord entry is blank or corrupted
         if not chord_table[i] or type(chord_table[i][4]) ~= "string" or string.sub(chord_table[i][4], 1, 1) == "=" then
             goto skip_push 
         end
-
         chord_table[i][3] = chord_table[i][3] - push_grab
         if string.sub(chord_table[i][4], 1, 2) == "<." then
             --reaper.ShowConsoleMsg("Dottend 8th Push - " .. chord_table[i][4] .. "\n")
