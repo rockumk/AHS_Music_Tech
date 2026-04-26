@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.8.8
+-- @version  1.8.9
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.8.8
+--   # Numbers2Notes 1.8.9
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -2179,7 +2179,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.8.8")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.8.9")
             reaper.ImGui_Dummy(ctx, 0, 5) -- Add a tiny bit of vertical spacing
             Link("https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
@@ -4228,7 +4228,10 @@ function orgainize_input_into_bars(oiib_error_log) -- PLACE ALL THE USER INPUT I
                     oiib_measurecount = oiib_measurecount + 1
                     oiib_measure_ticks = oiib_measuremultiple * G_time_signature_top * G_ticks_per_measure
                     measuremultiplelist[oiib_measurecount] = oiib_measure_ticks
-                    if splitbar == false then
+                    if string.sub(measure, 1, 1) == "=" then
+                        -- Inline Meta Command (=90, =Bb): Takes 0 ticks!
+                        table.insert(chord_table, oiib_measurecount, {0, 0, 0, measure})
+                    elseif splitbar == false then
                         table.insert(
                             chord_table,
                             oiib_measurecount,
