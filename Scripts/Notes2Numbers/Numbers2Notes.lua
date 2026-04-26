@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.9.2
+-- @version  1.9.3
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.9.2
+--   # Numbers2Notes 1.9.3
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -2179,7 +2179,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.9.2")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.9.3")
             reaper.ImGui_Dummy(ctx, 0, 5) -- Add a tiny bit of vertical spacing
             Link("https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
@@ -4704,15 +4704,16 @@ function place_MIDI_data(
 
     -- Safely grab the track if it exists
     local tr_nns = G_RENDER_TARGETS[1] and G_RENDER_TARGETS[1][1]
-
+    local current_text_item_idx = 0 -- NEW: Independent counter for text items
     for i, value in pairs(chord_table) do
         local pmd_root, rel_root, bass_note, rel_bass = "", 0, 0, 0
         local chord_type = ""
 
         -- Safely get the item to color ONLY if the track exists
         local pmd_item_to_color = nil
-        if tr_nns then
-            pmd_item_to_color = reaper.GetTrackMediaItem(tr_nns, i - 1)
+        if tr_nns and string.sub(value[4], 1, 1) ~= "=" then
+            pmd_item_to_color = reaper.GetTrackMediaItem(tr_nns, current_text_item_idx)
+            current_text_item_idx = current_text_item_idx + 1
         end
 
         -- ============================================================
@@ -4760,8 +4761,29 @@ function place_MIDI_data(
                     reaper.MIDI_InsertCC(grid_item_first_take, false, false, ins_pos, 176, 0, 119, sw_val)
                 end
             end
+        elseif string.sub(value[4], 1, 1) == "=" then
+            -- NEW INLINE META COMMANDS (=90 or =Bb)
+            local cmd = string.sub(value[4], 2)
+            local new_bpm = tonumber(cmd)
+            
+            if new_bpm and new_bpm > 0 and grid_item_first_take then
+                -- Drop a mid-song tempo marker!
+                local t_pos = reaper.MIDI_GetProjTimeFromPPQPos(grid_item_first_take, pmd_running_ppqpos_total)
+                reaper.SetTempoTimeSigMarker(0, -1, t_pos, -1, -1, new_bpm, 0, 0, false)
+                reaper.UpdateTimeline()
+            elseif musictheory.key_table[cmd] then
+                -- Process a mid-song Key Change!
+                current_key = cmd
+                keyshift = musictheory.key_table[current_key]
+                if grid_item_first_take then
+                    local t_pos = reaper.MIDI_GetProjTimeFromPPQPos(grid_item_first_take, pmd_running_ppqpos_total)
+                    reaper.AddProjectMarker(0, false, t_pos, 0, "Key: " .. current_key, -1)
+                end
+            end
+           pmd_note_end_ppqpos = pmd_running_ppqpos_total
+           pmd_running_ppqpos_total = pmd_note_end_ppqpos         
+            
         end
-
         -- ============================================================
         -- PARSING & ERROR LOGIC
         -- ============================================================
@@ -4832,8 +4854,8 @@ function place_MIDI_data(
             local color_root = nil
             for search_idx = i + 1, #chord_table do
                 local future_val = chord_table[search_idx] and chord_table[search_idx][4]
-                -- Stop searching as soon as we hit a non-marker item
-                if future_val and not future_val:match("^{") then
+                -- Stop searching as soon as we hit a non-marker AND non-command item!
+                if future_val and not future_val:match("^{") and not future_val:match("^=") then
                     if future_val == "-" then
                         color_root = "REST"
                     else
