@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.9.3
+-- @version  1.9.4
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.9.3
+--   # Numbers2Notes 1.9.4
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -22,6 +22,7 @@
 --   + Added "Classics" row of and better glowing.
 --   + Reduced instructions font size.
 --   + Fixed tempo stamping at cursor.
+--   + Added dynamic tempo changes using =90 type expressions the sections.
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require "imgui" "0.8.6" -- Version of IMGUI used during development.
@@ -2179,7 +2180,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.9.3")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.9.4")
             reaper.ImGui_Dummy(ctx, 0, 5) -- Add a tiny bit of vertical spacing
             Link("https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
@@ -6739,8 +6740,8 @@ function Export_OM()
     ckey_endso, _ = string.find(header_area, "Swing:")
     _, cbpm_startso = string.find(header_area, "BPM: ")
     cbpm_endso, _ = string.find(header_area, "Key:")
-    cbpmfound = string.sub(header_area, cbpm_startso + 1, cbpm_endso - 2)
-    ckeyfound = string.sub(header_area, ckey_startso + 1, ckey_endso - 2)
+    cbpmfound = string.sub(header_area, cbpm_startso + 1, cbpm_endso - 2):gsub("[%s\r\n]", "")
+    ckeyfound = string.sub(header_area, ckey_startso + 1, ckey_endso - 2):gsub("[%s\r\n]", "")
     theresultofprocessOMbars = Process_OM_bars()
     --if cancel_OM_opperation == true then
     --  onemotionoutput = the_OM_fail
@@ -6765,7 +6766,11 @@ function Process_OM_bars()
     measurechord_count = 0
     OM_rebuild = ""
     local safe_header = Normalize_Form_Line(header_area)
-    unfolded_OM_data, error_zone = form.process_the_form(header_area, chord_charting_area)
+    unfolded_OM_data, error_zone = form.process_the_form(safe_header, chord_charting_area)
+    
+    -- SWALLOW INLINE COMMANDS before OM sees them!
+    unfolded_OM_data = unfolded_OM_data:gsub("=[%w#%%]+%s*", "")
+    
     unfolded_OM_data = inital_swaps(unfolded_OM_data)
 
     --make chord list protected by swaping chord for &chord&
@@ -7324,8 +7329,8 @@ function export_ccc()
     cbpm_endso, _ = string.find(header_area, "Key:")
     ctitlefound = string.sub(header_area, ctitle_startso + 1, ctitle_endso - 2)
     cwriterfound = string.sub(header_area, cwriter_startso + 1, cwriter_endso - 2)
-    cbpmfound = string.sub(header_area, cbpm_startso + 1, cbpm_endso - 2)
-    ckeyfound = string.sub(header_area, ckey_startso + 1, ckey_endso - 2)
+    cbpmfound = string.sub(header_area, cbpm_startso + 1, cbpm_endso - 2):gsub("[%s\r\n]", "")
+    ckeyfound = string.sub(header_area, ckey_startso + 1, ckey_endso - 2):gsub("[%s\r\n]", "")
 
     -- https://www.chordsheet.com/song/populate-new?title=Your%20Title&artist=Your%20Artist&chords=A%20B%20C%20D%20%0AA%20B%20C%20D&key=Bbm&bpm=96
 
@@ -7379,10 +7384,13 @@ function process_ccc_bars()
     thefail = ""
     chord_charting_area = inital_swaps(chord_charting_area)
     local safe_header = Normalize_Form_Line(header_area)
-    unfolded_ccc_data, error_zone = form.process_the_form(header_area, chord_charting_area)
-    -- FORM     DEAL WITH UNFOLDING THE FORM
-    unfolded_ccc_data = string.gsub(unfolded_ccc_data, "{", "=")
-
+    
+    
+    unfolded_ccc_data, error_zone = form.process_the_form(safe_header, chord_charting_area)
+        -- SWALLOW INLINE COMMANDS (=80, =Bb, =75%) before CCC sees them!
+        unfolded_ccc_data = unfolded_ccc_data:gsub("=[%w#%%]+%s*", "")
+        -- FORM     DEAL WITH UNFOLDING THE FORM
+        unfolded_ccc_data = string.gsub(unfolded_ccc_data, "{", "=")
     unfolded_ccc_data = string.gsub(unfolded_ccc_data, "$}", "|")
     unfolded_ccc_data = string.gsub(unfolded_ccc_data, "%$", "")
     --unfolded_ccc_data = string.gsub(unfolded_ccc_data, "%%", "!Repeat!")
@@ -8066,7 +8074,11 @@ function process_biab_bars()
     thefail = ""
     chord_charting_area = inital_swaps(chord_charting_area)
     local safe_header = Normalize_Form_Line(header_area)
-    unfolded_biab_data, error_zone = form.process_the_form(header_area, chord_charting_area)
+    unfolded_biab_data, error_zone = form.process_the_form(safe_header, chord_charting_area)
+    
+    -- SWALLOW INLINE COMMANDS before BIAB sees them!
+    unfolded_biab_data = unfolded_biab_data:gsub("=[%w#%%]+%s*", "")
+    
     -- FORM     DEAL WITH UNFOLDING THE FORM
     unfolded_biab_data = string.gsub(unfolded_biab_data, "{$Intro$}", "Â")
     unfolded_biab_data = string.gsub(unfolded_biab_data, "{$Verse$}", "Â")
