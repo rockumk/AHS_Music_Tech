@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version  1.8.7
+-- @version  1.8.8
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 1.8.7
+--   # Numbers2Notes 1.8.8
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -2179,7 +2179,7 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 9 then
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.8.7")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 1.8.8")
             reaper.ImGui_Dummy(ctx, 0, 5) -- Add a tiny bit of vertical spacing
             Link("https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
         end
@@ -4204,12 +4204,6 @@ function orgainize_input_into_bars(oiib_error_log) -- PLACE ALL THE USER INPUT I
              
              if section_close_end then
                  section_name = string.sub(progression, i, section_close_end)
-                 
-                 
-                 
-                 
-                 
-                 
                  oiib_measurecount = oiib_measurecount + 1
                  oiib_measure_ticks = 0
                  measuremultiplelist[oiib_measurecount] = oiib_measure_ticks
@@ -4231,28 +4225,22 @@ function orgainize_input_into_bars(oiib_error_log) -- PLACE ALL THE USER INPUT I
             if oiib_inmeasure == false then -- WHEN NOT WORKING WITH A SPLIT MEASURE
                 if oiib_last_char_is_space == false then -- WHEN NOT AFTER A SPACE
                     oiib_last_char_is_space = true
-                    
-                    
-                    oiib_measurecount = oiib_measurecount + 1             
+                    oiib_measurecount = oiib_measurecount + 1
                     oiib_measure_ticks = oiib_measuremultiple * G_time_signature_top * G_ticks_per_measure
                     measuremultiplelist[oiib_measurecount] = oiib_measure_ticks
-
-                    
-
-                    
-                    if string.sub(measure, 1, 1) == "=" then                   -- ADDED FOR TEMPOCHANGE
-                        -- Inline Meta Command (=90, =Bb): Takes 0 ticks!      
-                        table.insert(chord_table, oiib_measurecount, {0, 0, 0, measure})
-                    elseif splitbar == false then
-                        table.insert(chord_table, oiib_measurecount, {0, oiib_measuremultiple, oiib_measure_ticks, measure})
+                    if splitbar == false then
+                        table.insert(
+                            chord_table,
+                            oiib_measurecount,
+                            {0, oiib_measuremultiple, oiib_measure_ticks, measure}
+                        )
                     else
-                        table.insert(chord_table, oiib_measurecount, {1, oiib_measuremultiple, oiib_measure_ticks, measure})
+                        table.insert(
+                            chord_table,
+                            oiib_measurecount,
+                            {1, oiib_measuremultiple, oiib_measure_ticks, measure}
+                        )
                     end
-                  
-                    
-                    
-                    
-                    
                     splitbar = false
                     measure = ""
                     oiib_measuremultiple = 1
