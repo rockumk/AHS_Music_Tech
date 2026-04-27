@@ -1,5 +1,5 @@
 -- @description numbers2notes_config
--- @version 1.7.3
+-- @version 1.7.4
 -- @noindex
 -- @author Rock Kennedy
 -- @about
@@ -7,7 +7,7 @@
 --   Contains Plugin Source URLs and the Master Track Layout.
 -- @changelog
 --   + Links Updated
-
+--   + No longer bass heavy by default
 local config = {}
 
 -- 1. PLUGIN SOURCES (Instructions/Links)
@@ -27,7 +27,8 @@ config.pluginsources = {
     [13] = "Drum8: https://audiolatry.gumroad.com/l/drum8",
     [14] = "Drum8: https://audiolatry.gumroad.com/l/drumtastic",
     [15] = "MT Power Drumkit2: https://www.powerdrumkit.com/download76187.php",
-    [16] = "Vital: https://vital.audio/#getvital",[17] = "Chmaha's Airwindows Ports: https://github.com/chmaha/airwindows-JSFX-ports/raw/main/index.xml",
+    [16] = "Vital: https://vital.audio/#getvital",
+	[17] = "Chmaha's Airwindows Ports: https://github.com/chmaha/airwindows-JSFX-ports/raw/main/index.xml",
     [18] = "Sixth Sample Deelay: https://sixthsample.com/deelay/",
     [19] = "OMG Instruments BlueARP: https://omg-instruments.com/wp/?page_id=46",
 	[20] = "Librearp: https://librearp.gitlab.io/download/",
@@ -353,7 +354,7 @@ config.track_table = {
             {"ThisTriggersThat", false, nil, 3},
 			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACEPRESET", 0}
-        }, {}, 0, {160, 198, 207}, 0.4},
+        }, {}, 0, {160, 198, 207}, 1.0},
         [3] = {"N2N DrumA. Chord ##", true, true, 0, {
             {"JS: N2N Drum Arranger", true, nil, 3},
             {"REPLACEFX", true, "REPLACE PRESET", 0}
