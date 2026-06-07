@@ -1,5 +1,5 @@
 -- @description numbers2notes_form
--- @version 1.0.7
+-- @version 1.0.8
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -170,17 +170,21 @@ local form = {
             return G_original_user_entry, errormessage
         end
 
-        for i, v in ipairs(G_form_table) do
-            if G_section_table[v] ~= nil then
-                if G_section_replacement_table[v] ~= nil then
-                    local replace_name = G_section_replacement_table[v]
-                    updated_text_to_process = updated_text_to_process .. "{$" .. replace_name .. "$}\n"
-                    updated_text_to_process = updated_text_to_process .. G_section_table[v]
-                else
-                    -- For C2, V2, Flute Duet, etc.
-                    updated_text_to_process = updated_text_to_process .. "{$" .. v .. "$}\n"
-                    updated_text_to_process = updated_text_to_process .. G_section_table[v]
+	for i, v in ipairs(G_form_table) do
+            local section_content = G_section_table[v]
+            
+            -- FALLBACK LOGIC: If e.g. "C2" isn't found, look for "C"
+            if not section_content then
+                local base = v:match("^(%a+)%s*%d*$")
+                if base and G_section_table[base] then
+                    section_content = G_section_table[base]
                 end
+            end
+            
+            if section_content then
+                local replace_name = G_section_replacement_table[v] or v
+                updated_text_to_process = updated_text_to_process .. "{$" .. replace_name .. "$}\n"
+                updated_text_to_process = updated_text_to_process .. section_content
             else
                 errormessage = errormessage .. "Section {" .. v .. "} was found in the Form but missing in the Chart!\n"
             end
