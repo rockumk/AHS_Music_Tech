@@ -1,8 +1,8 @@
 -- @description Numbers2Notes
--- @version 2.0.1
+-- @version 2.0.2
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 2.0.1
+--   # Numbers2Notes 2.0.2
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -23,6 +23,7 @@
 --   + Reduced instructions font size.
 --   + Fixed tempo stamping at cursor.
 --   + Added dynamic tempo changes using =90 type expressions the sections.
+--   + Added Section Transport with warnings for undefined sections.
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require "imgui" "0.8.6" -- Version of IMGUI used during development.
@@ -2435,7 +2436,7 @@ Form: I V C V C B C O]]
             local white_color = reaper.ImGui_ColorConvertDouble4ToU32(1, 1, 1, 1)
             reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Text(), white_color)
 
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 2.0.1")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 2.0.2")
 
             reaper.ImGui_PopStyleColor(ctx)
 
