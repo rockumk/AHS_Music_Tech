@@ -1,8 +1,9 @@
+
 -- @description Numbers2Notes
--- @version  2.0.0
+-- @version  2.0.1
 -- @author Rock Kennedy
 -- @about
---   # Numbers2Notes 2.0.0
+--   # Numbers2Notes 2.0.1
 --   Nashville Number System Style Chord Charting for Reaper.
 --   Now includes automated setup wizard and non-destructive track handling.
 -- @provides
@@ -2435,7 +2436,7 @@ Form: I V C V C B C O]]
             local white_color = reaper.ImGui_ColorConvertDouble4ToU32(1, 1, 1, 1)
             reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Text(), white_color)
 
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 2.0.0")
+            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 2.0.1")
 
             reaper.ImGui_PopStyleColor(ctx)
 
@@ -3684,11 +3685,20 @@ Form: I V C V C B C O]]
 
         -- ROW 2: SCROLLING SECTIONS (Spans remaining window width)
         -- 4. SCROLLING SECTION BUTTONS
-if reaper.ImGui_BeginChild(ctx, "TransportSections", child_w, 42, false, reaper.ImGui_WindowFlags_HorizontalScrollbar()) then
+                if reaper.ImGui_BeginChild(ctx, "TransportSections", child_w, 42, false, reaper.ImGui_WindowFlags_HorizontalScrollbar()) then
                 -- Pass the active chord charting text so it can detect missing ones!
+
                 local chord_content = chord_charting_area
                 if charting_tab_mode == 7 then chord_content = chord_charting_area_letters end
-                local sections = Get_Transport_Sections(header_area, chord_content)
+            
+                -- SMART CACHING: Only re-parse the text if the user actually typed something!
+                if header_area ~= cached_header_area or chord_content ~= cached_chord_content then
+                    cached_header_area = header_area
+                    cached_chord_content = chord_content
+                    cached_transport_sections = Get_Transport_Sections(header_area, chord_content)
+                end
+            
+                local sections = cached_transport_sections
                 
                 for i, sec in ipairs(sections) do
                     if i > 1 then reaper.ImGui_SameLine(ctx) end
@@ -7133,6 +7143,11 @@ local audition_mute_time = nil
 local audition_mute_delay_ms = 2000 -- TWEAK THIS: How long the reverb tail rings out (in milliseconds)
 
 N2N_Playing_Notes = {}
+
+-- TRANSPORT CACHING VARIABLES
+local cached_header_area = nil
+local cached_chord_content = nil
+local cached_transport_sections = {}
 
 function Kill_All_Audition_Notes()
     for _, pitch in ipairs(N2N_Playing_Notes) do
