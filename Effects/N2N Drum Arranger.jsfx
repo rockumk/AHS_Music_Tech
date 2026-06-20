@@ -1,5 +1,5 @@
 desc: N2N Drum Arranger
-version: 7.7.9
+version: 7.7.10
 author: Rock Kennedy
 about:
   # N2N Drum Arranger v7.7.9 -
@@ -135,7 +135,7 @@ slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
 slider11:14<10,30,1>-Grid Row Height
 
 @init
-version_display = "v7.7.9";
+version_display = "v7.7.10";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -779,7 +779,7 @@ local(line_len, i, k, note_val, chan_val, name_start_idx, name_end_idx, col_sep_
                 col_sep_idx = -1;
                 k = name_start_idx;
                 
-                // Look for color code // at the end of the line
+                // Look for legacy inline color code // at the end of the line
                 while (k < line_len - 1) (
                     (str_getchar(line_slot_in, k) == '/' && str_getchar(line_slot_in, k+1) == '/') ? (
                         col_sep_idx = k; k = line_len; 
@@ -790,8 +790,8 @@ local(line_len, i, k, note_val, chan_val, name_start_idx, name_end_idx, col_sep_
                 col_sep_idx != -1 ? (
                     name_end_idx = col_sep_idx - 1; 
                     col_start = col_sep_idx + 2;
-                    strcpy_substr(#color_tmp, line_slot_in, col_start, line_len - col_start);
-                    mem[color_idx_out] = resolve_color_idx(#color_tmp);
+                    strcpy_substr(STR_BUF_COLOR, line_slot_in, col_start, line_len - col_start);
+                    mem[color_idx_out] = resolve_color_idx(STR_BUF_COLOR);
                 );
                 
                 // Trim trailing spaces
@@ -809,12 +809,60 @@ local(line_len, i, k, note_val, chan_val, name_start_idx, name_end_idx, col_sep_
     1; // Always return 1 to keep the file reading loop going
 );
 
+function parse_color_meta_line(line_slot_in, note_out, color_idx_out)
+local(line_len, i, note_val, has_digit, color_start, color_val)
+(
+    mem[note_out] = -1;
+    mem[color_idx_out] = -1;
+    line_len = strlen(line_slot_in);
+
+    // COLOR_BEGIN block payload lines are whole-line comments:
+    // 30,Yellow
+    // 31,Dark Orange
+    i = 0;
+    while (i < line_len && (str_getchar(line_slot_in, i) <= 32 || str_getchar(line_slot_in, i) > 126)) ( i += 1; );
+
+    (i < line_len - 1 && str_getchar(line_slot_in, i) == '/' && str_getchar(line_slot_in, i+1) == '/') ? (
+        i += 2;
+        while (i < line_len && str_getchar(line_slot_in, i) <= 32) ( i += 1; );
+
+        note_val = 0;
+        has_digit = 0;
+        while (i < line_len && str_getchar(line_slot_in, i) >= '0' && str_getchar(line_slot_in, i) <= '9') (
+            has_digit = 1;
+            note_val = note_val * 10 + (str_getchar(line_slot_in, i) - '0');
+            i += 1;
+        );
+
+        while (i < line_len && str_getchar(line_slot_in, i) <= 32) ( i += 1; );
+
+        (has_digit && note_val >= 0 && note_val <= 127 && i < line_len && str_getchar(line_slot_in, i) == ',') ? (
+            i += 1;
+            while (i < line_len && str_getchar(line_slot_in, i) <= 32) ( i += 1; );
+            color_start = i;
+
+            (color_start < line_len) ? (
+                strcpy_substr(STR_BUF_COLOR, line_slot_in, color_start, line_len - color_start);
+                color_val = resolve_color_idx(STR_BUF_COLOR);
+                color_val != -1 ? (
+                    mem[note_out] = note_val;
+                    mem[color_idx_out] = color_val;
+                );
+            );
+        );
+    );
+    1;
+);
+
 function load_kit_from_slider()
 local(handle, note_out, chan_out, color_idx_out, current_chan, cur_row_idx, parsed, i, SLOT_LINE, SLOT_NAME,
-      sel_r, context_chan, context_color)
+      sel_r, context_chan, context_color, in_color_block, in_lp_block, note_to_row_base, note_color_base,
+      line_note, line_color, row_idx, final_color)
 (
     note_out = 50000; chan_out = 50001; color_idx_out = 50002; 
     SLOT_LINE = STR_BUF_LINE; SLOT_NAME = STR_BUF_NAME;
+    note_to_row_base = kit_tmp_base + 384;
+    note_color_base  = kit_tmp_base + 512;
     sel_r = mem[ui_selected_row];
     sel_r < 0 ? sel_r = 0; sel_r >= MAX_ROWS ? sel_r = MAX_ROWS - 1;
     context_chan = mem[row_chan_base + sel_r];
@@ -828,22 +876,59 @@ local(handle, note_out, chan_out, color_idx_out, current_chan, cur_row_idx, pars
             strcpy(row_name_str_base + i, ""); 
             i+=1;
         );
+        i = 0; loop(128,
+            mem[note_to_row_base+i] = -1;
+            mem[note_color_base+i] = -1;
+            i+=1;
+        );
         current_chan = context_chan; 
         cur_row_idx = 0;
+        in_color_block = 0;
+        in_lp_block = 0;
         while (file_string(handle, SLOT_LINE) > 0) (
-            parsed = parse_kit_line(SLOT_LINE, SLOT_NAME, note_out, chan_out, color_idx_out);
-            (parsed == 1) ? (
-                (mem[note_out] != -1) ? ( 
-                    (cur_row_idx < MAX_ROWS) ? (
-                        mem[row_note_base+cur_row_idx]  = mem[note_out];
-                        mem[row_chan_base+cur_row_idx]  = current_chan; 
-                        strlen(SLOT_NAME) > 0 ? ( strcpy(row_name_str_base + cur_row_idx, SLOT_NAME); ) 
-                        : ( sprintf(row_name_str_base + cur_row_idx, "Drum %d", mem[note_out]); );
-                        mem[row_name_idx+cur_row_idx] = 41; 
-                        mem[row_color_base+cur_row_idx] = (mem[color_idx_out] != -1) ? mem[color_idx_out] : context_color;
-                        cur_row_idx += 1;
+            matchi("*// COLOR_BEGIN*", SLOT_LINE) ? (
+                in_color_block = 1;
+            ) : matchi("*// COLOR_END*", SLOT_LINE) ? (
+                in_color_block = 0;
+            ) : in_color_block ? (
+                parse_color_meta_line(SLOT_LINE, note_out, color_idx_out);
+                (mem[note_out] != -1 && mem[color_idx_out] != -1) ? (
+                    line_note = mem[note_out];
+                    line_color = mem[color_idx_out];
+                    mem[note_color_base + line_note] = line_color;
+                    row_idx = mem[note_to_row_base + line_note];
+                    (row_idx >= 0 && row_idx < MAX_ROWS) ? (
+                        mem[row_color_base + row_idx] = line_color;
                     );
-                ) : ( (mem[chan_out] != -1) ? ( current_chan = mem[chan_out]; ); );
+                );
+            ) : (matchi("*// LP_DEVICE_START*", SLOT_LINE) || matchi("*// LP_LAYOUT_BEGIN*", SLOT_LINE)) ? (
+                in_lp_block = 1;
+            ) : (matchi("*// LP_DEVICE_END*", SLOT_LINE) || matchi("*// LP_LAYOUT_END*", SLOT_LINE)) ? (
+                in_lp_block = 0;
+            ) : in_lp_block ? (
+                0;
+            ) : (
+                parsed = parse_kit_line(SLOT_LINE, SLOT_NAME, note_out, chan_out, color_idx_out);
+                (parsed == 1) ? (
+                    (mem[note_out] != -1) ? ( 
+                        (cur_row_idx < MAX_ROWS) ? (
+                            line_note = mem[note_out];
+                            mem[row_note_base+cur_row_idx]  = line_note;
+                            mem[row_chan_base+cur_row_idx]  = current_chan; 
+                            strlen(SLOT_NAME) > 0 ? ( strcpy(row_name_str_base + cur_row_idx, SLOT_NAME); ) 
+                            : ( sprintf(row_name_str_base + cur_row_idx, "Drum %d", line_note); );
+                            mem[row_name_idx+cur_row_idx] = 41;
+
+                            (mem[color_idx_out] != -1) ? (
+                                mem[note_color_base + line_note] = mem[color_idx_out];
+                            );
+                            final_color = mem[note_color_base + line_note];
+                            mem[row_color_base+cur_row_idx] = (final_color != -1) ? final_color : context_color;
+                            mem[note_to_row_base + line_note] = cur_row_idx;
+                            cur_row_idx += 1;
+                        );
+                    ) : ( (mem[chan_out] != -1) ? ( current_chan = mem[chan_out]; ); );
+                );
             );
             strcpy(SLOT_LINE, ""); 
         );
@@ -853,13 +938,14 @@ local(handle, note_out, chan_out, color_idx_out, current_chan, cur_row_idx, pars
 
 function add_kit_from_slider()
 local(handle, note_out, chan_out, color_idx_out, current_chan, 
-      tmp_kit_note, tmp_kit_chan, tmp_kit_color, kit_buf_idx, 
+      tmp_kit_note, tmp_kit_chan, tmp_kit_color, tmp_note_to_idx, tmp_note_color, kit_buf_idx, 
       parsed, j, insert_idx, incoming_note, incoming_chan, incoming_color, i, SLOT_LINE, SLOT_NAME, TEMP_STR_OFFSET,
-      sel_r, context_chan, context_color)
+      sel_r, context_chan, context_color, in_color_block, in_lp_block, line_note, line_color, tmp_idx, final_color)
 (
     note_out = 50000; chan_out = 50001; color_idx_out = 50002; 
     SLOT_LINE = STR_BUF_LINE; SLOT_NAME = STR_BUF_NAME;
-    tmp_kit_note = kit_tmp_base; tmp_kit_chan = kit_tmp_base + 128; tmp_kit_color = kit_tmp_base + 256; 
+    tmp_kit_note = kit_tmp_base; tmp_kit_chan = kit_tmp_base + 128; tmp_kit_color = kit_tmp_base + 256;
+    tmp_note_to_idx = kit_tmp_base + 384; tmp_note_color = kit_tmp_base + 512;
     TEMP_STR_OFFSET = 800; // FIXED: Was 3000 (out of bounds)
     sel_r = mem[ui_selected_row];
     sel_r < 0 ? sel_r = 0; sel_r >= MAX_ROWS ? sel_r = MAX_ROWS - 1;
@@ -871,23 +957,61 @@ local(handle, note_out, chan_out, color_idx_out, current_chan,
     handle > 0 ? (
         kit_buf_idx = 0;
         i = 0; loop(MAX_ROWS, mem[tmp_kit_note+i]=-1; i+=1;); 
-        current_chan = context_chan; 
+        i = 0; loop(128,
+            mem[tmp_note_to_idx+i] = -1;
+            mem[tmp_note_color+i] = -1;
+            i+=1;
+        );
+        current_chan = context_chan;
+        in_color_block = 0;
+        in_lp_block = 0;
         while (file_string(handle, SLOT_LINE) > 0) (
-            parsed = parse_kit_line(SLOT_LINE, SLOT_NAME, note_out, chan_out, color_idx_out);
-            (parsed == 1) ? (
-                (mem[note_out] != -1) ? (
-                    (kit_buf_idx < MAX_ROWS) ? (
-                        mem[tmp_kit_note + kit_buf_idx] = mem[note_out];
-                        mem[tmp_kit_chan + kit_buf_idx] = current_chan;
-                        mem[tmp_kit_color + kit_buf_idx] = mem[color_idx_out];
-                        strlen(SLOT_NAME) > 20 ? (
-                            strcpy_substr(TEMP_STR_OFFSET + kit_buf_idx, SLOT_NAME, 0, 20);
-                        ) : (
-                            strcpy(TEMP_STR_OFFSET + kit_buf_idx, SLOT_NAME);
-                        );
-                        kit_buf_idx += 1;
+            matchi("*// COLOR_BEGIN*", SLOT_LINE) ? (
+                in_color_block = 1;
+            ) : matchi("*// COLOR_END*", SLOT_LINE) ? (
+                in_color_block = 0;
+            ) : in_color_block ? (
+                parse_color_meta_line(SLOT_LINE, note_out, color_idx_out);
+                (mem[note_out] != -1 && mem[color_idx_out] != -1) ? (
+                    line_note = mem[note_out];
+                    line_color = mem[color_idx_out];
+                    mem[tmp_note_color + line_note] = line_color;
+                    tmp_idx = mem[tmp_note_to_idx + line_note];
+                    (tmp_idx >= 0 && tmp_idx < MAX_ROWS) ? (
+                        mem[tmp_kit_color + tmp_idx] = line_color;
                     );
-                ) : ( (mem[chan_out] != -1) ? ( current_chan = mem[chan_out]; ); );
+                );
+            ) : (matchi("*// LP_DEVICE_START*", SLOT_LINE) || matchi("*// LP_LAYOUT_BEGIN*", SLOT_LINE)) ? (
+                in_lp_block = 1;
+            ) : (matchi("*// LP_DEVICE_END*", SLOT_LINE) || matchi("*// LP_LAYOUT_END*", SLOT_LINE)) ? (
+                in_lp_block = 0;
+            ) : in_lp_block ? (
+                0;
+            ) : (
+                parsed = parse_kit_line(SLOT_LINE, SLOT_NAME, note_out, chan_out, color_idx_out);
+                (parsed == 1) ? (
+                    (mem[note_out] != -1) ? (
+                        (kit_buf_idx < MAX_ROWS) ? (
+                            line_note = mem[note_out];
+                            mem[tmp_kit_note + kit_buf_idx] = line_note;
+                            mem[tmp_kit_chan + kit_buf_idx] = current_chan;
+
+                            (mem[color_idx_out] != -1) ? (
+                                mem[tmp_note_color + line_note] = mem[color_idx_out];
+                            );
+                            final_color = mem[tmp_note_color + line_note];
+                            mem[tmp_kit_color + kit_buf_idx] = final_color;
+                            mem[tmp_note_to_idx + line_note] = kit_buf_idx;
+
+                            strlen(SLOT_NAME) > 20 ? (
+                                strcpy_substr(TEMP_STR_OFFSET + kit_buf_idx, SLOT_NAME, 0, 20);
+                            ) : (
+                                strcpy(TEMP_STR_OFFSET + kit_buf_idx, SLOT_NAME);
+                            );
+                            kit_buf_idx += 1;
+                        );
+                    ) : ( (mem[chan_out] != -1) ? ( current_chan = mem[chan_out]; ); );
+                );
             );
             strcpy(SLOT_LINE, ""); 
         );
