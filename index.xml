@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="eec966bfc086d64b6a02e9bcb1c1941ed3ab49ba">
+<index version="1" name="AHS_Music_Tech" commit="57ededc47342e2e7c7f16f1d1f5ecfefb5d4615f">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -2299,6 +2299,29 @@ Auto Reload of Last Numbers2Notes Session]]></changelog>
       </metadata>
       <version name="1.0" author="rockumk (Rock Kennedy)" time="2024-09-23T02:55:29Z">
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/c452b8833abe2360b543d9ae7d6d1c54ec5e1362/Scripts/Notes2Numbers/ChordCharts/Last_Numbers2Notes_Chart.txt</source>
+      </version>
+    </reapack>
+  </category>
+  <category name="Themes">
+    <reapack name="ClassroomTheme.theme" type="theme" desc="Reapertips Theme (Classroom Modified)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Based on the Reapertips Theme created by Alejandro Hernandez, which is itself based on the default REAPER 6 theme.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 This version includes minor modifications for classroom use, primarily to accommodate custom REAPER controls and workflows.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 All credit for the original theme and its design belongs to Alejandro Hernandez.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 This is an unofficial classroom modification and is not an official Reapertips release.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Please visit the original author's website and consider supporting his work.\par}
+}
+]]></description>
+        <link rel="website" href="https://www.reapertips.com/products/reapertips-theme">Original Reapertips Theme</link>
+        <link rel="website" href="https://www.reapertips.com">Reapertips Website</link>
+        <link rel="donation">https://www.reapertips.com/support</link>
+      </metadata>
+      <version name="1.1" author="Alejandro Hernandez (Reapertips)" time="2026-10-19T15:18:05Z">
+        <source file="ClassroomTheme.ReaperThemeZip">https://github.com/rockumk/AHS_Music_Tech/raw/57ededc47342e2e7c7f16f1d1f5ecfefb5d4615f/Themes/ClassroomTheme.ReaperThemeZip</source>
       </version>
     </reapack>
   </category>
