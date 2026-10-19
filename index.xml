@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="db3d88de0f76b207688f695dcfb19677548aeb60">
+<index version="1" name="AHS_Music_Tech" commit="3ce9f6a825a539f74eb72397a4611dbddc813773">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -1671,6 +1671,20 @@
       </version>
       <version name="7.0" author="Rock Kennedy + ChatGPT" time="2026-10-19T18:15:01Z">
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/db3d88de0f76b207688f695dcfb19677548aeb60/Scripts/Launchpad_Xtra.lua</source>
+      </version>
+    </reapack>
+    <reapack name="LaunchpadSystemLib.lua" type="script" desc="LaunchpadSystemLib">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Contains some of the Launchpad Xtra's Underlying Structure\par}
+}
+]]></description>
+      </metadata>
+      <version name="7.0" author="Rock Kennedy" time="2026-10-19T21:34:47Z">
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/3ce9f6a825a539f74eb72397a4611dbddc813773/Scripts/LaunchpadSystemLib.lua</source>
       </version>
     </reapack>
     <reapack name="mactest.lua" type="script" desc="mactest">
