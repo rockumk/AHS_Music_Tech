@@ -1,6 +1,6 @@
 -- @description Launchpad Xtra - Direct MIDI Controller
 -- @author Rock Kennedy + ChatGPT
--- @version 6.7 Narrows editor label field and tunes Custom upload table columns
+-- @version 6.8 Narrows editor label field and tunes Custom upload table columns
 -- @about
 --   Standalone Launchpad rebuild prototype.
 --
