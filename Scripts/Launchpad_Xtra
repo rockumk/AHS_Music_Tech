@@ -1,6 +1,6 @@
 -- @description Launchpad Xtra - Direct MIDI Controller
 -- @author Rock Kennedy + ChatGPT
--- @version 6.68 Narrows editor label field and tunes Custom upload table columns
+-- @version 6.7 Narrows editor label field and tunes Custom upload table columns
 -- @about
 --   Standalone Launchpad rebuild prototype.
 --
@@ -3752,12 +3752,39 @@ local function send_custom_fader_feedback(fader_number, value)
   value = math.max(0, math.min(127, math.floor((tonumber(value) or 0) + 0.5)))
 
   local sent
+  
+  
+  
+  
   if surface_mode == "DAW_VOLUME_FADERS" then
+    local feedback_status = 0xB0 | DAW.FADER_CHANNEL
+    
+    -- Marker ZZZZZZ
+    -- DAW fader position feedback:
+    -- Launchpad X uses B4 (MIDI channel 5), as documented.
+    -- Launchpad Mini Mk3 also officially specifies B4 for position and
+    -- B5 for color. However, on Rock's RTP-MIDI setup (Windows REAPER PC
+    -- via Apple MIDI Networking on a Mac Mini), B4 changed fader colors
+    -- instead of positions. B5 was experimentally confirmed to work.
+    --
+    -- This may be specific to the MIDI routing or channel translation.
+    -- If testing on another system, try B4 first for the Mini.
+    local feedback_status = 0xB0 | DAW.FADER_CHANNEL
+
+    if selected_device and selected_device.key == "M" then
+      feedback_status = 0xB5  -- Mini workaround; normally expected to be B4
+    end
+
     sent = DAW.send_bytes({
-      0xB0 | DAW.FADER_CHANNEL,
+      feedback_status,
       cc_number,
       value,
     })
+    
+    
+    
+    
+    
   else
     sent = send_bytes({
       0xB0 | VOLUME_MIDI_CHANNEL,
@@ -3841,6 +3868,16 @@ end
 
 process_active_custom_fader_feedback = function(now)
   if not volume_fader_surface_is_active() then return end
+
+  -- Let the Mini finish entering DAW Fader mode before sending
+  -- its first position feedback.
+  if selected_device.key == "M"
+      and pending_full_custom_fader_feedback_time
+      and now < pending_full_custom_fader_feedback_time then
+    return
+  end
+
+
 
   if pending_full_custom_fader_feedback_time and now >= pending_full_custom_fader_feedback_time then
     pending_full_custom_fader_feedback_time = nil
@@ -8251,10 +8288,23 @@ DAW.enter_volume_faders = function(bank)
   surface_mode = "DAW_VOLUME_FADERS"
   initialized = true
   apply_custom_fader_mcp_layout_tabs(DAW.active_bank, start_track, true)
+  
+  
+  
   reset_custom_fader_feedback_state()
 
-  sync_active_custom_fader_feedback(true)
+  if selected_device.key == "M" then
+    schedule_full_active_custom_fader_feedback(1.0)
+  else
+    sync_active_custom_fader_feedback(true)
+  end
+
   DAW.send_bank_indicators(DAW.active_bank)
+  
+  
+  
+  
+  
   DAW.send_top_row_indicators()
   if not DAW.send_layout(0x0D) then return false end
   DAW.send_bank_indicators(DAW.active_bank)
