@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="57ededc47342e2e7c7f16f1d1f5ecfefb5d4615f">
+<index version="1" name="AHS_Music_Tech" commit="26df9b4b392f3c3f9fcc6f60c24e8ec64cee48f6">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -1647,6 +1647,27 @@
 + Perfected macOS dynamic Bottom-Left to Top-Left coordinate normalizer.
 + Prompt Menu and Hidden Dot spawn safely inside plugin bounds to prevent clipping.]]></changelog>
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/0fae3c80a37f4b4fdb345e276e61a7c99e20f226/Scripts/FX_Graffiti_Mac.lua</source>
+      </version>
+    </reapack>
+    <reapack name="Launchpad_Xtra.lua" type="script" desc="Launchpad Xtra - Direct MIDI Controller">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Standalone Launchpad rebuild prototype.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 This test does NOT use ReaLearn. Presets 21-23 use ValueVault in Monitoring FX. It loads LaunchpadSystemLib.lua from the same folder, switches a selected Launchpad X or Launchpad Mini Mk3 into Programmer Mode, sends the existing 9x9 home-page lighting configuration directly to the hardware, draws a resizable labeled helper grid, changes pages directly from incoming MIDI, and runs the first set of clear REAPER actions directly. In volume Custom Modes, MCP-visible track volumes and the eight Novation faders synchronize in both directions without immediately echoing the same movement back.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Experimental addition: the Library also remembers a second DAW MIDI In/Out pair and can configure the Launchpad firmware DAW Fader layout through the DAW port. This is intentionally a parallel test path; the working Custom Mode volume patch remains available unchanged.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Programmer Mode page buttons: Page 1: B0 27 xx (CC 39) Page 2: B0 1D xx (CC 29) Page 3: B0 13 xx (CC 19)\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 A small "x" on an on-screen cell means that the cell is intentionally not wired yet. Numbered selection slots and project-specific navigation remain placeholders until their intended behavior is defined.\par}
+}
+]]></description>
+      </metadata>
+      <version name="6.8 Narrows editor label field and tunes Custom upload table columns" author="Rock Kennedy + ChatGPT" time="2026-10-19T15:33:04Z">
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/9c8fca6efd70c14b069ed73d7fb493a224ab6595/Scripts/Launchpad_Xtra.lua</source>
+      </version>
+      <version name="6.9 Narrows editor label field and tunes Custom upload table columns" author="Rock Kennedy + ChatGPT" time="2026-10-19T15:33:41Z">
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/26df9b4b392f3c3f9fcc6f60c24e8ec64cee48f6/Scripts/Launchpad_Xtra.lua</source>
       </version>
     </reapack>
     <reapack name="mactest.lua" type="script" desc="mactest">
