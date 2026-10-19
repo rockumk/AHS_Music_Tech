@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="26df9b4b392f3c3f9fcc6f60c24e8ec64cee48f6">
+<index version="1" name="AHS_Music_Tech" commit="db3d88de0f76b207688f695dcfb19677548aeb60">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -1668,6 +1668,9 @@
       </version>
       <version name="6.9 Narrows editor label field and tunes Custom upload table columns" author="Rock Kennedy + ChatGPT" time="2026-10-19T15:33:41Z">
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/26df9b4b392f3c3f9fcc6f60c24e8ec64cee48f6/Scripts/Launchpad_Xtra.lua</source>
+      </version>
+      <version name="7.0" author="Rock Kennedy + ChatGPT" time="2026-10-19T18:15:01Z">
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/db3d88de0f76b207688f695dcfb19677548aeb60/Scripts/Launchpad_Xtra.lua</source>
       </version>
     </reapack>
     <reapack name="mactest.lua" type="script" desc="mactest">
