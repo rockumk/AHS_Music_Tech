@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="4535c9c18911ff241e059bb27afe8e332519c9dd">
+<index version="1" name="AHS_Music_Tech" commit="f65e172fb0a72ffc071953fa3de99ae64eb36db4">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -1772,6 +1772,20 @@
       </version>
       <version name="4.0.0" author="Rock Kennedy" time="2026-04-16T02:23:50Z">
         <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/4bd8317b9efe690aee7540de458b321ed9c45117/Scripts/N2NCue.lua</source>
+      </version>
+    </reapack>
+    <reapack name="RestartRecording.lua" type="script" desc="RestartRecording">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Immediately gives another try at a failed recording attempt.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="Rock Kennedy" time="2026-10-22T02:56:00Z">
+        <source main="main">https://github.com/rockumk/AHS_Music_Tech/raw/f65e172fb0a72ffc071953fa3de99ae64eb36db4/Scripts/RestartRecording.lua</source>
       </version>
     </reapack>
     <reapack name="RSK - Full Spectrum.lua" type="script" desc="RSK_Full_Spectrum">
