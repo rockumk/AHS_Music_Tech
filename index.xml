@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="AHS_Music_Tech" commit="f65e172fb0a72ffc071953fa3de99ae64eb36db4">
+<index version="1" name="AHS_Music_Tech" commit="61a7cbab7dd0ced4d0476744383d0eb90fd7399a">
   <category name="Data/DrumArranger">
     <reapack name="[8-BIT] 01 Game Over.txt" type="midinotenames">
       <version name="1.2" author="Rock Kennedy" time="2026-03-31T03:52:35Z">
@@ -1349,6 +1349,31 @@
       <version name="1.0.0" author="Rock Kennedy" time="2023-04-05T04:29:37Z">
         <changelog><![CDATA[- Fix Version]]></changelog>
         <source>https://github.com/rockumk/AHS_Music_Tech/raw/12f48c4a15511dc3148259e11614f3131b617a35/Effects/Wait-A-Moment.jsfx</source>
+      </version>
+    </reapack>
+  </category>
+  <category name="Extensions">
+    <reapack name="ReaPackLabSetup.ext" type="extension" desc="AHS classroom migration: ReaPackLabSetup (replaces standard ReaPack; install only when instructed)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 AHS classroom migration: ReaPackLabSetup\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b For classroom deployment only, when specifically instructed by the administrator.}\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Installing this extension starts a transition from standard ReaPack to a centrally managed ReaPackLab environment. ReaPackLabSetup downloads the ReaPackLab extension; ReaPackLab then retires original ReaPack extension binaries on macOS and preserves the old registry for migration.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Only supports macOS 15.0 or newer on Apple Silicon (ARM64). The binary is Developer ID-signed, but the published v0.1.1 release has not been verified as notarized.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Restart REAPER when instructed. Do not install on a personal machine unless you have agreed to this centrally managed configuration.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Published temporarily in AHS_Music_Tech; the identical signed binary is hosted by the official ReaPackLabSetup release.\par}
+}
+]]></description>
+        <link rel="website" href="https://github.com/rockumk/ReaPackLabSetup">Official ReaPackLabSetup distribution</link>
+        <link rel="website" href="https://github.com/rockumk/ReaPackLab">Managed ReaPackLab extension</link>
+      </metadata>
+      <version name="0.1.1" author="ReaLab" time="2026-11-10T21:41:07Z">
+        <changelog><![CDATA[One-time classroom deployment of the existing signed ReaPackLabSetup v0.1.1 release.
+Source binary is unchanged; this is a temporary additional repository entry.]]></changelog>
+        <source platform="darwin-arm64" file="reaper_reapacklabsetup-arm64.dylib">https://github.com/rockumk/ReaPackLabSetup/releases/download/v0.1.1/reaper_reapacklabsetup-arm64.dylib</source>
       </version>
     </reapack>
   </category>
