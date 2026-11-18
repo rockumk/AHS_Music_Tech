@@ -2387,7 +2387,7 @@ loop(3,
             );
 
             // Thin yellow cue line: full button width, 1px higher, behind the lock.
-            (mem[ui_play_prog_tab] == gui_t) ? rect(draw_x, draw_y+18, item_w-5, 2, 1.0, 1.0, 0.2, 1);
+            (mem[ui_play_prog_tab] == gui_t) ? rect(draw_x, draw_y+18, item_w, 2, 1.0, 1.0, 0.2, 1);
             // Tab Sub-Lock UI
             gfx_set(0.0, 0.0, 0.0, 1); 
             gfx_circle(draw_x+item_w-17, ly=draw_y+8, 6, 0); 
