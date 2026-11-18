@@ -2234,7 +2234,7 @@ loop(3,
                 );
 
                 gfx_set(0.0, 0.0, 0.0, 1); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 6, 0); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 5, 0); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 4, 0); 
-                lx=draw_x+item_w-25; ly=draw_y+9; lw=17; lh=14; rect(lx,ly,lw,lh, 0.1,0.1,0.1,1); 
+                lx=draw_x+item_w-25; ly=draw_y+9; lw=17; lh=14; rect(lx,ly,lw,lh, 0,0,0,1); 
 
                 (mb && p_mb == 0 && mx>=lx-3 && mx<lx+lw+3 && my>=ly-2 && my<ly+lh+2) ? ( 
                     rec_cues_active == 0 ? (
@@ -2257,14 +2257,19 @@ loop(3,
                 mem[LOC_TAB_POPULATED + gui_t] ? (
                     // White content bracket: top and left only.
                     gfx_set(1, 1, 1, 1);
-                    gfx_rect(draw_x-1, draw_y-1, 4, 24);
-                    gfx_rect(draw_x-1, draw_y-2, 41, 4);
+                    gfx_rect(draw_x-1, draw_y-2, 4, 20);
+                    gfx_rect(draw_x-1, draw_y-2, 20, 4);
                 );
                 
                 f_amt = mem[tab_flash_base + gui_t];
                 f_amt > 0 ? ( rect(draw_x, draw_y, item_w-5, 26, 1, 1, 1, f_amt/10); mem[tab_flash_base + gui_t] -= 1; );
-                // Orange full-width underline: current MIDI-cued song position, not lock state.
-                (mem[ui_play_prog_tab] == gui_t) ? rect(draw_x, draw_y+22, item_w-5, 4, 0.96, 0.78, 0.27, 1);
+                // Drum palette yellow: full-width 4px base, with 8px uprights.
+                // White content dog-ear ends at y+18, where the yellow left upright begins.
+                (mem[ui_play_prog_tab] == gui_t) ? (
+                    rect(draw_x-1, draw_y+22, item_w-4, 4, 1.0, 1.0, 0.2, 1);
+                    rect(draw_x-1, draw_y+18, 4, 8, 1.0, 1.0, 0.2, 1);
+                    rect(draw_x+item_w-9, draw_y+18, 4, 8, 1.0, 1.0, 0.2, 1);
+                );
                 
                 draw_x += item_w; 
             );
@@ -2310,7 +2315,7 @@ loop(3,
 
         is_lock ? (lr=.2; lg=.9; lb=.2;) : (lr=COL_H_R*1.5; lg=COL_H_G*1.5; lb=COL_H_B*1.5;); 
         rect(px+2, py+20, pat_w-4, 15, lr, lg, lb, 1);
-        // Song position is shown by a full-width orange underline below.
+        // Song position is shown by a full-width yellow U-shaped underline below.
         
         gfx_setfont(1, os_font, fontsize-2, 'b'); 
         (i == 0) ? ( draw_text(px+4, py+8, "0", 1, 1, 1); ) : (
@@ -2321,7 +2326,11 @@ loop(3,
         
         f_amt = mem[tab_flash_base + i];
         f_amt > 0 ? ( rect(px, py, pat_w, ui_tab_h+3, 1, 1, 1, f_amt/10); mem[tab_flash_base + i] -= 1; );
-        is_play ? rect(px+1, py+ui_tab_h-2, pat_w, 4, 0.96, 0.78, 0.27, 1);
+        is_play ? (
+            rect(px+1, py+ui_tab_h-2, pat_w, 4, 1.0, 1.0, 0.2, 1);
+            rect(px+1, py+ui_tab_h-6, 4, 8, 1.0, 1.0, 0.2, 1);
+            rect(px+pat_w-3, py+ui_tab_h-6, 4, 8, 1.0, 1.0, 0.2, 1);
+        );
 
         (mb && p_mb==0 && mx>=px && mx<px+pat_w && capture_id == 0) ? (
                     (my >= py && my < py + ui_tab_h) ? (
