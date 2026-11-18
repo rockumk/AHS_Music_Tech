@@ -1,8 +1,9 @@
+
 desc: N2N Drum Arranger
 version: 7.7.10
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.7.9 -
+  # N2N Drum Arranger v7.7.10 -
   ADDED CUE SETTING
   ADDED PATTERN MUTE
   ADDED FALLBACK PATTERN SYSTEM
@@ -2264,6 +2265,15 @@ item_w = 30; btn(draw_x, draw_y, item_w, "   >") ? ( gfx_set(1,0,0,1); export_n2
 // =========================================================
 draw_y = ROW2_Y; // Advance Y to Tab Area
 
+// VISUAL ONLY: show the currently playing cue's resolved pattern source.
+arrow_req = mem[ui_play_prog_tab];
+arrow_eff = effective_play_tab;
+arrow_show = ((play_state & 1) && mem[ui_locked_tab] == -1 &&
+              arrow_req >= 0 && arrow_req < TOTAL_TABS &&
+              arrow_eff >= 0 && arrow_eff < TOTAL_TABS &&
+              arrow_req != arrow_eff && arrow_eff > 0);
+arrow_req_x = -1; arrow_eff_x = -1;
+
 current_tab_row = 1;
 loop(3,
     // ------------------------------------------
@@ -2305,6 +2315,9 @@ loop(3,
         gfx_circle(FOLLOW_BOX_X+25, draw_y-12, 6, 0); 
         gfx_circle(FOLLOW_BOX_X+25, draw_y-12, 5.5, 0); 
         gfx_circle(FOLLOW_BOX_X+25, draw_y-13, 5, 0); 
+        // Display only: erase the right side of the shackle while FOLLOW is enabled.
+        // Keep the lock body and its existing controls unchanged.
+        is_follow ? rect(FOLLOW_BOX_X+25, draw_y-15, 10, 11, 0, 0, 0, 1);
         rect(FOLLOW_BOX_X+15, draw_y-10, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.5, 0.5, 0.5, 1);
         gfx_setfont(1, os_font, 21, 'b');
         is_follow ? draw_text(FOLLOW_BOX_X+21, draw_y-14, "X", 0,1,0);
@@ -2331,6 +2344,15 @@ loop(3,
         
         (my_row == current_tab_row) ? (
             item_w = mem[tab_w_base + gui_t]; // Using item_w dynamically from tab width
+            // Capture the actual drawn tab rectangles; no changes to layout or clicks.
+            arrow_show && gui_t == arrow_req ? (
+                arrow_req_x = draw_x; arrow_req_y = draw_y;
+                arrow_req_w = item_w - 5; arrow_req_h = 26;
+            );
+            arrow_show && gui_t == arrow_eff ? (
+                arrow_eff_x = draw_x; arrow_eff_y = draw_y;
+                arrow_eff_w = item_w - 5; arrow_eff_h = 26;
+            );
             is_ed = (gui_t == mem[ui_edit_tab]);
             t_r = mem[tab_col_r + gui_t]; t_g = mem[tab_col_g + gui_t]; t_b = mem[tab_col_b + gui_t];
             
@@ -2398,6 +2420,103 @@ loop(3,
     
     draw_y += 30; // Move down for the next row of tabs
     current_tab_row += 1;
+);
+
+// VISUAL ONLY: overlay one green arrow from the active MIDI-cued tab
+// to the effective playback pattern. Do not recalculate the fallback.
+arrow_show && arrow_req_x >= 0 && arrow_eff_x >= 0 ? (
+    arrow_req_cx = arrow_req_x + arrow_req_w * 0.5;
+    arrow_req_cy = arrow_req_y + arrow_req_h * 0.5;
+    arrow_eff_cx = arrow_eff_x + arrow_eff_w * 0.5;
+    arrow_eff_cy = arrow_eff_y + arrow_eff_h * 0.5;
+
+    abs(arrow_req_cy - arrow_eff_cy) < 1 ? (
+        // Same row: connect the nearest vertical edges at their centers.
+        arrow_y1 = arrow_req_cy; arrow_y2 = arrow_eff_cy;
+        arrow_req_cx < arrow_eff_cx ? (
+            arrow_x1 = arrow_req_x + arrow_req_w;
+            arrow_x2 = arrow_eff_x;
+        ) : (
+            arrow_x1 = arrow_req_x;
+            arrow_x2 = arrow_eff_x + arrow_eff_w;
+        );
+    ) : abs(arrow_req_cx - arrow_eff_cx) < 12 ? (
+        // Same column: connect horizontal edges at their centers.
+        arrow_x1 = arrow_req_cx; arrow_x2 = arrow_eff_cx;
+        arrow_req_cy < arrow_eff_cy ? (
+            arrow_y1 = arrow_req_y + arrow_req_h;
+            arrow_y2 = arrow_eff_y;
+        ) : (
+            arrow_y1 = arrow_req_y;
+            arrow_y2 = arrow_eff_y + arrow_eff_h;
+        );
+    ) : (
+        // Diagonal: compare all 16 corner pairs and choose the closest.
+        arrow_best_d2 = 1000000000; // Large initial squared-distance value
+        arrow_i = 0;
+        loop(4,
+            arrow_ax = arrow_req_x + ((arrow_i & 1) ? arrow_req_w : 0);
+            arrow_ay = arrow_req_y + ((arrow_i & 2) ? arrow_req_h : 0);
+            arrow_j = 0;
+            loop(4,
+                arrow_bx = arrow_eff_x + ((arrow_j & 1) ? arrow_eff_w : 0);
+                arrow_by = arrow_eff_y + ((arrow_j & 2) ? arrow_eff_h : 0);
+                arrow_dx = arrow_bx - arrow_ax;
+                arrow_dy = arrow_by - arrow_ay;
+                arrow_d2 = arrow_dx*arrow_dx + arrow_dy*arrow_dy;
+                arrow_d2 < arrow_best_d2 ? (
+                    arrow_best_d2 = arrow_d2;
+                    arrow_x1 = arrow_ax; arrow_y1 = arrow_ay;
+                    arrow_x2 = arrow_bx; arrow_y2 = arrow_by;
+                );
+                arrow_j += 1;
+            );
+            arrow_i += 1;
+        );
+    );
+
+    arrow_dx = arrow_x2 - arrow_x1;
+    arrow_dy = arrow_y2 - arrow_y1;
+    arrow_len = sqrt(arrow_dx*arrow_dx + arrow_dy*arrow_dy);
+    // Adjacent tabs leave only a 4-5px gap, compressing the arrowhead.
+    // For short connections, overlap each tab slightly to keep the head legible.
+    // Drawing coordinates only; source selection remains untouched.
+    arrow_len > 1 && arrow_len < 24 ? (
+        arrow_extend = (24 - arrow_len) * 0.5 + 4;
+        arrow_x1 -= (arrow_dx / arrow_len) * arrow_extend;
+        arrow_y1 -= (arrow_dy / arrow_len) * arrow_extend;
+        arrow_x2 += (arrow_dx / arrow_len) * arrow_extend;
+        arrow_y2 += (arrow_dy / arrow_len) * arrow_extend;
+        arrow_dx = arrow_x2 - arrow_x1;
+        arrow_dy = arrow_y2 - arrow_y1;
+        arrow_len = sqrt(arrow_dx*arrow_dx + arrow_dy*arrow_dy);
+    );
+    arrow_len > 1 ? (
+        arrow_ux = arrow_dx / arrow_len;
+        arrow_uy = arrow_dy / arrow_len;
+        arrow_nx = -arrow_uy;
+        arrow_ny = arrow_ux;
+        arrow_head = min(11, arrow_len * 0.35);
+        arrow_half = 1.5; // Three-pixel shaft.
+        arrow_base_x = arrow_x2 - arrow_ux * arrow_head;
+        arrow_base_y = arrow_y2 - arrow_uy * arrow_head;
+        gfx_set(0, 1, 0, 1);
+        gfx_triangle(
+            arrow_x1 + arrow_nx*arrow_half, arrow_y1 + arrow_ny*arrow_half,
+            arrow_x1 - arrow_nx*arrow_half, arrow_y1 - arrow_ny*arrow_half,
+            arrow_base_x - arrow_nx*arrow_half, arrow_base_y - arrow_ny*arrow_half
+        );
+        gfx_triangle(
+            arrow_x1 + arrow_nx*arrow_half, arrow_y1 + arrow_ny*arrow_half,
+            arrow_base_x - arrow_nx*arrow_half, arrow_base_y - arrow_ny*arrow_half,
+            arrow_base_x + arrow_nx*arrow_half, arrow_base_y + arrow_ny*arrow_half
+        );
+        gfx_triangle(
+            arrow_x2, arrow_y2,
+            arrow_base_x + arrow_nx*5, arrow_base_y + arrow_ny*5,
+            arrow_base_x - arrow_nx*5, arrow_base_y - arrow_ny*5
+        );
+    );
 );
 
 // =========================================================
