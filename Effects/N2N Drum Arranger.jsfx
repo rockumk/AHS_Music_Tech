@@ -1,9 +1,8 @@
-
 desc: N2N Drum Arranger
-version: 7.7.11
+version: 7.7.12
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.7.11 -
+  # N2N Drum Arranger v7.7.12 -
   ADDED CUE SETTING
   ADDED PATTERN MUTE
   ADDED FALLBACK PATTERN SYSTEM
@@ -136,7 +135,7 @@ slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
 slider11:14<10,30,1>-Grid Row Height
 
 @init
-version_display = "v7.7.11";
+version_display = "v7.7.12";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
