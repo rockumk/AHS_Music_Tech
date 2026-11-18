@@ -2171,10 +2171,13 @@ loop(3,
         // Visual only: open the right side of the shackle when FOLLOW is enabled.
         is_follow ? rect(FOLLOW_BOX_X+25, draw_y-15, 10, 11, 0, 0, 0, 1);
         rect(FOLLOW_BOX_X+15, draw_y-10, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.5, 0.5, 0.5, 1);
-        gfx_setfont(1, os_font, 21, 'b');
-        is_follow ? draw_text(FOLLOW_BOX_X+21, draw_y-14, "X", 0,1,0);
-        // FOLLOW open: keep the body grey like the shackle, not cyan.
-        // The existing black mask above opens the hoop visually.
+        // FOLLOW enabled: restore the original soft green/cyan fill.
+        // Black triangle replaces the X and is drawn after the fill.
+        is_follow ? (
+            rect(FOLLOW_BOX_X+15, draw_y-10, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.18, 0.9, 0.9, 1);
+            gfx_set(0, 0, 0, 1);
+            gfx_triangle(FOLLOW_BOX_X+22, draw_y-7, FOLLOW_BOX_X+22, draw_y+3, FOLLOW_BOX_X+30, draw_y-2);
+        );
         gfx_setfont(1, os_font, fontsize, 'b'); 
         
         (mb && p_mb == 0 && !rec_hit && mx>=FOLLOW_BOX_X && mx<FOLLOW_BOX_X+FOLLOW_BOX_W+31 && my>=draw_y-33 && my<draw_y+FOLLOW_BOX_H+5) ? (
@@ -2230,8 +2233,8 @@ loop(3,
                     );
                 );
 
-                gfx_set(0.5, 0.5, 0.5, 1); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 6, 0); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 5, 0); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 4, 0); 
-                lx=draw_x+item_w-25; ly=draw_y+9; lw=17; lh=14; rect(lx,ly,lw,lh, 0.5,0.5,0.5,1); 
+                gfx_set(0.0, 0.0, 0.0, 1); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 6, 0); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 5, 0); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 4, 0); 
+                lx=draw_x+item_w-25; ly=draw_y+9; lw=17; lh=14; rect(lx,ly,lw,lh, 0.1,0.1,0.1,1); 
 
                 (mb && p_mb == 0 && mx>=lx-3 && mx<lx+lw+3 && my>=ly-2 && my<ly+lh+2) ? ( 
                     rec_cues_active == 0 ? (
@@ -2261,7 +2264,7 @@ loop(3,
                 f_amt = mem[tab_flash_base + gui_t];
                 f_amt > 0 ? ( rect(draw_x, draw_y, item_w-5, 26, 1, 1, 1, f_amt/10); mem[tab_flash_base + gui_t] -= 1; );
                 // Orange full-width underline: current MIDI-cued song position, not lock state.
-                (mem[ui_play_prog_tab] == gui_t) ? rect(draw_x, draw_y+22, item_w-5, 4, 1, 0.55, 0.08, 1);
+                (mem[ui_play_prog_tab] == gui_t) ? rect(draw_x, draw_y+22, item_w-5, 4, 0.96, 0.78, 0.27, 1);
                 
                 draw_x += item_w; 
             );
@@ -2318,7 +2321,7 @@ loop(3,
         
         f_amt = mem[tab_flash_base + i];
         f_amt > 0 ? ( rect(px, py, pat_w, ui_tab_h+3, 1, 1, 1, f_amt/10); mem[tab_flash_base + i] -= 1; );
-        is_play ? rect(px+1, py+ui_tab_h-2, pat_w, 4, 1, 0.55, 0.08, 1);
+        is_play ? rect(px+1, py+ui_tab_h-2, pat_w, 4, 0.96, 0.78, 0.27, 1);
 
         (mb && p_mb==0 && mx>=px && mx<px+pat_w && capture_id == 0) ? (
                     (my >= py && my < py + ui_tab_h) ? (
