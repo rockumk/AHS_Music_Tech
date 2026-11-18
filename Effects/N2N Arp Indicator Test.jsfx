@@ -2230,8 +2230,8 @@ loop(3,
                     );
                 );
 
-                gfx_set(0.0, 0.0, 0.0, 1); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 6, 0); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 5, 0); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 4, 0); 
-                lx=draw_x+item_w-25; ly=draw_y+9; lw=17; lh=14; rect(lx,ly,lw,lh, 0.1,0.1,0.1,1); 
+                gfx_set(0.5, 0.5, 0.5, 1); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 6, 0); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 5, 0); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 4, 0); 
+                lx=draw_x+item_w-25; ly=draw_y+9; lw=17; lh=14; rect(lx,ly,lw,lh, 0.5,0.5,0.5,1); 
 
                 (mb && p_mb == 0 && mx>=lx-3 && mx<lx+lw+3 && my>=ly-2 && my<ly+lh+2) ? ( 
                     rec_cues_active == 0 ? (
