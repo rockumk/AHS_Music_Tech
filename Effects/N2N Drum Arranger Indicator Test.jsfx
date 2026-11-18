@@ -2388,7 +2388,7 @@ loop(3,
 
             // Current MIDI-cued section: yellow lower half (13px of the 26px button).
             // Draw before the black lock and the white populated-section dog-ear.
-            (mem[ui_play_prog_tab] == gui_t) ? rect(draw_x, draw_y+13, item_w-4, 13, 1.0, 1.0, 0.2, 1);
+            (mem[ui_play_prog_tab] == gui_t) ? rect(draw_x-1, draw_y+18, item_w-4, 7, 1.0, 1.0, 0.2, 1);
             // Tab Sub-Lock UI
             gfx_set(0.0, 0.0, 0.0, 1); 
             gfx_circle(draw_x+item_w-17, ly=draw_y+8, 6, 0); 
@@ -2419,8 +2419,8 @@ loop(3,
             mem[LOC_TAB_POPULATED + gui_t] ? (
                 // White content bracket: top and left only.
                 gfx_set(1, 1, 1, 1);
-                gfx_rect(draw_x-1, draw_y-2, 4, 28);
-                gfx_rect(draw_x-1, draw_y-2, 28, 4);
+                gfx_rect(draw_x-1, draw_y-2, 4, 20);
+                gfx_rect(draw_x-1, draw_y-2, 14, 4);
             );
             
             f_amt = mem[tab_flash_base + gui_t];
