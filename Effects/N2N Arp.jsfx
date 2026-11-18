@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.2.7
+version: 12.2.8
 author: Rock Kennedy
 about:
-  # N2N Arp v12.2.7
+  # N2N Arp v12.2.8
   - FEATURE: Velocity Scaling
 provides:
   [main] .
@@ -26,7 +26,7 @@ slider14:0<0,2,1{Chords,Split (Chords and Bass),Bass}>-Input Mode
 
 @init
 scale_dirty = 0;
-thisversion = "v12.2.7";
+thisversion = "v12.2.8";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -2122,6 +2122,16 @@ row2_y = UI_TOP_Y + 24;
 draw_y = ROW2_Y; // Advance Y to Tab Area
 FOLLOW_LBL_X=UI_TOP_X; FOLLOW_BOX_X=UI_TOP_X + 60; FOLLOW_BOX_W=20; FOLLOW_BOX_H=16;
 
+// VISUAL ONLY: current cue -> actually playing fallback (both Sections and Slots).
+// The audio engine has already resolved t_pl; do not run fallback lookup here.
+arrow_req = mem[ui_play_prog_tab];
+arrow_eff = t_pl;
+arrow_show = ((play_state & 1) && mem[ui_locked_tab] == -1 &&
+              arrow_req >= 0 && arrow_req < TOTAL_TABS &&
+              arrow_eff > 0 && arrow_eff < TOTAL_TABS &&
+              arrow_req != arrow_eff);
+arrow_req_x = -1; arrow_eff_x = -1;
+
 current_tab_row = 1;
 loop(3,
     // --- LEFT COLUMN (REC Cues & Follow MIDI) ---
@@ -2158,6 +2168,8 @@ loop(3,
         FOLLOW_BOX_X = FOLLOW_BOX_X + 6;
         gfx_set(0.9,0.9,0.9,1); 
         gfx_circle(FOLLOW_BOX_X+25, draw_y-2, 7, 0); gfx_circle(FOLLOW_BOX_X+25, draw_y-12, 6.5, 0); gfx_circle(FOLLOW_BOX_X+25, draw_y-12, 6, 0); gfx_circle(FOLLOW_BOX_X+25, draw_y-12, 5.5, 0); gfx_circle(FOLLOW_BOX_X+25, draw_y-13, 5, 0); 
+        // Visual only: open the right side of the shackle when FOLLOW is enabled.
+        is_follow ? rect(FOLLOW_BOX_X+25, draw_y-15, 10, 11, 0, 0, 0, 1);
         rect(FOLLOW_BOX_X+15, draw_y-10, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.5, 0.5, 0.5, 1);
         gfx_setfont(1, os_font, 21, 'b');
         is_follow ? draw_text(FOLLOW_BOX_X+21, draw_y-14, "X", 0,1,0);
@@ -2183,6 +2195,14 @@ loop(3,
             my_row = mem[tab_ui_row_base + gui_t];
             (my_row == current_tab_row) ? (
                 item_w = mem[tab_w_base + gui_t]; 
+                arrow_show && gui_t == arrow_req ? (
+                    arrow_req_x = draw_x; arrow_req_y = draw_y;
+                    arrow_req_w = item_w - 5; arrow_req_h = 26;
+                );
+                arrow_show && gui_t == arrow_eff ? (
+                    arrow_eff_x = draw_x; arrow_eff_y = draw_y;
+                    arrow_eff_w = item_w - 5; arrow_eff_h = 26;
+                );
                 is_ed = (gui_t == mem[ui_edit_tab]);
                 t_r = mem[tab_col_r + gui_t]; t_g = mem[tab_col_g + gui_t]; t_b = mem[tab_col_b + gui_t];
                 
@@ -2253,6 +2273,15 @@ loop(3,
         row_idx = floor(i/64); col_idx = i % 64; 
         px = pat_x_offset + (col_idx * pat_w); 
         py = pat_y + (row_idx * (ui_tab_h + 10));
+        // Capture visible slot geometry without changing the UI interactions.
+        arrow_show && i == arrow_req ? (
+            arrow_req_x = px + 1; arrow_req_y = py;
+            arrow_req_w = pat_w; arrow_req_h = ui_tab_h + 3;
+        );
+        arrow_show && i == arrow_eff ? (
+            arrow_eff_x = px + 1; arrow_eff_y = py;
+            arrow_eff_w = pat_w; arrow_eff_h = ui_tab_h + 3;
+        );
         
         is_curr = (mem[ui_edit_tab] == i); is_play = (mem[ui_play_prog_tab] == i); is_lock = (mem[ui_locked_tab] == i);
         is_curr ? (r=.0; g=.25; b=.45;) : (r=0.35; g=0.35; b=0.35;); 
@@ -2302,6 +2331,103 @@ loop(3,
         i+=1;
     );
     gfx_setfont(1, os_font, fontsize, 'b'); 
+);
+
+// VISUAL ONLY: overlay one green arrow from the active MIDI-cued tab
+// to the effective playback pattern. Do not recalculate the fallback.
+arrow_show && arrow_req_x >= 0 && arrow_eff_x >= 0 ? (
+    arrow_req_cx = arrow_req_x + arrow_req_w * 0.5;
+    arrow_req_cy = arrow_req_y + arrow_req_h * 0.5;
+    arrow_eff_cx = arrow_eff_x + arrow_eff_w * 0.5;
+    arrow_eff_cy = arrow_eff_y + arrow_eff_h * 0.5;
+
+    abs(arrow_req_cy - arrow_eff_cy) < 1 ? (
+        // Same row: connect the nearest vertical edges at their centers.
+        arrow_y1 = arrow_req_cy; arrow_y2 = arrow_eff_cy;
+        arrow_req_cx < arrow_eff_cx ? (
+            arrow_x1 = arrow_req_x + arrow_req_w;
+            arrow_x2 = arrow_eff_x;
+        ) : (
+            arrow_x1 = arrow_req_x;
+            arrow_x2 = arrow_eff_x + arrow_eff_w;
+        );
+    ) : abs(arrow_req_cx - arrow_eff_cx) < 12 ? (
+        // Same column: connect horizontal edges at their centers.
+        arrow_x1 = arrow_req_cx; arrow_x2 = arrow_eff_cx;
+        arrow_req_cy < arrow_eff_cy ? (
+            arrow_y1 = arrow_req_y + arrow_req_h;
+            arrow_y2 = arrow_eff_y;
+        ) : (
+            arrow_y1 = arrow_req_y;
+            arrow_y2 = arrow_eff_y + arrow_eff_h;
+        );
+    ) : (
+        // Diagonal: compare all 16 corner pairs and choose the closest.
+        arrow_best_d2 = 1000000000; // Large initial squared-distance value
+        arrow_i = 0;
+        loop(4,
+            arrow_ax = arrow_req_x + ((arrow_i & 1) ? arrow_req_w : 0);
+            arrow_ay = arrow_req_y + ((arrow_i & 2) ? arrow_req_h : 0);
+            arrow_j = 0;
+            loop(4,
+                arrow_bx = arrow_eff_x + ((arrow_j & 1) ? arrow_eff_w : 0);
+                arrow_by = arrow_eff_y + ((arrow_j & 2) ? arrow_eff_h : 0);
+                arrow_dx = arrow_bx - arrow_ax;
+                arrow_dy = arrow_by - arrow_ay;
+                arrow_d2 = arrow_dx*arrow_dx + arrow_dy*arrow_dy;
+                arrow_d2 < arrow_best_d2 ? (
+                    arrow_best_d2 = arrow_d2;
+                    arrow_x1 = arrow_ax; arrow_y1 = arrow_ay;
+                    arrow_x2 = arrow_bx; arrow_y2 = arrow_by;
+                );
+                arrow_j += 1;
+            );
+            arrow_i += 1;
+        );
+    );
+
+    arrow_dx = arrow_x2 - arrow_x1;
+    arrow_dy = arrow_y2 - arrow_y1;
+    arrow_len = sqrt(arrow_dx*arrow_dx + arrow_dy*arrow_dy);
+    // Adjacent tabs leave only a 4-5px gap, compressing the arrowhead.
+    // For short connections, overlap each tab slightly to keep the head legible.
+    // Drawing coordinates only; source selection remains untouched.
+    arrow_len > 1 && arrow_len < 24 ? (
+        arrow_extend = (24 - arrow_len) * 0.5 + 4;
+        arrow_x1 -= (arrow_dx / arrow_len) * arrow_extend;
+        arrow_y1 -= (arrow_dy / arrow_len) * arrow_extend;
+        arrow_x2 += (arrow_dx / arrow_len) * arrow_extend;
+        arrow_y2 += (arrow_dy / arrow_len) * arrow_extend;
+        arrow_dx = arrow_x2 - arrow_x1;
+        arrow_dy = arrow_y2 - arrow_y1;
+        arrow_len = sqrt(arrow_dx*arrow_dx + arrow_dy*arrow_dy);
+    );
+    arrow_len > 1 ? (
+        arrow_ux = arrow_dx / arrow_len;
+        arrow_uy = arrow_dy / arrow_len;
+        arrow_nx = -arrow_uy;
+        arrow_ny = arrow_ux;
+        arrow_head = min(11, arrow_len * 0.35);
+        arrow_half = 1.5; // Three-pixel shaft.
+        arrow_base_x = arrow_x2 - arrow_ux * arrow_head;
+        arrow_base_y = arrow_y2 - arrow_uy * arrow_head;
+        gfx_set(0, 1, 0, 1);
+        gfx_triangle(
+            arrow_x1 + arrow_nx*arrow_half, arrow_y1 + arrow_ny*arrow_half,
+            arrow_x1 - arrow_nx*arrow_half, arrow_y1 - arrow_ny*arrow_half,
+            arrow_base_x - arrow_nx*arrow_half, arrow_base_y - arrow_ny*arrow_half
+        );
+        gfx_triangle(
+            arrow_x1 + arrow_nx*arrow_half, arrow_y1 + arrow_ny*arrow_half,
+            arrow_base_x - arrow_nx*arrow_half, arrow_base_y - arrow_ny*arrow_half,
+            arrow_base_x + arrow_nx*arrow_half, arrow_base_y + arrow_ny*arrow_half
+        );
+        gfx_triangle(
+            arrow_x2, arrow_y2,
+            arrow_base_x + arrow_nx*5, arrow_base_y + arrow_ny*5,
+            arrow_base_x - arrow_nx*5, arrow_base_y - arrow_ny*5
+        );
+    );
 );
 
 ctrl_y = draw_y; // Pass vertical position to the Pattern Settings row
