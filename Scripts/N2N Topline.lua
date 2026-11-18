@@ -1,8 +1,10 @@
 -- @description N2N Topline
--- @version 5.2
+-- @version 5.3
 -- @author Rock Kennedy and Gemini 4 Hydrogen (which did an absolutely fabulous job of transforming the vision into solid Lua code)
 -- @about
 --   Numbers2Notes Topline Melody Editor (1200x640 minimum):
+--   - Cross-platform Windows & macOS dark frameless window move/resize + minimum size enforcement
+--   - Proportional multi-note tail resizing with temporary floor
 --   - 3-Layer NNS diatonic/chromatic roll + gmem Harmony, Groove (5000000..5000031), 8th Swing (gmem[2])
 --   - 4-Node MPE ([Green, Black, White, Red] chains), true-lane snap + Alt chromatic, Vibrato patterns (<, >, <>)
 --   - Section-owned hidden clips, Commit / Recommit* with lossless Track Reload & Export Topline (.mid)
@@ -10,6 +12,9 @@
 --------------------------------------------------------------------------------
 -- 1. UTILITIES & SERIALIZATION
 --------------------------------------------------------------------------------
+local OS_STR = reaper.GetOS()
+local IS_MAC = (OS_STR:match("OSX") ~= nil) or (OS_STR:match("macOS") ~= nil)
+
 local function clamp(v, lo, hi) return (v < lo) and lo or ((v > hi) and hi or v) end
 local function lerp(a, b, t) return a + (b - a) * t end
 local function is_finite(x) return type(x) == "number" and x == x and math.abs(x) < 1e9 end
@@ -118,7 +123,7 @@ end
 --------------------------------------------------------------------------------
 local state = {
   hwnd=nil, use_frameless=true, frameless=false, titlebar_h=0, should_close=false,
-  win_x=80, win_y=60, win_w=1380, win_h=780,
+  win_x=80, win_y=60, win_w=1380, win_h=780, has_saved_win_pos=false,
   hidden_track=nil, section_items={}, output_track=nil, output_track_guid="",
   auto_arm_preview=false, saved_track_states={}, track_note_names={},
   commit_state="none", audition_mode="draft",
@@ -128,13 +133,11 @@ local state = {
   section_glow_uid=nil, section_glow_until=0, section_glow_held=false, last_region_poll=0,
 
   nns_chart_items={}, letter_chart_items={}, has_nns_chart=false, has_letter_chart=false, chord_lane_h=24, last_chart_poll=0,
-
   view_mode="diatonic", tonic_pc=0, mode_idx=1, sync_key_from_gmem=true,
   gmem_tonic_pc=0, gmem_modal_center=0, gmem_has_key=false,
   in_scale_h=34, harmony_border_style="dotted",
 
   notes={}, next_note_id=1, clipboard={}, undo_stack={}, redo_stack={},
-
   harmony_source="gmem", gmem_guides={}, gmem_song_end_qn=0, clip_guides={},
   manual_harmony_notes={}, next_harm_id=1, gmem_sig="", last_gmem_poll=0,
 
@@ -162,10 +165,13 @@ for i = 1, 32 do state.groove_data[i] = 0.0 end
 --------------------------------------------------------------------------------
 local function save_global_prefs()
   if state.hwnd and reaper.JS_Window_GetRect and gfx.dock(-1) == 0 then
-    local _, wx, wy, wr, wb = reaper.JS_Window_GetRect(state.hwnd)
+    local _, wx, wt, wr, wb = reaper.JS_Window_GetRect(state.hwnd)
     if wx and wr then
-      state.win_x, state.win_y = wx, wy
-      state.win_w, state.win_h = math.max(MIN_WIN_W, math.abs(wr-wx)), math.max(MIN_WIN_H, math.abs(wb-wy))
+      state.win_x = wx
+      state.win_y = IS_MAC and wb or wt -- Cocoa bottom-left on macOS; top-left on Win/Linux
+      state.win_w = math.max(MIN_WIN_W, math.abs(wr - wx))
+      state.win_h = math.max(MIN_WIN_H, math.abs(wb - wt))
+      state.has_saved_win_pos = true
     end
   end
   local s = function(k, v) reaper.SetExtState(EXT_GLOBAL_SEC, k, tostring(v), true) end
@@ -177,6 +183,7 @@ local function save_global_prefs()
   s("mpe_release_tail_ms", state.mpe_release_tail_ms); s("in_scale_h", state.in_scale_h)
   s("view_mode", state.view_mode); s("mpe_enabled", state.mpe_enabled and "1" or "0"); s("mpe_bend_range", state.mpe_bend_range)
   s("win_x", state.win_x); s("win_y", state.win_y); s("win_w", state.win_w); s("win_h", state.win_h)
+  s("win_pos_v2", state.has_saved_win_pos and "1" or "0")
   s("mod_vscroll", state.wheel_mods.v_scroll); s("mod_hscroll", state.wheel_mods.h_scroll)
   s("mod_hzoom", state.wheel_mods.h_zoom); s("mod_vzoom", state.wheel_mods.v_zoom)
 end
@@ -198,7 +205,7 @@ local function load_global_prefs()
   if g("mpe_enabled")=="0" then state.mpe_enabled=false elseif g("mpe_enabled")=="1" then state.mpe_enabled=true end
   local mbr=tonumber(g("mpe_bend_range")); if mbr and (mbr==2 or mbr==12 or mbr==24 or mbr==48) then state.mpe_bend_range=mbr end
   local wx, wy, ww, wh = tonumber(g("win_x")), tonumber(g("win_y")), tonumber(g("win_w")), tonumber(g("win_h"))
-  if wx and wy then state.win_x, state.win_y = math.floor(wx), math.floor(wy) end
+  if g("win_pos_v2") == "1" and wx and wy then state.win_x, state.win_y = math.floor(wx), math.floor(wy); state.has_saved_win_pos = true end
   if ww and wh then state.win_w, state.win_h = math.max(MIN_WIN_W, math.floor(ww)), math.max(MIN_WIN_H, math.floor(wh)) end
   local function rm(k, d) local v=g(k); return (v and v~="") and v or d end
   state.wheel_mods.v_scroll=rm("mod_vscroll","None"); state.wheel_mods.h_scroll=rm("mod_hscroll","Shift")
@@ -249,56 +256,35 @@ local function load_project_state()
   local ok, str = reaper.GetProjExtState(0, EXT_PROJ_SEC, EXT_PROJ_KEY)
   if ok == 0 or not str or str == "" then return false end
   local data = deserialize_table(str); if not data then return false end
-
-  state.next_note_id = data.next_note_id or 1; state.next_section_seq = data.next_section_seq or 1
-  state.selected_section_uid = data.selected_section_uid; state.output_track_guid = data.output_track_guid or ""
-  state.auto_arm_preview = (data.auto_arm_preview == true)
-  if data.commit_state then state.commit_state = data.commit_state end
-  if data.audition_mode then state.audition_mode = data.audition_mode end
-  if data.mpe_enabled ~= nil then state.mpe_enabled = data.mpe_enabled end
-  if data.mpe_bend_range then state.mpe_bend_range = data.mpe_bend_range end
-  state.instrument_bend_verified = (data.instrument_bend_verified == true)
-  if data.view_mode then state.view_mode = data.view_mode end
-  if data.tonic_pc ~= nil then state.tonic_pc = data.tonic_pc end
-  if data.mode_idx ~= nil then state.mode_idx = data.mode_idx end
-  if data.sync_key_from_gmem ~= nil then state.sync_key_from_gmem = data.sync_key_from_gmem end
-  if data.in_scale_h then state.in_scale_h = data.in_scale_h end
-  if data.groove_enabled ~= nil then state.groove_enabled = data.groove_enabled end
-  if data.groove_unit then state.groove_unit = data.groove_unit end
-  if data.swing_from_gmem ~= nil then state.swing_from_gmem = data.swing_from_gmem end
-  if data.swing_pct ~= nil then state.swing_pct = data.swing_pct end
-  if data.swing_div ~= nil then state.swing_div = data.swing_div end
-  if data.harmony_source then state.harmony_source = data.harmony_source end
-  if data.clip_guides then state.clip_guides = data.clip_guides end
-  if data.scroll_x_qn then state.scroll_x_qn = data.scroll_x_qn; state.has_saved_view = true end
-  if data.scroll_y_px then state.scroll_y_px = data.scroll_y_px; state.has_saved_view = true end
-  if data.px_per_qn then state.px_per_qn = clamp(data.px_per_qn, 20, 480) end
-  if data.v_scale then state.v_scale = clamp(data.v_scale, 0.45, 3.0) end
-
-  state.sections = {}
-  if data.sections then
-    for _, s in ipairs(data.sections) do
-      table.insert(state.sections, {
-        uid=s.uid, markrgn_num=s.markrgn_num, name=s.name or "Section", start_qn=s.start_qn or 0, end_qn=s.end_qn or 16,
-        prev_start_qn=s.start_qn or 0, prev_end_qn=s.end_qn or 16, pos_sec=reaper.TimeMap2_QNToTime(0, s.start_qn or 0),
-        bar_qn=s.bar_qn or 4.0, rgb=s.rgb or {0.45,0.52,0.62}, deleted=s.deleted or false, overflow_cnt=0,
-      })
-    end
-  end
-  state.notes = {}
-  if data.notes then
-    for _, n in ipairs(data.notes) do
-      local out_st = n.out_st or ((n.bend_st or 0) + (n.bend_cents or 0)/100.0)
-      table.insert(state.notes, make_default_note({
-        id=n.id, muted=n.muted, start_qn=n.start_qn, end_qn=n.end_qn, pitch=n.pitch, vel=n.vel, chan=n.chan,
-        section_uid=n.section_uid, section_override=n.section_override, t1=n.t1 or 0.05, pre_st=n.pre_st or 0.0,
-        t2=n.t2 or 0.35, t3=n.t3 or 0.65, t4=n.t4 or 0.95, out_st=out_st, pre_shape=n.pre_shape or "s_curve",
-        pre_tension=n.pre_tension or 0.0, out_shape=n.out_shape or "s_curve", out_tension=n.out_tension or 0.0,
-        connect_to_id=n.connect_to_id, vibrato=n.vibrato,
-      }))
-      if n.id >= state.next_note_id then state.next_note_id = n.id + 1 end
-    end
-  end
+  state.next_note_id=data.next_note_id or 1; state.next_section_seq=data.next_section_seq or 1
+  state.selected_section_uid=data.selected_section_uid; state.output_track_guid=data.output_track_guid or ""
+  state.auto_arm_preview=(data.auto_arm_preview==true)
+  if data.commit_state then state.commit_state=data.commit_state end; if data.audition_mode then state.audition_mode=data.audition_mode end
+  if data.mpe_enabled~=nil then state.mpe_enabled=data.mpe_enabled end; if data.mpe_bend_range then state.mpe_bend_range=data.mpe_bend_range end
+  state.instrument_bend_verified=(data.instrument_bend_verified==true)
+  if data.view_mode then state.view_mode=data.view_mode end; if data.tonic_pc~=nil then state.tonic_pc=data.tonic_pc end
+  if data.mode_idx~=nil then state.mode_idx=data.mode_idx end; if data.sync_key_from_gmem~=nil then state.sync_key_from_gmem=data.sync_key_from_gmem end
+  if data.in_scale_h then state.in_scale_h=data.in_scale_h end
+  if data.groove_enabled~=nil then state.groove_enabled=data.groove_enabled end; if data.groove_unit then state.groove_unit=data.groove_unit end
+  if data.swing_from_gmem~=nil then state.swing_from_gmem=data.swing_from_gmem end
+  if data.swing_pct~=nil then state.swing_pct=data.swing_pct end; if data.swing_div~=nil then state.swing_div=data.swing_div end
+  if data.harmony_source then state.harmony_source=data.harmony_source end; if data.clip_guides then state.clip_guides=data.clip_guides end
+  if data.scroll_x_qn then state.scroll_x_qn=data.scroll_x_qn; state.has_saved_view=true end
+  if data.scroll_y_px then state.scroll_y_px=data.scroll_y_px; state.has_saved_view=true end
+  if data.px_per_qn then state.px_per_qn=clamp(data.px_per_qn,20,480) end; if data.v_scale then state.v_scale=clamp(data.v_scale,0.45,3.0) end
+  state.sections={}
+  if data.sections then for _, s in ipairs(data.sections) do
+    table.insert(state.sections,{uid=s.uid,markrgn_num=s.markrgn_num,name=s.name or "Section",start_qn=s.start_qn or 0,end_qn=s.end_qn or 16,
+      prev_start_qn=s.start_qn or 0,prev_end_qn=s.end_qn or 16,pos_sec=reaper.TimeMap2_QNToTime(0,s.start_qn or 0),bar_qn=s.bar_qn or 4.0,rgb=s.rgb or {0.45,0.52,0.62},deleted=s.deleted or false,overflow_cnt=0})
+  end end
+  state.notes={}
+  if data.notes then for _, n in ipairs(data.notes) do
+    local out_st = n.out_st or ((n.bend_st or 0) + (n.bend_cents or 0)/100.0)
+    table.insert(state.notes, make_default_note({id=n.id,muted=n.muted,start_qn=n.start_qn,end_qn=n.end_qn,pitch=n.pitch,vel=n.vel,chan=n.chan,
+      section_uid=n.section_uid,section_override=n.section_override,t1=n.t1 or 0.05,pre_st=n.pre_st or 0.0,t2=n.t2 or 0.35,t3=n.t3 or 0.65,t4=n.t4 or 0.95,out_st=out_st,
+      pre_shape=n.pre_shape or "s_curve",pre_tension=n.pre_tension or 0.0,out_shape=n.out_shape or "s_curve",out_tension=n.out_tension or 0.0,connect_to_id=n.connect_to_id,vibrato=n.vibrato}))
+    if n.id >= state.next_note_id then state.next_note_id = n.id + 1 end
+  end end
   if data.manual_harmony_notes then state.manual_harmony_notes = data.manual_harmony_notes end
   return true
 end
@@ -320,8 +306,7 @@ local function get_note_visual_h() return math.max(6, math.floor(get_effective_l
 local function rebuild_row_layout()
   local y = 0
   for p = 127, 0, -1 do
-    local is_dia = CONFIG.step_definitions[get_rel_step(p)].diatonic
-    local h = (is_dia or state.view_mode ~= "diatonic") and get_effective_lane_h() or 0
+    local h = (CONFIG.step_definitions[get_rel_step(p)].diatonic or state.view_mode ~= "diatonic") and get_effective_lane_h() or 0
     state.row_y[p] = y; state.row_h[p] = h; y = y + h
   end
   state.total_h = math.max(1, y)
@@ -333,9 +318,9 @@ local function snap_floor_qn(qn) local g = get_grid_qn(); return math.max(0, mat
 
 local function get_key_left_right_labels(pitch)
   local nns = CONFIG.step_definitions[get_rel_step(pitch)].nns
-  local note_name = CONFIG.note_names[(pitch % 12) + 1] .. (math.floor(pitch / 12) - 1)
+  local nn = CONFIG.note_names[(pitch % 12) + 1] .. (math.floor(pitch / 12) - 1)
   local custom = state.track_note_names[pitch]
-  return (custom and custom ~= "") and string.format("%s (%s)", custom, note_name) or note_name, nns
+  return (custom and custom ~= "") and string.format("%s (%s)", custom, nn) or nn, nns
 end
 
 local function pitch_to_screen_y(pitch) return get_top_area_y() + (state.row_y[pitch] or 0) - state.scroll_y_px end
@@ -349,15 +334,13 @@ local function pitch_float_to_screen_y(pitch_f)
 end
 
 local function screen_y_to_pitch(sy, allow_zero_alt)
-  local content_y = sy - get_top_area_y() + state.scroll_y_px
+  local cy = sy - get_top_area_y() + state.scroll_y_px
   if state.view_mode == "diatonic" and allow_zero_alt then
-    local best_p, best_dist = nil, 9.0
-    for p = 127, 0, -1 do
-      if state.row_h[p] == 0 then local d = math.abs(content_y - state.row_y[p]); if d < best_dist then best_dist = d; best_p = p end end
-    end
-    if best_p then return best_p end
+    local bp, bd = nil, 9.0
+    for p = 127, 0, -1 do if state.row_h[p] == 0 then local d = math.abs(cy - state.row_y[p]); if d < bd then bd=d; bp=p end end end
+    if bp then return bp end
   end
-  for p = 127, 0, -1 do local ry, rh = state.row_y[p], state.row_h[p]; if rh > 0 and content_y >= ry and content_y < ry + rh then return p end end
+  for p = 127, 0, -1 do local ry, rh = state.row_y[p], state.row_h[p]; if rh > 0 and cy >= ry and cy < ry + rh then return p end end
   return nil
 end
 
@@ -373,9 +356,9 @@ local function get_max_timeline_qn()
     for _, g in ipairs(state.clip_guides) do if g.end_qn > song_end then song_end = g.end_qn end end
   end
   if song_end <= 0 then song_end = four_bars end
-  local timeline_end = song_end + four_bars
-  for _, n in ipairs(state.notes) do if n.end_qn + bar_qn > timeline_end then timeline_end = n.end_qn + bar_qn end end
-  return timeline_end
+  local te = song_end + four_bars
+  for _, n in ipairs(state.notes) do if n.end_qn + bar_qn > te then te = n.end_qn + bar_qn end end
+  return te
 end
 
 local function get_section_by_uid(uid) if not uid then return nil end; for _, s in ipairs(state.sections) do if s.uid == uid then return s end end; return nil end
@@ -435,9 +418,7 @@ end
 
 local function eval_vibrato_pattern_env(pattern, t_active)
   t_active = clamp(t_active, 0.0, 1.0)
-  if pattern == "cresc" then return t_active
-  elseif pattern == "decresc" then return 1.0 - t_active
-  elseif pattern == "swell" then return math.sin(math.pi * t_active) end
+  if pattern == "cresc" then return t_active elseif pattern == "decresc" then return 1.0 - t_active elseif pattern == "swell" then return math.sin(math.pi * t_active) end
   return 1.0
 end
 
@@ -454,16 +435,13 @@ end
 local function eval_chain_bend_at_qn(root, qn, chain_start_qn, chain_end_qn)
   local nodes, base_st = get_chain_nodes(root), 0.0
   for i = 1, #nodes do
-    local cur, dst = nodes[i], nodes[i + 1]; local cur_base = cur.pitch - root.pitch
-    local q1, q2, q3, q4 = get_note_node_qns(cur, i > 1, dst)
+    local cur, dst = nodes[i], nodes[i + 1]; local cur_base = cur.pitch - root.pitch; local q1, q2, q3, q4 = get_note_node_qns(cur, i > 1, dst)
     if i == 1 and qn < q2 then
       local pre = cur.pre_st or 0.0
       base_st = (math.abs(pre) > 1e-4) and ((qn <= q1) and (cur_base + pre) or (cur_base + pre * (1.0 - eval_curve_shape((qn - q1) / math.max(1e-4, q2 - q1), cur.pre_shape, cur.pre_tension)))) or cur_base
       break
     elseif qn <= q3 then base_st = cur_base; break
-    elseif qn <= q4 then
-      base_st = lerp(cur_base, dst and (dst.pitch - root.pitch) or (cur_base + (cur.out_st or 0.0)), eval_curve_shape((qn - q3) / math.max(1e-4, q4 - q3), cur.out_shape, cur.out_tension))
-      break
+    elseif qn <= q4 then base_st = lerp(cur_base, dst and (dst.pitch - root.pitch) or (cur_base + (cur.out_st or 0.0)), eval_curve_shape((qn - q3) / math.max(1e-4, q4 - q3), cur.out_shape, cur.out_tension)); break
     elseif not dst then base_st = cur_base + (cur.out_st or 0.0); break end
   end
   local vib, vib_st = root.vibrato, 0.0
@@ -490,9 +468,7 @@ local function reallocate_all_mpe_channels()
   table.sort(roots, function(a, b) return a.start_qn < b.start_qn end)
   local tail_sec, ch_busy_until, ch_tail_until, ch_bent, exhausted = (state.mpe_release_tail_ms or 500) / 1000.0, {}, {}, {}, false
   for _, root in ipairs(roots) do
-    local s_qn, e_qn = get_chain_span_qn(root)
-    local s_sec, e_sec = reaper.TimeMap2_QNToTime(0, s_qn), reaper.TimeMap2_QNToTime(0, e_qn)
-    local chosen = nil
+    local s_qn, e_qn = get_chain_span_qn(root); local s_sec, e_sec = reaper.TimeMap2_QNToTime(0, s_qn), reaper.TimeMap2_QNToTime(0, e_qn); local chosen = nil
     for ch = state.mpe_chan_min, state.mpe_chan_max do if (ch_tail_until[ch] or -1) <= s_sec + 1e-4 then chosen = ch break end end
     if not chosen then for ch = state.mpe_chan_min, state.mpe_chan_max do if (ch_busy_until[ch] or -1) <= s_sec + 1e-4 then chosen = ch break end end end
     if not chosen then
@@ -509,16 +485,10 @@ end
 
 local function read_gmem_groove_and_swing()
   local changed = false; reaper.gmem_attach(GMEM_NAMESPACE)
-  for i = 1, 32 do
-    local v = reaper.gmem_read(GMEM_GROOVE_BASE + (i - 1))
-    if is_finite(v) and math.abs(v - (state.groove_data[i] or 0)) > 1e-5 then state.groove_data[i] = v; changed = true end
-  end
+  for i = 1, 32 do local v = reaper.gmem_read(GMEM_GROOVE_BASE + (i - 1)); if is_finite(v) and math.abs(v - (state.groove_data[i] or 0)) > 1e-5 then state.groove_data[i] = v; changed = true end end
   if state.swing_from_gmem then
     local sw = reaper.gmem_read(2)
-    if not is_finite(sw) or sw <= 0 then
-      reaper.gmem_attach(""); local sw_g = reaper.gmem_read(2); reaper.gmem_attach(GMEM_NAMESPACE)
-      if is_finite(sw_g) and sw_g > 0 and sw_g <= 100 then sw = sw_g end
-    end
+    if not is_finite(sw) or sw <= 0 then reaper.gmem_attach(""); local sw_g = reaper.gmem_read(2); reaper.gmem_attach(GMEM_NAMESPACE); if is_finite(sw_g) and sw_g > 0 and sw_g <= 100 then sw = sw_g end end
     if is_finite(sw) and sw >= 0 and sw <= 100 then local sw_i = math.floor(sw + 0.5); if sw_i ~= state.swing_pct then state.swing_pct = sw_i; changed = true end end
   end
   return changed
@@ -545,10 +515,7 @@ end
 --------------------------------------------------------------------------------
 -- 7. HIDDEN TRACK, COMMIT, LOSSLESS TRACK IMPORT & .mid EXPORT
 --------------------------------------------------------------------------------
-local function find_track_by_name(target_name)
-  for i = 0, reaper.CountTracks(0) - 1 do local tr = reaper.GetTrack(0, i); local _, nm = reaper.GetTrackName(tr); if trim(nm) == target_name then return tr end end
-  return nil
-end
+local function find_track_by_name(tn) for i = 0, reaper.CountTracks(0) - 1 do local tr = reaper.GetTrack(0, i); local _, nm = reaper.GetTrackName(tr); if trim(nm) == tn then return tr end end; return nil end
 
 local function ensure_hidden_track()
   local tr = state.hidden_track
@@ -560,8 +527,7 @@ local function ensure_hidden_track()
   end
   reaper.SetMediaTrackInfo_Value(tr, "B_SHOWINTCP", 0); reaper.SetMediaTrackInfo_Value(tr, "B_SHOWINMIXER", 0)
   reaper.SetMediaTrackInfo_Value(tr, "B_MAINSEND", 0); reaper.SetMediaTrackInfo_Value(tr, "I_RECARM", 0)
-  reaper.SetMediaTrackInfo_Value(tr, "I_FREEMODE", 1); reaper.TrackList_AdjustWindows(false)
-  return tr
+  reaper.SetMediaTrackInfo_Value(tr, "I_FREEMODE", 1); reaper.TrackList_AdjustWindows(false); return tr
 end
 
 local function apply_audition_mute_routing()
@@ -576,8 +542,7 @@ local function apply_audition_mute_routing()
 end
 
 local function update_hidden_track_send()
-  local htr = ensure_hidden_track()
-  while reaper.GetTrackNumSends(htr, 0) > 0 do reaper.RemoveTrackSend(htr, 0, 0) end
+  local htr = ensure_hidden_track(); while reaper.GetTrackNumSends(htr, 0) > 0 do reaper.RemoveTrackSend(htr, 0, 0) end
   local dst = state.output_track
   if dst and reaper.ValidatePtr2(0, dst, "MediaTrack*") and dst ~= htr then
     local sidx = reaper.CreateTrackSend(htr, dst)
@@ -590,79 +555,61 @@ local function write_section_clips_to_track(target_track, ext_key, store_lossles
   if not target_track or not reaper.ValidatePtr2(0, target_track, "MediaTrack*") then return end
   local existing_by_uid = {}
   for i = 0, reaper.CountTrackMediaItems(target_track) - 1 do
-    local it = reaper.GetTrackMediaItem(target_track, i); local ok, uid = reaper.GetSetMediaItemInfo_String(it, ext_key, "", false)
-    if ok and uid ~= "" then existing_by_uid[uid] = it end
+    local it = reaper.GetTrackMediaItem(target_track, i); local ok, uid = reaper.GetSetMediaItemInfo_String(it, ext_key, "", false); if ok and uid ~= "" then existing_by_uid[uid] = it end
   end
-
   local roots_by_sec, notes_by_sec, used_keys, all_roots = {}, {}, {}, {}
   for _, sec in ipairs(state.sections) do roots_by_sec[sec.uid] = {}; notes_by_sec[sec.uid] = {}; used_keys[sec.uid] = true end
   roots_by_sec["__unassigned"] = {}; notes_by_sec["__unassigned"] = {}
   for _, n in ipairs(state.notes) do
     local key = (n.section_uid and roots_by_sec[n.section_uid]) and n.section_uid or "__unassigned"
-    table.insert(notes_by_sec[key], n)
-    if get_incoming_note(n.id) == nil then table.insert(roots_by_sec[key], n); table.insert(all_roots, n) end
+    table.insert(notes_by_sec[key], n); if get_incoming_note(n.id) == nil then table.insert(roots_by_sec[key], n); table.insert(all_roots, n) end
   end
   if #roots_by_sec["__unassigned"] > 0 then used_keys["__unassigned"] = true end
 
   local ch_starts = {}
-  for _, root in ipairs(all_roots) do
-    local sq = get_chain_span_qn(root); local ss = reaper.TimeMap2_QNToTime(0, math.max(0, sq + compute_groove_swing_offset_qn(sq)))
-    ch_starts[root.chan] = ch_starts[root.chan] or {}; table.insert(ch_starts[root.chan], ss)
+  for _, r in ipairs(all_roots) do
+    local sq = get_chain_span_qn(r); local ss = reaper.TimeMap2_QNToTime(0, math.max(0, sq + compute_groove_swing_offset_qn(sq)))
+    ch_starts[r.chan] = ch_starts[r.chan] or {}; table.insert(ch_starts[r.chan], ss)
   end
   for _, list in pairs(ch_starts) do table.sort(list) end
   local tail_sec = (state.mpe_release_tail_ms or 500) / 1000.0
-  local function find_next_start_sec(chan, after_sec)
-    for _, st in ipairs(ch_starts[chan] or {}) do if st > after_sec + 1e-4 then return st end end; return nil
-  end
+  local function find_next_start_sec(chan, after_sec) for _, st in ipairs(ch_starts[chan] or {}) do if st > after_sec + 1e-4 then return st end end; return nil end
 
   reaper.PreventUIRefresh(1)
-  for uid, it in pairs(existing_by_uid) do
-    if not used_keys[uid] and reaper.ValidatePtr2(0, it, "MediaItem*") then reaper.DeleteTrackMediaItem(target_track, it); existing_by_uid[uid] = nil end
-  end
+  for uid, it in pairs(existing_by_uid) do if not used_keys[uid] and reaper.ValidatePtr2(0, it, "MediaItem*") then reaper.DeleteTrackMediaItem(target_track, it); existing_by_uid[uid] = nil end end
 
   for key, roots in pairs(roots_by_sec) do
     if used_keys[key] then
       local sec = get_section_by_uid(key)
-      local min_sec = sec and sec.pos_sec or math.huge
-      local max_sec = sec and reaper.TimeMap2_QNToTime(0, sec.end_qn) or 0
-      local root_timings = {}
+      local min_sec, max_sec, root_timings = sec and sec.pos_sec or math.huge, sec and reaper.TimeMap2_QNToTime(0, sec.end_qn) or 0, {}
       for _, r in ipairs(roots) do
         local rs, re = get_chain_span_qn(r); local off = compute_groove_swing_offset_qn(rs)
-        local out_s_qn, out_e_qn = math.max(0, rs + off), math.max(0.05, re + off)
-        local out_s_sec, out_e_sec = reaper.TimeMap2_QNToTime(0, out_s_qn), reaper.TimeMap2_QNToTime(0, out_e_qn)
-        local reset_sec = out_e_sec
+        local osq, oeq = math.max(0, rs + off), math.max(0.05, re + off)
+        local oss, oes = reaper.TimeMap2_QNToTime(0, osq), reaper.TimeMap2_QNToTime(0, oeq); local reset_sec = oes
         if note_or_chain_has_bend(r) then
-          local nxt_s = find_next_start_sec(r.chan, out_e_sec - 0.005)
-          reset_sec = nxt_s and math.max(out_e_sec + 0.002, math.min(out_e_sec + tail_sec, nxt_s - 0.012)) or (out_e_sec + tail_sec)
+          local nxt_s = find_next_start_sec(r.chan, oes - 0.005)
+          reset_sec = nxt_s and math.max(oes + 0.002, math.min(oes + tail_sec, nxt_s - 0.012)) or (oes + tail_sec)
         end
-        root_timings[r.id] = { s_qn=rs, e_qn=re, out_s_qn=out_s_qn, out_e_qn=out_e_qn, out_s_sec=out_s_sec, out_e_sec=out_e_sec, reset_sec=reset_sec }
-        min_sec = math.min(min_sec, out_s_sec); max_sec = math.max(max_sec, reset_sec + 0.04)
+        root_timings[r.id] = { s_qn=rs, e_qn=re, out_s_qn=osq, out_e_qn=oeq, out_s_sec=oss, out_e_sec=oes, reset_sec=reset_sec }
+        min_sec = math.min(min_sec, oss); max_sec = math.max(max_sec, reset_sec + 0.04)
       end
       if min_sec == math.huge then min_sec = 0 end; if max_sec <= min_sec then max_sec = min_sec + 1.0 end
 
       local it = existing_by_uid[key]
-      if not it or not reaper.ValidatePtr2(0, it, "MediaItem*") then
-        it = reaper.CreateNewMIDIItemInProj(target_track, min_sec, max_sec, false); reaper.GetSetMediaItemInfo_String(it, ext_key, key, true)
+      if not it or not reaper.ValidatePtr2(0, it, "MediaItem*") then it = reaper.CreateNewMIDIItemInProj(target_track, min_sec, max_sec, false); reaper.GetSetMediaItemInfo_String(it, ext_key, key, true)
       else reaper.SetMediaItemInfo_Value(it, "D_POSITION", min_sec); reaper.SetMediaItemInfo_Value(it, "D_LENGTH", max_sec - min_sec) end
-
-      if sec and sec.rgb then
-        reaper.SetMediaItemInfo_Value(it, "I_CUSTOMCOLOR", reaper.ColorToNative(clamp(math.floor(sec.rgb[1]*255+0.5),0,255), clamp(math.floor(sec.rgb[2]*255+0.5),0,255), clamp(math.floor(sec.rgb[3]*255+0.5),0,255)) | 0x1000000)
-      end
-      if store_lossless_meta then
-        local ser = {}; for _, sn in ipairs(notes_by_sec[key]) do table.insert(ser, serialize_note(sn)) end
-        reaper.GetSetMediaItemInfo_String(it, "P_EXT:N2N_TOPLINE_NOTES", serialize_val(ser), true)
-      end
+      if sec and sec.rgb then reaper.SetMediaItemInfo_Value(it, "I_CUSTOMCOLOR", reaper.ColorToNative(clamp(math.floor(sec.rgb[1]*255+0.5),0,255), clamp(math.floor(sec.rgb[2]*255+0.5),0,255), clamp(math.floor(sec.rgb[3]*255+0.5),0,255)) | 0x1000000) end
+      if store_lossless_meta then local ser = {}; for _, sn in ipairs(notes_by_sec[key]) do table.insert(ser, serialize_note(sn)) end; reaper.GetSetMediaItemInfo_String(it, "P_EXT:N2N_TOPLINE_NOTES", serialize_val(ser), true) end
 
       local tk = reaper.GetActiveTake(it)
       if tk and reaper.TakeIsMIDI(tk) then
         reaper.MIDI_DisableSort(tk)
-        local _, notecnt, ccevtcnt = reaper.MIDI_CountEvts(tk)
-        for i = notecnt - 1, 0, -1 do reaper.MIDI_DeleteNote(tk, i) end
-        for i = ccevtcnt - 1, 0, -1 do local ok, _, _, _, cm = reaper.MIDI_GetCC(tk, i); if ok and (cm & 0xF0) == 0xE0 then reaper.MIDI_DeleteCC(tk, i) end end
+        local _, nc, cc = reaper.MIDI_CountEvts(tk)
+        for i = nc - 1, 0, -1 do reaper.MIDI_DeleteNote(tk, i) end
+        for i = cc - 1, 0, -1 do local ok, _, _, _, cm = reaper.MIDI_GetCC(tk, i); if ok and (cm & 0xF0) == 0xE0 then reaper.MIDI_DeleteCC(tk, i) end end
         for _, root in ipairs(roots) do
-          local rt = root_timings[root.id]
-          local s_ppq, e_ppq = reaper.MIDI_GetPPQPosFromProjQN(tk, rt.out_s_qn), reaper.MIDI_GetPPQPosFromProjQN(tk, rt.out_e_qn)
-          reaper.MIDI_InsertNote(tk, false, root.muted, s_ppq, e_ppq, root.chan, root.pitch, clamp(root.vel, 1, 127), true)
+          local rt = root_timings[root.id]; local sp, ep = reaper.MIDI_GetPPQPosFromProjQN(tk, rt.out_s_qn), reaper.MIDI_GetPPQPosFromProjQN(tk, rt.out_e_qn)
+          reaper.MIDI_InsertNote(tk, false, root.muted, sp, ep, root.chan, root.pitch, clamp(root.vel, 1, 127), true)
           if note_or_chain_has_bend(root) then
             local steps = clamp(math.floor(math.max(0.02, rt.out_e_sec - rt.out_s_sec) * 80), 24, 240)
             for step = 0, steps do
@@ -670,8 +617,7 @@ local function write_section_clips_to_track(target_track, ext_key, store_lossles
               local v14 = clamp(math.floor(8192 + clamp(st / state.mpe_bend_range, -1, 1) * 8191 + 0.5), 0, 16383)
               reaper.MIDI_InsertCC(tk, false, false, reaper.MIDI_GetPPQPosFromProjQN(tk, lerp(rt.out_s_qn, rt.out_e_qn, t)), 0xE0, root.chan, v14 & 0x7F, (v14 >> 7) & 0x7F)
             end
-            local reset_ppq = reaper.MIDI_GetPPQPosFromProjQN(tk, reaper.TimeMap2_timeToQN(0, rt.reset_sec))
-            reaper.MIDI_InsertCC(tk, false, false, math.max(e_ppq + 1, reset_ppq), 0xE0, root.chan, 0, 64)
+            reaper.MIDI_InsertCC(tk, false, false, math.max(ep + 1, reaper.MIDI_GetPPQPosFromProjQN(tk, reaper.TimeMap2_timeToQN(0, rt.reset_sec))), 0xE0, root.chan, 0, 64)
           end
         end
         reaper.MIDI_Sort(tk); reaper.UpdateItemInProject(it); reaper.MarkTrackItemsDirty(target_track, it)
@@ -692,8 +638,7 @@ local function commit_clips_to_output_track()
   if not state.output_track or not reaper.ValidatePtr2(0, state.output_track, "MediaTrack*") then state.status_msg = "Select an Output Track first"; return false end
   reaper.Undo_BeginBlock(); reallocate_all_mpe_channels()
   write_section_clips_to_track(state.output_track, "P_EXT:N2N_COMMITTED_UID", true)
-  state.commit_state = "committed"; state.audition_mode = "committed"
-  apply_audition_mute_routing(); save_project_state()
+  state.commit_state = "committed"; state.audition_mode = "committed"; apply_audition_mute_routing(); save_project_state()
   reaper.Undo_EndBlock("N2N Topline: Commit Section Clips", -1)
   local _, tn = reaper.GetTrackName(state.output_track); state.status_msg = "Committed clips -> [" .. tn .. "]"; return true
 end
@@ -713,44 +658,31 @@ local function load_midi_from_track(tr, mode)
   if not tr or not reaper.ValidatePtr2(0, tr, "MediaTrack*") then return end
   local imported, lossless_cnt = {}, 0
   for i = 0, reaper.CountTrackMediaItems(tr) - 1 do
-    local it = reaper.GetTrackMediaItem(tr, i)
-    local ok_meta, meta_str = reaper.GetSetMediaItemInfo_String(it, "P_EXT:N2N_TOPLINE_NOTES", "", false)
-    local meta_tbl = (ok_meta and meta_str ~= "") and deserialize_table(meta_str) or nil
-    if meta_tbl and #meta_tbl > 0 then
+    local it = reaper.GetTrackMediaItem(tr, i); local ok_m, m_str = reaper.GetSetMediaItemInfo_String(it, "P_EXT:N2N_TOPLINE_NOTES", "", false)
+    local m_tbl = (ok_m and m_str ~= "") and deserialize_table(m_str) or nil
+    if m_tbl and #m_tbl > 0 then
       local id_remap, batch = {}, {}
-      for _, mn in ipairs(meta_tbl) do
+      for _, mn in ipairs(m_tbl) do
         local nid = state.next_note_id; state.next_note_id = state.next_note_id + 1; id_remap[mn.id] = nid
-        table.insert(batch, make_default_note({
-          id=nid, selected=true, muted=mn.muted, start_qn=mn.start_qn, end_qn=mn.end_qn, pitch=mn.pitch, vel=mn.vel, chan=mn.chan,
+        table.insert(batch, make_default_note({ id=nid, selected=true, muted=mn.muted, start_qn=mn.start_qn, end_qn=mn.end_qn, pitch=mn.pitch, vel=mn.vel, chan=mn.chan,
           section_uid=mn.section_uid, section_override=mn.section_override, t1=mn.t1, pre_st=mn.pre_st, t2=mn.t2, t3=mn.t3, t4=mn.t4, out_st=mn.out_st,
-          pre_shape=mn.pre_shape, pre_tension=mn.pre_tension, out_shape=mn.out_shape, out_tension=mn.out_tension, connect_to_id=mn.connect_to_id, vibrato=mn.vibrato,
-        }))
+          pre_shape=mn.pre_shape, pre_tension=mn.pre_tension, out_shape=mn.out_shape, out_tension=mn.out_tension, connect_to_id=mn.connect_to_id, vibrato=mn.vibrato }))
       end
       for _, nn in ipairs(batch) do if nn.connect_to_id then nn.connect_to_id = id_remap[nn.connect_to_id] end; table.insert(imported, nn) end
       lossless_cnt = lossless_cnt + #batch
     else
-      local ok_c, cuid = reaper.GetSetMediaItemInfo_String(it, "P_EXT:N2N_COMMITTED_UID", "", false)
-      local tk = reaper.GetActiveTake(it)
+      local ok_c, cuid = reaper.GetSetMediaItemInfo_String(it, "P_EXT:N2N_COMMITTED_UID", "", false); local tk = reaper.GetActiveTake(it)
       if tk and reaper.TakeIsMIDI(tk) then
-        local _, notecnt, ccevtcnt = reaper.MIDI_CountEvts(tk); local pb_events = {}
-        for ci = 0, ccevtcnt - 1 do
-          local cok, _, _, ppq, cm, ch, m2, m3 = reaper.MIDI_GetCC(tk, ci)
-          if cok and (cm & 0xF0) == 0xE0 then table.insert(pb_events, { qn=reaper.MIDI_GetProjQNFromPPQPos(tk, ppq), ch=ch, st=(((m3<<7)|m2)-8192)/8191.0*state.mpe_bend_range }) end
-        end
-        for ni = 0, notecnt - 1 do
-          local nok, _, muted, s_ppq, e_ppq, chan, pitch, vel = reaper.MIDI_GetNote(tk, ni)
+        local _, nc, cc = reaper.MIDI_CountEvts(tk); local pb_ev = {}
+        for ci = 0, cc - 1 do local cok, _, _, ppq, cm, ch, m2, m3 = reaper.MIDI_GetCC(tk, ci); if cok and (cm & 0xF0) == 0xE0 then table.insert(pb_ev, {qn=reaper.MIDI_GetProjQNFromPPQPos(tk,ppq),ch=ch,st=(((m3<<7)|m2)-8192)/8191.0*state.mpe_bend_range}) end end
+        for ni = 0, nc - 1 do
+          local nok, _, muted, sp, ep, chan, pitch, vel = reaper.MIDI_GetNote(tk, ni)
           if nok then
-            local s_qn = reaper.MIDI_GetProjQNFromPPQPos(tk, s_ppq); local e_qn = math.max(s_qn + 0.0625, reaper.MIDI_GetProjQNFromPPQPos(tk, e_ppq))
-            local sec = (ok_c and cuid ~= "" and get_section_by_uid(cuid)) or find_section_at_qn(s_qn)
-            local pre_st, out_st = 0.0, 0.0
-            for _, pb in ipairs(pb_events) do
-              if pb.ch == chan then if math.abs(pb.qn - s_qn) < 0.05 then pre_st = pb.st end; if math.abs(pb.qn - e_qn) < 0.05 then out_st = pb.st end end
-            end
-            table.insert(imported, make_default_note({
-              id=state.next_note_id, selected=true, muted=muted, start_qn=s_qn, end_qn=e_qn, pitch=pitch, vel=clamp(vel,1,127), chan=chan,
-              section_uid=sec and sec.uid or state.selected_section_uid, section_override=(ok_c and cuid ~= "" and sec ~= nil),
-              pre_st=math.floor(pre_st*4+0.5)*0.25, out_st=math.floor(out_st*4+0.5)*0.25,
-            }))
+            local sq = reaper.MIDI_GetProjQNFromPPQPos(tk, sp); local eq = math.max(sq + 0.0625, reaper.MIDI_GetProjQNFromPPQPos(tk, ep))
+            local sec = (ok_c and cuid ~= "" and get_section_by_uid(cuid)) or find_section_at_qn(sq); local ps, os = 0.0, 0.0
+            for _, pb in ipairs(pb_ev) do if pb.ch == chan then if math.abs(pb.qn - sq) < 0.05 then ps = pb.st end; if math.abs(pb.qn - eq) < 0.05 then os = pb.st end end end
+            table.insert(imported, make_default_note({ id=state.next_note_id, selected=true, muted=muted, start_qn=sq, end_qn=eq, pitch=pitch, vel=clamp(vel,1,127), chan=chan,
+              section_uid=sec and sec.uid or state.selected_section_uid, section_override=(ok_c and cuid ~= "" and sec ~= nil), pre_st=math.floor(ps*4+0.5)*0.25, out_st=math.floor(os*4+0.5)*0.25 }))
             state.next_note_id = state.next_note_id + 1
           end
         end
@@ -772,29 +704,21 @@ local function u32_be(v) return string.char((v>>24)&0xFF, (v>>16)&0xFF, (v>>8)&0
 local function u16_be(v) return string.char((v>>8)&0xFF, v&0xFF) end
 
 local function export_topline_mid()
-  local file_path = ""
-  if reaper.JS_Dialog_BrowseForSaveFile then
-    local ok, fn = reaper.JS_Dialog_BrowseForSaveFile("Export Topline MIDI (.mid)", "", "N2N_Topline_Melody.mid", "MIDI Files (*.mid)\0*.mid\0")
-    if not ok or fn == "" then return end; file_path = fn
-  else
-    local ok, fn = reaper.GetUserInputs("Export Topline .mid", 1, "Output .mid path:,extrawidth=200", reaper.GetProjectPath("") .. "/N2N_Topline_Melody.mid")
-    if not ok or fn == "" then return end; file_path = fn
-  end
-  if not file_path:lower():match("%.mid$") then file_path = file_path .. ".mid" end
+  local fp = ""
+  if reaper.JS_Dialog_BrowseForSaveFile then local ok, fn = reaper.JS_Dialog_BrowseForSaveFile("Export Topline MIDI (.mid)", "", "N2N_Topline_Melody.mid", "MIDI Files (*.mid)\0*.mid\0"); if not ok or fn == "" then return end; fp = fn
+  else local ok, fn = reaper.GetUserInputs("Export Topline .mid", 1, "Output .mid path:,extrawidth=200", reaper.GetProjectPath("") .. "/N2N_Topline_Melody.mid"); if not ok or fn == "" then return end; fp = fn end
+  if not fp:lower():match("%.mid$") then fp = fp .. ".mid" end
   reallocate_all_mpe_channels()
   local PPQ, events = 480, {}
   local function add_ev(qn, order, bytes) table.insert(events, { tick = math.max(0, math.floor(qn * PPQ + 0.5)), order = order, bytes = bytes }) end
-  local us_per_qn = math.floor(60000000 / math.max(20, reaper.Master_GetTempo()) + 0.5)
-  add_ev(0, 0, string.char(0xFF, 0x51, 0x03, (us_per_qn>>16)&0xFF, (us_per_qn>>8)&0xFF, us_per_qn&0xFF))
+  local upq = math.floor(60000000 / math.max(20, reaper.Master_GetTempo()) + 0.5)
+  add_ev(0, 0, string.char(0xFF, 0x51, 0x03, (upq>>16)&0xFF, (upq>>8)&0xFF, upq&0xFF))
   local _, num, denom = reaper.TimeMap_GetTimeSigAtTime(0, 0)
   add_ev(0, 0, string.char(0xFF, 0x58, 0x04, math.floor(num or 4), math.floor(math.log(math.max(1, denom or 4))/math.log(2)+0.5), 24, 8))
 
   local roots, ch_starts = {}, {}
   for _, n in ipairs(state.notes) do if not n.muted and get_incoming_note(n.id) == nil then table.insert(roots, n) end end
-  for _, r in ipairs(roots) do
-    local sq = get_chain_span_qn(r); local ss = reaper.TimeMap2_QNToTime(0, math.max(0, sq + compute_groove_swing_offset_qn(sq)))
-    ch_starts[r.chan] = ch_starts[r.chan] or {}; table.insert(ch_starts[r.chan], ss)
-  end
+  for _, r in ipairs(roots) do local sq = get_chain_span_qn(r); local ss = reaper.TimeMap2_QNToTime(0, math.max(0, sq + compute_groove_swing_offset_qn(sq))); ch_starts[r.chan] = ch_starts[r.chan] or {}; table.insert(ch_starts[r.chan], ss) end
   for _, l in pairs(ch_starts) do table.sort(l) end
   local tail_sec = (state.mpe_release_tail_ms or 500) / 1000.0
 
@@ -816,15 +740,13 @@ local function export_topline_mid()
       add_ev(math.max(out_e + 0.005, reaper.TimeMap2_timeToQN(0, reset_sec)), 1, string.char(0xE0 + ch, 0, 64))
     end
   end
-
   table.sort(events, function(a, b) if a.tick == b.tick then return a.order < b.order end; return a.tick < b.tick end)
   local trk, prev_tick = {}, 0
   for _, ev in ipairs(events) do trk[#trk + 1] = write_vlq(ev.tick - prev_tick) .. ev.bytes; prev_tick = ev.tick end
   trk[#trk + 1] = write_vlq(0) .. string.char(0xFF, 0x2F, 0x00)
-  local trk_data = table.concat(trk)
-  local f = io.open(file_path, "wb"); if not f then state.status_msg = "Failed to write .mid"; return end
-  f:write("MThd" .. u32_be(6) .. u16_be(0) .. u16_be(1) .. u16_be(PPQ) .. "MTrk" .. u32_be(#trk_data) .. trk_data); f:close()
-  state.status_msg = "Exported Topline -> " .. file_path:match("[^/\\]+$")
+  local td = table.concat(trk); local f = io.open(fp, "wb"); if not f then state.status_msg = "Failed to write .mid"; return end
+  f:write("MThd" .. u32_be(6) .. u16_be(0) .. u16_be(1) .. u16_be(PPQ) .. "MTrk" .. u32_be(#td) .. td); f:close()
+  state.status_msg = "Exported Topline -> " .. fp:match("[^/\\]+$")
 end
 
 local function migrate_legacy_hidden_clip_if_needed()
@@ -835,11 +757,11 @@ local function migrate_legacy_hidden_clip_if_needed()
     if not ok or uid == "" then
       local tk = reaper.GetActiveTake(it)
       if tk and reaper.TakeIsMIDI(tk) then
-        local _, notecnt = reaper.MIDI_CountEvts(tk)
-        for ni = 0, notecnt - 1 do
-          local nok, _, muted, s_ppq, e_ppq, chan, pitch, vel = reaper.MIDI_GetNote(tk, ni)
+        local _, nc = reaper.MIDI_CountEvts(tk)
+        for ni = 0, nc - 1 do
+          local nok, _, muted, sp, ep, chan, pitch, vel = reaper.MIDI_GetNote(tk, ni)
           if nok then
-            local sq, eq = reaper.MIDI_GetProjQNFromPPQPos(tk, s_ppq), reaper.MIDI_GetProjQNFromPPQPos(tk, e_ppq); local sec = find_section_at_qn(sq)
+            local sq, eq = reaper.MIDI_GetProjQNFromPPQPos(tk, sp), reaper.MIDI_GetProjQNFromPPQPos(tk, ep); local sec = find_section_at_qn(sq)
             table.insert(state.notes, make_default_note({ id=state.next_note_id, muted=muted, start_qn=sq, end_qn=math.max(sq+0.125, eq), pitch=pitch, vel=clamp(vel,1,127), chan=chan, section_uid=sec and sec.uid or state.selected_section_uid }))
             state.next_note_id = state.next_note_id + 1
           end
@@ -855,9 +777,7 @@ end
 -- 8. SECTIONS, CHORD CHARTS & OUTPUT TRACK
 --------------------------------------------------------------------------------
 local function compute_section_overflows()
-  for _, sec in ipairs(state.sections) do
-    local ov = 0; for _, n in ipairs(state.notes) do if n.section_uid == sec.uid and n.end_qn > sec.end_qn + 1e-4 then ov = ov + 1 end end; sec.overflow_cnt = ov
-  end
+  for _, sec in ipairs(state.sections) do local ov = 0; for _, n in ipairs(state.notes) do if n.section_uid == sec.uid and n.end_qn > sec.end_qn + 1e-4 then ov = ov + 1 end end; sec.overflow_cnt = ov end
 end
 
 local function refresh_regions_and_sections()
@@ -894,13 +814,8 @@ local function refresh_regions_and_sections()
       table.insert(state.sections, { uid=uid, markrgn_num=rr.markrgn_num, name=rr.name, start_qn=rr.start_qn, end_qn=rr.end_qn, prev_start_qn=rr.start_qn, prev_end_qn=rr.end_qn, pos_sec=rr.pos_sec, bar_qn=rr.bar_qn, rgb=rr.rgb, deleted=false, overflow_cnt=0 })
     end
   end
-
   for i = #state.sections, 1, -1 do
-    local s = state.sections[i]
-    if not matched_sec[s.uid] then
-      local has_n = false; for _, n in ipairs(state.notes) do if n.section_uid == s.uid then has_n = true break end end
-      if has_n then s.deleted = true else table.remove(state.sections, i) end
-    end
+    local s = state.sections[i]; if not matched_sec[s.uid] then local hn = false; for _, n in ipairs(state.notes) do if n.section_uid == s.uid then hn = true break end end; if hn then s.deleted = true else table.remove(state.sections, i) end end
   end
   table.sort(state.sections, function(a, b) return a.start_qn < b.start_qn end); compute_section_overflows()
   if shortened_warn and shortened_warn.overflow_cnt > 0 then state.status_msg = string.format("Warning: '%s' shortened; %d note(s) overflow", shortened_warn.name, shortened_warn.overflow_cnt) end
@@ -984,8 +899,7 @@ end
 local function trigger_preview_note(pitch, vel, chan, duration)
   chan = chan or 0
   for i = #state.previews, 1, -1 do local pr = state.previews[i]; if pr.pitch == pitch and pr.chan == chan then send_midi_note_off(pr.pitch, pr.chan); table.remove(state.previews, i) end end
-  send_midi_note_on(pitch, vel or 100, chan); table.insert(state.previews, { pitch=pitch, chan=chan, expire=reaper.time_precise()+(duration or 0.22) })
-  check_preview_arm_hint()
+  send_midi_note_on(pitch, vel or 100, chan); table.insert(state.previews, { pitch=pitch, chan=chan, expire=reaper.time_precise()+(duration or 0.22) }); check_preview_arm_hint()
 end
 
 local function update_previews()
@@ -1002,8 +916,7 @@ end
 local function apply_n2n_default_key()
   state.tonic_pc = clamp(math.floor(state.gmem_tonic_pc or 0), 0, 11)
   local step = (clamp(math.floor(state.gmem_modal_center or 0), 0, 11) - state.tonic_pc) % 12
-  for i, m in ipairs(CONFIG.modes) do if m.center_step == step then state.mode_idx = i break end end
-  rebuild_row_layout()
+  for i, m in ipairs(CONFIG.modes) do if m.center_step == step then state.mode_idx = i break end end; rebuild_row_layout()
 end
 
 local function read_gmem_harmony(force_report)
@@ -1014,48 +927,35 @@ local function read_gmem_harmony(force_report)
   local count = math.floor(raw_cnt); if count < 0 or count > 32768 then return false end
   if is_finite(rel_tonic) and rel_tonic >= 0 and rel_tonic <= 11 then state.gmem_tonic_pc = math.floor(rel_tonic); state.gmem_has_key = true end
   if is_finite(modal_center) and modal_center >= 0 and modal_center <= 11 then state.gmem_modal_center = math.floor(modal_center) end
-
-  local f_p = (count > 0) and reaper.gmem_read(GMEM_CHORD_BASE+10) or -1; local f_s = (count > 0) and reaper.gmem_read(GMEM_CHORD_BASE+11) or -1
+  local f_p, f_s = (count > 0) and reaper.gmem_read(GMEM_CHORD_BASE+10) or -1, (count > 0) and reaper.gmem_read(GMEM_CHORD_BASE+11) or -1
   local l_idx = GMEM_CHORD_BASE + 10 + math.max(0, count-1)*4
   local sig = string.format("%d:%d:%d:%.2f:%.2f:%.2f:%.2f:%.2f:%d", count, state.gmem_tonic_pc, state.gmem_modal_center, rev_word or 0, f_p, f_s, (count>0) and reaper.gmem_read(l_idx) or -1, (count>0) and reaper.gmem_read(l_idx+2) or -1, math.floor(scale_cnt or 0))
-  if not force_report and sig == state.gmem_sig then return false end
-  state.gmem_sig = sig
+  if not force_report and sig == state.gmem_sig then return false end; state.gmem_sig = sig
 
   local guides, max_end_qn, idx = {}, 0, GMEM_CHORD_BASE + 10
   for i = 0, count - 1 do
     local pitch, raw_s, raw_e = reaper.gmem_read(idx), reaper.gmem_read(idx+1), reaper.gmem_read(idx+2); idx = idx + 4
     if is_finite(pitch) and is_finite(raw_s) and is_finite(raw_e) then
       local p = math.floor(pitch + 0.5)
-      if p >= 0 and p <= 127 and raw_e > raw_s then
-        local sq = round_guide_start_to_32nd(raw_s); local eq = math.max(sq + 0.125, raw_e)
-        if eq > max_end_qn then max_end_qn = eq end; table.insert(guides, { pitch=p, pc=p%12, start_qn=sq, end_qn=eq })
-      end
+      if p >= 0 and p <= 127 and raw_e > raw_s then local sq = round_guide_start_to_32nd(raw_s); local eq = math.max(sq + 0.125, raw_e); if eq > max_end_qn then max_end_qn = eq end; table.insert(guides, {pitch=p,pc=p%12,start_qn=sq,end_qn=eq}) end
     end
   end
-  if is_finite(scale_cnt) and scale_cnt > 0 and scale_cnt <= 8192 then
-    local last_s = reaper.gmem_read(GMEM_SCALE_BASE + 2 + (math.floor(scale_cnt)-1)*2)
-    if is_finite(last_s) and last_s > max_end_qn then max_end_qn = last_s end
-  end
+  if is_finite(scale_cnt) and scale_cnt > 0 and scale_cnt <= 8192 then local ls = reaper.gmem_read(GMEM_SCALE_BASE+2+(math.floor(scale_cnt)-1)*2); if is_finite(ls) and ls > max_end_qn then max_end_qn = ls end end
   state.gmem_guides, state.gmem_song_end_qn = guides, max_end_qn
   if state.sync_key_from_gmem and state.gmem_has_key then apply_n2n_default_key() end
-  if count > 0 then state.status_msg = string.format("N2N Pref: %d harmony guides (1=%s)", #guides, CONFIG.note_names[state.gmem_tonic_pc+1]) end
-  return true
+  if count > 0 then state.status_msg = string.format("N2N Pref: %d harmony guides (1=%s)", #guides, CONFIG.note_names[state.gmem_tonic_pc+1]) end; return true
 end
 
 local function pull_clip_as_harmony_guides()
   local item = reaper.GetSelectedMediaItem(0, 0); local tk = item and reaper.GetActiveTake(item)
   if not tk or not reaper.TakeIsMIDI(tk) then local ed = reaper.MIDIEditor_GetActive(); tk = ed and reaper.MIDIEditor_GetTake(ed) end
   if not tk or not reaper.TakeIsMIDI(tk) then state.status_msg = "No MIDI clip selected" return false end
-  local guides, _, notecnt = {}, reaper.MIDI_CountEvts(tk)
-  for i = 0, notecnt - 1 do
-    local ok, _, muted, s_ppq, e_ppq, _, pitch = reaper.MIDI_GetNote(tk, i)
-    if ok and not muted then
-      local rs, re = reaper.MIDI_GetProjQNFromPPQPos(tk, s_ppq), reaper.MIDI_GetProjQNFromPPQPos(tk, e_ppq)
-      if re > rs then local sq = round_guide_start_to_32nd(rs); table.insert(guides, { pitch=pitch, pc=pitch%12, start_qn=sq, end_qn=math.max(sq+0.125, re) }) end
-    end
+  local guides, _, nc = {}, reaper.MIDI_CountEvts(tk)
+  for i = 0, nc - 1 do
+    local ok, _, muted, sp, ep, _, pitch = reaper.MIDI_GetNote(tk, i)
+    if ok and not muted then local rs, re = reaper.MIDI_GetProjQNFromPPQPos(tk, sp), reaper.MIDI_GetProjQNFromPPQPos(tk, ep); if re > rs then local sq = round_guide_start_to_32nd(rs); table.insert(guides, {pitch=pitch,pc=pitch%12,start_qn=sq,end_qn=math.max(sq+0.125, re)}) end end
   end
-  state.clip_guides, state.harmony_source = guides, "clip_pulled"
-  save_project_state(); state.status_msg = string.format("Pulled %d Mid-Layer harmony guides", #guides); return true
+  state.clip_guides, state.harmony_source = guides, "clip_pulled"; save_project_state(); state.status_msg = string.format("Pulled %d Mid-Layer harmony guides", #guides); return true
 end
 
 --------------------------------------------------------------------------------
@@ -1065,11 +965,9 @@ local function clone_notes_list(list)
   local out = {}
   for _, n in ipairs(list) do
     local vc = { enabled=n.vibrato.enabled, rate=n.vibrato.rate, depth_cents=n.vibrato.depth_cents, delay=n.vibrato.delay, ramp=n.vibrato.ramp, curve=n.vibrato.curve, pattern=n.vibrato.pattern or "consistent" }
-    table.insert(out, make_default_note({
-      id=n.id, selected=n.selected, muted=n.muted, start_qn=n.start_qn, end_qn=n.end_qn, pitch=n.pitch, vel=n.vel, chan=n.chan,
+    table.insert(out, make_default_note({ id=n.id, selected=n.selected, muted=n.muted, start_qn=n.start_qn, end_qn=n.end_qn, pitch=n.pitch, vel=n.vel, chan=n.chan,
       section_uid=n.section_uid, section_override=n.section_override, t1=n.t1, pre_st=n.pre_st, t2=n.t2, t3=n.t3, t4=n.t4, out_st=n.out_st,
-      pre_shape=n.pre_shape, pre_tension=n.pre_tension, out_shape=n.out_shape, out_tension=n.out_tension, connect_to_id=n.connect_to_id, vibrato=vc,
-    }))
+      pre_shape=n.pre_shape, pre_tension=n.pre_tension, out_shape=n.out_shape, out_tension=n.out_tension, connect_to_id=n.connect_to_id, vibrato=vc }))
   end
   return out
 end
@@ -1077,7 +975,6 @@ end
 local function push_undo() table.insert(state.undo_stack, clone_notes_list(state.notes)); if #state.undo_stack > 60 then table.remove(state.undo_stack, 1) end; state.redo_stack = {} end
 local function pop_undo() if #state.undo_stack == 0 then return end; table.insert(state.redo_stack, clone_notes_list(state.notes)); state.notes = table.remove(state.undo_stack); compute_section_overflows(); sync_section_clips(); state.status_msg = "Undo" end
 local function pop_redo() if #state.redo_stack == 0 then return end; table.insert(state.undo_stack, clone_notes_list(state.notes)); state.notes = table.remove(state.redo_stack); compute_section_overflows(); sync_section_clips(); state.status_msg = "Redo" end
-
 local function get_selected_notes() local r = {}; for _, n in ipairs(state.notes) do if n.selected then table.insert(r, n) end end; return r end
 local function deselect_all() for _, n in ipairs(state.notes) do n.selected = false end end
 local function select_all() for _, n in ipairs(state.notes) do n.selected = true end end
@@ -1090,10 +987,8 @@ local function toggle_mute_selected()
 end
 
 local function remove_note_by_index(idx)
-  local victim = state.notes[idx]; if not victim then return end
-  if victim.connect_to_id then disconnect_note_outgoing(victim) end
-  local inc = get_incoming_note(victim.id); if inc then disconnect_note_outgoing(inc) end
-  table.remove(state.notes, idx)
+  local v = state.notes[idx]; if not v then return end
+  if v.connect_to_id then disconnect_note_outgoing(v) end; local inc = get_incoming_note(v.id); if inc then disconnect_note_outgoing(inc) end; table.remove(state.notes, idx)
 end
 
 local function get_repetition_start_qns(base_qn, sec, use_shift, use_ctrl)
@@ -1121,10 +1016,8 @@ local function copy_notes_to_buf(src_notes, ref_qn)
   local buf, id_to_idx = {}, {}; for i, n in ipairs(src_notes) do id_to_idx[n.id] = i end
   for _, n in ipairs(src_notes) do
     local vc = { enabled=n.vibrato.enabled, rate=n.vibrato.rate, depth_cents=n.vibrato.depth_cents, delay=n.vibrato.delay, ramp=n.vibrato.ramp, curve=n.vibrato.curve, pattern=n.vibrato.pattern or "consistent" }
-    table.insert(buf, {
-      rel_start=n.start_qn-ref_qn, dur=n.end_qn-n.start_qn, pitch=n.pitch, vel=n.vel, t1=n.t1, pre_st=n.pre_st, t2=n.t2, t3=n.t3, t4=n.t4, out_st=n.out_st,
-      pre_shape=n.pre_shape, pre_tension=n.pre_tension, out_shape=n.out_shape, out_tension=n.out_tension, connect_to_idx=id_to_idx[n.connect_to_id], section_override=n.section_override, vibrato=vc,
-    })
+    table.insert(buf, { rel_start=n.start_qn-ref_qn, dur=n.end_qn-n.start_qn, pitch=n.pitch, vel=n.vel, t1=n.t1, pre_st=n.pre_st, t2=n.t2, t3=n.t3, t4=n.t4, out_st=n.out_st,
+      pre_shape=n.pre_shape, pre_tension=n.pre_tension, out_shape=n.out_shape, out_tension=n.out_tension, connect_to_idx=id_to_idx[n.connect_to_id], section_override=n.section_override, vibrato=vc })
   end
   return buf
 end
@@ -1138,11 +1031,11 @@ end
 local function paste_items_at_base(items, base_qn, target_sec_uid, sec_bounds)
   if #items == 0 then return 0 end; local created = {}
   for i, c in ipairs(items) do
-    local s_qn = math.max(0, base_qn + c.rel_start); local own_uid, is_ov = target_sec_uid, false
-    if not own_uid then local sec = find_section_at_qn(s_qn); own_uid = sec and sec.uid or state.selected_section_uid
-    elseif sec_bounds then is_ov = (c.section_override or s_qn < sec_bounds.start_qn - 1e-4 or s_qn >= sec_bounds.end_qn - 1e-4) end
+    local sq = math.max(0, base_qn + c.rel_start); local own_uid, is_ov = target_sec_uid, false
+    if not own_uid then local sec = find_section_at_qn(sq); own_uid = sec and sec.uid or state.selected_section_uid
+    elseif sec_bounds then is_ov = (c.section_override or sq < sec_bounds.start_qn - 1e-4 or sq >= sec_bounds.end_qn - 1e-4) end
     local vc = { enabled=c.vibrato.enabled, rate=c.vibrato.rate, depth_cents=c.vibrato.depth_cents, delay=c.vibrato.delay, ramp=c.vibrato.ramp, curve=c.vibrato.curve, pattern=c.vibrato.pattern or "consistent" }
-    local n = make_default_note({ id=state.next_note_id, selected=true, start_qn=s_qn, end_qn=s_qn+c.dur, pitch=c.pitch, vel=c.vel, section_uid=own_uid, section_override=is_ov,
+    local n = make_default_note({ id=state.next_note_id, selected=true, start_qn=sq, end_qn=sq+c.dur, pitch=c.pitch, vel=c.vel, section_uid=own_uid, section_override=is_ov,
       t1=c.t1, pre_st=c.pre_st, t2=c.t2, t3=c.t3, t4=c.t4, out_st=c.out_st, pre_shape=c.pre_shape, pre_tension=c.pre_tension, out_shape=c.out_shape, out_tension=c.out_tension, vibrato=vc })
     state.next_note_id = state.next_note_id + 1; table.insert(state.notes, n); created[i] = n
   end
@@ -1163,17 +1056,14 @@ local function duplicate_selected()
 end
 
 local function count_section_notes(sec_uid) local c=0; for _,n in ipairs(state.notes) do if n.section_uid==sec_uid then c=c+1 end end; return c end
-
 local function copy_section_notes(sec)
   local owned = {}; for _, n in ipairs(state.notes) do if n.section_uid == sec.uid then table.insert(owned, n) end end
-  state.section_clipboard = copy_notes_to_buf(owned, sec.start_qn)
-  state.status_msg = string.format("Copied %d note(s) owned by [%s]", #state.section_clipboard, sec.name)
+  state.section_clipboard = copy_notes_to_buf(owned, sec.start_qn); state.status_msg = string.format("Copied %d note(s) owned by [%s]", #state.section_clipboard, sec.name)
 end
-
 local function paste_section_notes(sec)
   if #state.section_clipboard == 0 then return end; push_undo(); deselect_all(); state.selected_section_uid = sec.uid
-  local cnt = paste_items_at_base(state.section_clipboard, sec.start_qn, sec.uid, sec)
-  compute_section_overflows(); sync_section_clips(); state.status_msg = string.format("Pasted %d note(s) into [%s]", cnt, sec.name)
+  local cnt = paste_items_at_base(state.section_clipboard, sec.start_qn, sec.uid, sec); compute_section_overflows(); sync_section_clips()
+  state.status_msg = string.format("Pasted %d note(s) into [%s]", cnt, sec.name)
 end
 
 local function get_phrase_owned_notes(sec, p_start_qn, p_end_qn, is_first, is_last)
@@ -1188,24 +1078,23 @@ local function get_phrase_owned_notes(sec, p_start_qn, p_end_qn, is_first, is_la
   return list
 end
 
-local function copy_phrase_notes(sec, p_start_qn, p_end_qn, is_first, is_last, label)
-  state.phrase_clipboard = copy_notes_to_buf(get_phrase_owned_notes(sec, p_start_qn, p_end_qn, is_first, is_last), p_start_qn)
-  state.status_msg = string.format("Copied %d phrase note(s) [%s]", #state.phrase_clipboard, label)
+local function copy_phrase_notes(sec, ps, pe, is_f, is_l, lbl)
+  state.phrase_clipboard = copy_notes_to_buf(get_phrase_owned_notes(sec, ps, pe, is_f, is_l), ps)
+  state.status_msg = string.format("Copied %d phrase note(s) [%s]", #state.phrase_clipboard, lbl)
 end
 
-local function paste_phrase_notes(sec, p_start_qn, p_end_qn, is_first, is_last, label, mode)
+local function paste_phrase_notes(sec, ps, pe, is_f, is_l, lbl, mode)
   if #state.phrase_clipboard == 0 then return end; mode = mode or state.phrase_paste_mode; push_undo(); deselect_all()
   if mode == "replace" then
-    local drop = {}; for _, n in ipairs(get_phrase_owned_notes(sec, p_start_qn, p_end_qn, is_first, is_last)) do drop[n.id] = true end
+    local drop = {}; for _, n in ipairs(get_phrase_owned_notes(sec, ps, pe, is_f, is_l)) do drop[n.id] = true end
     for k = #state.notes, 1, -1 do if drop[state.notes[k].id] then remove_note_by_index(k) end end
   end
-  local cnt = paste_items_at_base(state.phrase_clipboard, p_start_qn, sec.uid, sec)
-  compute_section_overflows(); sync_section_clips(); state.status_msg = string.format("Pasted (%s) %d note(s) -> [%s]", mode, cnt, label)
+  local cnt = paste_items_at_base(state.phrase_clipboard, ps, sec.uid, sec); compute_section_overflows(); sync_section_clips()
+  state.status_msg = string.format("Pasted (%s) %d note(s) -> [%s]", mode, cnt, lbl)
 end
 
 local function quantize_selected()
-  local sel = get_selected_notes(); if #sel == 0 then sel = state.notes end; if #sel == 0 then return end
-  push_undo(); local g = get_grid_qn()
+  local sel = get_selected_notes(); if #sel == 0 then sel = state.notes end; if #sel == 0 then return end; push_undo(); local g = get_grid_qn()
   for _, n in ipairs(sel) do
     local dur = n.end_qn - n.start_qn; n.start_qn = snap_qn(n.start_qn); n.end_qn = math.max(n.start_qn + g*0.25, n.start_qn + dur)
     if not n.section_override then local s = find_section_at_qn(n.start_qn); if s then n.section_uid = s.uid end end
@@ -1213,9 +1102,7 @@ local function quantize_selected()
   compute_section_overflows(); sync_section_clips(); state.status_msg = "Quantized notes to grid"
 end
 
-local function step_pitch_diatonic(pitch, dir)
-  local p = pitch + dir; while p >= 0 and p <= 127 do if is_pitch_diatonic(p) then return p end; p = p + dir end; return pitch
-end
+local function step_pitch_diatonic(pitch, dir) local p = pitch + dir; while p >= 0 and p <= 127 do if is_pitch_diatonic(p) then return p end; p = p + dir end; return pitch end
 
 local function move_selected_by_arrows(d_pitch, d_grid, shift_held, alt_held, ctrl_held)
   local sel = get_selected_notes(); if #sel == 0 then return end; push_undo()
@@ -1231,8 +1118,7 @@ local function move_selected_by_arrows(d_pitch, d_grid, shift_held, alt_held, ct
     if shift_held and d_grid ~= 0 then n.end_qn = math.max(n.start_qn + g*0.25, n.end_qn + d_grid*g)
     elseif d_grid ~= 0 then
       local dur = n.end_qn - n.start_qn; n.start_qn = math.max(0, n.start_qn + d_grid*g); n.end_qn = n.start_qn + dur
-      if not n.section_override then local s = find_section_at_qn(n.start_qn); if s then n.section_uid = s.uid end end
-      preview_target = n
+      if not n.section_override then local s = find_section_at_qn(n.start_qn); if s then n.section_uid = s.uid end end; preview_target = n
     end
   end
   if rejected then state.status_msg = string.format("Blocked: exceeds ±%d st range", state.mpe_bend_range)
@@ -1244,23 +1130,19 @@ end
 -- 11. VECTOR & ANTI-ALIASED CURVE PRIMITIVES
 --------------------------------------------------------------------------------
 local function draw_filled_roundrect(x, y, w, h, r)
-  x, y, w, h = math.floor(x+0.5), math.floor(y+0.5), math.floor(w+0.5), math.floor(h+0.5)
-  if w <= 0 or h <= 0 then return end
-  r = math.floor(math.min(r or 5, w/2, h/2))
-  if r <= 1 then gfx.rect(x, y, w, h, 1); return end
+  x, y, w, h = math.floor(x+0.5), math.floor(y+0.5), math.floor(w+0.5), math.floor(h+0.5); if w <= 0 or h <= 0 then return end
+  r = math.floor(math.min(r or 5, w/2, h/2)); if r <= 1 then gfx.rect(x, y, w, h, 1); return end
   gfx.rect(x+r, y, w-2*r, h, 1); gfx.rect(x, y+r, r, h-2*r, 1); gfx.rect(x+w-r, y+r, r, h-2*r, 1)
   gfx.circle(x+r, y+r, r, 1, 1); gfx.circle(x+w-r-1, y+r, r, 1, 1); gfx.circle(x+r, y+h-r-1, r, 1, 1); gfx.circle(x+w-r-1, y+h-r-1, r, 1, 1)
 end
 
 local function draw_bordered_roundrect(x, y, w, h, r, bp, bcol, fcol, fa)
-  set_col(bcol, fa or 1.0); draw_filled_roundrect(x, y, w, h, r)
-  local b = bp or 1.5
+  set_col(bcol, fa or 1.0); draw_filled_roundrect(x, y, w, h, r); local b = bp or 1.5
   if w > b*2+2 and h > b*2+2 then set_col(fcol, fa or 1.0); draw_filled_roundrect(x+b, y+b, w-b*2, h-b*2, math.max(1, r-b)) end
 end
 
 local function draw_dashed_line(x1, y1, x2, y2, dash, gap)
-  local dx, dy = x2-x1, y2-y1; local len = math.sqrt(dx*dx+dy*dy); if len < 1 then return end
-  local ux, uy, pos = dx/len, dy/len, 0
+  local dx, dy = x2-x1, y2-y1; local len = math.sqrt(dx*dx+dy*dy); if len < 1 then return end; local ux, uy, pos = dx/len, dy/len, 0
   while pos < len do local pe = math.min(pos+dash, len); gfx.line(x1+ux*pos, y1+uy*pos, x1+ux*pe, y1+uy*pe, 1); pos = pos+dash+gap end
 end
 
@@ -1275,15 +1157,9 @@ end
 local function draw_thick_aa_curve(pts, col, alpha)
   if #pts < 2 then return end
   set_col(col, (alpha or 1.0) * 0.28)
-  for i = 1, #pts - 1 do
-    local x1, y1, x2, y2 = pts[i][1], pts[i][2], pts[i+1][1], pts[i+1][2]; local dx, dy = x2-x1, y2-y1; local len = math.sqrt(dx*dx+dy*dy)
-    if len > 0.2 then local nx, ny = (-dy/len)*1.4, (dx/len)*1.4; gfx.line(x1+nx,y1+ny,x2+nx,y2+ny,1); gfx.line(x1-nx,y1-ny,x2-nx,y2-ny,1) end
-  end
+  for i = 1, #pts - 1 do local x1,y1,x2,y2=pts[i][1],pts[i][2],pts[i+1][1],pts[i+1][2]; local dx,dy=x2-x1,y2-y1; local l=math.sqrt(dx*dx+dy*dy); if l>0.2 then local nx,ny=(-dy/l)*1.4,(dx/l)*1.4; gfx.line(x1+nx,y1+ny,x2+nx,y2+ny,1); gfx.line(x1-nx,y1-ny,x2-nx,y2-ny,1) end end
   set_col(col, alpha or 1.0)
-  for i = 1, #pts - 1 do
-    local x1, y1, x2, y2 = pts[i][1], pts[i][2], pts[i+1][1], pts[i+1][2]; local dx, dy = x2-x1, y2-y1; local len = math.sqrt(dx*dx+dy*dy)
-    if len > 0.2 then local nx, ny = (-dy/len)*0.7, (dx/len)*0.7; gfx.line(x1,y1,x2,y2,1); gfx.line(x1+nx,y1+ny,x2+nx,y2+ny,1); gfx.line(x1-nx,y1-ny,x2-nx,y2-ny,1) end
-  end
+  for i = 1, #pts - 1 do local x1,y1,x2,y2=pts[i][1],pts[i][2],pts[i+1][1],pts[i+1][2]; local dx,dy=x2-x1,y2-y1; local l=math.sqrt(dx*dx+dy*dy); if l>0.2 then local nx,ny=(-dy/l)*0.7,(dx/l)*0.7; gfx.line(x1,y1,x2,y2,1); gfx.line(x1+nx,y1+ny,x2+nx,y2+ny,1); gfx.line(x1-nx,y1-ny,x2-nx,y2-ny,1) end end
 end
 
 local function draw_text_centered(str, x, y, w, h) local tw, th = gfx.measurestr(str); gfx.x, gfx.y = math.floor(x+(w-tw)*0.5), math.floor(y+(h-th)*0.5); gfx.drawstr(str, 0, x+w, y+h) end
@@ -1292,16 +1168,12 @@ local function draw_text_right(str, x, y, w, h) local tw, th = gfx.measurestr(st
 
 local function register_btn(id, x, y, w, h, label, active, on_click, custom_active_bg, custom_rest_bg, on_right_click)
   local bx, by, bw, bh = x, y, w, h
-  table.insert(state.ui_controls, {
-    id = id, x = bx, y = by, w = bw, h = bh,
-    on_click = on_click and function() on_click(bx, by, bw, bh) end or nil,
-    on_right_click = on_right_click and function() on_right_click(bx, by, bw, bh) end or nil,
-  })
-  local hovered = gfx.mouse_x >= bx and gfx.mouse_x <= bx + bw and gfx.mouse_y >= by and gfx.mouse_y <= by + bh
+  table.insert(state.ui_controls, { id=id, x=bx, y=by, w=bw, h=bh, on_click=on_click and function() on_click(bx,by,bw,bh) end or nil, on_right_click=on_right_click and function() on_right_click(bx,by,bw,bh) end or nil })
+  local hov = gfx.mouse_x >= bx and gfx.mouse_x <= bx + bw and gfx.mouse_y >= by and gfx.mouse_y <= by + bh
   local act_col = custom_active_bg or {0.22, 0.45, 0.78}
   local rest_col = custom_rest_bg or (CONFIG.dark_mode and {0.20, 0.22, 0.26} or {0.93, 0.94, 0.96})
   local hov_col = custom_rest_bg and mix_rgb(custom_rest_bg, {1,1,1}, 0.14) or (CONFIG.dark_mode and {0.25, 0.27, 0.32} or {0.88, 0.90, 0.94})
-  local bg = active and act_col or (hovered and hov_col or rest_col)
+  local bg = active and act_col or (hov and hov_col or rest_col)
   set_col(bg); draw_filled_roundrect(bx, by, bw, bh, 6)
   set_col((active or custom_rest_bg) and contrast_text_col(bg) or (CONFIG.dark_mode and {0.88,0.90,0.94} or {0.18,0.21,0.26}))
   gfx.setfont(1, "Segoe UI", 14); draw_text_centered(label, bx, by, bw, bh)
@@ -1334,88 +1206,61 @@ end
 local function draw_custom_titlebar_and_resize_grip()
   if not state.frameless or state.titlebar_h <= 0 then return end
   local h = state.titlebar_h
-  set_col(CONFIG.dark_mode and {0.08, 0.09, 0.11} or {0.90, 0.91, 0.94}); gfx.rect(0, 0, gfx.w, h, 1)
-  set_col(CONFIG.dark_mode and {0.20, 0.22, 0.26} or {0.80, 0.82, 0.86}); gfx.line(0, h - 1, gfx.w, h - 1)
-  gfx.setfont(1, "Segoe UI", 13); set_col(CONFIG.dark_mode and {0.78, 0.82, 0.88} or {0.22, 0.24, 0.28})
+  set_col(CONFIG.dark_mode and {0.08,0.09,0.11} or {0.90,0.91,0.94}); gfx.rect(0, 0, gfx.w, h, 1)
+  set_col(CONFIG.dark_mode and {0.20,0.22,0.26} or {0.80,0.82,0.86}); gfx.line(0, h - 1, gfx.w, h - 1)
+  gfx.setfont(1, "Segoe UI", 13); set_col(CONFIG.dark_mode and {0.78,0.82,0.88} or {0.22,0.24,0.28})
   draw_text_left(WIN_TITLE, 12, 0, gfx.w - 80, h)
   local cx, cy = gfx.w - 18, h * 0.5
   local hov = math.abs(gfx.mouse_x - cx) <= 8 and math.abs(gfx.mouse_y - cy) <= 8
   table.insert(state.ui_controls, { id = "win_close", x = cx - 9, y = cy - 9, w = 18, h = 18, on_click = function() state.should_close = true end })
-  set_col(hov and {0.95, 0.35, 0.35} or {0.85, 0.29, 0.29}); gfx.circle(cx, cy, 7, 1, 1)
-
-  set_col(CONFIG.dark_mode and {0.50, 0.54, 0.62} or {0.55, 0.58, 0.64}, 0.75)
-  gfx.line(gfx.w - 13, gfx.h - 3, gfx.w - 3, gfx.h - 13)
-  gfx.line(gfx.w - 9,  gfx.h - 3, gfx.w - 3, gfx.h - 9)
-  gfx.line(gfx.w - 5,  gfx.h - 3, gfx.w - 3, gfx.h - 5)
+  set_col(hov and {0.95,0.35,0.35} or {0.85,0.29,0.29}); gfx.circle(cx, cy, 7, 1, 1)
+  set_col(CONFIG.dark_mode and {0.50,0.54,0.62} or {0.55,0.58,0.64}, 0.75)
+  gfx.line(gfx.w - 13, gfx.h - 3, gfx.w - 3, gfx.h - 13); gfx.line(gfx.w - 9, gfx.h - 3, gfx.w - 3, gfx.h - 9); gfx.line(gfx.w - 5, gfx.h - 3, gfx.w - 3, gfx.h - 5)
 end
 
--- Compact Top Toolbar: fits easily within 1200px minimum width!
 local function draw_toolbar()
   local ty = state.titlebar_h
   set_col(CONFIG.dark_mode and {0.13,0.14,0.17} or {0.98,0.98,0.99}); gfx.rect(0, ty, gfx.w, state.toolbar_h, 1)
   set_col(CONFIG.dark_mode and {0.22,0.24,0.28} or {0.86,0.88,0.91}); gfx.line(0, ty + state.toolbar_h - 1, gfx.w, ty + state.toolbar_h - 1)
-
   local x, y, h = 8, ty + 9, 32
 
   register_btn("file_menu", x, y, 50, h, "File", false, function(bx, by, bw, bh)
     gfx.x, gfx.y = bx, by + bh; local tracks, rep_sub, mrg_sub = {}, "", ""
-    for i = 0, reaper.CountTracks(0) - 1 do
-      local tr = reaper.GetTrack(0, i); local _, tn = reaper.GetTrackName(tr)
-      if tn ~= HIDDEN_TRACK_NAME then table.insert(tracks, tr); local l = string.format("%d: %s|", i+1, tn); rep_sub = rep_sub..l; mrg_sub = mrg_sub..l end
-    end
+    for i = 0, reaper.CountTracks(0) - 1 do local tr = reaper.GetTrack(0, i); local _, tn = reaper.GetTrackName(tr); if tn ~= HIDDEN_TRACK_NAME then table.insert(tracks, tr); local l = string.format("%d: %s|", i+1, tn); rep_sub = rep_sub..l; mrg_sub = mrg_sub..l end end
     local ch = gfx.showmenu(">Load MIDI from Track (Replace)|" .. rep_sub .. "<|>Load MIDI from Track (Merge)|" .. mrg_sub .. "<|Export Topline (.mid)...||Clear All Content...")
     local n_tr = #tracks
     if ch >= 1 and ch <= n_tr then push_undo(); load_midi_from_track(tracks[ch], "replace")
     elseif ch >= n_tr + 1 and ch <= n_tr * 2 then push_undo(); load_midi_from_track(tracks[ch - n_tr], "merge")
-    elseif ch == n_tr * 2 + 1 then export_topline_mid()
-    elseif ch == n_tr * 2 + 2 then clear_all_content() end
+    elseif ch == n_tr * 2 + 1 then export_topline_mid() elseif ch == n_tr * 2 + 2 then clear_all_content() end
   end); x = x + 54
 
   local out_lbl = "Out: None"
   if state.output_track and reaper.ValidatePtr2(0, state.output_track, "MediaTrack*") then local _, tn = reaper.GetTrackName(state.output_track); out_lbl = "Out: " .. tn:sub(1, 11) end
   register_btn("out_track", x, y, 114, h, out_lbl, state.output_track ~= nil, function(bx, by, bw, bh)
-    gfx.x, gfx.y = bx, by + bh
-    local menu = (state.output_track == nil and "!" or "") .. "None (Clear Send)|" .. (state.auto_arm_preview and "!" or "") .. "Auto-Arm Out Track for Click Preview|>Select Output Track|"
-    local tracks = {}
-    for i = 0, reaper.CountTracks(0) - 1 do
-      local tr = reaper.GetTrack(0, i); local _, tn = reaper.GetTrackName(tr)
-      if tn ~= HIDDEN_TRACK_NAME then table.insert(tracks, tr); menu = menu .. (state.output_track == tr and "!" or "") .. string.format("%d: %s|", i+1, tn) end
-    end
+    gfx.x, gfx.y = bx, by + bh; local menu = (state.output_track == nil and "!" or "") .. "None (Clear Send)|" .. (state.auto_arm_preview and "!" or "") .. "Auto-Arm Out Track for Click Preview|>Select Output Track|"; local tracks = {}
+    for i = 0, reaper.CountTracks(0) - 1 do local tr = reaper.GetTrack(0, i); local _, tn = reaper.GetTrackName(tr); if tn ~= HIDDEN_TRACK_NAME then table.insert(tracks, tr); menu = menu .. (state.output_track == tr and "!" or "") .. string.format("%d: %s|", i+1, tn) end end
     local choice = gfx.showmenu(menu .. "<")
-    if choice == 1 then select_output_track(nil)
-    elseif choice == 2 then state.auto_arm_preview = not state.auto_arm_preview; apply_auto_arm_if_enabled(state.output_track); save_project_state()
+    if choice == 1 then select_output_track(nil) elseif choice == 2 then state.auto_arm_preview = not state.auto_arm_preview; apply_auto_arm_if_enabled(state.output_track); save_project_state()
     elseif choice >= 3 and choice <= #tracks + 2 then select_output_track(tracks[choice - 2]) end
   end); x = x + 118
 
   local cm_lbl, cm_col, cm_act = "Commit", nil, false
-  if state.commit_state == "committed" then
-    cm_lbl = (state.audition_mode == "draft") and "Draft Audition" or "Committed ✓"
-    cm_col = (state.audition_mode == "draft") and {0.22,0.45,0.78} or {0.18,0.56,0.34}; cm_act = true
+  if state.commit_state == "committed" then cm_lbl = (state.audition_mode == "draft") and "Draft Audition" or "Committed ✓"; cm_col = (state.audition_mode == "draft") and {0.22,0.45,0.78} or {0.18,0.56,0.34}; cm_act = true
   elseif state.commit_state == "dirty" then cm_lbl, cm_col, cm_act = "Recommit*", {0.78,0.48,0.14}, true end
-
   local function open_commit_menu(bx, by, bw, bh)
     gfx.x, gfx.y = bx, by + bh
     local c = gfx.showmenu(string.format("%s|>Audition Playback|%sDraft (Hidden Track)|%sCommitted (Output Track)|<|Clear N2N Committed Clips from Output Track",
       (state.commit_state == "none") and "Commit Clips to Output Track" or "Recommit Updated Clips to Output Track",
-      (state.audition_mode == "draft" or state.commit_state == "none") and "!" or "",
-      (state.audition_mode == "committed" and state.commit_state ~= "none") and "!" or ""))
-    if c == 1 then commit_clips_to_output_track()
-    elseif c == 2 then state.audition_mode = "draft"; apply_audition_mute_routing(); save_project_state(); state.status_msg = "Auditioning Draft (Hidden Track)"
-    elseif c == 3 then state.audition_mode = "committed"; apply_audition_mute_routing(); save_project_state(); state.status_msg = "Auditioning Committed Track Clips"
-    elseif c == 4 then clear_committed_clips_from_output_track() end
+      (state.audition_mode == "draft" or state.commit_state == "none") and "!" or "", (state.audition_mode == "committed" and state.commit_state ~= "none") and "!" or ""))
+    if c == 1 then commit_clips_to_output_track() elseif c == 2 then state.audition_mode = "draft"; apply_audition_mute_routing(); save_project_state(); state.status_msg = "Auditioning Draft (Hidden Track)"
+    elseif c == 3 then state.audition_mode = "committed"; apply_audition_mute_routing(); save_project_state(); state.status_msg = "Auditioning Committed Track Clips" elseif c == 4 then clear_committed_clips_from_output_track() end
   end
-
-  register_btn("commit_btn", x, y, 90, h, cm_lbl, cm_act, function(bx, by, bw, bh)
-    if state.commit_state == "committed" then open_commit_menu(bx, by, bw, bh) else commit_clips_to_output_track() end
-  end, cm_col, nil, open_commit_menu); x = x + 94
+  register_btn("commit_btn", x, y, 90, h, cm_lbl, cm_act, function(bx, by, bw, bh) if state.commit_state == "committed" then open_commit_menu(bx, by, bw, bh) else commit_clips_to_output_track() end end, cm_col, nil, open_commit_menu); x = x + 94
 
   local is_dia = (state.view_mode == "diatonic")
-  register_btn("mode_btn", x, y, 78, h, is_dia and "Diatonic" or "Chromatic", is_dia, function()
-    state.view_mode = is_dia and "chromatic" or "diatonic"; rebuild_row_layout(); save_global_prefs(); save_project_state()
-  end); x = x + 82
+  register_btn("mode_btn", x, y, 78, h, is_dia and "Diatonic" or "Chromatic", is_dia, function() state.view_mode = is_dia and "chromatic" or "diatonic"; rebuild_row_layout(); save_global_prefs(); save_project_state() end); x = x + 82
 
-  local key_lbl = (state.sync_key_from_gmem and "N2N " or "") .. string.format("1=%s", CONFIG.note_names[state.tonic_pc + 1])
-  register_btn("nns_key", x, y, 72, h, key_lbl, state.sync_key_from_gmem, function(bx, by, bw, bh)
+  register_btn("nns_key", x, y, 72, h, (state.sync_key_from_gmem and "N2N " or "") .. string.format("1=%s", CONFIG.note_names[state.tonic_pc + 1]), state.sync_key_from_gmem, function(bx, by, bw, bh)
     gfx.x, gfx.y = bx, by + bh
     local n2n_str = state.gmem_has_key and string.format("Numbers2Notes Default Key (gmem 1=%s)", CONFIG.note_names[state.gmem_tonic_pc + 1]) or "Numbers2Notes Default Key (from gmem)"
     local menu = (state.sync_key_from_gmem and "!" or "") .. n2n_str .. "|>Manual Tonic (1 = Major Root)|"
@@ -1438,8 +1283,7 @@ local function draw_toolbar()
   register_btn("grid_menu", x, y, g_w, h, g_lbl, false, function(bx, by, bw, bh)
     gfx.x, gfx.y = bx, by + bh; local menu = ""
     for i, opt in ipairs(CONFIG.grid_options) do menu = menu .. (state.grid_idx == i and "!" or "") .. opt.label .. "|" end
-    menu = menu .. "|" .. (state.triplet and "!" or "") .. "Triplet (T)|" .. (state.snap and "!" or "") .. "Snap to Grid"
-    local ch = gfx.showmenu(menu)
+    local ch = gfx.showmenu(menu .. "|" .. (state.triplet and "!" or "") .. "Triplet (T)|" .. (state.snap and "!" or "") .. "Snap to Grid")
     if ch >= 1 and ch <= #CONFIG.grid_options then state.grid_idx = ch elseif ch == #CONFIG.grid_options + 1 then state.triplet = not state.triplet elseif ch == #CONFIG.grid_options + 2 then state.snap = not state.snap end
     save_global_prefs()
   end); x = x + g_w + 4
@@ -1450,32 +1294,21 @@ local function draw_toolbar()
   register_btn("bend_range_btn", x, y, 60, h, string.format("±%dst%s", state.mpe_bend_range, state.instrument_bend_verified and "✓" or "?"), false, function(bx, by, bw, bh)
     gfx.x, gfx.y = bx, by + bh; local menu = ""
     for _, br in ipairs(CONFIG.bend_ranges) do menu = menu .. (state.mpe_bend_range == br and "!" or "") .. string.format("Bend Range: ±%d st|", br) end
-    menu = menu .. "|Send RPN 0,0 (±" .. state.mpe_bend_range .. " st) to Instrument|" .. (state.instrument_bend_verified and "!" or "") .. "Confirm Instrument Matches ±" .. state.mpe_bend_range .. " st"
-    local c = gfx.showmenu(menu)
-    if c >= 1 and c <= #CONFIG.bend_ranges then
-      if CONFIG.bend_ranges[c] ~= state.mpe_bend_range then state.mpe_bend_range = CONFIG.bend_ranges[c]; state.instrument_bend_verified = false; save_global_prefs(); sync_section_clips() end
-    elseif c == #CONFIG.bend_ranges + 1 then send_bend_range_rpn(state.mpe_bend_range)
-    elseif c == #CONFIG.bend_ranges + 2 then state.instrument_bend_verified = not state.instrument_bend_verified; save_project_state() end
+    local c = gfx.showmenu(menu .. "|Send RPN 0,0 (±" .. state.mpe_bend_range .. " st) to Instrument|" .. (state.instrument_bend_verified and "!" or "") .. "Confirm Instrument Matches ±" .. state.mpe_bend_range .. " st")
+    if c >= 1 and c <= #CONFIG.bend_ranges then if CONFIG.bend_ranges[c] ~= state.mpe_bend_range then state.mpe_bend_range = CONFIG.bend_ranges[c]; state.instrument_bend_verified = false; save_global_prefs(); sync_section_clips() end
+    elseif c == #CONFIG.bend_ranges + 1 then send_bend_range_rpn(state.mpe_bend_range) elseif c == #CONFIG.bend_ranges + 2 then state.instrument_bend_verified = not state.instrument_bend_verified; save_project_state() end
   end, play_teal, play_teal); x = x + 64
 
   register_btn("autoscroll_btn", x, y, 74, h, "AutoScroll", state.auto_scroll, function() state.auto_scroll = not state.auto_scroll; save_global_prefs() end); x = x + 78
-
-  if #get_selected_notes() > 0 then
-    register_btn("clear_sel_btn", x, y, 66, h, "Clear Sel", false, function() deselect_all(); state.status_msg = "Selection cleared" end); x = x + 70
-  end
+  if #get_selected_notes() > 0 then register_btn("clear_sel_btn", x, y, 66, h, "Clear Sel", false, function() deselect_all(); state.status_msg = "Selection cleared" end); x = x + 70 end
 
   local deleted_secs = {}; for _, s in ipairs(state.sections) do if s.deleted then table.insert(deleted_secs, s) end end
   if #deleted_secs > 0 then
     register_btn("orphan_btn", x, y, 80, h, "Orphan(" .. #deleted_secs .. ")", true, function(bx, by, bw, bh)
       gfx.x, gfx.y = bx, by + bh; local dsec = deleted_secs[1]
       local c = gfx.showmenu(string.format("#Deleted Region: %s (%d notes)|Keep Orphaned|Reassign to Auto|Delete Notes & Clip", dsec.name, count_section_notes(dsec.uid)))
-      if c == 3 then
-        push_undo(); for _, n in ipairs(state.notes) do if n.section_uid == dsec.uid then local t = find_section_at_qn(n.start_qn); n.section_uid = t and t.uid or nil; n.section_override = false end end
-        for k = #state.sections, 1, -1 do if state.sections[k].uid == dsec.uid then table.remove(state.sections, k) break end end; sync_section_clips()
-      elseif c == 4 then
-        push_undo(); for k = #state.notes, 1, -1 do if state.notes[k].section_uid == dsec.uid then remove_note_by_index(k) end end
-        for k = #state.sections, 1, -1 do if state.sections[k].uid == dsec.uid then table.remove(state.sections, k) break end end; sync_section_clips()
-      end
+      if c == 3 then push_undo(); for _, n in ipairs(state.notes) do if n.section_uid == dsec.uid then local t = find_section_at_qn(n.start_qn); n.section_uid = t and t.uid or nil; n.section_override = false end end; for k = #state.sections, 1, -1 do if state.sections[k].uid == dsec.uid then table.remove(state.sections, k) break end end; sync_section_clips()
+      elseif c == 4 then push_undo(); for k = #state.notes, 1, -1 do if state.notes[k].section_uid == dsec.uid then remove_note_by_index(k) end end; for k = #state.sections, 1, -1 do if state.sections[k].uid == dsec.uid then table.remove(state.sections, k) break end end; sync_section_clips() end
     end, {0.82, 0.25, 0.25})
   end
 
@@ -1497,8 +1330,7 @@ local function draw_regions_bar(canvas_w)
       if ex > left_x and sx < right_x then
         local cx, ce = math.max(left_x, sx), math.min(right_x, ex); local cw = ce - cx
         if cw >= 4 then
-          local ovs = (cx < prev_right - 1) and 4 or 0
-          local btn_y, btn_h = ry + 2 + ovs, state.regions_h - 4 - ovs
+          local ovs = (cx < prev_right - 1) and 4 or 0; local btn_y, btn_h = ry + 2 + ovs, state.regions_h - 4 - ovs
           local top_half_h = math.floor(btn_h * 0.5); local sub_y, sub_h = btn_y + top_half_h + 1, btn_h - top_half_h - 3
           local is_sel = (state.selected_section_uid == sec.uid)
           local hov = gfx.mouse_x >= cx and gfx.mouse_x <= cx + cw and gfx.mouse_y >= btn_y and gfx.mouse_y <= btn_y + top_half_h
@@ -1506,8 +1338,7 @@ local function draw_regions_bar(canvas_w)
           table.insert(state.ui_controls, {
             id = "sec_" .. i, x = cx, y = btn_y, w = cw, h = btn_h,
             on_click = function()
-              state.selected_section_uid = sec.uid; state.section_glow_uid = sec.uid
-              state.section_glow_until = reaper.time_precise() + 0.65; state.section_glow_held = true
+              state.selected_section_uid = sec.uid; state.section_glow_uid = sec.uid; state.section_glow_until = reaper.time_precise() + 0.65; state.section_glow_held = true
               reaper.SetEditCurPos(sec.pos_sec, true, true); state.status_msg = string.format("Active Section -> [%s] (%d notes)", sec.name, count_section_notes(sec.uid)); save_project_state()
             end,
             on_right_click = function()
@@ -1544,12 +1375,10 @@ local function draw_regions_bar(canvas_w)
                 local p_hov = gfx.mouse_x >= pcx and gfx.mouse_x <= pcx + pcw and gfx.mouse_y >= sub_y and gfx.mouse_y <= sub_y + sub_h
                 local is_ps = state.selected_phrase and state.selected_phrase.section_uid == sec.uid and math.abs(state.selected_phrase.start_qn - p_start) < 1e-4
                 local csec, cs, ce2, cf, cl, clbl = sec, p_start, p_end, is_f, is_l, full_lbl
-
                 table.insert(state.ui_controls, {
                   id = string.format("phr_%d_%d", i, pidx), x = pcx, y = sub_y, w = pcw, h = sub_h,
                   on_click = function()
-                    state.selected_phrase = { section_uid=csec.uid, start_qn=cs, end_qn=ce2, label=clbl }
-                    reaper.SetEditCurPos(reaper.TimeMap2_QNToTime(0, cs), true, true)
+                    state.selected_phrase = { section_uid=csec.uid, start_qn=cs, end_qn=ce2, label=clbl }; reaper.SetEditCurPos(reaper.TimeMap2_QNToTime(0, cs), true, true)
                     state.status_msg = string.format("Selected Phrase %s (%d owned notes)", clbl, #get_phrase_owned_notes(csec, cs, ce2, cf, cl))
                   end,
                   on_right_click = function()
@@ -1590,10 +1419,7 @@ local function draw_chord_lanes_and_reserved(canvas_w)
       local sx, ex = qn_to_screen_x(it.start_qn), qn_to_screen_x(it.end_qn)
       if ex > left_x and sx < right_x then
         local cx = math.max(left_x, sx); local cw = math.min(right_x - 2, ex) - cx
-        if cw >= 6 then
-          set_col(it.rgb, 0.92); draw_filled_roundrect(cx+1, y+2, cw-2, state.chord_lane_h-4, 4)
-          if it.text ~= "" and cw > 18 then set_col(contrast_text_col(it.rgb)); gfx.setfont(1, "Segoe UI", 13); draw_text_centered(it.text, cx+4, y+2, cw-8, state.chord_lane_h-4) end
-        end
+        if cw >= 6 then set_col(it.rgb, 0.92); draw_filled_roundrect(cx+1, y+2, cw-2, state.chord_lane_h-4, 4); if it.text ~= "" and cw > 18 then set_col(contrast_text_col(it.rgb)); gfx.setfont(1, "Segoe UI", 13); draw_text_centered(it.text, cx+4, y+2, cw-8, state.chord_lane_h-4) end end
       end
     end
     set_col(border, 0.7); gfx.line(0, y + state.chord_lane_h - 1, canvas_w, y + state.chord_lane_h - 1); y = y + state.chord_lane_h
@@ -1608,17 +1434,11 @@ local function draw_ruler(canvas_w)
   local ry, right_x = get_ruler_y(), get_grid_right_x(canvas_w)
   local bg, txt = CONFIG.dark_mode and {0.16,0.17,0.21} or {0.95,0.95,0.97}, CONFIG.dark_mode and {0.75,0.78,0.84} or {0.35,0.38,0.44}
   set_col(bg); gfx.rect(state.keyboard_w, ry, right_x - state.keyboard_w, state.ruler_h, 1)
-  if state.selected_phrase then
-    local psx, pex = math.max(state.keyboard_w, qn_to_screen_x(state.selected_phrase.start_qn)), math.min(right_x, qn_to_screen_x(state.selected_phrase.end_qn))
-    if pex > psx then set_col({0.95,0.78,0.18}, 0.28); gfx.rect(psx, ry, pex-psx, state.ruler_h, 1) end
-  end
+  if state.selected_phrase then local psx, pex = math.max(state.keyboard_w, qn_to_screen_x(state.selected_phrase.start_qn)), math.min(right_x, qn_to_screen_x(state.selected_phrase.end_qn)); if pex > psx then set_col({0.95,0.78,0.18}, 0.28); gfx.rect(psx, ry, pex-psx, state.ruler_h, 1) end end
   gfx.setfont(1, "Segoe UI", 13)
   for qn = math.max(0, math.floor(state.scroll_x_qn)), math.ceil(screen_x_to_qn(right_x) + 1) do
     local sx = qn_to_screen_x(qn)
-    if sx >= state.keyboard_w and sx <= right_x then
-      local is_bar = (qn % 4 == 0); set_col(txt, is_bar and 0.9 or 0.45); gfx.line(sx, ry + (is_bar and 3 or 12), sx, ry + state.ruler_h)
-      if is_bar then gfx.x, gfx.y = sx + 5, ry + 2; gfx.drawstr(tostring(math.floor(qn / 4) + 1)) end
-    end
+    if sx >= state.keyboard_w and sx <= right_x then local is_bar = (qn % 4 == 0); set_col(txt, is_bar and 0.9 or 0.45); gfx.line(sx, ry + (is_bar and 3 or 12), sx, ry + state.ruler_h); if is_bar then gfx.x, gfx.y = sx + 5, ry + 2; gfx.drawstr(tostring(math.floor(qn / 4) + 1)) end end
   end
   set_col(bg); gfx.rect(0, ry, state.keyboard_w, state.ruler_h, 1)
   set_col(txt, 0.85); draw_text_left("Pitch", 12, ry, 70, state.ruler_h); draw_text_right("NNS", 12, ry, state.keyboard_w - 24, state.ruler_h)
@@ -1631,15 +1451,10 @@ local function draw_keyboard(grid_bottom_y)
     if rh > 0 then
       local sy = pitch_to_screen_y(p); local cy1, cy2 = math.max(top_area, sy + 1), math.min(grid_bottom_y - 1, sy + rh - 1)
       if cy2 > cy1 then
-        local cols = get_step_colors(get_rel_step(p)); local is_hov = (state.hover_pitch == p or state.kbd_held_pitch == p)
-        local kw, kf = state.keyboard_w - 10, (is_hov and cols.key_bright or cols.key_mid)
-        set_col(kf); draw_filled_roundrect(4, cy1, kw, cy2 - cy1, 4)
-        set_col(cols.active, 1.0); draw_filled_roundrect(4, cy1 + 1, 6, math.max(2, cy2 - cy1 - 2), 2)
+        local cols = get_step_colors(get_rel_step(p)); local is_hov = (state.hover_pitch == p or state.kbd_held_pitch == p); local kw, kf = state.keyboard_w - 10, (is_hov and cols.key_bright or cols.key_mid)
+        set_col(kf); draw_filled_roundrect(4, cy1, kw, cy2 - cy1, 4); set_col(cols.active, 1.0); draw_filled_roundrect(4, cy1 + 1, 6, math.max(2, cy2 - cy1 - 2), 2)
         if is_hov then set_col(CONFIG.dark_mode and {1,1,1} or {0.12,0.14,0.18}, 0.95); gfx.roundrect(4, cy1, kw, cy2 - cy1, 4, 1); gfx.roundrect(5, cy1 + 1, kw - 2, math.max(1, cy2 - cy1 - 2), 3, 1) end
-        if cy2 - cy1 >= 14 and sy >= top_area - 4 then
-          local l_lbl, r_lbl = get_key_left_right_labels(p); set_col(contrast_text_col(kf))
-          draw_text_left(l_lbl, 14, cy1, kw - 38, cy2 - cy1); draw_text_right(r_lbl, 14, cy1, kw - 20, cy2 - cy1)
-        end
+        if cy2 - cy1 >= 14 and sy >= top_area - 4 then local ll, rl = get_key_left_right_labels(p); set_col(contrast_text_col(kf)); draw_text_left(ll, 14, cy1, kw - 38, cy2 - cy1); draw_text_right(rl, 14, cy1, kw - 20, cy2 - cy1) end
       end
     end
   end
@@ -1648,8 +1463,7 @@ end
 local function draw_harmony_span_block(cx, hy, cw, h_vis, cols, top_area, grid_bottom_y)
   local cy1, cy2 = math.max(top_area, hy), math.min(grid_bottom_y - 1, hy + h_vis); if cy2 <= cy1 + 2 then return end
   set_col(cols.harmony, 0.88); draw_filled_roundrect(cx, cy1, cw, cy2 - cy1, 5); set_col(cols.harmony_dash, 0.95)
-  if state.harmony_border_style == "solid" then gfx.roundrect(math.floor(cx+0.5), math.floor(cy1+0.5), math.floor(cw+0.5), math.floor((cy2-cy1)+0.5), 5, 1)
-  else draw_dashed_roundrect(cx, cy1, cw, cy2 - cy1, 5, 4, 3) end
+  if state.harmony_border_style == "solid" then gfx.roundrect(math.floor(cx+0.5), math.floor(cy1+0.5), math.floor(cw+0.5), math.floor((cy2-cy1)+0.5), 5, 1) else draw_dashed_roundrect(cx, cy1, cw, cy2 - cy1, 5, 4, 3) end
 end
 
 local function draw_3_layer_grid_and_notes(canvas_w, grid_bottom_y)
@@ -1657,34 +1471,16 @@ local function draw_3_layer_grid_and_notes(canvas_w, grid_bottom_y)
   local grid_qn, view_start_qn, view_end_qn = get_grid_qn(), math.max(0, screen_x_to_qn(left_x)), screen_x_to_qn(right_x)
   local min_qn, max_qn = math.max(0, snap_floor_qn(view_start_qn)), view_end_qn + grid_qn
 
-  for p = 127, 0, -1 do
-    local rh = state.row_h[p]
-    if rh > 0 then
-      local sy = pitch_to_screen_y(p); local cy1, cy2 = math.max(top_area, sy + 1), math.min(grid_bottom_y - 1, sy + rh - 1)
-      if cy2 > cy1 then set_col(get_step_colors(get_rel_step(p)).bg); draw_filled_roundrect(left_x + 2, cy1, right_x - left_x - 4, cy2 - cy1, 5) end
-    end
-  end
-  if state.selected_phrase then
-    local psx, pex = math.max(left_x, qn_to_screen_x(state.selected_phrase.start_qn)), math.min(right_x, qn_to_screen_x(state.selected_phrase.end_qn))
-    if pex > psx then set_col({1.0,0.85,0.25}, 0.06); gfx.rect(psx, top_area, pex - psx, grid_bottom_y - top_area, 1) end
-  end
-  for _, sec in ipairs(state.sections) do
-    if not sec.deleted then local rx = qn_to_screen_x(sec.start_qn); if rx >= left_x and rx <= right_x then set_col(sec.rgb, 0.36); gfx.line(rx, top_area, rx, grid_bottom_y) end end
-  end
+  for p = 127, 0, -1 do local rh = state.row_h[p]; if rh > 0 then local sy = pitch_to_screen_y(p); local cy1, cy2 = math.max(top_area, sy + 1), math.min(grid_bottom_y - 1, sy + rh - 1); if cy2 > cy1 then set_col(get_step_colors(get_rel_step(p)).bg); draw_filled_roundrect(left_x + 2, cy1, right_x - left_x - 4, cy2 - cy1, 5) end end end
+  if state.selected_phrase then local psx, pex = math.max(left_x, qn_to_screen_x(state.selected_phrase.start_qn)), math.min(right_x, qn_to_screen_x(state.selected_phrase.end_qn)); if pex > psx then set_col({1.0,0.85,0.25}, 0.06); gfx.rect(psx, top_area, pex - psx, grid_bottom_y - top_area, 1) end end
+  for _, sec in ipairs(state.sections) do if not sec.deleted then local rx = qn_to_screen_x(sec.start_qn); if rx >= left_x and rx <= right_x then set_col(sec.rgb, 0.36); gfx.line(rx, top_area, rx, grid_bottom_y) end end end
   local g_start, g_end = math.floor(min_qn / grid_qn), math.ceil(max_qn / grid_qn)
-  for gi = g_start, g_end do
-    local qn = gi * grid_qn; local sx = qn_to_screen_x(qn)
-    if sx >= left_x and sx <= right_x then
-      set_col(CONFIG.dark_mode and {1,1,1} or {0.42,0.44,0.48}, (math.abs(qn%4)<1e-4) and 0.26 or ((math.abs(qn%1)<1e-4) and 0.14 or 0.06))
-      gfx.line(sx, top_area, sx, grid_bottom_y)
-    end
-  end
+  for gi = g_start, g_end do local qn = gi * grid_qn; local sx = qn_to_screen_x(qn); if sx >= left_x and sx <= right_x then set_col(CONFIG.dark_mode and {1,1,1} or {0.42,0.44,0.48}, (math.abs(qn%4)<1e-4) and 0.26 or ((math.abs(qn%1)<1e-4) and 0.14 or 0.06)); gfx.line(sx, top_area, sx, grid_bottom_y) end end
   if state.view_mode == "diatonic" and state.hover_alt_seam then
-    local sp = state.hover_alt_seam; local seam_y = pitch_to_screen_y(sp)
-    if seam_y >= top_area and seam_y <= grid_bottom_y then
-      local cols = get_step_colors(get_rel_step(sp)); set_col(cols.active, 0.85); draw_dashed_line(left_x+4, seam_y, right_x-4, seam_y, 6, 4)
-      gfx.setfont(1, "Segoe UI", 13); draw_filled_roundrect(left_x+6, seam_y-11, 114, 22, 4); set_col(contrast_text_col(cols.active))
-      local ll, rl = get_key_left_right_labels(sp); draw_text_centered("Alt: " .. rl .. " " .. ll, left_x+6, seam_y-11, 114, 22)
+    local sp = state.hover_alt_seam; local sy = pitch_to_screen_y(sp)
+    if sy >= top_area and sy <= grid_bottom_y then
+      local cols = get_step_colors(get_rel_step(sp)); set_col(cols.active, 0.85); draw_dashed_line(left_x+4, sy, right_x-4, sy, 6, 4)
+      gfx.setfont(1, "Segoe UI", 13); draw_filled_roundrect(left_x+6, sy-11, 114, 22, 4); set_col(contrast_text_col(cols.active)); local ll, rl = get_key_left_right_labels(sp); draw_text_centered("Alt: " .. rl .. " " .. ll, left_x+6, sy-11, 114, 22)
     end
   end
 
@@ -1693,7 +1489,6 @@ local function draw_3_layer_grid_and_notes(canvas_w, grid_bottom_y)
   local vis_guides, vis_manual = {}, {}
   if guide_list then for _, g in ipairs(guide_list) do if g.end_qn > view_start_qn and g.start_qn < view_end_qn then table.insert(vis_guides, g) end end end
   for _, mh in ipairs(state.manual_harmony_notes) do if mh.end_qn > view_start_qn and mh.start_qn < view_end_qn then table.insert(vis_manual, mh) end end
-
   local function draw_h_pass(zero_h)
     for p = 127, 0, -1 do
       local rh = state.row_h[p]
@@ -1702,23 +1497,13 @@ local function draw_3_layer_grid_and_notes(canvas_w, grid_bottom_y)
         if hy + h_vis > top_area and hy < grid_bottom_y then
           local pc, cols = p % 12, get_step_colors(get_rel_step(p))
           if guide_list then
-            for _, g in ipairs(vis_guides) do if g.pc == pc then
-              local cx = math.max(left_x+2, qn_to_screen_x(g.start_qn)+2); local cw = math.min(right_x-2, qn_to_screen_x(g.end_qn)-2) - cx
-              if cw > 3 then draw_harmony_span_block(cx, hy, cw, h_vis, cols, top_area, grid_bottom_y) end
-            end end
+            for _, g in ipairs(vis_guides) do if g.pc == pc then local cx = math.max(left_x+2, qn_to_screen_x(g.start_qn)+2); local cw = math.min(right_x-2, qn_to_screen_x(g.end_qn)-2) - cx; if cw > 3 then draw_harmony_span_block(cx, hy, cw, h_vis, cols, top_area, grid_bottom_y) end end end
           elseif state.harmony_source == "diatonic" or state.harmony_source == "triad_1" then
-            local rel = get_rel_step(p); local hit = (state.harmony_source == "diatonic" and is_pitch_diatonic(p)) or (state.harmony_source == "triad_1" and (rel==0 or rel==4 or rel==7))
-            if hit then
-              for gi = g_start, g_end - 1 do
-                local sx = qn_to_screen_x(gi * grid_qn) + 3; local cx = math.max(left_x+2, sx); local cw = math.min(right_x-2, sx + grid_qn*state.px_per_qn - 6) - cx
-                if cw > 4 then draw_harmony_span_block(cx, hy, cw, h_vis, cols, top_area, grid_bottom_y) end
-              end
+            local rel = get_rel_step(p); if (state.harmony_source == "diatonic" and is_pitch_diatonic(p)) or (state.harmony_source == "triad_1" and (rel==0 or rel==4 or rel==7)) then
+              for gi = g_start, g_end - 1 do local sx = qn_to_screen_x(gi * grid_qn) + 3; local cx = math.max(left_x+2, sx); local cw = math.min(right_x-2, sx + grid_qn*state.px_per_qn - 6) - cx; if cw > 4 then draw_harmony_span_block(cx, hy, cw, h_vis, cols, top_area, grid_bottom_y) end end
             end
           end
-          for _, mh in ipairs(vis_manual) do if mh.pc == pc then
-            local cx = math.max(left_x+2, qn_to_screen_x(mh.start_qn)+2); local cw = math.min(right_x-2, qn_to_screen_x(mh.end_qn)-2) - cx
-            if cw > 3 then draw_harmony_span_block(cx, hy, cw, h_vis, cols, top_area, grid_bottom_y) end
-          end end
+          for _, mh in ipairs(vis_manual) do if mh.pc == pc then local cx = math.max(left_x+2, qn_to_screen_x(mh.start_qn)+2); local cw = math.min(right_x-2, qn_to_screen_x(mh.end_qn)-2) - cx; if cw > 3 then draw_harmony_span_block(cx, hy, cw, h_vis, cols, top_area, grid_bottom_y) end end end
         end
       end
     end
@@ -1736,19 +1521,17 @@ local function draw_3_layer_grid_and_notes(canvas_w, grid_bottom_y)
       if sx + nw >= left_x and sx <= right_x then
         local cx, cw = math.max(left_x, sx), math.min(right_x, sx + nw) - math.max(left_x, sx)
         if cw >= 2 then
-          local cols, is_slide_target = get_step_colors(get_rel_step(n.pitch)), (get_incoming_note(n.id) ~= nil)
+          local cols, is_st = get_step_colors(get_rel_step(n.pitch)), (get_incoming_note(n.id) ~= nil)
           if glow_active_uid and n.section_uid == glow_active_uid then
-            local sec = get_section_by_uid(glow_active_uid)
-            local ga = state.section_glow_held and 0.65 or clamp((state.section_glow_until - now_t) / 0.65, 0, 1) * 0.65
+            local sec = get_section_by_uid(glow_active_uid); local ga = state.section_glow_held and 0.65 or clamp((state.section_glow_until - now_t) / 0.65, 0, 1) * 0.65
             set_col(mix_rgb((sec and sec.rgb) or {1,0.92,0.45}, {1,1,1}, 0.5), ga * 0.45); draw_filled_roundrect(cx - 4, ny1 - 4, cw + 8, (ny2 - ny1) + 8, 8)
             set_col({1,1,1}, ga); gfx.roundrect(math.floor(cx-2), math.floor(ny1-2), math.floor(cw+4), math.floor((ny2-ny1)+4), 6, 1)
           end
-          draw_bordered_roundrect(cx, ny1, cw, ny2-ny1, 5, (n.selected or is_slide_target) and 2 or 1.5, n.selected and outline_sel or (is_slide_target and {0.40,0.85,1.0} or outline_default), cols.active, n.muted and 0.34 or (is_slide_target and 0.78 or 1.0))
-          if is_slide_target and cw > 14 then set_col(contrast_text_col(cols.active), 0.9); gfx.setfont(1, "Segoe UI", 11); draw_text_left("→", cx+3, ny1, cw-6, ny2-ny1) end
-          if not is_slide_target and cw >= 10 and (ny2 - ny1) >= 8 then
-            local bar_w, bar_y = math.max(4, cw - 8), math.floor((ny1 + ny2) * 0.5 - 1.5)
-            set_col({0,0,0}, 0.45); draw_filled_roundrect(cx + 4, bar_y, bar_w, 3, 1)
-            set_col({1,1,1}, n.muted and 0.45 or 0.92); draw_filled_roundrect(cx + 4, bar_y, math.max(2, bar_w * clamp(n.vel/127.0, 0.06, 1.0)), 3, 1)
+          draw_bordered_roundrect(cx, ny1, cw, ny2-ny1, 5, (n.selected or is_st) and 2 or 1.5, n.selected and outline_sel or (is_st and {0.40,0.85,1.0} or outline_default), cols.active, n.muted and 0.34 or (is_st and 0.78 or 1.0))
+          if is_st and cw > 14 then set_col(contrast_text_col(cols.active), 0.9); gfx.setfont(1, "Segoe UI", 11); draw_text_left("→", cx+3, ny1, cw-6, ny2-ny1) end
+          if not is_st and cw >= 10 and (ny2 - ny1) >= 8 then
+            local bw, by = math.max(4, cw - 8), math.floor((ny1 + ny2) * 0.5 - 1.5)
+            set_col({0,0,0}, 0.45); draw_filled_roundrect(cx + 4, by, bw, 3, 1); set_col({1,1,1}, n.muted and 0.45 or 0.92); draw_filled_roundrect(cx + 4, by, math.max(2, bw * clamp(n.vel/127.0, 0.06, 1.0)), 3, 1)
           end
         end
       end
@@ -1760,20 +1543,16 @@ local function draw_3_layer_grid_and_notes(canvas_w, grid_bottom_y)
   local col_green, col_black, col_white, col_red = {0.12,0.78,0.30}, {0.08,0.09,0.11}, {0.96,0.97,0.99}, {0.90,0.18,0.20}
   local function draw_node_dot(nx, ny, fill, border_col, kind, note, dst, is_conn)
     if not show_nodes or nx < left_x or nx > right_x or ny < top_area or ny > grid_bottom_y then return end
-    table.insert(state.curve_handles, { kind = kind, note = note, dst = dst, is_connection = is_conn, x = nx, y = ny })
+    table.insert(state.curve_handles, { kind=kind, note=note, dst=dst, is_connection=is_conn, x=nx, y=ny })
     set_col(fill); gfx.circle(nx, ny, 5.2, 1, 1); set_col(border_col); gfx.circle(nx, ny, 5.2, 0, 1)
   end
 
   for _, n in ipairs(state.notes) do
-    local dst, inc = get_note_by_id(n.connect_to_id), get_incoming_note(n.id)
-    local q1, q2, q3, q4 = get_note_node_qns(n, inc ~= nil, dst)
-    local base_y = pitch_center_screen_y(n.pitch)
-    local pre_y, out_y = pitch_float_to_screen_y(n.pitch + (n.pre_st or 0.0)), dst and pitch_center_screen_y(dst.pitch) or pitch_float_to_screen_y(n.pitch + (n.out_st or 0.0))
-
+    local dst, inc = get_note_by_id(n.connect_to_id), get_incoming_note(n.id); local q1, q2, q3, q4 = get_note_node_qns(n, inc ~= nil, dst)
+    local base_y = pitch_center_screen_y(n.pitch); local pre_y, out_y = pitch_float_to_screen_y(n.pitch + (n.pre_st or 0.0)), dst and pitch_center_screen_y(dst.pitch) or pitch_float_to_screen_y(n.pitch + (n.out_st or 0.0))
     if not inc and math.abs(n.pre_st or 0.0) > 0.02 then
       local pts = {}; for s = 0, 20 do local u = s/20; local x, y = qn_to_screen_x(lerp(q1,q2,u)), lerp(pre_y,base_y,eval_curve_shape(u,n.pre_shape,n.pre_tension)); if x>=left_x and x<=right_x and y>=top_area and y<=grid_bottom_y then table.insert(pts,{x,y}) end end
-      draw_thick_aa_curve(pts, {0.25,0.92,0.50}, 0.95)
-      draw_node_dot(qn_to_screen_x(lerp(q1,q2,0.5)), lerp(pre_y,base_y,eval_curve_shape(0.5,n.pre_shape,n.pre_tension)), {0.85,0.95,0.88}, col_black, "pre_mid", n, nil, false)
+      draw_thick_aa_curve(pts, {0.25,0.92,0.50}, 0.95); draw_node_dot(qn_to_screen_x(lerp(q1,q2,0.5)), lerp(pre_y,base_y,eval_curve_shape(0.5,n.pre_shape,n.pre_tension)), {0.85,0.95,0.88}, col_black, "pre_mid", n, nil, false)
     end
     if dst or math.abs(n.out_st or 0.0) > 0.02 then
       local pts = {}; for s = 0, 28 do local u = s/28; local x, y = qn_to_screen_x(lerp(q3,q4,u)), lerp(base_y,out_y,eval_curve_shape(u,n.out_shape,n.out_tension)); if x>=left_x and x<=right_x and y>=top_area and y<=grid_bottom_y then table.insert(pts,{x,y}) end end
@@ -1782,21 +1561,15 @@ local function draw_3_layer_grid_and_notes(canvas_w, grid_bottom_y)
     end
     if n.vibrato and n.vibrato.enabled then
       local sx, ex = qn_to_screen_x(n.start_qn), qn_to_screen_x(n.end_qn); local nw, pts, pat = math.max(6, ex - sx), {}, n.vibrato.pattern or "consistent"
-      for s = 0, 36 do
-        local t = s/36; local px, amp = sx + 4 + (nw - 8)*t, 0
-        if t >= n.vibrato.delay then amp = eval_vibrato_pattern_env(pat, clamp((t - n.vibrato.delay)/math.max(1e-4, 1.0 - n.vibrato.delay), 0, 1)) * (n_vis * 0.38) end
-        local py = base_y - amp * math.sin(t * n.vibrato.rate * 6.0)
-        if px >= left_x and px <= right_x and py >= top_area and py <= grid_bottom_y then table.insert(pts, {px, py}) end
-      end
+      for s = 0, 36 do local t = s/36; local px, amp = sx + 4 + (nw - 8)*t, 0; if t >= n.vibrato.delay then amp = eval_vibrato_pattern_env(pat, clamp((t - n.vibrato.delay)/math.max(1e-4, 1.0 - n.vibrato.delay), 0, 1)) * (n_vis * 0.38) end
+        local py = base_y - amp * math.sin(t * n.vibrato.rate * 6.0); if px >= left_x and px <= right_x and py >= top_area and py <= grid_bottom_y then table.insert(pts, {px, py}) end end
       draw_thick_aa_curve(pts, {1, 1, 1}, 0.88)
     end
     if show_nodes then
-      local drag_this = state.drag and state.drag.type == "node4_drag" and state.drag.note == n
-      local show_black = (inc ~= nil) or is_green_positioned(n) or (drag_this and (state.drag.kind == "n1" or state.drag.kind == "n2"))
-      local show_white = (dst ~= nil) or is_red_positioned(n)   or (drag_this and (state.drag.kind == "n3" or state.drag.kind == "n4"))
+      local dt = state.drag and state.drag.type == "node4_drag" and state.drag.note == n
       if not inc then draw_node_dot(qn_to_screen_x(q1), pre_y, col_green, col_black, "n1", n, nil, false) end
-      if show_black then draw_node_dot(qn_to_screen_x(q2), base_y, col_black, col_white, "n2", n, nil, false) end
-      if show_white then draw_node_dot(qn_to_screen_x(q3), base_y, col_white, col_black, "n3", n, dst, dst ~= nil) end
+      if (inc ~= nil) or is_green_positioned(n) or (dt and (state.drag.kind == "n1" or state.drag.kind == "n2")) then draw_node_dot(qn_to_screen_x(q2), base_y, col_black, col_white, "n2", n, nil, false) end
+      if (dst ~= nil) or is_red_positioned(n)   or (dt and (state.drag.kind == "n3" or state.drag.kind == "n4")) then draw_node_dot(qn_to_screen_x(q3), base_y, col_white, col_black, "n3", n, dst, dst ~= nil) end
       if not dst then draw_node_dot(qn_to_screen_x(q4), out_y, col_red, col_black, "n4", n, nil, false) end
     end
   end
@@ -1821,12 +1594,10 @@ local function draw_horizontal_scrollbar(canvas_w, scroll_y)
   local sx, right_x = state.keyboard_w, get_grid_right_x(canvas_w); local sw = right_x - sx; if sw <= 40 then return end
   set_col(CONFIG.dark_mode and {0.15,0.16,0.20} or {0.91,0.92,0.94}); draw_filled_roundrect(sx, scroll_y + 3, sw, state.hscroll_h - 6, 5)
   local visible_qn = sw / state.px_per_qn; local max_qn = math.max(get_max_timeline_qn(), state.scroll_x_qn + visible_qn)
-  local thumb_w = clamp((visible_qn / max_qn) * sw, 30, sw)
-  local thumb_x = sx + math.max(0, sw - thumb_w) * ((max_qn > visible_qn) and clamp(state.scroll_x_qn / (max_qn - visible_qn), 0, 1) or 0)
+  local thumb_w = clamp((visible_qn / max_qn) * sw, 30, sw); local thumb_x = sx + math.max(0, sw - thumb_w) * ((max_qn > visible_qn) and clamp(state.scroll_x_qn / (max_qn - visible_qn), 0, 1) or 0)
   local hov = gfx.mouse_x >= thumb_x and gfx.mouse_x <= thumb_x + thumb_w and gfx.mouse_y >= scroll_y and gfx.mouse_y <= scroll_y + state.hscroll_h
   local act = state.drag and (state.drag.type == "hscroll_pan" or state.drag.type == "hscroll_left" or state.drag.type == "hscroll_right")
-  set_col((hov or act) and (CONFIG.dark_mode and {0.42,0.46,0.55} or {0.55,0.60,0.68}) or (CONFIG.dark_mode and {0.30,0.33,0.40} or {0.72,0.75,0.81}))
-  draw_filled_roundrect(thumb_x, scroll_y + 3, thumb_w, state.hscroll_h - 6, 5)
+  set_col((hov or act) and (CONFIG.dark_mode and {0.42,0.46,0.55} or {0.55,0.60,0.68}) or (CONFIG.dark_mode and {0.30,0.33,0.40} or {0.72,0.75,0.81})); draw_filled_roundrect(thumb_x, scroll_y + 3, thumb_w, state.hscroll_h - 6, 5)
   local cy, cr = scroll_y + state.hscroll_h * 0.5, 5.5
   set_col(CONFIG.dark_mode and {0.82,0.86,0.94} or {0.98,0.99,1.0}, 0.92); gfx.circle(thumb_x+6, cy, cr, 1, 1); gfx.circle(thumb_x+thumb_w-6, cy, cr, 1, 1)
   set_col({0.18,0.20,0.26}, 0.7); gfx.circle(thumb_x+6, cy, cr, 0, 1); gfx.circle(thumb_x+thumb_w-6, cy, cr, 0, 1)
@@ -1840,15 +1611,13 @@ local function draw_vertical_scrollbar(canvas_w, grid_bottom_y)
   local thumb_y = top_area + math.max(0, vh - thumb_h) * clamp(state.scroll_y_px / math.max(0.001, total_h - vh), 0, 1)
   local hov = gfx.mouse_x >= vx and gfx.mouse_x <= vx + vw and gfx.mouse_y >= thumb_y and gfx.mouse_y <= thumb_y + thumb_h
   local act = state.drag and (state.drag.type == "vscroll_pan" or state.drag.type == "vscroll_top" or state.drag.type == "vscroll_bot")
-  set_col((hov or act) and (CONFIG.dark_mode and {0.42,0.46,0.55} or {0.55,0.60,0.68}) or (CONFIG.dark_mode and {0.30,0.33,0.40} or {0.72,0.75,0.81}))
-  draw_filled_roundrect(vx + 3, thumb_y, vw - 4, thumb_h, 5)
+  set_col((hov or act) and (CONFIG.dark_mode and {0.42,0.46,0.55} or {0.55,0.60,0.68}) or (CONFIG.dark_mode and {0.30,0.33,0.40} or {0.72,0.75,0.81})); draw_filled_roundrect(vx + 3, thumb_y, vw - 4, thumb_h, 5)
   local cx, cr = vx + vw * 0.5 + 1, 5.5
   set_col(CONFIG.dark_mode and {0.82,0.86,0.94} or {0.98,0.99,1.0}, 0.92); gfx.circle(cx, thumb_y+6, cr, 1, 1); gfx.circle(cx, thumb_y+thumb_h-6, cr, 1, 1)
   set_col({0.18,0.20,0.26}, 0.7); gfx.circle(cx, thumb_y+6, cr, 0, 1); gfx.circle(cx, thumb_y+thumb_h-6, cr, 0, 1)
   state.vscroll_geom = { x=vx, y=top_area, w=vw, h=vh, thumb_y=thumb_y, thumb_h=thumb_h, total_h=total_h }
 end
 
--- Permanent Parameter Row (Show Vel first + MPE:ON/OFF + Selection controls + Active Section) + Collapsible Velocity Bars
 local function draw_bottom_controls(canvas_w)
   local param_y = gfx.h - state.transport_h - state.param_bar_h
   local vel_y = param_y - (state.show_vel_lane and state.vel_lane_h or 0)
@@ -1861,32 +1630,15 @@ local function draw_bottom_controls(canvas_w)
     if lane_w > 40 then
       set_col(CONFIG.dark_mode and {0.11,0.12,0.15} or {0.99,0.99,1.0}); draw_filled_roundrect(left_x+2, vel_y+4, lane_w-4, state.vel_lane_h-6, 6)
       set_col(CONFIG.dark_mode and {0.65,0.68,0.75} or {0.42,0.45,0.50}); gfx.setfont(1, "Segoe UI", 13); draw_text_centered("VELOCITY", 6, vel_y+4, left_x-12, state.vel_lane_h-6)
-      local usable_h = state.vel_lane_h - 16
-      for _, n in ipairs(state.notes) do
-        if get_incoming_note(n.id) == nil then
-          local sx = qn_to_screen_x(n.start_qn)
-          if sx >= left_x + 2 and sx <= right_x - 4 then
-            local bh = (n.vel / 127.0) * usable_h; set_col(get_step_colors(get_rel_step(n.pitch)).active, n.selected and 1.0 or 0.72)
-            draw_filled_roundrect(sx - 3, vel_y + state.vel_lane_h - 5 - bh, 7, math.max(4, bh), 3)
-          end
-        end
-      end
+      local uh = state.vel_lane_h - 16
+      for _, n in ipairs(state.notes) do if get_incoming_note(n.id) == nil then local sx = qn_to_screen_x(n.start_qn); if sx >= left_x + 2 and sx <= right_x - 4 then local bh = (n.vel/127.0)*uh; set_col(get_step_colors(get_rel_step(n.pitch)).active, n.selected and 1.0 or 0.72); draw_filled_roundrect(sx-3, vel_y+state.vel_lane_h-5-bh, 7, math.max(4,bh), 3) end end end
     end
   end
 
-  set_col(bg); gfx.rect(0, param_y, canvas_w, state.param_bar_h, 1)
-  set_col(border, 0.75); gfx.line(0, param_y, canvas_w, param_y)
-
+  set_col(bg); gfx.rect(0, param_y, canvas_w, state.param_bar_h, 1); set_col(border, 0.75); gfx.line(0, param_y, canvas_w, param_y)
   local cx = 8
-  -- 1st item on lower row: Show Velocities toggle (migrated from top toolbar!)
-  register_btn("show_vel_btn", cx, param_y + 5, 72, 28, "Show Vel", state.show_vel_lane, function()
-    state.show_vel_lane = not state.show_vel_lane; save_global_prefs()
-  end); cx = cx + 76
-
-  -- 2nd item (permanent): MPE:ON/OFF
-  register_btn("mpe_toggle", cx, param_y + 5, 68, 28, "MPE:" .. (state.mpe_enabled and "ON" or "OFF"), state.mpe_enabled, function()
-    state.mpe_enabled = not state.mpe_enabled; save_global_prefs(); sync_section_clips()
-  end); cx = cx + 72
+  register_btn("show_vel_btn", cx, param_y + 5, 72, 28, "Show Vel", state.show_vel_lane, function() state.show_vel_lane = not state.show_vel_lane; save_global_prefs() end); cx = cx + 76
+  register_btn("mpe_toggle", cx, param_y + 5, 68, 28, "MPE:" .. (state.mpe_enabled and "ON" or "OFF"), state.mpe_enabled, function() state.mpe_enabled = not state.mpe_enabled; save_global_prefs(); sync_section_clips() end); cx = cx + 72
 
   local sel = get_selected_notes(); local target = sel[1]
   gfx.setfont(1, "Segoe UI", 13); set_col(CONFIG.dark_mode and {0.88,0.90,0.94} or {0.20,0.22,0.26})
@@ -1909,40 +1661,26 @@ local function draw_bottom_controls(canvas_w)
 
     draw_slider("sel_vel", cx, param_y + 5, 64, 28, target.vel, 1, 127, "Vel", "%s:%d", function(v) for _, n in ipairs(sel) do n.vel = math.floor(v+0.5) end end); cx = cx + 68
     local br = state.mpe_bend_range
-    draw_slider("sel_pre_st", cx, param_y + 5, 72, 28, target.pre_st or 0, -br, br, "Pre", "%s:%+.1f", function(v)
-      local rv = math.floor(v*2+0.5)*0.5; for _, n in ipairs(sel) do if not get_incoming_note(n.id) then n.pre_st = rv end end
-    end); cx = cx + 76
-    draw_slider("sel_out_st", cx, param_y + 5, 72, 28, target.out_st or 0, -br, br, "Out", "%s:%+.1f", function(v)
-      local rv = math.floor(v*2+0.5)*0.5; for _, n in ipairs(sel) do if not n.connect_to_id then n.out_st = rv end end
-    end); cx = cx + 76
+    draw_slider("sel_pre_st", cx, param_y + 5, 72, 28, target.pre_st or 0, -br, br, "Pre", "%s:%+.1f", function(v) local rv = math.floor(v*2+0.5)*0.5; for _, n in ipairs(sel) do if not get_incoming_note(n.id) then n.pre_st = rv end end end); cx = cx + 76
+    draw_slider("sel_out_st", cx, param_y + 5, 72, 28, target.out_st or 0, -br, br, "Out", "%s:%+.1f", function(v) local rv = math.floor(v*2+0.5)*0.5; for _, n in ipairs(sel) do if not n.connect_to_id then n.out_st = rv end end end); cx = cx + 76
 
-    local cur_sh_lbl = "S-Curve"
-    for _, cs in ipairs(CONFIG.curve_shapes) do if cs.id == (target.out_shape or "s_curve") then cur_sh_lbl = cs.label break end end
-    register_btn("sel_shape", cx, param_y + 5, 64, 28, cur_sh_lbl, false, function(bx, by, bw, bh)
-      gfx.x, gfx.y = bx, by + bh; local menu = ""
-      for _, cs in ipairs(CONFIG.curve_shapes) do menu = menu .. (((target.out_shape or "s_curve") == cs.id) and "!" or "") .. cs.label .. "|" end
-      local c = gfx.showmenu(menu)
-      if c >= 1 and c <= #CONFIG.curve_shapes then push_undo(); for _, n in ipairs(sel) do n.out_shape = CONFIG.curve_shapes[c].id; n.pre_shape = CONFIG.curve_shapes[c].id end; sync_section_clips() end
+    local cur_sh = "S-Curve"; for _, cs in ipairs(CONFIG.curve_shapes) do if cs.id == (target.out_shape or "s_curve") then cur_sh = cs.label break end end
+    register_btn("sel_shape", cx, param_y + 5, 64, 28, cur_sh, false, function(bx, by, bw, bh)
+      gfx.x, gfx.y = bx, by + bh; local menu = ""; for _, cs in ipairs(CONFIG.curve_shapes) do menu = menu .. (((target.out_shape or "s_curve") == cs.id) and "!" or "") .. cs.label .. "|" end
+      local c = gfx.showmenu(menu); if c >= 1 and c <= #CONFIG.curve_shapes then push_undo(); for _, n in ipairs(sel) do n.out_shape = CONFIG.curve_shapes[c].id; n.pre_shape = CONFIG.curve_shapes[c].id end; sync_section_clips() end
     end); cx = cx + 68
-
-    draw_slider("sel_curve", cx, param_y + 5, 70, 28, target.out_tension or 0, -1.0, 1.0, "Tens", "%s:%+.2f", function(v)
-      for _, n in ipairs(sel) do n.out_tension = v; n.pre_tension = v end
-    end); cx = cx + 74
+    draw_slider("sel_curve", cx, param_y + 5, 70, 28, target.out_tension or 0, -1.0, 1.0, "Tens", "%s:%+.2f", function(v) for _, n in ipairs(sel) do n.out_tension = v; n.pre_tension = v end end); cx = cx + 74
 
     if #sel >= 2 then
       register_btn("conn_sel", cx, param_y + 5, 64, 28, "Connect", false, function()
-        table.sort(sel, function(a, b) return a.start_qn < b.start_qn end); push_undo(); local c_cnt = 0
-        for i = 1, #sel - 1 do
-          local ok, err = can_connect_notes(sel[i], sel[i + 1])
-          if ok then connect_notes(sel[i], sel[i + 1]); c_cnt = c_cnt + 1 else state.status_msg = err or "Rejected" end
-        end
-        if c_cnt > 0 then sync_section_clips() end
+        table.sort(sel, function(a, b) return a.start_qn < b.start_qn end); push_undo(); local cc = 0
+        for i = 1, #sel - 1 do local ok, err = can_connect_notes(sel[i], sel[i + 1]); if ok then connect_notes(sel[i], sel[i + 1]); cc = cc + 1 else state.status_msg = err or "Rejected" end end
+        if cc > 0 then sync_section_clips() end
       end); cx = cx + 68
     elseif target.connect_to_id or get_incoming_note(target.id) then
       register_btn("disconn_sel", cx, param_y + 5, 54, 28, "Unlink", true, function()
-        push_undo(); if target.connect_to_id then disconnect_note_outgoing(target) end
-        local inc = get_incoming_note(target.id); if inc then disconnect_note_outgoing(inc) end; sync_section_clips()
-      end, {0.76, 0.34, 0.22}); cx = cx + 58
+        push_undo(); if target.connect_to_id then disconnect_note_outgoing(target) end; local inc = get_incoming_note(target.id); if inc then disconnect_note_outgoing(inc) end; sync_section_clips()
+      end, {0.76,0.34,0.22}); cx = cx + 58
     end
 
     register_btn("vib_toggle", cx, param_y + 5, 58, 28, "Vib:" .. (target.vibrato.enabled and "ON" or "OFF"), target.vibrato.enabled, function()
@@ -1950,13 +1688,10 @@ local function draw_bottom_controls(canvas_w)
     end); cx = cx + 62
 
     if target.vibrato.enabled then
-      local pat_btn = "Pat:Const"
-      for _, vp in ipairs(CONFIG.vib_patterns) do if vp.id == (target.vibrato.pattern or "consistent") then pat_btn = vp.btn break end end
+      local pat_btn = "Pat:Const"; for _, vp in ipairs(CONFIG.vib_patterns) do if vp.id == (target.vibrato.pattern or "consistent") then pat_btn = vp.btn break end end
       register_btn("vib_pat", cx, param_y + 5, 68, 28, pat_btn, false, function(bx, by, bw, bh)
-        gfx.x, gfx.y = bx, by + bh; local menu = ""
-        for _, vp in ipairs(CONFIG.vib_patterns) do menu = menu .. (((target.vibrato.pattern or "consistent") == vp.id) and "!" or "") .. vp.menu .. "|" end
-        local c = gfx.showmenu(menu)
-        if c >= 1 and c <= #CONFIG.vib_patterns then push_undo(); for _, n in ipairs(sel) do n.vibrato.pattern = CONFIG.vib_patterns[c].id end; sync_section_clips() end
+        gfx.x, gfx.y = bx, by + bh; local menu = ""; for _, vp in ipairs(CONFIG.vib_patterns) do menu = menu .. (((target.vibrato.pattern or "consistent") == vp.id) and "!" or "") .. vp.menu .. "|" end
+        local c = gfx.showmenu(menu); if c >= 1 and c <= #CONFIG.vib_patterns then push_undo(); for _, n in ipairs(sel) do n.vibrato.pattern = CONFIG.vib_patterns[c].id end; sync_section_clips() end
       end); cx = cx + 72
       if cx + 130 < canvas_w - 140 then
         draw_slider("vib_rate", cx, param_y + 5, 62, 28, target.vibrato.rate, 1.0, 12.0, "Hz", "%s:%.1f", function(v) for _, n in ipairs(sel) do n.vibrato.rate = v end end); cx = cx + 66
@@ -1965,11 +1700,10 @@ local function draw_bottom_controls(canvas_w)
     end
   end
 
-  local act_sec = get_section_by_uid(state.selected_section_uid)
-  local act_w = clamp(canvas_w - cx - 8, 110, 175)
+  local act_sec = get_section_by_uid(state.selected_section_uid); local act_w = clamp(canvas_w - cx - 8, 110, 175)
   if act_w >= 100 then
     local act_x = canvas_w - act_w - 8; local pcol = act_sec and act_sec.rgb or (CONFIG.dark_mode and {0.22,0.24,0.28} or {0.88,0.90,0.93})
-    draw_bordered_roundrect(act_x, param_y + 5, act_w, 28, 6, 1.5, mix_rgb(pcol, {0,0,0}, 0.2), pcol, 0.9)
+    draw_bordered_roundrect(act_x, param_y + 5, act_w, 28, 6, 1.5, mix_rgb(pcol,{0,0,0},0.2), pcol, 0.9)
     set_col(contrast_text_col(pcol)); gfx.setfont(1, "Segoe UI", 13)
     draw_text_centered(act_sec and string.format("Active: %s (%d)", act_sec.name, count_section_notes(act_sec.uid)) or "Active: None", act_x + 4, param_y + 5, act_w - 8, 28)
   end
@@ -1979,166 +1713,107 @@ local function draw_transport_bar(canvas_w)
   local trans_y, right_x, left_x = gfx.h - state.transport_h, get_grid_right_x(canvas_w), state.keyboard_w
   set_col(CONFIG.dark_mode and {0.12,0.13,0.17} or {0.95,0.96,0.98}); gfx.rect(0, trans_y, canvas_w, state.transport_h, 1)
   set_col(CONFIG.dark_mode and {0.24,0.26,0.30} or {0.84,0.86,0.90}); gfx.line(0, trans_y, canvas_w, trans_y)
-
   local ps = reaper.GetPlayState(); local is_play, is_pause, is_rec, is_loop = (ps&1)==1, (ps&2)==2, (ps&4)==4, reaper.GetSetRepeat(-1)==1
-  local rec_rest, rec_act   = { 102/255, 40/255, 40/255 },  { 190/255, 48/255, 48/255 }
-  local play_rest, play_act = { 20/255, 102/255, 102/255 }, { 30/255, 165/255, 165/255 }
-
   local tx, ty, th = 10, trans_y + 5, 34
-  register_btn("tr_rec",   tx, ty, 52, th, "Rec",   is_rec,   function() reaper.Main_OnCommand(1013, 0) end, rec_act, rec_rest); tx = tx + 56
-  register_btn("tr_play",  tx, ty, 54, th, "Play",  is_play,  function() reaper.Main_OnCommand(1007, 0) end, play_act, play_rest); tx = tx + 58
+  register_btn("tr_rec",   tx, ty, 52, th, "Rec",   is_rec,   function() reaper.Main_OnCommand(1013, 0) end, {190/255,48/255,48/255}, {102/255,40/255,40/255}); tx = tx + 56
+  register_btn("tr_play",  tx, ty, 54, th, "Play",  is_play,  function() reaper.Main_OnCommand(1007, 0) end, {30/255,165/255,165/255}, {20/255,102/255,102/255}); tx = tx + 58
   register_btn("tr_loop",  tx, ty, 54, th, "Loop",  is_loop,  function() reaper.GetSetRepeat(2) end, {0.22,0.48,0.85}); tx = tx + 58
   register_btn("tr_stop",  tx, ty, 54, th, "Stop",  not is_play and not is_pause, function() reaper.Main_OnCommand(1016, 0) end, {0.42,0.45,0.52}); tx = tx + 58
   register_btn("tr_pause", tx, ty, 58, th, "Pause", is_pause, function() reaper.Main_OnCommand(1008, 0) end, {0.85,0.58,0.16}); tx = tx + 70
 
   local active_secs = {}; for _, s in ipairs(state.sections) do if not s.deleted then table.insert(active_secs, s) end end
   if #active_secs > 0 then
-    gfx.setfont(1, "Segoe UI", 12); set_col(CONFIG.dark_mode and {0.68,0.72,0.80} or {0.40,0.44,0.50})
-    draw_text_left("Jump (-1 Bar):", tx, ty, 88, th); tx = tx + 92
+    gfx.setfont(1, "Segoe UI", 12); set_col(CONFIG.dark_mode and {0.68,0.72,0.80} or {0.40,0.44,0.50}); draw_text_left("Jump (-1 Bar):", tx, ty, 88, th); tx = tx + 92
     for i, sec in ipairs(active_secs) do
       if tx + 32 <= canvas_w - 200 then
         register_btn("jmp_" .. i, tx, ty, 30, th, sec.name:sub(1, 1):upper(), true, function()
-          local tqn = math.max(0, sec.start_qn - (sec.bar_qn or 4.0))
-          reaper.SetEditCurPos(reaper.TimeMap2_QNToTime(0, tqn), true, true)
-          local vis_qn = (right_x - left_x) / state.px_per_qn
-          if tqn < state.scroll_x_qn or tqn > state.scroll_x_qn + vis_qn * 0.85 then state.scroll_x_qn = math.max(0, tqn - vis_qn * 0.15) end
+          local tqn = math.max(0, sec.start_qn - (sec.bar_qn or 4.0)); reaper.SetEditCurPos(reaper.TimeMap2_QNToTime(0, tqn), true, true)
+          local vis_qn = (right_x - left_x) / state.px_per_qn; if tqn < state.scroll_x_qn or tqn > state.scroll_x_qn + vis_qn * 0.85 then state.scroll_x_qn = math.max(0, tqn - vis_qn * 0.15) end
           state.status_msg = string.format("Jumped 1 bar before [%s]", sec.name)
         end, sec.rgb); tx = tx + 34
       end
     end
   end
-  gfx.setfont(1, "Segoe UI", 12); set_col(CONFIG.dark_mode and {0.64,0.68,0.75} or {0.42,0.45,0.52})
-  draw_text_right(state.status_msg, tx + 6, ty, math.max(120, canvas_w - tx - 22), th)
+  gfx.setfont(1, "Segoe UI", 12); set_col(CONFIG.dark_mode and {0.64,0.68,0.75} or {0.42,0.45,0.52}); draw_text_right(state.status_msg, tx + 6, ty, math.max(120, canvas_w - tx - 22), th)
 end
 
--- Compact Preferences Drawer (includes Harmony View + Light/Dark Theme + 2-column 7->1 NNS swatches to fit 640px height!)
 local function draw_lanes_drawer()
   if not state.show_drawer then return end
   local dx, dy, dh = gfx.w - state.drawer_w, state.titlebar_h + state.toolbar_h, gfx.h - (state.titlebar_h + state.toolbar_h)
   set_col(CONFIG.dark_mode and {0.15,0.16,0.20} or {0.97,0.97,0.99}); gfx.rect(dx, dy, state.drawer_w, dh, 1)
   set_col(CONFIG.dark_mode and {0.25,0.27,0.32} or {0.84,0.86,0.90}); gfx.line(dx, dy, dx, gfx.h)
-
-  gfx.setfont(1, "Segoe UI", 15); set_col(CONFIG.dark_mode and {0.92,0.94,0.97} or {0.16,0.18,0.22})
-  draw_text_left("Preferences", dx + 14, dy + 6, state.drawer_w - 28, 22)
+  gfx.setfont(1, "Segoe UI", 15); set_col(CONFIG.dark_mode and {0.92,0.94,0.97} or {0.16,0.18,0.22}); draw_text_left("Preferences", dx + 14, dy + 6, state.drawer_w - 28, 22)
 
   local y, hw = dy + 32, (state.drawer_w - 34) * 0.5
-  draw_slider("in_scale_h", dx + 14, y, state.drawer_w - 28, 22, state.in_scale_h, 16, 64, "Lane Height (Locked)", "%s: %d px", function(v)
-    state.in_scale_h = math.floor(v + 0.5); rebuild_row_layout()
-  end); y = y + 25
+  draw_slider("in_scale_h", dx + 14, y, state.drawer_w - 28, 22, state.in_scale_h, 16, 64, "Lane Height (Locked)", "%s: %d px", function(v) state.in_scale_h = math.floor(v + 0.5); rebuild_row_layout() end); y = y + 25
+  draw_slider("mpe_tail_ms", dx + 14, y, state.drawer_w - 28, 22, state.mpe_release_tail_ms, 50, 2500, "MPE Release Tail", "%s: %d ms", function(v) state.mpe_release_tail_ms = math.floor(v/10+0.5)*10 end); y = y + 25
 
-  draw_slider("mpe_tail_ms", dx + 14, y, state.drawer_w - 28, 22, state.mpe_release_tail_ms, 50, 2500, "MPE Release Tail", "%s: %d ms", function(v)
-    state.mpe_release_tail_ms = math.floor(v / 10 + 0.5) * 10
-  end); y = y + 25
+  register_btn("theme_btn", dx + 14, y, hw, 23, "Theme: " .. (CONFIG.dark_mode and "Dark" or "Light"), CONFIG.dark_mode, function() CONFIG.dark_mode = not CONFIG.dark_mode; save_global_prefs() end)
+  register_btn("frameless_btn", dx + 20 + hw, y, hw, 23, "Dark Bar: " .. (state.use_frameless and "ON" or "OFF"), state.use_frameless, function() state.use_frameless = not state.use_frameless; apply_window_frame_style(); save_global_prefs() end); y = y + 26
+  register_btn("harm_border_style", dx + 14, y, hw, 23, "Mid: " .. (state.harmony_border_style == "dotted" and "Dotted" or "Solid"), state.harmony_border_style == "solid", function() state.harmony_border_style = (state.harmony_border_style == "dotted") and "solid" or "dotted"; save_global_prefs() end)
+  register_btn("phrase_mode_btn", dx + 20 + hw, y, hw, 23, "Paste: " .. (state.phrase_paste_mode == "replace" and "Replace" or "Merge"), state.phrase_paste_mode == "replace", function() state.phrase_paste_mode = (state.phrase_paste_mode == "replace") and "merge" or "replace"; save_global_prefs() end); y = y + 26
 
-  register_btn("theme_btn", dx + 14, y, hw, 23, "Theme: " .. (CONFIG.dark_mode and "Dark" or "Light"), CONFIG.dark_mode, function()
-    CONFIG.dark_mode = not CONFIG.dark_mode; save_global_prefs()
-  end)
-  register_btn("frameless_btn", dx + 20 + hw, y, hw, 23, "Dark Bar: " .. (state.use_frameless and "ON" or "OFF"), state.use_frameless, function()
-    state.use_frameless = not state.use_frameless; apply_window_frame_style(); save_global_prefs()
-  end); y = y + 26
-
-  register_btn("harm_border_style", dx + 14, y, hw, 23, "Mid: " .. (state.harmony_border_style == "dotted" and "Dotted" or "Solid"), state.harmony_border_style == "solid", function()
-    state.harmony_border_style = (state.harmony_border_style == "dotted") and "solid" or "dotted"; save_global_prefs()
-  end)
-  register_btn("phrase_mode_btn", dx + 20 + hw, y, hw, 23, "Paste: " .. (state.phrase_paste_mode == "replace" and "Replace" or "Merge"), state.phrase_paste_mode == "replace", function()
-    state.phrase_paste_mode = (state.phrase_paste_mode == "replace") and "merge" or "replace"; save_global_prefs()
-  end); y = y + 26
-
-  -- Moved from top toolbar: Harmony View selector
   local h_lbl = "Harmony View: N2N Pref"
-  if state.harmony_source == "clip_pulled" then h_lbl = "Harmony View: Pulled Clip"
-  elseif state.harmony_source == "diatonic" then h_lbl = "Harmony View: Diatonic"
-  elseif state.harmony_source == "triad_1" then h_lbl = "Harmony View: Triad 1-3-5"
-  elseif state.harmony_source == "manual" then h_lbl = "Harmony View: Manual" end
+  if state.harmony_source == "clip_pulled" then h_lbl = "Harmony View: Pulled Clip" elseif state.harmony_source == "diatonic" then h_lbl = "Harmony View: Diatonic"
+  elseif state.harmony_source == "triad_1" then h_lbl = "Harmony View: Triad 1-3-5" elseif state.harmony_source == "manual" then h_lbl = "Harmony View: Manual" end
   register_btn("harm_src", dx + 14, y, state.drawer_w - 28, 24, h_lbl, false, function(bx, by, bw, bh)
-    gfx.x, gfx.y = bx, by + bh; local menu = ""
-    for _, hs in ipairs(CONFIG.harmony_sources) do menu = menu .. (state.harmony_source == hs.id and "!" or "") .. hs.label .. "|" end
-    menu = menu .. "|Refresh N2N gmem Now|Pull Selected Clip as Harmony Guides|Clear Manual Harmony Notes"
-    local c = gfx.showmenu(menu)
+    gfx.x, gfx.y = bx, by + bh; local menu = ""; for _, hs in ipairs(CONFIG.harmony_sources) do menu = menu .. (state.harmony_source == hs.id and "!" or "") .. hs.label .. "|" end
+    local c = gfx.showmenu(menu .. "|Refresh N2N gmem Now|Pull Selected Clip as Harmony Guides|Clear Manual Harmony Notes")
     if c >= 1 and c <= #CONFIG.harmony_sources then state.harmony_source = CONFIG.harmony_sources[c].id; if state.harmony_source == "gmem" then read_gmem_harmony(true) end; save_project_state()
     elseif c == #CONFIG.harmony_sources + 1 then state.harmony_source = "gmem"; read_gmem_harmony(true); save_project_state()
-    elseif c == #CONFIG.harmony_sources + 2 then pull_clip_as_harmony_guides()
-    elseif c == #CONFIG.harmony_sources + 3 then state.manual_harmony_notes = {}; save_project_state() end
+    elseif c == #CONFIG.harmony_sources + 2 then pull_clip_as_harmony_guides() elseif c == #CONFIG.harmony_sources + 3 then state.manual_harmony_notes = {}; save_project_state() end
   end); y = y + 28
 
-  gfx.setfont(1, "Segoe UI", 12); set_col(CONFIG.dark_mode and {0.85,0.88,0.94} or {0.20,0.22,0.26})
-  draw_text_left("Clip Groove & 8th Swing (gmem)", dx + 14, y, state.drawer_w - 28, 16); y = y + 18
+  gfx.setfont(1, "Segoe UI", 12); set_col(CONFIG.dark_mode and {0.85,0.88,0.94} or {0.20,0.22,0.26}); draw_text_left("Clip Groove & 8th Swing (gmem)", dx + 14, y, state.drawer_w - 28, 16); y = y + 18
   register_btn("groove_en", dx + 14, y, hw, 23, "Groove: " .. (state.groove_enabled and "ON" or "OFF"), state.groove_enabled, function() state.groove_enabled = not state.groove_enabled; sync_section_clips() end)
   register_btn("swing_src_btn", dx + 20 + hw, y, hw, 23, "Swing: " .. (state.swing_from_gmem and "gmem[2]" or "Manual"), state.swing_from_gmem, function() state.swing_from_gmem = not state.swing_from_gmem; read_gmem_groove_and_swing(); sync_section_clips() end); y = y + 26
-  draw_slider("swing_pct", dx + 14, y, state.drawer_w - 28, 22, state.swing_pct, 0, 100, "8th Swing", "%s: %d%% (100=Triplet)", function(v)
-    state.swing_from_gmem = false; state.swing_pct = math.floor(v + 0.5)
-  end); y = y + 26
+  draw_slider("swing_pct", dx + 14, y, state.drawer_w - 28, 22, state.swing_pct, 0, 100, "8th Swing", "%s: %d%% (100=Triplet)", function(v) state.swing_from_gmem = false; state.swing_pct = math.floor(v + 0.5) end); y = y + 26
 
-  gfx.setfont(1, "Segoe UI", 12); set_col(CONFIG.dark_mode and {0.85,0.88,0.94} or {0.20,0.22,0.26})
-  draw_text_left("Scroll & Zoom Wheel Modifiers (Grid)", dx + 14, y, state.drawer_w - 28, 16); y = y + 18
+  gfx.setfont(1, "Segoe UI", 12); set_col(CONFIG.dark_mode and {0.85,0.88,0.94} or {0.20,0.22,0.26}); draw_text_left("Scroll & Zoom Wheel Modifiers (Grid)", dx + 14, y, state.drawer_w - 28, 16); y = y + 18
   for idx, mi in ipairs({{key="v_scroll",label="V-Scroll"},{key="h_scroll",label="H-Scroll"},{key="h_zoom",label="H-Zoom"},{key="v_zoom",label="V-Zoom"}}) do
     local bx, by = dx + 14 + ((idx-1)%2)*(hw+6), y + math.floor((idx-1)/2)*25
     register_btn("mod_"..mi.key, bx, by, hw, 22, mi.label..": "..state.wheel_mods[mi.key], false, function(cbx, cby, cbw, cbh)
-      gfx.x, gfx.y = cbx, cby + cbh; local menu = ""
-      for _, mc in ipairs(MOD_CHOICES) do menu = menu .. (state.wheel_mods[mi.key] == mc and "!" or "") .. mc .. "|" end
+      gfx.x, gfx.y = cbx, cby + cbh; local menu = ""; for _, mc in ipairs(MOD_CHOICES) do menu = menu .. (state.wheel_mods[mi.key] == mc and "!" or "") .. mc .. "|" end
       local c = gfx.showmenu(menu); if c >= 1 and c <= #MOD_CHOICES then state.wheel_mods[mi.key] = MOD_CHOICES[c]; save_global_prefs() end
     end)
   end
   y = y + 54
 
-  -- 2-Column 7 -> 1 Color Legend (fits cleanly inside 640px minimum height!)
-  gfx.setfont(1, "Segoe UI", 12); set_col(CONFIG.dark_mode and {0.78,0.82,0.88} or {0.30,0.33,0.38})
-  draw_text_left("NNS Colors 7 → 1 (1 = " .. CONFIG.note_names[state.tonic_pc + 1] .. ")", dx + 14, y, state.drawer_w - 28, 16); y = y + 18
-  for row = 0, 5 do
-    for col = 0, 1 do
-      local s = 11 - (col * 6 + row)
-      local def, cols = CONFIG.step_definitions[s], get_step_colors(s)
-      local sx, sy = dx + 14 + col * (hw + 6), y + row * 21
-      set_col(cols.active); draw_filled_roundrect(sx, sy, 26, 18, 4)
-      set_col(contrast_text_col(cols.active)); gfx.setfont(1, "Segoe UI", 11); draw_text_centered(def.nns, sx, sy, 26, 18)
-      set_col(CONFIG.dark_mode and {0.88,0.90,0.94} or {0.20,0.22,0.26})
-      draw_text_left(string.format("%s (%s)", CONFIG.note_names[(state.tonic_pc + s)%12 + 1], def.hex), sx + 30, sy, hw - 32, 18)
-    end
-  end
+  gfx.setfont(1, "Segoe UI", 12); set_col(CONFIG.dark_mode and {0.78,0.82,0.88} or {0.30,0.33,0.38}); draw_text_left("NNS Colors 7 → 1 (1 = " .. CONFIG.note_names[state.tonic_pc + 1] .. ")", dx + 14, y, state.drawer_w - 28, 16); y = y + 18
+  for row = 0, 5 do for col = 0, 1 do
+    local s = 11 - (col * 6 + row); local def, cols = CONFIG.step_definitions[s], get_step_colors(s); local sx, sy = dx + 14 + col * (hw + 6), y + row * 21
+    set_col(cols.active); draw_filled_roundrect(sx, sy, 26, 18, 4); set_col(contrast_text_col(cols.active)); gfx.setfont(1, "Segoe UI", 11); draw_text_centered(def.nns, sx, sy, 26, 18)
+    set_col(CONFIG.dark_mode and {0.88,0.90,0.94} or {0.20,0.22,0.26}); draw_text_left(string.format("%s (%s)", CONFIG.note_names[(state.tonic_pc + s)%12 + 1], def.hex), sx + 30, sy, hw - 32, 18)
+  end end
 end
 
 --------------------------------------------------------------------------------
 -- 13. INPUT HANDLING
 --------------------------------------------------------------------------------
 local function match_wheel_mod(mod_name, ctrl, shift, alt)
-  if mod_name == "None" then return not ctrl and not shift and not alt
-  elseif mod_name == "Shift" then return shift and not ctrl and not alt
-  elseif mod_name == "Ctrl" then return ctrl and not shift and not alt
-  elseif mod_name == "Alt" then return alt and not ctrl and not shift
-  elseif mod_name == "Ctrl+Shift" then return ctrl and shift and not alt end
-  return false
+  if mod_name == "None" then return not ctrl and not shift and not alt elseif mod_name == "Shift" then return shift and not ctrl and not alt
+  elseif mod_name == "Ctrl" then return ctrl and not shift and not alt elseif mod_name == "Alt" then return alt and not ctrl and not shift
+  elseif mod_name == "Ctrl+Shift" then return ctrl and shift and not alt end; return false
 end
 
 local function update_auto_scroll(canvas_w)
   if not state.auto_scroll or (reaper.GetPlayState() & 1) ~= 1 then return end
   if state.drag and (state.drag.type == "hscroll_pan" or state.drag.type == "hscroll_left" or state.drag.type == "hscroll_right") then return end
   local grid_w = get_grid_right_x(canvas_w) - state.keyboard_w; if grid_w <= 40 then return end
-  local visible_qn = grid_w / state.px_per_qn; local play_qn = reaper.TimeMap2_timeToQN(0, reaper.GetPlayPosition())
-  if play_qn > state.scroll_x_qn + visible_qn * (2.0 / 3.0) then state.scroll_x_qn = math.max(0, play_qn - visible_qn * (2.0 / 3.0))
-  elseif play_qn < state.scroll_x_qn then state.scroll_x_qn = math.max(0, play_qn - visible_qn * 0.15) end
+  local vqn, pqn = grid_w / state.px_per_qn, reaper.TimeMap2_timeToQN(0, reaper.GetPlayPosition())
+  if pqn > state.scroll_x_qn + vqn * (2.0/3.0) then state.scroll_x_qn = math.max(0, pqn - vqn * (2.0/3.0))
+  elseif pqn < state.scroll_x_qn then state.scroll_x_qn = math.max(0, pqn - vqn * 0.15) end
 end
 
 local function find_note_at(sx, sy)
-  local half_h = get_note_visual_h() * 0.5 + 2
-  for i = #state.notes, 1, -1 do
-    local n = state.notes[i]; local cy = pitch_center_screen_y(n.pitch)
-    if sy >= cy - half_h and sy <= cy + half_h then
-      local nx1, nx2 = qn_to_screen_x(n.start_qn), qn_to_screen_x(n.end_qn)
-      if sx >= nx1 - 3 and sx <= nx2 + 3 then return n, (sx >= nx2 - 7) and "right" or "body" end
-    end
-  end
+  local hh = get_note_visual_h() * 0.5 + 2
+  for i = #state.notes, 1, -1 do local n = state.notes[i]; local cy = pitch_center_screen_y(n.pitch); if sy >= cy - hh and sy <= cy + hh then local x1, x2 = qn_to_screen_x(n.start_qn), qn_to_screen_x(n.end_qn); if sx >= x1 - 3 and sx <= x2 + 3 then return n, (sx >= x2 - 7) and "right" or "body" end end end
   return nil, nil
 end
 
 local function find_manual_harmony_at(sx, sy)
-  local half_h = get_harmony_visual_h() * 0.5 + 2
-  for i = #state.manual_harmony_notes, 1, -1 do
-    local mh = state.manual_harmony_notes[i]; local cy = pitch_center_screen_y(mh.pitch)
-    if sy >= cy - half_h and sy <= cy + half_h then
-      local nx1, nx2 = qn_to_screen_x(mh.start_qn), qn_to_screen_x(mh.end_qn)
-      if sx >= nx1 - 3 and sx <= nx2 + 3 then return mh, i, (sx >= nx2 - 7) and "right" or "body" end
-    end
-  end
+  local hh = get_harmony_visual_h() * 0.5 + 2
+  for i = #state.manual_harmony_notes, 1, -1 do local mh = state.manual_harmony_notes[i]; local cy = pitch_center_screen_y(mh.pitch); if sy >= cy - hh and sy <= cy + hh then local x1, x2 = qn_to_screen_x(mh.start_qn), qn_to_screen_x(mh.end_qn); if sx >= x1 - 3 and sx <= x2 + 3 then return mh, i, (sx >= x2 - 7) and "right" or "body" end end end
   return nil, nil, nil
 end
 
@@ -2158,7 +1833,6 @@ local function handle_mouse()
   local ctrl, shift, alt = (cap&4)==4, (cap&8)==8, (cap&16)==16
 
   if state.section_glow_held and not l_down then state.section_glow_held = false; state.section_glow_until = reaper.time_precise() + 0.35 end
-
   local canvas_w = state.show_drawer and (gfx.w - state.drawer_w) or gfx.w
   local canvas_h = gfx.h - state.transport_h - state.param_bar_h - (state.show_vel_lane and state.vel_lane_h or 0)
   local grid_bottom_y, ruler_y, top_area, right_x = canvas_h - state.hscroll_h, get_ruler_y(), get_top_area_y(), get_grid_right_x(canvas_w)
@@ -2171,22 +1845,12 @@ local function handle_mouse()
 
   if gfx.mouse_wheel ~= 0 then
     local steps = gfx.mouse_wheel / 120.0; gfx.mouse_wheel = 0
-    local grid_w, grid_h = math.max(40, right_x - state.keyboard_w), math.max(40, grid_bottom_y - top_area)
-    if mx < state.keyboard_w then
-      state.scroll_y_px = clamp(state.scroll_y_px - steps * 36, 0, math.max(0, state.total_h - grid_h))
-    elseif match_wheel_mod(state.wheel_mods.h_zoom, ctrl, shift, alt) then
-      local cqn = state.scroll_x_qn + (grid_w * 0.5) / state.px_per_qn
-      state.px_per_qn = clamp(state.px_per_qn * (1.15 ^ steps), 20, 480)
-      state.scroll_x_qn = math.max(0, cqn - (grid_w * 0.5) / state.px_per_qn)
-    elseif match_wheel_mod(state.wheel_mods.v_zoom, ctrl, shift, alt) then
-      local cf = (state.scroll_y_px + grid_h * 0.5) / math.max(1, state.total_h)
-      state.v_scale = clamp(state.v_scale * (1.1 ^ steps), 0.45, 3.0); rebuild_row_layout()
-      state.scroll_y_px = clamp(cf * state.total_h - grid_h * 0.5, 0, math.max(0, state.total_h - grid_h))
-    elseif match_wheel_mod(state.wheel_mods.h_scroll, ctrl, shift, alt) then
-      state.auto_scroll = false; state.scroll_x_qn = math.max(0, state.scroll_x_qn - steps * 2.0)
-    elseif match_wheel_mod(state.wheel_mods.v_scroll, ctrl, shift, alt) then
-      state.scroll_y_px = clamp(state.scroll_y_px - steps * 36, 0, math.max(0, state.total_h - grid_h))
-    end
+    local gw, gh = math.max(40, right_x - state.keyboard_w), math.max(40, grid_bottom_y - top_area)
+    if mx < state.keyboard_w then state.scroll_y_px = clamp(state.scroll_y_px - steps * 36, 0, math.max(0, state.total_h - gh))
+    elseif match_wheel_mod(state.wheel_mods.h_zoom, ctrl, shift, alt) then local c = state.scroll_x_qn + (gw*0.5)/state.px_per_qn; state.px_per_qn = clamp(state.px_per_qn*(1.15^steps), 20, 480); state.scroll_x_qn = math.max(0, c - (gw*0.5)/state.px_per_qn)
+    elseif match_wheel_mod(state.wheel_mods.v_zoom, ctrl, shift, alt) then local cf = (state.scroll_y_px + gh*0.5)/math.max(1, state.total_h); state.v_scale = clamp(state.v_scale*(1.1^steps), 0.45, 3.0); rebuild_row_layout(); state.scroll_y_px = clamp(cf*state.total_h - gh*0.5, 0, math.max(0, state.total_h - gh))
+    elseif match_wheel_mod(state.wheel_mods.h_scroll, ctrl, shift, alt) then state.auto_scroll = false; state.scroll_x_qn = math.max(0, state.scroll_x_qn - steps * 2.0)
+    elseif match_wheel_mod(state.wheel_mods.v_scroll, ctrl, shift, alt) then state.scroll_y_px = clamp(state.scroll_y_px - steps * 36, 0, math.max(0, state.total_h - gh)) end
   end
 
   if state.active_slider then
@@ -2214,14 +1878,21 @@ local function handle_mouse()
     end
   end
 
-  if l_pressed and state.frameless and mx >= gfx.w - 18 and my >= gfx.h - 18 and state.hwnd and reaper.JS_Window_GetRect and reaper.JS_Window_SetPosition then
-    local _, wx, wy, wr, wb = reaper.JS_Window_GetRect(state.hwnd); local smx, smy = reaper.GetMousePosition()
-    state.drag = { type="win_resize", smx=smx, smy=smy, wx=wx, wy=wy, ww=math.abs(wr-wx), wh=math.abs(wb-wy) }; state.last_mouse_cap = cap; return
+  -- Bottom-right corner resize grip (cross-platform Windows & macOS via JS_Window_Resize)
+  if l_pressed and state.frameless and mx >= gfx.w - 18 and my >= gfx.h - 18 and state.hwnd and reaper.JS_Window_GetRect and reaper.JS_Window_Resize then
+    local _, wx, wt, wr, wb = reaper.JS_Window_GetRect(state.hwnd); local smx, smy = reaper.GetMousePosition()
+    local ow, oh = math.abs(wr - wx), math.abs(wb - wt)
+    state.drag = { type="win_resize", smx=smx, smy=smy, ww=ow, wh=oh, fw=math.max(0, ow - gfx.w), fh=math.max(0, oh - gfx.h) }
+    state.last_mouse_cap = cap; return
   end
-  if l_pressed and state.frameless and my < state.titlebar_h and state.hwnd and reaper.JS_Window_GetRect then
-    local _, wx, wy = reaper.JS_Window_GetRect(state.hwnd); local smx, smy = reaper.GetMousePosition()
-    state.drag = { type="win_move", smx=smx, smy=smy, wx=wx, wy=wy }; state.last_mouse_cap = cap; return
+
+  -- Frameless Dark Title Bar Move (uses Cocoa bottom-left Y on macOS, top-left Y on Windows/Linux)
+  if l_pressed and state.frameless and my < state.titlebar_h and state.hwnd and reaper.JS_Window_GetRect and reaper.JS_Window_Move then
+    local _, wx, wt, wr, wb = reaper.JS_Window_GetRect(state.hwnd); local smx, smy = reaper.GetMousePosition()
+    state.drag = { type="win_move", smx=smx, smy=smy, wx=wx, wy=(IS_MAC and wb or wt) }
+    state.last_mouse_cap = cap; return
   end
+
   if l_pressed and mx >= state.keyboard_w and mx < right_x and my >= ruler_y and my < top_area then
     reaper.SetEditCurPos(reaper.TimeMap2_QNToTime(0, math.max(0, snap_qn(screen_x_to_qn(mx)))), true, true)
     state.drag = { type="ruler_scrub" }; state.last_mouse_cap = cap; return
@@ -2285,9 +1956,10 @@ local function handle_mouse()
         local hit_note, hit_edge = find_note_at(mx, my)
         if hit_note then
           push_undo(); if not shift and not hit_note.selected then deselect_all() end; hit_note.selected = true
-          if hit_edge == "right" then state.drag = { type="resize", note=hit_note, orig_end=hit_note.end_qn, start_mx=mx }
+          local orig = {}; for _, n in ipairs(state.notes) do if n.selected then orig[n.id] = { s=n.start_qn, e=n.end_qn, dur=n.end_qn - n.start_qn, p=n.pitch } end end
+          if hit_edge == "right" then
+            state.drag = { type="resize", anchor=hit_note, orig_end=hit_note.end_qn, orig_dur=hit_note.end_qn - hit_note.start_qn, start_mx=mx, orig=orig }
           else
-            local orig = {}; for _, n in ipairs(state.notes) do if n.selected then orig[n.id]={s=n.start_qn,e=n.end_qn,p=n.pitch} end end
             trigger_preview_note(hit_note.pitch, hit_note.vel, hit_note.chan, 0.20)
             state.drag = { type="move", anchor=hit_note, start_mx=mx, orig=orig, last_preview_p=hit_note.pitch }
           end
@@ -2334,273 +2006,304 @@ local function handle_mouse()
         else state.drag = { type="marquee_r", start_x=mx, start_y=my, moved=false } end
       else
         local hn = find_note_at(mx, my)
-                if hn then
-                  push_undo()
-                  if (shift or ctrl) and hn.section_uid then
-                    local del_qns = get_repetition_start_qns(hn.start_qn, get_section_by_uid(hn.section_uid), shift, ctrl)
-                    for k = #state.notes, 1, -1 do
-                      local cand = state.notes[k]
-                      if cand.section_uid == hn.section_uid and cand.pitch == hn.pitch then
-                        for _, dq in ipairs(del_qns) do if math.abs(cand.start_qn - dq) < 1e-3 then remove_note_by_index(k) break end end
-                      end
-                    end
-                  else for i, n in ipairs(state.notes) do if n.id == hn.id then remove_note_by_index(i) break end end end
-                  compute_section_overflows(); sync_section_clips()
-                else
-                  -- Right-click tap clears selections; right-drag > 4px starts box marquee selection
-                  state.drag = { type="marquee_r", start_x=mx, start_y=my, moved=false }
-                end
+        if hn then
+          push_undo()
+          if (shift or ctrl) and hn.section_uid then
+            local del_qns = get_repetition_start_qns(hn.start_qn, get_section_by_uid(hn.section_uid), shift, ctrl)
+            for k = #state.notes, 1, -1 do
+              local cand = state.notes[k]
+              if cand.section_uid == hn.section_uid and cand.pitch == hn.pitch then
+                for _, dq in ipairs(del_qns) do if math.abs(cand.start_qn - dq) < 1e-3 then remove_note_by_index(k) break end end
               end
             end
-          end
-        
-          if state.drag then
-            local d = state.drag
-            if d.type == "win_move" and l_down then
-              local smx, smy = reaper.GetMousePosition(); reaper.JS_Window_Move(state.hwnd, d.wx + (smx - d.smx), d.wy + (smy - d.smy))
-            elseif d.type == "win_resize" and l_down then
-              local smx, smy = reaper.GetMousePosition()
-              reaper.JS_Window_SetPosition(state.hwnd, d.wx, d.wy, math.max(MIN_WIN_W, d.ww + (smx - d.smx)), math.max(MIN_WIN_H, d.wh + (smy - d.smy)), "", "NOZORDER,NOACTIVATE")
-            elseif d.type == "ruler_scrub" and l_down then
-              reaper.SetEditCurPos(reaper.TimeMap2_QNToTime(0, math.max(0, snap_qn(screen_x_to_qn(mx)))), true, true)
-            elseif d.type == "hscroll_pan" and l_down then
-              state.scroll_x_qn = clamp(d.orig_scroll + ((mx-d.start_mx)/d.hs.w)*d.hs.max_qn, 0, math.max(0, d.hs.max_qn-d.hs.visible_qn))
-            elseif d.type == "hscroll_left" and l_down then
-              local nl = clamp(((mx-d.hs.x)/d.hs.w)*d.hs.max_qn, 0, d.right_qn - math.max(1.0, d.grid_w/480.0))
-              state.px_per_qn = clamp(d.grid_w/(d.right_qn-nl), 20, 480); state.scroll_x_qn = math.max(0, d.right_qn - d.grid_w/state.px_per_qn)
-            elseif d.type == "hscroll_right" and l_down then
-              local nr = clamp(((mx-d.hs.x)/d.hs.w)*d.hs.max_qn, d.left_qn + math.max(1.0, d.grid_w/480.0), d.hs.max_qn*1.4)
-              state.px_per_qn = clamp(d.grid_w/(nr-d.left_qn), 20, 480)
-            elseif d.type == "vscroll_pan" and l_down then
-              state.scroll_y_px = clamp(d.orig_scroll + ((my-d.start_my)/d.vs.h)*d.vs.total_h, 0, math.max(0, d.vs.total_h-d.vs.h))
-            elseif d.type == "vscroll_top" and l_down then
-              local nt = clamp((my-d.vs.y)/d.vs.h, 0.0, d.bottom_frac-0.06)
-              state.v_scale = clamp(d.vs.h/((d.bottom_frac-nt)*d.base_total_h), 0.45, 3.0); rebuild_row_layout()
-              state.scroll_y_px = clamp(d.bottom_frac*state.total_h - d.vs.h, 0, math.max(0, state.total_h-d.vs.h))
-            elseif d.type == "vscroll_bot" and l_down then
-              local nb = clamp((my-d.vs.y)/d.vs.h, d.top_frac+0.06, 1.0)
-              state.v_scale = clamp(d.vs.h/((nb-d.top_frac)*d.base_total_h), 0.45, 3.0); rebuild_row_layout()
-              state.scroll_y_px = clamp(d.top_frac*state.total_h, 0, math.max(0, state.total_h-d.vs.h))
-            elseif d.type == "pan" and m_down then
-              state.scroll_x_qn = math.max(0, d.orig_sx - (mx-d.start_mx)/state.px_per_qn)
-              state.scroll_y_px = clamp(d.orig_sy - (my-d.start_my), 0, math.max(0, state.total_h-(grid_bottom_y-top_area)))
-            elseif d.type == "keyboard" and l_down then
-              local p = screen_y_to_pitch(my, alt)
-              if p and p ~= state.kbd_held_pitch then
-                if state.kbd_held_pitch then send_midi_note_off(state.kbd_held_pitch,0) end
-                state.kbd_held_pitch=p; send_midi_note_on(p,state.default_vel,0); check_preview_arm_hint()
-              end
-            elseif (d.type == "h_create" or d.type == "h_resize") and l_down then
-              d.note.end_qn = math.max(((d.type=="h_create") and d.anchor_qn or d.note.start_qn) + get_grid_qn()*0.25, snap_qn(screen_x_to_qn(mx)))
-            elseif d.type == "h_move" and l_down then
-              d.note.start_qn = math.max(0, snap_qn(d.orig_s + (mx-d.start_mx)/state.px_per_qn)); d.note.end_qn = d.note.start_qn + (d.orig_e-d.orig_s)
-              local np = screen_y_to_pitch(my, alt); if np then d.note.pitch=np; d.note.pc=np%12 end
-            elseif d.type == "vel_lane" and l_down then
-              local qn = screen_x_to_qn(mx); local nv = clamp(math.floor(((d.lane_bottom-my)/math.max(10,d.lane_bottom-d.lane_top))*127+0.5),1,127)
-              for _, n in ipairs(state.notes) do if get_incoming_note(n.id)==nil and math.abs(n.start_qn-qn)*state.px_per_qn<14 then n.vel=nv end end
-            elseif d.type == "node4_drag" and l_down then
-              local n, qn = d.note, screen_x_to_qn(mx)
-              local frac = (qn - n.start_qn) / math.max(0.01, n.end_qn - n.start_qn)
-              local has_inc = (get_incoming_note(n.id) ~= nil)
-              if d.kind == "n1" then
-                n.t1 = clamp(frac, 0.0, (n.t2 or 0.35) - 0.04)
-                local tp = screen_y_to_pitch(my, alt)
-                if tp then
-                  local old_st = n.pre_st; n.pre_st = clamp(tp - n.pitch, -state.mpe_bend_range, state.mpe_bend_range)
-                  if not validate_chain_bend_range(get_chain_root(n)) then n.pre_st = old_st end
-                  state.status_msg = string.format("Pre-Bend: %s (%+.1f st)%s", get_key_left_right_labels(n.pitch + n.pre_st), n.pre_st, alt and " [Alt:Chromatic]" or "")
-                end
-              elseif d.kind == "n2" then n.t2 = clamp(frac, has_inc and 0.0 or ((n.t1 or 0.05) + 0.04), (n.t3 or 0.65) - 0.04)
-              elseif d.kind == "n3" then n.t3 = clamp(frac, (n.t2 or 0.0) + 0.04, d.dst and 0.99 or ((n.t4 or 0.95) - 0.04))
-              elseif d.kind == "n4" then
-                local cand = find_note_at(mx, my)
-                if cand and cand.id ~= n.id then d.hover_dst = cand
-                else
-                  d.hover_dst = nil; n.t4 = clamp(frac, (n.t3 or 0.65) + 0.04, 1.0)
-                  local tp = screen_y_to_pitch(my, alt)
-                  if tp then
-                    local old_st = n.out_st; n.out_st = clamp(tp - n.pitch, -state.mpe_bend_range, state.mpe_bend_range)
-                    if not validate_chain_bend_range(get_chain_root(n)) then n.out_st = old_st end
-                    state.status_msg = string.format("Out-Bend: %s (%+.1f st)%s", get_key_left_right_labels(n.pitch + n.out_st), n.out_st, alt and " [Alt:Chromatic]" or "")
-                  end
-                end
-              elseif d.kind == "pre_mid" then n.pre_tension = clamp(d.orig_pre_t + (d.start_my - my) / 50.0, -1.0, 1.0)
-              elseif d.kind == "out_mid" then n.out_tension = clamp(d.orig_out_t + (d.start_my - my) / 50.0, -1.0, 1.0) end
-            elseif d.type == "create_batch" and l_down then
-              local nd = math.max(get_grid_qn()*0.25, snap_qn(screen_x_to_qn(mx)) - d.anchor_qn)
-              for _, bn in ipairs(d.batch) do bn.end_qn = bn.start_qn + nd end
-            elseif d.type == "resize" and l_down then
-              d.note.end_qn = math.max(d.note.start_qn + get_grid_qn()*0.25, snap_qn(d.orig_end + (mx-d.start_mx)/state.px_per_qn))
-            elseif d.type == "move" and l_down then
-              local dqn, tp, ao = (mx-d.start_mx)/state.px_per_qn, screen_y_to_pitch(my, alt) or d.anchor.pitch, d.orig[d.anchor.id]
-              local adqn, dp = snap_qn(ao.s+dqn) - ao.s, tp - ao.p
-              for _, n in ipairs(state.notes) do
-                local o = d.orig[n.id]
-                if o then
-                  local old_p = n.pitch; n.start_qn = math.max(0, o.s + adqn); n.end_qn = n.start_qn + (o.e - o.s)
-                  local np = clamp(o.p + dp, 0, 127)
-                  if state.view_mode == "diatonic" and not alt and not is_pitch_diatonic(np) then np = step_pitch_diatonic(np, dp>=0 and 1 or -1) end
-                  n.pitch = np; if not validate_chain_bend_range(get_chain_root(n)) then n.pitch = old_p end
-                  if not n.section_override then local s = find_section_at_qn(n.start_qn); if s then n.section_uid = s.uid end end
-                end
-              end
-              if d.anchor.pitch ~= d.last_preview_p then d.last_preview_p = d.anchor.pitch; trigger_preview_note(d.anchor.pitch, d.anchor.vel, d.anchor.chan, 0.20) end
-            elseif d.type == "marquee" and l_down then
-              state.marquee.x2, state.marquee.y2 = mx, my
-            elseif d.type == "marquee_r" and r_down then
-              if not d.moved and (math.abs(mx - d.start_x) > 4 or math.abs(my - d.start_y) > 4) then d.moved = true end
-              if d.moved then state.marquee = { x1 = d.start_x, y1 = d.start_y, x2 = mx, y2 = my } end
-            end
-        
-            local released = (d.type=="pan" and not m_down) or (d.type=="marquee_r" and r_released) or (d.type~="pan" and d.type~="marquee_r" and l_released)
-            if released then
-              if d.type == "keyboard" and state.kbd_held_pitch then
-                send_midi_note_off(state.kbd_held_pitch, 0); state.kbd_held_pitch = nil
-              elseif d.type == "node4_drag" then
-                if d.kind == "n4" and d.hover_dst then
-                  local ok, msg = can_connect_notes(d.note, d.hover_dst)
-                  if ok then connect_notes(d.note, d.hover_dst); state.status_msg = "Connected note slide"
-                  else state.status_msg = msg or "Connection rejected" end
-                end
-                compute_section_overflows(); sync_section_clips()
-              elseif d.type == "h_create" or d.type == "h_resize" or d.type == "h_move" then
-                save_project_state()
-              elseif d.type == "marquee" or d.type == "marquee_r" then
-                if d.type == "marquee_r" and not d.moved then
-                  deselect_all(); state.status_msg = "Selection cleared"
-                elseif state.marquee then
-                  if d.type == "marquee_r" and not shift then deselect_all() end
-                  local x1, x2 = math.min(state.marquee.x1, state.marquee.x2), math.max(state.marquee.x1, state.marquee.x2)
-                  local y1, y2 = math.min(state.marquee.y1, state.marquee.y2), math.max(state.marquee.y1, state.marquee.y2)
-                  local hh = get_note_visual_h() * 0.5
-                  for _, n in ipairs(state.notes) do
-                    local nx1, nx2, cy = qn_to_screen_x(n.start_qn), qn_to_screen_x(n.end_qn), pitch_center_screen_y(n.pitch)
-                    if nx2>=x1 and nx1<=x2 and cy+hh>=y1 and cy-hh<=y2 then n.selected=true end
-                  end
-                end
-                state.marquee = nil
-              elseif d.type == "create_batch" or d.type == "resize" or d.type == "move" or d.type == "vel_lane" then
-                compute_section_overflows(); sync_section_clips()
-              end
-              state.drag = nil
-            end
-          end
-          state.last_mouse_cap = cap
+          else for i, n in ipairs(state.notes) do if n.id == hn.id then remove_note_by_index(i) break end end end
+          compute_section_overflows(); sync_section_clips()
+        else
+          state.drag = { type="marquee_r", start_x=mx, start_y=my, moved=false }
         end
-        
-        local function handle_keyboard()
-          local char = gfx.getchar()
-          if char < 0 or state.should_close then return false end
-          if char == 0 then return true end
-          local cap = gfx.mouse_cap; local ctrl, shift, alt = (cap&4)==4, (cap&8)==8, (cap&16)==16
-          if char == 27 then deselect_all(); state.status_msg = "Selection cleared"
-          elseif char == 30064 then move_selected_by_arrows(1, 0, shift, alt, ctrl)
-          elseif char == 1685026670 then move_selected_by_arrows(-1, 0, shift, alt, ctrl)
-          elseif char == 1818584692 then move_selected_by_arrows(0, -1, shift, alt, false)
-          elseif char == 1919379572 then move_selected_by_arrows(0, 1, shift, alt, false)
-          elseif char == 6579564 or char == 8 then delete_selected()
-          elseif char == 32 then reaper.Main_OnCommand(40044, 0)
-          elseif not ctrl and not alt and (char == 109 or char == 77) then toggle_mute_selected()
-          elseif char == 1 or (ctrl and (char == 65 or char == 97)) then select_all()
-          elseif char == 3 or (ctrl and (char == 67 or char == 99)) then copy_selected()
-          elseif char == 22 or (ctrl and (char == 86 or char == 118)) then paste_notes()
-          elseif char == 4 or (ctrl and (char == 68 or char == 100)) then duplicate_selected()
-          elseif (char == 26 and shift) or char == 25 or (ctrl and (char == 89 or char == 121)) then pop_redo()
-          elseif char == 26 or (ctrl and (char == 90 or char == 122)) then pop_undo()
-          elseif char == 113 or char == 81 then quantize_selected() end
-          return true
+      end
+    end
+  end
+
+  if state.drag then
+    local d = state.drag
+    if d.type == "win_move" and l_down then
+      local smx, smy = reaper.GetMousePosition()
+      reaper.JS_Window_Move(state.hwnd, d.wx + (smx - d.smx), d.wy + (smy - d.smy))
+    elseif d.type == "win_resize" and l_down then
+      local smx, smy = reaper.GetMousePosition()
+      local dx = smx - d.smx
+      local dy = IS_MAC and (d.smy - smy) or (smy - d.smy) -- macOS GetMousePosition Y is bottom-to-top!
+      reaper.JS_Window_Resize(state.hwnd, math.max(MIN_WIN_W + d.fw, d.ww + dx), math.max(MIN_WIN_H + d.fh, d.wh + dy))
+    elseif d.type == "ruler_scrub" and l_down then
+      reaper.SetEditCurPos(reaper.TimeMap2_QNToTime(0, math.max(0, snap_qn(screen_x_to_qn(mx)))), true, true)
+    elseif d.type == "hscroll_pan" and l_down then
+      state.scroll_x_qn = clamp(d.orig_scroll + ((mx-d.start_mx)/d.hs.w)*d.hs.max_qn, 0, math.max(0, d.hs.max_qn-d.hs.visible_qn))
+    elseif d.type == "hscroll_left" and l_down then
+      local nl = clamp(((mx-d.hs.x)/d.hs.w)*d.hs.max_qn, 0, d.right_qn - math.max(1.0, d.grid_w/480.0))
+      state.px_per_qn = clamp(d.grid_w/(d.right_qn-nl), 20, 480); state.scroll_x_qn = math.max(0, d.right_qn - d.grid_w/state.px_per_qn)
+    elseif d.type == "hscroll_right" and l_down then
+      local nr = clamp(((mx-d.hs.x)/d.hs.w)*d.hs.max_qn, d.left_qn + math.max(1.0, d.grid_w/480.0), d.hs.max_qn*1.4)
+      state.px_per_qn = clamp(d.grid_w/(nr-d.left_qn), 20, 480)
+    elseif d.type == "vscroll_pan" and l_down then
+      state.scroll_y_px = clamp(d.orig_scroll + ((my-d.start_my)/d.vs.h)*d.vs.total_h, 0, math.max(0, d.vs.total_h-d.vs.h))
+    elseif d.type == "vscroll_top" and l_down then
+      local nt = clamp((my-d.vs.y)/d.vs.h, 0.0, d.bottom_frac-0.06)
+      state.v_scale = clamp(d.vs.h/((d.bottom_frac-nt)*d.base_total_h), 0.45, 3.0); rebuild_row_layout()
+      state.scroll_y_px = clamp(d.bottom_frac*state.total_h - d.vs.h, 0, math.max(0, state.total_h-d.vs.h))
+    elseif d.type == "vscroll_bot" and l_down then
+      local nb = clamp((my-d.vs.y)/d.vs.h, d.top_frac+0.06, 1.0)
+      state.v_scale = clamp(d.vs.h/((nb-d.top_frac)*d.base_total_h), 0.45, 3.0); rebuild_row_layout()
+      state.scroll_y_px = clamp(d.top_frac*state.total_h, 0, math.max(0, state.total_h-d.vs.h))
+    elseif d.type == "pan" and m_down then
+      state.scroll_x_qn = math.max(0, d.orig_sx - (mx-d.start_mx)/state.px_per_qn)
+      state.scroll_y_px = clamp(d.orig_sy - (my-d.start_my), 0, math.max(0, state.total_h-(grid_bottom_y-top_area)))
+    elseif d.type == "keyboard" and l_down then
+      local p = screen_y_to_pitch(my, alt)
+      if p and p ~= state.kbd_held_pitch then
+        if state.kbd_held_pitch then send_midi_note_off(state.kbd_held_pitch,0) end
+        state.kbd_held_pitch=p; send_midi_note_on(p,state.default_vel,0); check_preview_arm_hint()
+      end
+    elseif (d.type == "h_create" or d.type == "h_resize") and l_down then
+      d.note.end_qn = math.max(((d.type=="h_create") and d.anchor_qn or d.note.start_qn) + get_grid_qn()*0.25, snap_qn(screen_x_to_qn(mx)))
+    elseif d.type == "h_move" and l_down then
+      d.note.start_qn = math.max(0, snap_qn(d.orig_s + (mx-d.start_mx)/state.px_per_qn)); d.note.end_qn = d.note.start_qn + (d.orig_e-d.orig_s)
+      local np = screen_y_to_pitch(my, alt); if np then d.note.pitch=np; d.note.pc=np%12 end
+    elseif d.type == "vel_lane" and l_down then
+      local qn = screen_x_to_qn(mx); local nv = clamp(math.floor(((d.lane_bottom-my)/math.max(10,d.lane_bottom-d.lane_top))*127+0.5),1,127)
+      for _, n in ipairs(state.notes) do if get_incoming_note(n.id)==nil and math.abs(n.start_qn-qn)*state.px_per_qn<14 then n.vel=nv end end
+    elseif d.type == "node4_drag" and l_down then
+      local n, qn = d.note, screen_x_to_qn(mx)
+      local frac = (qn - n.start_qn) / math.max(0.01, n.end_qn - n.start_qn)
+      local has_inc = (get_incoming_note(n.id) ~= nil)
+      if d.kind == "n1" then
+        n.t1 = clamp(frac, 0.0, (n.t2 or 0.35) - 0.04)
+        local tp = screen_y_to_pitch(my, alt)
+        if tp then
+          local old_st = n.pre_st; n.pre_st = clamp(tp - n.pitch, -state.mpe_bend_range, state.mpe_bend_range)
+          if not validate_chain_bend_range(get_chain_root(n)) then n.pre_st = old_st end
+          state.status_msg = string.format("Pre-Bend: %s (%+.1f st)%s", get_key_left_right_labels(n.pitch + n.pre_st), n.pre_st, alt and " [Alt:Chromatic]" or "")
         end
-        
-        --------------------------------------------------------------------------------
-        -- 14. MAIN LOOP & INIT
-        --------------------------------------------------------------------------------
-        local function main()
-          state.ui_controls = {}
-          update_previews()
-          if not handle_keyboard() then gfx.quit(); on_script_exit(); return end
-        
-          -- Enforce 1200x640 minimum window size when undocked & not actively resizing
-          if gfx.dock(-1) == 0 and (gfx.w < MIN_WIN_W or gfx.h < MIN_WIN_H) and state.hwnd and reaper.JS_Window_SetPosition and (gfx.mouse_cap & 1) == 0 then
-            local _, wx, wy = reaper.JS_Window_GetRect(state.hwnd)
-            if wx then reaper.JS_Window_SetPosition(state.hwnd, wx, wy, math.max(MIN_WIN_W, gfx.w), math.max(MIN_WIN_H, gfx.h), "", "NOZORDER,NOACTIVATE") end
-          end
-        
-          local now = reaper.time_precise()
-          if now - state.last_region_poll > 0.75 then state.last_region_poll = now; refresh_regions_and_sections() end
-          if now - state.last_chart_poll > 0.75 then state.last_chart_poll = now; refresh_chord_charts() end
-          if state.harmony_source == "gmem" and (now - state.last_gmem_poll > 0.35) then
-            state.last_gmem_poll = now; read_gmem_harmony(false)
-            if (state.groove_enabled or state.swing_from_gmem) and read_gmem_groove_and_swing() then sync_section_clips() end
-          end
-        
-          local canvas_w = state.show_drawer and (gfx.w - state.drawer_w) or gfx.w
-          local canvas_h = gfx.h - state.transport_h - state.param_bar_h - (state.show_vel_lane and state.vel_lane_h or 0)
-          local grid_bottom_y = canvas_h - state.hscroll_h
-          update_auto_scroll(canvas_w)
-        
-          gfx.clear = pack_color(table.unpack(CONFIG.dark_mode and {0.10,0.11,0.14} or {0.98,0.98,0.99}))
-          draw_3_layer_grid_and_notes(canvas_w, grid_bottom_y)
-          draw_keyboard(grid_bottom_y)
-          draw_regions_bar(canvas_w)
-          draw_chord_lanes_and_reserved(canvas_w)
-          draw_ruler(canvas_w)
-          draw_horizontal_scrollbar(canvas_w, grid_bottom_y)
-          draw_vertical_scrollbar(canvas_w, grid_bottom_y)
-          draw_bottom_controls(canvas_w)
-          draw_transport_bar(canvas_w)
-          draw_lanes_drawer()
-          draw_toolbar()
-          draw_custom_titlebar_and_resize_grip()
-        
-          handle_mouse()
-          gfx.update()
-          reaper.defer(main)
-        end
-        
-        local function restore_output_track_by_guid_or_default()
-          if state.output_track_guid and state.output_track_guid ~= "" then
-            for i = 0, reaper.CountTracks(0) - 1 do
-              local tr = reaper.GetTrack(0, i)
-              if reaper.GetTrackGUID(tr) == state.output_track_guid then
-                local _, tn = reaper.GetTrackName(tr); if tn ~= HIDDEN_TRACK_NAME then select_output_track(tr); return end
-              end
-            end
-          end
-          local def_tr = find_track_by_name(DEFAULT_OUT_TRACK)
-          if def_tr then select_output_track(def_tr); return end
-          local sel_tr = reaper.GetSelectedTrack(0, 0)
-          if sel_tr then local _, tn = reaper.GetTrackName(sel_tr); if tn ~= HIDDEN_TRACK_NAME then select_output_track(sel_tr) end end
-        end
-        
-        local function setup_frameless_dark_titlebar()
-          if reaper.JS_Window_Find then
-            state.hwnd = reaper.JS_Window_Find(WIN_TITLE, true)
-            apply_window_frame_style()
+      elseif d.kind == "n2" then n.t2 = clamp(frac, has_inc and 0.0 or ((n.t1 or 0.05) + 0.04), (n.t3 or 0.65) - 0.04)
+      elseif d.kind == "n3" then n.t3 = clamp(frac, (n.t2 or 0.0) + 0.04, d.dst and 0.99 or ((n.t4 or 0.95) - 0.04))
+      elseif d.kind == "n4" then
+        local cand = find_note_at(mx, my)
+        if cand and cand.id ~= n.id then d.hover_dst = cand
+        else
+          d.hover_dst = nil; n.t4 = clamp(frac, (n.t3 or 0.65) + 0.04, 1.0)
+          local tp = screen_y_to_pitch(my, alt)
+          if tp then
+            local old_st = n.out_st; n.out_st = clamp(tp - n.pitch, -state.mpe_bend_range, state.mpe_bend_range)
+            if not validate_chain_bend_range(get_chain_root(n)) then n.out_st = old_st end
+            state.status_msg = string.format("Out-Bend: %s (%+.1f st)%s", get_key_left_right_labels(n.pitch + n.out_st), n.out_st, alt and " [Alt:Chromatic]" or "")
           end
         end
-        
-        local function init()
-          load_global_prefs()
-          local had_proj_state = load_project_state()
-          refresh_regions_and_sections()
-          if not had_proj_state then migrate_legacy_hidden_clip_if_needed() end
-          refresh_chord_charts()
-          read_gmem_harmony(true)
-          read_gmem_groove_and_swing()
-          rebuild_row_layout()
-        
-          ensure_hidden_track()
-          restore_output_track_by_guid_or_default()
-          update_hidden_track_send()
-          compute_section_overflows()
-          sync_section_clips()
-        
-          if not state.has_saved_view then state.scroll_y_px = math.max(0, (state.row_y[72] or 450)) end
-          gfx.ext_retina = 1.0
-          gfx.init(WIN_TITLE, math.max(MIN_WIN_W, state.win_w), math.max(MIN_WIN_H, state.win_h), 0, state.win_x, state.win_y)
-          setup_frameless_dark_titlebar()
-          reaper.atexit(on_script_exit)
-          main()
+      elseif d.kind == "pre_mid" then n.pre_tension = clamp(d.orig_pre_t + (d.start_my - my) / 50.0, -1.0, 1.0)
+      elseif d.kind == "out_mid" then n.out_tension = clamp(d.orig_out_t + (d.start_my - my) / 50.0, -1.0, 1.0) end
+    elseif d.type == "create_batch" and l_down then
+      local nd = math.max(get_grid_qn()*0.25, snap_qn(screen_x_to_qn(mx)) - d.anchor_qn)
+      for _, bn in ipairs(d.batch) do bn.end_qn = bn.start_qn + nd end
+    elseif d.type == "resize" and l_down then
+      -- Proportional multi-note tail resize with temporary 1/32nd (0.125 QN) floor!
+      local dqn = (mx - d.start_mx) / state.px_per_qn
+      local ao = d.orig[d.anchor.id]
+      local anchor_floor = math.min(d.orig_dur, 0.125)
+      local target_end = snap_qn(d.orig_end + dqn)
+      local new_anchor_dur = math.max(anchor_floor, target_end - ao.s)
+      local ratio = new_anchor_dur / math.max(1e-5, d.orig_dur)
+      local cnt = 0
+      for _, n in ipairs(state.notes) do
+        local o = d.orig[n.id]
+        if o then
+          local n_floor = math.min(o.dur, 0.125)
+          n.end_qn = o.s + math.max(n_floor, o.dur * ratio)
+          cnt = cnt + 1
         end
-        
-        init()
+      end
+      if cnt > 1 then state.status_msg = string.format("Resize (%d notes): %.2fx", cnt, ratio) end
+    elseif d.type == "move" and l_down then
+      local dqn, tp, ao = (mx-d.start_mx)/state.px_per_qn, screen_y_to_pitch(my, alt) or d.anchor.pitch, d.orig[d.anchor.id]
+      local adqn, dp = snap_qn(ao.s+dqn) - ao.s, tp - ao.p
+      for _, n in ipairs(state.notes) do
+        local o = d.orig[n.id]
+        if o then
+          local old_p = n.pitch; n.start_qn = math.max(0, o.s + adqn); n.end_qn = n.start_qn + (o.e - o.s)
+          local np = clamp(o.p + dp, 0, 127)
+          if state.view_mode == "diatonic" and not alt and not is_pitch_diatonic(np) then np = step_pitch_diatonic(np, dp>=0 and 1 or -1) end
+          n.pitch = np; if not validate_chain_bend_range(get_chain_root(n)) then n.pitch = old_p end
+          if not n.section_override then local s = find_section_at_qn(n.start_qn); if s then n.section_uid = s.uid end end
+        end
+      end
+      if d.anchor.pitch ~= d.last_preview_p then d.last_preview_p = d.anchor.pitch; trigger_preview_note(d.anchor.pitch, d.anchor.vel, d.anchor.chan, 0.20) end
+    elseif d.type == "marquee" and l_down then
+      state.marquee.x2, state.marquee.y2 = mx, my
+    elseif d.type == "marquee_r" and r_down then
+      if not d.moved and (math.abs(mx - d.start_x) > 4 or math.abs(my - d.start_y) > 4) then d.moved = true end
+      if d.moved then state.marquee = { x1 = d.start_x, y1 = d.start_y, x2 = mx, y2 = my } end
+    end
+
+    local released = (d.type=="pan" and not m_down) or (d.type=="marquee_r" and r_released) or (d.type~="pan" and d.type~="marquee_r" and l_released)
+    if released then
+      if d.type == "win_move" or d.type == "win_resize" then
+        save_global_prefs()
+      elseif d.type == "keyboard" and state.kbd_held_pitch then
+        send_midi_note_off(state.kbd_held_pitch, 0); state.kbd_held_pitch = nil
+      elseif d.type == "node4_drag" then
+        if d.kind == "n4" and d.hover_dst then
+          local ok, msg = can_connect_notes(d.note, d.hover_dst)
+          if ok then connect_notes(d.note, d.hover_dst); state.status_msg = "Connected note slide"
+          else state.status_msg = msg or "Connection rejected" end
+        end
+        compute_section_overflows(); sync_section_clips()
+      elseif d.type == "h_create" or d.type == "h_resize" or d.type == "h_move" then
+        save_project_state()
+      elseif d.type == "marquee" or d.type == "marquee_r" then
+        if d.type == "marquee_r" and not d.moved then
+          deselect_all(); state.status_msg = "Selection cleared"
+        elseif state.marquee then
+          if d.type == "marquee_r" and not shift then deselect_all() end
+          local x1, x2 = math.min(state.marquee.x1, state.marquee.x2), math.max(state.marquee.x1, state.marquee.x2)
+          local y1, y2 = math.min(state.marquee.y1, state.marquee.y2), math.max(state.marquee.y1, state.marquee.y2)
+          local hh = get_note_visual_h() * 0.5
+          for _, n in ipairs(state.notes) do
+            local nx1, nx2, cy = qn_to_screen_x(n.start_qn), qn_to_screen_x(n.end_qn), pitch_center_screen_y(n.pitch)
+            if nx2>=x1 and nx1<=x2 and cy+hh>=y1 and cy-hh<=y2 then n.selected=true end
+          end
+        end
+        state.marquee = nil
+      elseif d.type == "create_batch" or d.type == "resize" or d.type == "move" or d.type == "vel_lane" then
+        compute_section_overflows(); sync_section_clips()
+      end
+      state.drag = nil
+    end
+  end
+  state.last_mouse_cap = cap
+end
+
+local function handle_keyboard()
+  local char = gfx.getchar()
+  if char < 0 or state.should_close then return false end
+  if char == 0 then return true end
+  local cap = gfx.mouse_cap; local ctrl, shift, alt = (cap&4)==4, (cap&8)==8, (cap&16)==16
+  if char == 27 then deselect_all(); state.status_msg = "Selection cleared"
+  elseif char == 30064 then move_selected_by_arrows(1, 0, shift, alt, ctrl)
+  elseif char == 1685026670 then move_selected_by_arrows(-1, 0, shift, alt, ctrl)
+  elseif char == 1818584692 then move_selected_by_arrows(0, -1, shift, alt, false)
+  elseif char == 1919379572 then move_selected_by_arrows(0, 1, shift, alt, false)
+  elseif char == 6579564 or char == 8 then delete_selected()
+  elseif char == 32 then reaper.Main_OnCommand(40044, 0)
+  elseif not ctrl and not alt and (char == 109 or char == 77) then toggle_mute_selected()
+  elseif char == 1 or (ctrl and (char == 65 or char == 97)) then select_all()
+  elseif char == 3 or (ctrl and (char == 67 or char == 99)) then copy_selected()
+  elseif char == 22 or (ctrl and (char == 86 or char == 118)) then paste_notes()
+  elseif char == 4 or (ctrl and (char == 68 or char == 100)) then duplicate_selected()
+  elseif (char == 26 and shift) or char == 25 or (ctrl and (char == 89 or char == 121)) then pop_redo()
+  elseif char == 26 or (ctrl and (char == 90 or char == 122)) then pop_undo()
+  elseif char == 113 or char == 81 then quantize_selected() end
+  return true
+end
+
+--------------------------------------------------------------------------------
+-- 14. MAIN LOOP & INIT
+--------------------------------------------------------------------------------
+local function main()
+  state.ui_controls = {}
+  update_previews()
+  if not handle_keyboard() then gfx.quit(); on_script_exit(); return end
+
+  -- Cross-platform minimum size enforcement (1200x640 client area via JS_Window_Resize)
+  if gfx.dock(-1) == 0 and (gfx.w < MIN_WIN_W or gfx.h < MIN_WIN_H) and (not state.drag or state.drag.type ~= "win_resize") then
+    if not state.hwnd and reaper.JS_Window_Find then state.hwnd = reaper.JS_Window_Find(WIN_TITLE, true) end
+    if state.hwnd and reaper.JS_Window_Resize and reaper.JS_Window_GetRect then
+      local _, wx, wt, wr, wb = reaper.JS_Window_GetRect(state.hwnd)
+      if wx and wr then
+        local ow, oh = math.abs(wr - wx), math.abs(wb - wt)
+        local fw, fh = math.max(0, ow - gfx.w), math.max(0, oh - gfx.h)
+        reaper.JS_Window_Resize(state.hwnd, math.max(MIN_WIN_W + fw, ow), math.max(MIN_WIN_H + fh, oh))
+      end
+    end
+  end
+
+  local now = reaper.time_precise()
+  if now - state.last_region_poll > 0.75 then state.last_region_poll = now; refresh_regions_and_sections() end
+  if now - state.last_chart_poll > 0.75 then state.last_chart_poll = now; refresh_chord_charts() end
+  if state.harmony_source == "gmem" and (now - state.last_gmem_poll > 0.35) then
+    state.last_gmem_poll = now; read_gmem_harmony(false)
+    if (state.groove_enabled or state.swing_from_gmem) and read_gmem_groove_and_swing() then sync_section_clips() end
+  end
+
+  local canvas_w = state.show_drawer and (gfx.w - state.drawer_w) or gfx.w
+  local canvas_h = gfx.h - state.transport_h - state.param_bar_h - (state.show_vel_lane and state.vel_lane_h or 0)
+  local grid_bottom_y = canvas_h - state.hscroll_h
+  update_auto_scroll(canvas_w)
+
+  gfx.clear = pack_color(table.unpack(CONFIG.dark_mode and {0.10,0.11,0.14} or {0.98,0.98,0.99}))
+  draw_3_layer_grid_and_notes(canvas_w, grid_bottom_y)
+  draw_keyboard(grid_bottom_y)
+  draw_regions_bar(canvas_w)
+  draw_chord_lanes_and_reserved(canvas_w)
+  draw_ruler(canvas_w)
+  draw_horizontal_scrollbar(canvas_w, grid_bottom_y)
+  draw_vertical_scrollbar(canvas_w, grid_bottom_y)
+  draw_bottom_controls(canvas_w)
+  draw_transport_bar(canvas_w)
+  draw_lanes_drawer()
+  draw_toolbar()
+  draw_custom_titlebar_and_resize_grip()
+
+  handle_mouse()
+  gfx.update()
+  reaper.defer(main)
+end
+
+local function restore_output_track_by_guid_or_default()
+  if state.output_track_guid and state.output_track_guid ~= "" then
+    for i = 0, reaper.CountTracks(0) - 1 do
+      local tr = reaper.GetTrack(0, i)
+      if reaper.GetTrackGUID(tr) == state.output_track_guid then
+        local _, tn = reaper.GetTrackName(tr); if tn ~= HIDDEN_TRACK_NAME then select_output_track(tr); return end
+      end
+    end
+  end
+  local def_tr = find_track_by_name(DEFAULT_OUT_TRACK)
+  if def_tr then select_output_track(def_tr); return end
+  local sel_tr = reaper.GetSelectedTrack(0, 0)
+  if sel_tr then local _, tn = reaper.GetTrackName(sel_tr); if tn ~= HIDDEN_TRACK_NAME then select_output_track(sel_tr) end end
+end
+
+local function setup_frameless_dark_titlebar()
+  if reaper.JS_Window_Find then
+    state.hwnd = reaper.JS_Window_Find(WIN_TITLE, true)
+    apply_window_frame_style()
+    if state.hwnd and state.has_saved_win_pos and gfx.dock(-1) == 0 then
+      if reaper.JS_Window_Move then reaper.JS_Window_Move(state.hwnd, state.win_x, state.win_y) end
+      if reaper.JS_Window_Resize then reaper.JS_Window_Resize(state.hwnd, math.max(MIN_WIN_W, state.win_w), math.max(MIN_WIN_H, state.win_h)) end
+    end
+  end
+end
+
+local function init()
+  load_global_prefs()
+  local had_proj_state = load_project_state()
+  refresh_regions_and_sections()
+  if not had_proj_state then migrate_legacy_hidden_clip_if_needed() end
+  refresh_chord_charts()
+  read_gmem_harmony(true)
+  read_gmem_groove_and_swing()
+  rebuild_row_layout()
+
+  ensure_hidden_track()
+  restore_output_track_by_guid_or_default()
+  update_hidden_track_send()
+  compute_section_overflows()
+  sync_section_clips()
+
+  if not state.has_saved_view then state.scroll_y_px = math.max(0, (state.row_y[72] or 450)) end
+  gfx.ext_retina = 1.0
+  gfx.init(WIN_TITLE, math.max(MIN_WIN_W, state.win_w), math.max(MIN_WIN_H, state.win_h), 0)
+  setup_frameless_dark_titlebar()
+  reaper.atexit(on_script_exit)
+  main()
+end
+
+init()
