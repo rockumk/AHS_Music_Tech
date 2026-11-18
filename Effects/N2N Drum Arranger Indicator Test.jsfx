@@ -2416,18 +2416,17 @@ loop(3,
             mem[LOC_TAB_POPULATED + gui_t] ? (
                 // White content bracket: top and left only.
                 gfx_set(1, 1, 1, 1);
-                gfx_rect(draw_x-1, draw_y-2, 4, 20);
-                gfx_rect(draw_x-1, draw_y-2, 20, 4);
+                gfx_rect(draw_x-1, draw_y-2, 4, 28);
+                gfx_rect(draw_x-1, draw_y-2, 28, 4);
             );
             
             f_amt = mem[tab_flash_base + gui_t];
             f_amt > 0 ? ( rect(draw_x, draw_y, item_w-5, 26, 1, 1, 1, f_amt/10); mem[tab_flash_base + gui_t] -= 1; );
-            // Drum palette yellow: full-width 4px base, with 8px uprights.
-            // White content dog-ear ends at y+18, where the yellow left upright begins.
+            // MIDI cue location: yellow bottom stroke overlays the full-height white content edge.
+            // The separate thin title underline ends at the white dog-ear's right edge.
             (mem[ui_play_prog_tab] == gui_t) ? (
                 rect(draw_x-1, draw_y+22, item_w-4, 4, 1.0, 1.0, 0.2, 1);
-                rect(draw_x-1, draw_y+18, 4, 8, 1.0, 1.0, 0.2, 1);
-                rect(draw_x+item_w-9, draw_y+18, 4, 8, 1.0, 1.0, 0.2, 1);
+                rect(draw_x+6, draw_y+19, 21, 2, 1.0, 1.0, 0.2, 1);
             );
             
             draw_x += item_w; // FLOW: Advance cursor by tab width
