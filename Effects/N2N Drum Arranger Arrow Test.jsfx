@@ -2448,7 +2448,7 @@ arrow_show && arrow_req_x >= 0 && arrow_eff_x >= 0 ? (
         );
     ) : (
         // Diagonal: compare all 16 corner pairs and choose the closest.
-        arrow_best_d2 = 1e30;
+        arrow_best_d2 = 1000000000; // Large initial squared-distance value
         arrow_i = 0;
         loop(4,
             arrow_ax = arrow_req_x + ((arrow_i & 1) ? arrow_req_w : 0);
