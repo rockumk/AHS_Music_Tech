@@ -2474,6 +2474,19 @@ arrow_show && arrow_req_x >= 0 && arrow_eff_x >= 0 ? (
     arrow_dx = arrow_x2 - arrow_x1;
     arrow_dy = arrow_y2 - arrow_y1;
     arrow_len = sqrt(arrow_dx*arrow_dx + arrow_dy*arrow_dy);
+    // Adjacent tabs leave only a 4-5px gap, compressing the arrowhead.
+    // For short connections, overlap each tab slightly to keep the head legible.
+    // Drawing coordinates only; source selection remains untouched.
+    arrow_len > 1 && arrow_len < 24 ? (
+        arrow_extend = (24 - arrow_len) * 0.5 + 4;
+        arrow_x1 -= (arrow_dx / arrow_len) * arrow_extend;
+        arrow_y1 -= (arrow_dy / arrow_len) * arrow_extend;
+        arrow_x2 += (arrow_dx / arrow_len) * arrow_extend;
+        arrow_y2 += (arrow_dy / arrow_len) * arrow_extend;
+        arrow_dx = arrow_x2 - arrow_x1;
+        arrow_dy = arrow_y2 - arrow_y1;
+        arrow_len = sqrt(arrow_dx*arrow_dx + arrow_dy*arrow_dy);
+    );
     arrow_len > 1 ? (
         arrow_ux = arrow_dx / arrow_len;
         arrow_uy = arrow_dy / arrow_len;
