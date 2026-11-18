@@ -2386,8 +2386,9 @@ loop(3,
                 );
             );
 
-            // Thin yellow cue line: full button width, 1px higher, behind the lock.
-            (mem[ui_play_prog_tab] == gui_t) ? rect(draw_x, draw_y+18, item_w, 2, 1.0, 1.0, 0.2, 1);
+            // Current MIDI-cued section: yellow lower half (13px of the 26px button).
+            // Draw before the black lock and the white populated-section dog-ear.
+            (mem[ui_play_prog_tab] == gui_t) ? rect(draw_x, draw_y+13, item_w-4, 13, 1.0, 1.0, 0.2, 1);
             // Tab Sub-Lock UI
             gfx_set(0.0, 0.0, 0.0, 1); 
             gfx_circle(draw_x+item_w-17, ly=draw_y+8, 6, 0); 
@@ -2424,11 +2425,6 @@ loop(3,
             
             f_amt = mem[tab_flash_base + gui_t];
             f_amt > 0 ? ( rect(draw_x, draw_y, item_w-5, 26, 1, 1, 1, f_amt/10); mem[tab_flash_base + gui_t] -= 1; );
-            // MIDI cue location: yellow bottom stroke overlays the full-height white content edge.
-            // The thin title line is drawn earlier, underneath the section lock.
-            (mem[ui_play_prog_tab] == gui_t) ? (
-                rect(draw_x-1, draw_y+22, item_w-4, 4, 1.0, 1.0, 0.2, 1);
-            );
             
             draw_x += item_w; // FLOW: Advance cursor by tab width
         );
