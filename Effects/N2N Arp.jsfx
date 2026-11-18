@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.2.8
+version: 12.2.9
 author: Rock Kennedy
 about:
-  # N2N Arp v12.2.8
+  # N2N Arp v12.2.9
   - FEATURE: Velocity Scaling
 provides:
   [main] .
@@ -26,7 +26,7 @@ slider14:0<0,2,1{Chords,Split (Chords and Bass),Bass}>-Input Mode
 
 @init
 scale_dirty = 0;
-thisversion = "v12.2.8";
+thisversion = "v12.2.9";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -2171,9 +2171,13 @@ loop(3,
         // Visual only: open the right side of the shackle when FOLLOW is enabled.
         is_follow ? rect(FOLLOW_BOX_X+25, draw_y-15, 10, 11, 0, 0, 0, 1);
         rect(FOLLOW_BOX_X+15, draw_y-10, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.5, 0.5, 0.5, 1);
-        gfx_setfont(1, os_font, 21, 'b');
-        is_follow ? draw_text(FOLLOW_BOX_X+21, draw_y-14, "X", 0,1,0);
-        is_follow ? rect(FOLLOW_BOX_X+15, draw_y-10, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.18, 0.9, 0.9, 1);
+        // FOLLOW enabled: restore the original soft green/cyan fill.
+        // Black triangle replaces the X and is drawn after the fill.
+        is_follow ? (
+            rect(FOLLOW_BOX_X+15, draw_y-10, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.18, 0.9, 0.9, 1);
+            gfx_set(0, 0, 0, 1);
+            gfx_triangle(FOLLOW_BOX_X+22, draw_y-7, FOLLOW_BOX_X+22, draw_y+3, FOLLOW_BOX_X+30, draw_y-2);
+        );
         gfx_setfont(1, os_font, fontsize, 'b'); 
         
         (mb && p_mb == 0 && !rec_hit && mx>=FOLLOW_BOX_X && mx<FOLLOW_BOX_X+FOLLOW_BOX_W+31 && my>=draw_y-33 && my<draw_y+FOLLOW_BOX_H+5) ? (
@@ -2229,8 +2233,11 @@ loop(3,
                     );
                 );
 
+                // Current MIDI-cued section: yellow lower half (13px of the 26px button).
+                // Draw before the black lock and the white populated-section dog-ear.
+                (mem[ui_play_prog_tab] == gui_t) ? rect(draw_x-1, draw_y+18, item_w-4, 7, 1.0, 1.0, 0.2, 1);
                 gfx_set(0.0, 0.0, 0.0, 1); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 6, 0); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 5, 0); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 4, 0); 
-                lx=draw_x+item_w-25; ly=draw_y+9; lw=17; lh=14; rect(lx,ly,lw,lh, 0.1,0.1,0.1,1); 
+                lx=draw_x+item_w-25; ly=draw_y+9; lw=17; lh=14; rect(lx,ly,lw,lh, 0,0,0,1); 
 
                 (mb && p_mb == 0 && mx>=lx-3 && mx<lx+lw+3 && my>=ly-2 && my<ly+lh+2) ? ( 
                     rec_cues_active == 0 ? (
@@ -2243,11 +2250,18 @@ loop(3,
                     rec_cues_active == 0 ? ( mem[ui_edit_tab] = gui_t; mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; );
                 );
                 
-                mem[ui_locked_tab] == gui_t ? rect(lx+1,ly+2,lw-2,lh-3, 0.3,.9,.7,1);  
-                (mem[ui_play_prog_tab] == gui_t) ? (gfx_set(1,.5 ,0,1); gfx_circle(draw_x+item_w-17, draw_y+16, 4, 1);); 
+                // Locked: cyan lock body with a small play-shaped marker.
+                // Unlocked: the existing grey body and hoop remain neutral.
+                mem[ui_locked_tab] == gui_t ? (
+                    rect(lx+1, ly+2, lw-2, lh-3, 0.3, .9, .7, 1);
+                    gfx_set(0.08, 0.15, 0.15, 1);
+                    gfx_triangle(lx+6, ly+4, lx+6, ly+11, lx+12, ly+7.5);
+                );
                 mem[LOC_TAB_POPULATED + gui_t] ? (
+                    // White content bracket: top and left only.
                     gfx_set(1, 1, 1, 1);
-                    gfx_rect(draw_x-1, draw_y-1, 4, 24); gfx_rect(draw_x-1, draw_y-2, 41, 4); gfx_rect(draw_x-1, draw_y+23, 21, 4);
+                    gfx_rect(draw_x-1, draw_y-2, 4, 20);
+                    gfx_rect(draw_x-1, draw_y-2, 14, 4);
                 );
                 
                 f_amt = mem[tab_flash_base + gui_t];
@@ -2297,17 +2311,19 @@ loop(3,
 
         is_lock ? (lr=.2; lg=.9; lb=.2;) : (lr=COL_H_R*1.5; lg=COL_H_G*1.5; lb=COL_H_B*1.5;); 
         rect(px+2, py+20, pat_w-4, 15, lr, lg, lb, 1);
-        is_play ? ( gfx_set(COL_M_R*1.7, COL_M_G*1.7, COL_M_B*1.7, 1); gfx_set(1, .4, 0, 1); gfx_circle(px+pat_w/2, py+27, 5, 1); );
+        // Song position is shown by a full-width yellow U-shaped underline below.
         
         gfx_setfont(1, os_font, fontsize-2, 'b'); 
         (i == 0) ? ( draw_text(px+4, py+8, "0", 1, 1, 1); ) : (
             (i) >= 100 ? ( sprintf(#lbl, "%d", floor(((i)%100)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : (i) >= 10 ? ( sprintf(#lbl, "%d", floor((i)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : ( sprintf(#lbl, "%d", i); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); );
         );
 
-        mem[LOC_TAB_POPULATED + i] ? ( gfx_set(1, 1, 1, 1); gfx_rect(px+2, py+17, pat_w-4, 3); gfx_rect(px+2, py+35, pat_w-4, 3); );
+        mem[LOC_TAB_POPULATED + i] ? ( gfx_set(1, 1, 1, 1); gfx_rect(px+2, py+17, pat_w-4, 3); );
         
         f_amt = mem[tab_flash_base + i];
         f_amt > 0 ? ( rect(px, py, pat_w, ui_tab_h+3, 1, 1, 1, f_amt/10); mem[tab_flash_base + i] -= 1; );
+        // Slots are too narrow for a second title accent; retain only the yellow base.
+        is_play ? rect(px+1, py+ui_tab_h-2, pat_w, 4, 1.0, 1.0, 0.2, 1);
 
         (mb && p_mb==0 && mx>=px && mx<px+pat_w && capture_id == 0) ? (
                     (my >= py && my < py + ui_tab_h) ? (
