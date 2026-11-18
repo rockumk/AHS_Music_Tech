@@ -2314,6 +2314,9 @@ loop(3,
         gfx_circle(FOLLOW_BOX_X+25, draw_y-12, 6, 0); 
         gfx_circle(FOLLOW_BOX_X+25, draw_y-12, 5.5, 0); 
         gfx_circle(FOLLOW_BOX_X+25, draw_y-13, 5, 0); 
+        // Display only: erase the right side of the shackle while FOLLOW is enabled.
+        // Keep the lock body and its existing controls unchanged.
+        is_follow ? rect(FOLLOW_BOX_X+25, draw_y-20, 10, 11, 0, 0, 0, 1);
         rect(FOLLOW_BOX_X+15, draw_y-10, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.5, 0.5, 0.5, 1);
         gfx_setfont(1, os_font, 21, 'b');
         is_follow ? draw_text(FOLLOW_BOX_X+21, draw_y-14, "X", 0,1,0);
