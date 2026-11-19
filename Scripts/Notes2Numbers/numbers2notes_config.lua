@@ -1,13 +1,13 @@
 -- @description numbers2notes_config
--- @version 1.7.4
+-- @version 1.7.5
 -- @noindex
 -- @author Rock Kennedy
 -- @about
 --   Configuration file for Numbers2Notes.
 --   Contains Plugin Source URLs and the Master Track Layout.
 -- @changelog
---   + Links Updated
---   + No longer bass heavy by default
+--   + Added N2N Topline Output Option
+
 local config = {}
 
 -- 1. PLUGIN SOURCES (Instructions/Links)
@@ -253,7 +253,7 @@ config.track_recipe = {
   { type = 15, ItemLabel = "Relative Background Grid (C Major)         Useful for displaying all chord tones in all octaves when visible as a MIDI editor background track.", IndentMIDI = -1, divider_before = true, Tr_divider_before = false, active = true, single = true, addchain = false },
   { type = 7, ItemLabel = "Absolute Background Grid (Actual Key)", IndentMIDI = -1, divider_before = false, Tr_divider_before = false, active = true, single = true, addchain = false },
   
-  
+  { type = 41, ItemLabel = "N2N Topline", IndentMIDI = -1, divider_before = true, Tr_divider_before = true, active = true, single = false, vsti_choice = config.vsti_synth_options[8], vsti_list = config.vsti_synth_options, addchain = true },
   
   { type = 21, ItemLabel = "Black Key Live", IndentMIDI = -1, divider_before = true, Tr_divider_before = true, active = true, single = false, vsti_choice = config.vsti_synth_options[8], vsti_list = config.vsti_synth_options, addchain = true },
   { type = 22, ItemLabel = "White Key Live", IndentMIDI = -1, divider_before = false, Tr_divider_before = false, active = true, single = false, vsti_choice = config.vsti_synth_options[8], vsti_list = config.vsti_synth_options, addchain = true },
@@ -328,6 +328,14 @@ config.track_table = {
     [15] = {
         [1] = {"N2N Rel. Bckgrd Grid", true, false, 1, {}, {}, 0, {150, 150, 150}, 0}
     },
+
+	[41] = {
+		[1] = {"N2N Topline", true, true, 0, {
+            {nil , true, nil, 0},
+            {"REPLACEFX", true, "N2N Vital Default", 0}
+        }, {}, 0, {207, 179, 160}, 0.4}
+    },	
+	
 	[21] = {
 		[1] = {"Black Key Live", true, true, 0, {
             {"JS: Mood2Mode", true, nil, 0},
