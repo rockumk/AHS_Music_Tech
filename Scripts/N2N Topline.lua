@@ -2121,7 +2121,7 @@ local function handle_mouse()
       local dqn = (mx - d.start_mx) / state.px_per_qn
       local g = get_grid_qn()
       local resize_step = g * 0.25
-      local step_count = math.floor(dqn / resize_step + (dqn >= 0 and 0.5 or 0.5))
+      local step_count = math.floor(dqn / resize_step + 0.5)
       local selected_count = 0
       for _ in pairs(d.orig) do selected_count = selected_count + 1 end
       -- One note: quarter of current grid. Multiple: 1/32 or 1/32T.
