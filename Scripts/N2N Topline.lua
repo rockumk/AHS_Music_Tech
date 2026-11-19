@@ -1882,7 +1882,7 @@ local function handle_mouse()
   if l_pressed and state.frameless and mx >= gfx.w - 18 and my >= gfx.h - 18 and state.hwnd and reaper.JS_Window_GetRect and reaper.JS_Window_Resize then
     local _, wx, wt, wr, wb = reaper.JS_Window_GetRect(state.hwnd); local smx, smy = reaper.GetMousePosition()
     local ow, oh = math.abs(wr - wx), math.abs(wb - wt)
-    state.drag = { type="win_resize", smx=smx, smy=smy, ww=ow, wh=oh, fw=math.max(0, ow - gfx.w), fh=math.max(0, oh - gfx.h) }
+    state.drag = { type="win_resize", smx=smx, smy=smy, wx=wx, top=wt, ww=ow, wh=oh, fw=math.max(0, ow - gfx.w), fh=math.max(0, oh - gfx.h) }
     state.last_mouse_cap = cap; return
   end
 
@@ -2034,7 +2034,14 @@ local function handle_mouse()
       local smx, smy = reaper.GetMousePosition()
       local dx = smx - d.smx
       local dy = IS_MAC and (d.smy - smy) or (smy - d.smy) -- macOS GetMousePosition Y is bottom-to-top!
-      reaper.JS_Window_Resize(state.hwnd, math.max(MIN_WIN_W + d.fw, d.ww + dx), math.max(MIN_WIN_H + d.fh, d.wh + dy))
+      local new_w = math.max(MIN_WIN_W + d.fw, d.ww + dx)
+      local new_h = math.max(MIN_WIN_H + d.fh, d.wh + dy)
+      if IS_MAC and reaper.JS_Window_SetPosition then
+        -- Cocoa Y increases upward. Preserve the original top edge while extending downward.
+        reaper.JS_Window_SetPosition(state.hwnd, d.wx, d.top - new_h, new_w, new_h)
+      else
+        reaper.JS_Window_Resize(state.hwnd, new_w, new_h)
+      end
     elseif d.type == "ruler_scrub" and l_down then
       reaper.SetEditCurPos(reaper.TimeMap2_QNToTime(0, math.max(0, snap_qn(screen_x_to_qn(mx)))), true, true)
     elseif d.type == "hscroll_pan" and l_down then
@@ -2101,21 +2108,32 @@ local function handle_mouse()
       elseif d.kind == "pre_mid" then n.pre_tension = clamp(d.orig_pre_t + (d.start_my - my) / 50.0, -1.0, 1.0)
       elseif d.kind == "out_mid" then n.out_tension = clamp(d.orig_out_t + (d.start_my - my) / 50.0, -1.0, 1.0) end
     elseif d.type == "create_batch" and l_down then
-      local nd = math.max(get_grid_qn()*0.25, snap_qn(screen_x_to_qn(mx)) - d.anchor_qn)
+      -- One full cell on click; extend by whole cells as the cursor enters them.
+      -- Snapping the endpoint to the nearest grid line used to collapse new notes
+      -- to a quarter-cell length on the first mouse-held frame.
+      local g = get_grid_qn()
+      local cells = math.floor((screen_x_to_qn(mx) - d.anchor_qn) / g + 1e-6) + 1
+      local nd = math.max(g, cells * g)
       for _, bn in ipairs(d.batch) do bn.end_qn = bn.start_qn + nd end
     elseif d.type == "resize" and l_down then
-      -- Proportional multi-note tail resize with temporary 1/32nd (0.125 QN) floor!
+      -- Scale from the mouse-down originals on EVERY frame, never from
+      -- temporarily clamped lengths (so dragging back out fully restores them).
       local dqn = (mx - d.start_mx) / state.px_per_qn
-      local ao = d.orig[d.anchor.id]
-      local anchor_floor = math.min(d.orig_dur, 0.125)
-      local target_end = snap_qn(d.orig_end + dqn)
-      local new_anchor_dur = math.max(anchor_floor, target_end - ao.s)
+      local g = get_grid_qn()
+      local resize_step = g * 0.25
+      local step_count = math.floor(dqn / resize_step + 0.5)
+      local selected_count = 0
+      for _ in pairs(d.orig) do selected_count = selected_count + 1 end
+      -- One note: quarter of current grid. Multiple: 1/32 or 1/32T.
+      local floor_qn = (selected_count > 1) and (state.triplet and (1/12) or (1/8)) or resize_step
+      local anchor_floor = math.min(d.orig_dur, floor_qn)
+      local new_anchor_dur = math.max(anchor_floor, d.orig_dur + step_count * resize_step)
       local ratio = new_anchor_dur / math.max(1e-5, d.orig_dur)
       local cnt = 0
       for _, n in ipairs(state.notes) do
         local o = d.orig[n.id]
         if o then
-          local n_floor = math.min(o.dur, 0.125)
+          local n_floor = math.min(o.dur, floor_qn)
           n.end_qn = o.s + math.max(n_floor, o.dur * ratio)
           cnt = cnt + 1
         end
@@ -2219,7 +2237,12 @@ local function main()
       if wx and wr then
         local ow, oh = math.abs(wr - wx), math.abs(wb - wt)
         local fw, fh = math.max(0, ow - gfx.w), math.max(0, oh - gfx.h)
-        reaper.JS_Window_Resize(state.hwnd, math.max(MIN_WIN_W + fw, ow), math.max(MIN_WIN_H + fh, oh))
+        local new_w, new_h = math.max(MIN_WIN_W + fw, ow), math.max(MIN_WIN_H + fh, oh)
+        if IS_MAC and reaper.JS_Window_SetPosition then
+          reaper.JS_Window_SetPosition(state.hwnd, wx, wt - new_h, new_w, new_h)
+        else
+          reaper.JS_Window_Resize(state.hwnd, new_w, new_h)
+        end
       end
     end
   end
