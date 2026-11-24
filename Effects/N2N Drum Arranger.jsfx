@@ -1394,7 +1394,31 @@ function get_tab_from_pc(pc_val) (
 
 
 
-active_row_list = mem_pos; mem_pos += 128; // Ensure this has its own space
+active_row_list = mem_pos; mem_pos += 128;
+FORM_MAX=4096; FORM_BASE=6000000;
+form_cache=mem_pos; mem_pos+=FORM_MAX*3;
+form_stage=mem_pos; mem_pos+=FORM_MAX*3;
+form_count=0; form_rev=-1;
+function form_find(q) local(lo,hi,m,ans) (
+    lo=0; hi=form_count-1; ans=-1;
+    while(lo<=hi)(m=floor((lo+hi)/2); mem[form_cache+m*3]<=q ? (ans=m;lo=m+1;) : hi=m-1;);
+    ans>=0 && q<mem[form_cache+ans*3+1] ? ans : -1;
+);
+function form_refresh() local(rev,n,i,p,tmp) (
+    rev=gmem[FORM_BASE+1];
+    gmem[FORM_BASE]==0x4E324631 && rev>0 && !(rev%2) && rev!=form_rev && gmem[FORM_BASE+10+my_slot]==my_key ? (
+        n=gmem[FORM_BASE+2]; n>=0 && n<=FORM_MAX ? (
+            i=0; loop(n*3, mem[form_stage+i]=gmem[FORM_BASE+1024+i]; i+=1;);
+            gmem[FORM_BASE+1]==rev && gmem[FORM_BASE+10+my_slot]==my_key ? (
+                tmp=form_cache; form_cache=form_stage; form_stage=tmp; form_count=n; form_rev=rev; needs_tab_update=1;
+            );
+        );
+    );
+);
+function resolve_pattern(t) local(out) (
+    out=t<=0||mem[tab_mute_base+t] ? 0 : get_active_fallback(t);
+    out>0 && (mem[tab_mute_base+out]&2) ? 0 : out;
+); // Ensure this has its own space
 needs_tab_update = 1;
 effective_play_tab = 26; // Default starting tab
 active_row_count = 0;
@@ -1570,6 +1594,15 @@ file_avail(0) > 0 ? (
         );
         file_var(0, requested_start_bar);
         file_var(0, rec_cues_active);
+        form_count=0; form_rev=-1;
+        file_avail(0)>0 ? (
+            file_var(0, form_magic);
+            form_magic==0x4E324631 ? (
+                file_var(0, form_count);
+                form_count=max(0,min(FORM_MAX,floor(form_count)));
+                form_count>0 ? file_mem(0,form_cache,form_count*3);
+            );
+        );
     );
     
     scan_all_tabs();
@@ -1609,6 +1642,8 @@ file_avail(0) > 0 ? (
     file_var(0, requested_start_bar);
     last_kit_idx = slider10;
     file_var(0, rec_cues_active);
+    form_magic=0x4E324631; file_var(0,form_magic); file_var(0,form_count);
+    form_count>0 ? file_mem(0,form_cache,form_count*3);
 );
 load_kit_from_slider;
 
@@ -1661,7 +1696,9 @@ track_b = gmem[my_info_idx + 3];
 
 GM_BASE = 7000000 + (slider5-1)*16;
 gmem[GM_BASE] != 0x44504531 ? ( gmem[GM_BASE] = 0x44504531; gmem[GM_BASE+1] = -1; gmem[GM_BASE+2] = 26; );
+old_locked_tab=mem[ui_locked_tab];
 mem[ui_locked_tab] = gmem[GM_BASE+1];
+old_locked_tab!=mem[ui_locked_tab] ? (needs_tab_update=1; last_play_tab=-99;);
 mem[ui_play_prog_tab] = gmem[GM_BASE+2];
 
 // SYNC GROOVE MEMORY
@@ -1760,6 +1797,13 @@ c_glob = gmem[GMEM_GLOBAL_ADDR];
 );
 
 // --- C. DECISION LOGIC (Who Wins?) ---
+form_refresh();
+form_count>0 ? (
+    form_at=form_find(beat_position);
+    form_raw=form_at>=0?mem[form_cache+form_at*3+2]:0;
+    mem[ui_play_prog_tab]!=form_raw ? (mem[ui_play_prog_tab]=form_raw; gmem[GM_BASE+2]=form_raw; needs_tab_update=1;);
+    midi_cue_tab=-1; midi_cue_source=-1; cue_armed=0;
+);
 final_target_tab = -1;
 final_source_type = -1; 
 
@@ -1776,7 +1820,7 @@ final_source_type = -1;
     final_source_type = 2;
 );
 
-(final_target_tab > -1) ? (
+(final_target_tab > -1 && form_count==0) ? (
     cue_armed = 1;
     cue_target_tab = final_target_tab;
     (cue_target_tab != mem[ui_play_prog_tab] && final_source_type == 1) ? (
@@ -1864,7 +1908,7 @@ mem[ui_power_off] ? raw_target=0;
     );
     
     (mem[tab_mute_base+effective_play_tab] & 2) ? effective_play_tab=0;
-    update_active_row_list(effective_play_tab);
+    update_active_row_list(effective_play_tab); active_list_tab=effective_play_tab;
     last_raw_target = raw_target;
     needs_tab_update = 0;
 );
@@ -1877,7 +1921,23 @@ t_pl = effective_play_tab; // Use the cached, efficient result for playback
 playing = (play_state & 1);
 
 // --- START PLAYBACK ENGINE ---
-playing && t_pl > 0 ? (
+// A map span owns its nominal steps. Schedule nearby spans too for negative timing offsets.
+form_audio=(form_count>0 && mem[ui_locked_tab]==-1 && !mem[ui_power_off]);
+span_scan=0; span_first=0; span_last=0;
+form_audio ? (
+    span_first=max(0,form_find(beat_position-4));
+    beat_position-4>=mem[form_cache+(form_count-1)*3+1] ? span_first=form_count;
+    span_last=form_count-1;
+);
+span_scan=span_first;
+playing ? while(span_scan<=span_last && (!form_audio || mem[form_cache+span_scan*3]<=beat_position+block_dur_beats+4)) (
+    form_audio ? (
+        span_begin=mem[form_cache+span_scan*3]; span_end=mem[form_cache+span_scan*3+1];
+        t_pl=resolve_pattern(mem[form_cache+span_scan*3+2]);
+        span_end<beat_position-4 ? t_pl=0;
+    ) : (span_begin=-100000000; span_end=100000000; t_pl=effective_play_tab;);
+    t_pl>0 ? (
+    active_list_tab!=t_pl ? (update_active_row_list(t_pl); active_list_tab=t_pl;);
     sub_v = eff_sub(t_pl); 
     bar_v = eff_bars(t_pl); 
     swing_v = eff_swing(t_pl);
@@ -1888,9 +1948,10 @@ playing && t_pl > 0 ? (
     p_l = (bar_v * 4) / spd_m;
     
     // Use the raw tab for sync logic, but the effective tab for data
-    curr_tab = mem[ui_play_prog_tab]; 
+    curr_tab = mem[ui_locked_tab]==-1?mem[ui_play_prog_tab]:mem[ui_locked_tab]; 
     curr_off = mem[ui_play_offset];
 
+    form_audio ? playback_shift=-span_begin :
     (pc_triggered || curr_tab != last_play_tab || curr_off != last_play_offset) ? (
         curr_off >= bar_v ? curr_off = 0;
         target_beat = (curr_off * 4) / spd_m; 
@@ -1953,7 +2014,7 @@ playing && t_pl > 0 ? (
                    total_time_beats = step_beat_time + final_offset;
                    diff_beats = total_time_beats - start_b;
                    diff_samples = floor(diff_beats * samps_per_beat);
-                   (diff_samples >= 0 && diff_samples < samplesblock) ? (
+                   (diff_samples >= 0 && diff_samples < samplesblock && (!form_audio || (step_beat_time>=-0.0000001 && step_beat_time+span_begin<span_end-0.0000001))) ? (
                         v_p = mem[cur_vel_ptr+row_data_idx]; 
                         v_p <= 0 ? v_p = slider1;
                         eff_h = eff_hum(t_pl); 
@@ -1981,7 +2042,10 @@ playing && t_pl > 0 ? (
         );
         s_idx_iter += 1;
     );
- );   
+    );
+    span_scan+=1;
+  );
+form_audio ? (form_at>=0 ? playback_shift=-mem[form_cache+form_at*3] : playback_shift=0;);
 i_k=0; 
 loop(128,
     mem[kill_note+i_k]>0 ? (
@@ -2437,7 +2501,7 @@ loop(3,
 
             // Current MIDI-cued section: yellow lower half (13px of the 26px button).
             // Draw before the black lock and the white populated-section dog-ear.
-            (mem[ui_play_prog_tab] == gui_t) ? rect(draw_x-1, draw_y+18, item_w-4, 7, 1.0, 1.0, 0.2, 1);
+            (arrow_req == gui_t && !mem[ui_power_off]) ? rect(draw_x-1, draw_y+18, item_w-4, 7, 1.0, 1.0, 0.2, 1);
             // Tab Sub-Lock UI
             gfx_set(0.0, 0.0, 0.0, 1); 
             gfx_circle(draw_x+item_w-17, ly=draw_y+8, 6, 0); 
