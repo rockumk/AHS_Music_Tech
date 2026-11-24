@@ -1,5 +1,5 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.1
+version: 7.8.0-dev.2
 author: Rock Kennedy
 about:
   # N2N Drum Arranger v7.7.13 -
@@ -133,9 +133,10 @@ slider7:20<1,128,1>-Visible Rows
 slider8:0<0,128,1>-View Scroll
 slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
 slider11:14<10,30,1>-Grid Row Height
+slider12:1<0,1,1>-Song Form Protocol
 
 @init
-version_display = "v7.8.0-dev.1";
+version_display = "v7.8.0-dev.2";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -1444,16 +1445,22 @@ rec_cues_active = 0;
 
 
 
-function factory_pattern(p,t) local(r,n,kick,snare,hat,i,step,sub,hit,v,ptr) (
-    kick=-1; snare=-1; hat=-1;
+function factory_pattern(p,t) local(r,n,kick,snare,hat,i,step,sub,hit,v,ptr,name,kick_gm,snare_gm,hat_gm) (
+    kick=-1; snare=-1; hat=-1; kick_gm=-1; snare_gm=-1; hat_gm=-1;
     r=0; loop(MAX_ROWS,
-        n=mem[row_note_base+r];
-        (n==36||n==35) && kick<0 ? kick=r;
-        (n==38||n==40) && snare<0 ? snare=r;
-        n==42 && hat<0 ? hat=r;
+        n=mem[row_note_base+r]; name=row_name_str_base+r;
+        n>=0 && n<=127 && strlen(name)>0 ? (
+            (matchi("kick*",name)||matchi("bass drum*",name)) && kick<0 ? kick=r;
+            (matchi("snare*",name)||matchi("snr*",name)) && snare<0 ? snare=r;
+            (matchi("hh*",name)||matchi("hat cl*",name)||matchi("closed hat*",name)||matchi("closed hi-hat*",name)) && hat<0 ? hat=r;
+            (n==36||n==35) && kick_gm<0 ? kick_gm=r;
+            (n==38||n==40) && snare_gm<0 ? snare_gm=r;
+            n==42 && hat_gm<0 ? hat_gm=r;
+        );
         r+=1;
     );
-    kick<0 && snare<0 && hat<0 ? (gfx_showmenu("#No standard kick, snare or hi-hat MIDI notes found");) : (
+    kick<0 ? kick=kick_gm; snare<0 ? snare=snare_gm; hat<0 ? hat=hat_gm;
+    (kick<0 || (p!=8 && (snare<0||hat<0))) ? (gfx_showmenu("#Required drum roles not found in this kit");) : (
         memset(grid_base+t*vel_stride_tab,0,vel_stride_tab);
         memset(vel_base+t*vel_stride_tab,0,vel_stride_tab);
         memset(step_len_base+t*vel_stride_tab,0,vel_stride_tab);
@@ -1597,7 +1604,7 @@ file_avail(0) > 0 ? (
         form_count=0; form_rev=-1;
         file_avail(0)>0 ? (
             file_var(0, form_magic);
-            form_magic==0x4E324631 ? (
+            form_magic==24631 ? (
                 file_var(0, form_count);
                 form_count=max(0,min(FORM_MAX,floor(form_count)));
                 form_count>0 ? file_mem(0,form_cache,form_count*3);
@@ -1642,7 +1649,8 @@ file_avail(0) > 0 ? (
     file_var(0, requested_start_bar);
     last_kit_idx = slider10;
     file_var(0, rec_cues_active);
-    form_magic=0x4E324631; file_var(0,form_magic); file_var(0,form_count);
+    form_refresh();
+    form_magic=24631; file_var(0,form_magic); file_var(0,form_count);
     form_count>0 ? file_mem(0,form_cache,form_count*3);
 );
 load_kit_from_slider;
@@ -2072,7 +2080,7 @@ loop(128,
 
 
 
-@gfx 1383 780
+@gfx 1290 780
 gfx_setfont(1, "Trebuchet MS", fontsize , 'b');
 gfx_measurestr("This is a test to determine if the text is being rendered on PC or Mac.", str_w, str_h);
 gfx_set(1,1,1,1); 
@@ -2529,7 +2537,7 @@ loop(3,
                 gfx_set(0.08, 0.15, 0.15, 1);
                 gfx_triangle(lx+6, ly+4, lx+6, ly+11, lx+12, ly+7.5);
             );
-            (mem[tab_mute_base+gui_t]&2) ? draw_text(draw_x+4,draw_y+14,"SILENT",1,0.5,0.5);
+            (mem[tab_mute_base+gui_t]&2) ? (gfx_set(1,0.45,0.45,1); gfx_line(draw_x+5,draw_y+21,draw_x+14,draw_y+12,1););
             mem[LOC_TAB_POPULATED + gui_t] ? (
                 // White content bracket: top and left only.
                 gfx_set(1, 1, 1, 1);
@@ -2684,11 +2692,12 @@ t_e = mem[ui_edit_tab];
     item_w=50;
     btn(draw_x,draw_y,item_w,"LIBRARY") ? (
         gfx_x=draw_x; gfx_y=draw_y+20;
-        lib_sel=gfx_showmenu("Save Pattern... (Requires Numbers2Notes running)|Load Pattern... (Requires Numbers2Notes running)||Backbeat|Four on the Floor|Half-Time|Double-Time|Shuffle|Basic Funk|Basic Hip-Hop|Count-In||Force Silence|Inherit Pattern");
+        lib_sel=gfx_showmenu("Save Pattern... (Requires Numbers2Notes running)|Load Pattern... (Requires Numbers2Notes running)||Backbeat|Four on the Floor|Half-Time|Double-Time|Shuffle|Basic Funk|Basic Hip-Hop|Count-In||Force Silence|Inherit (clear pattern)");
         lib_sel==11 ? (
             memset(curr_pat_g_ptr,0,vel_stride_tab); memset(curr_pat_v_ptr,0,vel_stride_tab); memset(curr_pat_l_ptr,0,vel_stride_tab);
             mem[tab_mute_base+t_e]=2; scan_active_tab(); needs_tab_update=1;
         ) : lib_sel==12 ? (
+            memset(curr_pat_g_ptr,0,vel_stride_tab); memset(curr_pat_v_ptr,0,vel_stride_tab); memset(curr_pat_l_ptr,0,vel_stride_tab);
             mem[tab_mute_base+t_e]=0; scan_active_tab(); needs_tab_update=1;
         );
         lib_sel>=3 && lib_sel<=10 ? factory_pattern(lib_sel-2,t_e);
