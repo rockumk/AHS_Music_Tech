@@ -330,7 +330,16 @@ function export.ServicePatternLibrary()
     r.gmem_attach("N2N_Ecosystem_RSKennedy")
     r.gmem_write(LIB+8,r.time_precise())
     local op=r.gmem_read(LIB)
+    if op==3 and (r.time_precise()-r.gmem_read(LIB+11)>30 or r.gmem_read(8000000+math.floor(r.gmem_read(LIB+1)))~=r.gmem_read(LIB+12)) then
+        r.gmem_write(LIB,0)
+        return
+    end
     if op~=1 and op~=2 then return end
+    local id=math.floor(r.gmem_read(LIB+1))
+    if id<1 or id>512 or r.gmem_read(8000000+id)~=r.gmem_read(LIB+12) then
+        r.gmem_write(LIB,0)
+        return
+    end
     r.gmem_write(LIB,5)
     local ok,err=pcall(function()
         local dir=pattern_path()
@@ -392,6 +401,7 @@ function export.ServicePatternLibrary()
             for i=1,5 do r.gmem_write(LIB+2+i,h[i]) end
             r.gmem_write(LIB+10,h[6]); r.gmem_write(LIB+9,n)
             for i,v in ipairs(rows) do for j=1,6 do r.gmem_write(LIB+16+(i-1)*6+j-1,v[j]) end end
+            r.gmem_write(LIB+11,r.time_precise())
             r.gmem_write(LIB,3)
         end
     end)
