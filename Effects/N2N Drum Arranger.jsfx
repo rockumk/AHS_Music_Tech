@@ -2,10 +2,8 @@ desc: N2N Drum Arranger
 version: 7.8.0-dev.2
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.7.13 -
-  ADDED CUE SETTING
-  ADDED PATTERN MUTE
-  ADDED FALLBACK PATTERN SYSTEM
+  # N2N Drum Arranger v7.8.0-dev.2 -
+  GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
 provides:[data] ../Data/DrumArranger/[BEATBOX] 01 Street Jam.txt > AHS_Music_Tech/DrumArranger/[BEATBOX] 01 Street Jam.txt
@@ -465,7 +463,7 @@ function default_tab() local(i,found) (
     found=0;
     mem[LOC_TAB_POPULATED+26] ? found=26 : (
         i=1; loop(TOTAL_TABS-1,
-            found==0 && eligible_song_tab(i) && mem[LOC_TAB_POPULATED+i] ? found=i;
+            found==0 && eligible_song_tab(i) && mem[LOC_TAB_POPULATED+i] && !(mem[tab_mute_base+i]&2) ? found=i;
             i+=1;
         );
     );
@@ -1242,7 +1240,7 @@ function get_active_fallback(req_tab) local(ptr, i, found_tab, cand, current_t, 
         iter = 0;
         
         while(iter < 20 && found_tab == -1) ( // 20 iterations max to prevent infinite loops
-            mem[LOC_TAB_POPULATED + current_t] ? (
+            mem[LOC_TAB_POPULATED + current_t] && (current_t==req_tab || !(mem[tab_mute_base+current_t]&2)) ? (
                 found_tab = current_t;
             ) : (
                 // Search its custom fallback list
@@ -1253,7 +1251,7 @@ function get_active_fallback(req_tab) local(ptr, i, found_tab, cand, current_t, 
                 while(i < 10 && found_tab == -1) (
                     cand = mem[ptr + i];
                     cand != -1 ? (
-                        mem[LOC_TAB_POPULATED + cand] ? (
+                        mem[LOC_TAB_POPULATED + cand] && !(mem[tab_mute_base+cand]&2) ? (
                             found_tab = cand;
                         ) : (
                             last_cand = cand; // Remember the last valid fallback in this chain
@@ -1495,7 +1493,7 @@ function factory_pattern(p,t) local(r,n,kick,snare,hat,i,step,sub,hit,v,ptr,name
 function library_request(op,t) (
     // Mailbox shared with Numbers2Notes; user pattern I/O is serviced by its Lua loop.
     gmem[6200000]==0 && abs(time_precise()-gmem[6200008])<3 ? (
-        gmem[6200001]=slider5; gmem[6200002]=t;
+        gmem[6200001]=slider5; gmem[6200002]=t; gmem[6200011]=time_precise(); gmem[6200012]=my_key;
         gmem[6200003]=eff_bars(t); gmem[6200004]=eff_sub(t);
         gmem[6200005]=eff_hum(t); gmem[6200006]=eff_swing(t); gmem[6200007]=eff_half(t);
         lib_n=0; lib_r=0; loop(MAX_ROWS,
@@ -1723,7 +1721,7 @@ mem[LOCAL_GROOVE_DB + 32] = max_gr;
 // =========================================================
 // CUE SYSTEM LOGIC
 // =========================================================
-(gmem[6200000]==3 && gmem[6200001]==slider5) ? (
+(gmem[6200000]==3 && gmem[6200001]==slider5 && gmem[6200012]==my_key) ? (
     lib_t=gmem[6200002]; lib_t>=1 && lib_t<TOTAL_TABS ? (
         memset(grid_base+lib_t*vel_stride_tab,0,vel_stride_tab); memset(vel_base+lib_t*vel_stride_tab,0,vel_stride_tab); memset(step_len_base+lib_t*vel_stride_tab,0,vel_stride_tab);
         mem[bars_ov_base+lib_t]=gmem[6200003]; lib_sub=gmem[6200004]; mem[subdiv_ov_base+lib_t]=lib_sub==8?0:lib_sub==12?1:lib_sub==16?2:lib_sub==24?3:4;
@@ -2254,7 +2252,7 @@ function calc_vis_beat(t_in) (
     p_l = (bar_v * 4) / spd_m;
     playing_tab = (mem[ui_locked_tab] <= 0) ? mem[ui_play_prog_tab] : mem[ui_locked_tab];
     offset_add = 0; 
-    (play_state & 1 && t_in == playing_tab) ? ( offset_add = playback_shift; );
+    (play_state & 1 && (t_in == playing_tab || t_in == effective_play_tab)) ? ( offset_add = playback_shift; );
     buffer_beats = (samplesblock / srate) * (tempo / 60);
     visual_pos = beat_position - buffer_beats ;
     play_state & 1 ? fmod_pos(visual_pos + offset_add, p_l) * spd_m : 0;
