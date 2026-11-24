@@ -1,5 +1,5 @@
 -- @description numbers2notes_help
--- @version 1.0.7
+-- @version 1.0.8
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -188,35 +188,38 @@ SECTIONS - Section heading codes must be on their own line!
 
 Special Single Character Sections - With autoreplaced names
 
-                        COLOR     N2N Arp and Drum Arr. Support
-						
-	{#} = Count In   	(Gray)     	Yes    1
-	{I} = Intro      	(Cyan)     	Yes    1
-	{V} = Verse      	(Blue)     	Yes    3
-	{P} = Pre-Chorus 	(Blue)     	Yes    3
-	{C} = Chorus     	(Red)      	Yes    3
-	{B} = Bridge     	(Yellow)   	Yes    1
-	{S} = Solo       	(Green)    	Yes    1
-	{O} = Outro      	(Teal)     	Yes    1
-	{M} = Middle 8   	(Magenta)	
-	{D} = Drop       	(Purple)		
-	{R} = Ramp       	(Purple)
-	{F} = Fadeout    	(Dark Gray)
+Mark    Section       Color       Drum Arranger (GMEM)      Arp (legacy cues)
+{#}     Count-In      Gray        Dedicated                 Existing support
+{I}     Intro         Cyan        A-D                       Existing support
+{V}     Verse         Blue        1-3, A-D                  Existing support
+{P}     Pre-Chorus    Blue        1-3, A-D                  Existing support
+{C}     Chorus        Red         1-3, A-D                  Existing support
+{B}     Bridge        Yellow      A-D                       Existing support
+{S}     Solo          Green       A-D                       Existing support
+{O}     Outro         Teal        A-D                       Existing support
+{M}     Middle 8      Yellow      Bridge                    Planned Bridge
+{R}     Ramp          Purple      Pre-Chorus 1-3            Planned Pre-Chorus
+{D}     Drop          Dark Gray   Dedicated                 Planned
+{F}     Fadeout       Dark Gray   Dedicated                 Planned
+{X}     Breakdown     Dark Gray   Dedicated                 Planned
+{1}     User 1        Dark Gray   Dedicated                 Planned
+{2}     User 2        Dark Gray   Dedicated                 Planned
+{3}     User 3        Dark Gray   Dedicated                 Planned
 
-    {V2} = Verse 2					
-    {C3} = Chorus 3                 
-	                                
-	
+{V2} = Verse 2       {C3} = Chorus 3
+
 Single Character Sections
+    {A} {E} {J} {K} {L} {N} {Q} {T} {U} {W} {Y} {Z}
+    {4} through {9} and unidentified regions use Default in Drum Arranger.
 
-    {A}  {E}  {J}  {K}  {L}  {N}  {Q}  {T}  {U}  {W}  {X}  {Y}  {Z}
+Custom Section Marks:
+    {Sax}           = Sax              Default
+    {Interlude}     = Interlude        Default
+    {Half Verse}    = Half Verse       Default
+    {Anything at all}                   Default
 
-Single Digit Examples:		Custom Section Marks:
-
-	{1}						{Sax} = Sax
-	{2}						{Interlude} = Interlude
-	{3}						{Half Verse} = "Half Verse"
-	{7}						{Anything at all} = "Anything at all"
+The new Drum Arranger reads the song structure via GMEM.
+The Arp remains on its existing MIDI cue system until its corresponding update.
 ]],
 Chord_out = [[
 
