@@ -1,5 +1,5 @@
 desc: N2N Drum Arranger
-version: 7.7.13
+version: 7.8.0-dev.1
 author: Rock Kennedy
 about:
   # N2N Drum Arranger v7.7.13 -
@@ -135,7 +135,7 @@ slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
 slider11:14<10,30,1>-Grid Row Height
 
 @init
-version_display = "v7.7.13";
+version_display = "v7.8.0-dev.1";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -243,7 +243,7 @@ midi_trigger_queued = -1;
 mem_pos = 10000000;
 
 ui_base = mem_pos; mem_pos += 32;
-ui_edit_tab = ui_base+0; ui_selected_row = ui_base+1; ui_locked_tab = ui_base+2; ui_play_prog_tab = ui_base+3; ui_play_offset = ui_base+4; ui_anchor_valid = ui_base+5; ui_last_step = ui_base+6;
+ui_edit_tab = ui_base+0; ui_selected_row = ui_base+1; ui_locked_tab = ui_base+2; ui_play_prog_tab = ui_base+3; ui_play_offset = ui_base+4; ui_anchor_valid = ui_base+5; ui_last_step = ui_base+6; ui_power_off = ui_base+8;
 
 // Memory Pointers (80 Tabs)
 tab_w_base = mem_pos; mem_pos += TOTAL_TABS;
@@ -382,88 +382,94 @@ function t(id, r_ui, name, w, cr, cg, cb) (
 
 ttabw = 39; hw = ttabw; sectw = ttabw * 2; ftabs = 51; hww = ttabw * 1.2;
 
-t(0,   1,   "Off",       ftabs,    0.5,  0.5,  0.5);
-t(1,   1,   "Intro",    hw *2,    0.2,  1.0,  1.0);
-t(2,   1,   "B",        hw,    0.2,  1.0,  1.0);
-t(3,   1,   "C",        hw,    0.2,  1.0,  1.0);
-t(4,   1,   "D",        hw,    0.2,  1.0,  1.0);
-t(5,   1,   "Verse 1",  sectw,    0.5,  0.7,  1.0);
-t(6,   1,   "B",        ttabw,    0.5,  0.7,  1.0);
-t(7,   1,   "C",        ttabw,    0.5,  0.7,  1.0);
-t(8,   1,   "D",        ttabw,    0.5,  0.7,  1.0);
-t(9,   1,   "Pre 1",    sectw,    0.8,  0.5,  1.0);
-t(10,  1,   "B",        ttabw,    0.8,  0.5,  1.0);
-t(11,  1,   "C",        ttabw,    0.8,  0.5,  1.0);
-t(12,  1,   "D",        ttabw,    0.8,  0.5,  1.0);
-t(13,  1,   "Chorus 1", sectw,    1.0,  0.4,  0.4);
-t(14,  1,   "B",        ttabw,    1.0,  0.4,  0.4);
-t(15,  1,   "C",        ttabw,    1.0,  0.4,  0.4);
-t(16,  1,   "D",        ttabw,    1.0,  0.4,  0.4);
-t(17,  1,   "Bridge",   sectw,    1.0,  0.9,  0.2);
-t(18,  1,   "B",        ttabw,    1.0,  0.9,  0.2);
-t(19,  1,   "C",        ttabw,    1.0,  0.9,  0.2);
-t(20,  1,   "D",        ttabw,    1.0,  0.9,  0.2);
-t(21,  1,   "H1",      hww,       0.8,  0.8,  0.8);
-t(22,  1,   "H2",      hww,       0.8,  0.8,  0.8);
-t(23,  1,   "1<",       hww,       0.8,  0.5,  1.0);
-t(24,  1,   "1=",       hww,       0.8,  0.5,  1.0);
-t(25,  1,   "1>",       hww,       0.8,  0.5,  1.0);
+// Visible tab layout. Keep all 80 internal pattern addresses for old projects.
+t(26,1,"Default",5*ttabw,0.7,0.7,0.9);
+t(77,2,"Count-In",5*ttabw,0.7,0.7,0.7);
+t(1,3,"Intro A",sectw,0.2,1.0,1.0);
+t(2,3,"B",ttabw,0.2,1.0,1.0);
+t(3,3,"C",ttabw,0.2,1.0,1.0);
+t(4,3,"D",ttabw,0.2,1.0,1.0);
+t(5,1,"Verse 1",sectw,0.5,0.7,1.0);
+t(6,1,"B",ttabw,0.5,0.7,1.0);
+t(7,1,"C",ttabw,0.5,0.7,1.0);
+t(8,1,"D",ttabw,0.5,0.7,1.0);
+t(9,1,"Pre 1",sectw,0.5,0.7,1.0);
+t(10,1,"B",ttabw,0.5,0.7,1.0);
+t(11,1,"C",ttabw,0.5,0.7,1.0);
+t(12,1,"D",ttabw,0.5,0.7,1.0);
+t(13,1,"Chorus 1",sectw,1.0,0.4,0.4);
+t(14,1,"B",ttabw,1.0,0.4,0.4);
+t(15,1,"C",ttabw,1.0,0.4,0.4);
+t(16,1,"D",ttabw,1.0,0.4,0.4);
+t(17,1,"Bridge",sectw,1.0,0.9,0.2);
+t(18,1,"B",ttabw,1.0,0.9,0.2);
+t(19,1,"C",ttabw,1.0,0.9,0.2);
+t(20,1,"D",ttabw,1.0,0.9,0.2);
+t(75,1,"Drop",2.5*ttabw,0.55,0.55,0.55);
+t(27,1,"User 1",2.5*ttabw,0.55,0.55,0.55);
+t(32,2,"Verse 2",sectw,0.5,0.7,1.0);
+t(33,2,"B",ttabw,0.5,0.7,1.0);
+t(34,2,"C",ttabw,0.5,0.7,1.0);
+t(35,2,"D",ttabw,0.5,0.7,1.0);
+t(36,2,"Pre 2",sectw,0.5,0.7,1.0);
+t(37,2,"B",ttabw,0.5,0.7,1.0);
+t(38,2,"C",ttabw,0.5,0.7,1.0);
+t(39,2,"D",ttabw,0.5,0.7,1.0);
+t(40,2,"Chorus 2",sectw,1.0,0.4,0.4);
+t(41,2,"B",ttabw,1.0,0.4,0.4);
+t(42,2,"C",ttabw,1.0,0.4,0.4);
+t(43,2,"D",ttabw,1.0,0.4,0.4);
+t(44,2,"Solo",sectw,0.2,0.8,0.3);
+t(45,2,"B",ttabw,0.2,0.8,0.3);
+t(46,2,"C",ttabw,0.2,0.8,0.3);
+t(47,2,"D",ttabw,0.2,0.8,0.3);
+t(76,2,"Breakdown",2.5*ttabw,0.55,0.55,0.55);
+t(28,2,"User 2",2.5*ttabw,0.55,0.55,0.55);
+t(59,3,"Verse 3",sectw,0.5,0.7,1.0);
+t(60,3,"B",ttabw,0.5,0.7,1.0);
+t(61,3,"C",ttabw,0.5,0.7,1.0);
+t(62,3,"D",ttabw,0.5,0.7,1.0);
+t(63,3,"Pre 3",sectw,0.5,0.7,1.0);
+t(64,3,"B",ttabw,0.5,0.7,1.0);
+t(65,3,"C",ttabw,0.5,0.7,1.0);
+t(66,3,"D",ttabw,0.5,0.7,1.0);
+t(67,3,"Chorus 3",sectw,1.0,0.4,0.4);
+t(68,3,"B",ttabw,1.0,0.4,0.4);
+t(69,3,"C",ttabw,1.0,0.4,0.4);
+t(70,3,"D",ttabw,1.0,0.4,0.4);
+t(71,3,"Outro",sectw,0.5,0.8,0.7);
+t(72,3,"B",ttabw,0.5,0.8,0.7);
+t(73,3,"C",ttabw,0.5,0.8,0.7);
+t(74,3,"D",ttabw,0.5,0.8,0.7);
+t(78,3,"Fadeout",2.5*ttabw,0.55,0.55,0.55);
+t(29,3,"User 3",2.5*ttabw,0.55,0.55,0.55);
 
-t(26,  2,   "Def",       ftabs,    0.7,  0.7,  0.9);
-t(27,  2,   "1",        hw,    0.8,  0.8,  0.8);
-t(28,  2,   "2",        hw,    0.8,  0.8,  0.8);
-t(29,  2,   "3",        hw,    0.8,  0.8,  0.8);
-t(30,  2,   "4",        hw,    0.8,  0.8,  0.8);
-t(31,  2,   "5",        hw,    0.8,  0.8,  0.8);
-t(32,  2,   "Verse 2",    sectw,   0.5,  0.7,  1.0);
-t(33,  2,   "B",          ttabw,   0.5,  0.7,  1.0);
-t(34,  2,   "C",          ttabw,   0.5,  0.7,  1.0);
-t(35,  2,   "D",          ttabw,   0.5,  0.7,  1.0);
-t(36,  2,   "Pre 2",      sectw,   0.8,  0.5,  1.0);
-t(37,  2,   "B",          ttabw,   0.8,  0.5,  1.0);
-t(38,  2,   "C",          ttabw,   0.8,  0.5,  1.0);
-t(39,  2,   "D",          ttabw,   0.8,  0.5,  1.0);
-t(40,  2,   "Chorus 2",   sectw,   1.0,  0.4,  0.4);
-t(41,  2,   "B",          ttabw,   1.0,  0.4,  0.4);
-t(42,  2,   "C",          ttabw,   1.0,  0.4,  0.4);
-t(43,  2,   "D",          ttabw,   1.0,  0.4,  0.4);
-t(44,  2,   "Solo",       sectw,   1,  0.6,  0.3);
-t(45,  2,   "B",          ttabw,   1,  0.6,  0.3);
-t(46,  2,   "C",          ttabw,   1,  0.6,  0.3);
-t(47,  2,   "D",          ttabw,   1,  0.6,  0.3);
-t(48,  2,   "H3",    hww,    0.8,  0.8,  0.8);
-t(49,  2,   "H4",    hww,    0.8,  0.8,  0.8);
-t(50,  2,   "2<",   hww,     0.9,  0.4,  1);
-t(51,  2,   "2=",   hww,     0.9,  0.4,  1);
-t(52,  2,   "2>",   hww,     0.9,  0.4,  1);
-
-t(53,  3,   "Min",       ftabs,    0.9,  0.7,  0.7);
-t(54,  3,   "6",   hw,    0.8,  0.8,  0.8);
-t(55,  3,   "7",   hw,    0.8,  0.8,  0.8);
-t(56,  3,   "8",   hw,    0.8,  0.8,  0.8);
-t(57,  3,   "9",   hw,    0.8,  0.8,  0.8);
-t(58,  3,   "10",  hw,    0.8,  0.8,  0.8);
-t(59,  3,   "Verse 3",    sectw,   0.5,  0.7,  1.0);
-t(60,  3,   "B",          ttabw,   0.5,  0.7,  1.0);
-t(61,  3,   "C",          ttabw,   0.5,  0.7,  1.0);
-t(62,  3,   "D",          ttabw,   0.5,  0.7,  1.0);
-t(63,  3,   "Pre 3",      sectw,   0.8,  0.5,  1.0);
-t(64,  3,   "B",          ttabw,   0.8,  0.5,  1.0);
-t(65,  3,   "C",          ttabw,   0.8,  0.5,  1.0);
-t(66,  3,   "D",          ttabw,   0.8,  0.5,  1.0);
-t(67,  3,   "Chorus 3",   sectw,   1.0,  0.4,  0.4);
-t(68,  3,   "B",          ttabw,   1.0,  0.4,  0.4);
-t(69,  3,   "C",          ttabw,   1.0,  0.4,  0.4);
-t(70,  3,   "D",          ttabw,   1.0,  0.4,  0.4);
-t(71,  3,   "Outro",      sectw,   0.5,  0.8,  0.7);
-t(72,  3,   "B",          ttabw,   0.5,  0.8,  0.7);
-t(73,  3,   "C",          ttabw,   0.5,  0.8,  0.7);
-t(74,  3,   "D",          ttabw,   0.5,  0.8,  0.7);
-t(75,  3,   "rsv",    hww,    0.8,  0.8,  0.8);
-t(76,  3,   "rsv",    hww,    0.8,  0.8,  0.8);
-t(77,  3,   "rsv",   hww,     0.9,  0.4,  1);
-t(78,  3,   "rsv",   hww,     0.9,  0.4,  1);
-t(79,  3,   "rsv",   hww,     0.9,  0.4,  1);
+// Display order differs from storage order; retain original IDs.
+function visible_tab_at(r,i) local(n,k,g,b) (
+    n = r == 3 ? 4 : 1;
+    i < n ? (r == 1 ? 26 : r == 2 ? 77 : 1+i) :
+    i < n+16 ? (
+        k=i-n; g=floor(k/4); 
+        b=r==1?(g==0?5:g==1?9:g==2?13:17):
+          r==2?(g==0?32:g==1?36:g==2?40:44):
+               (g==0?59:g==1?63:g==2?67:71);
+        b+k%4;
+    ) : i==n+16 ? (r==1?75:r==2?76:78) : 26+r;
+);
+function eligible_song_tab(t) (
+    (t>=1 && t<=20)||(t>=32 && t<=47)||(t>=59 && t<=74)||
+    (t>=27 && t<=29)||t==75||t==76||t==78;
+);
+function default_tab() local(i,found) (
+    found=0;
+    mem[LOC_TAB_POPULATED+26] ? found=26 : (
+        i=1; loop(TOTAL_TABS-1,
+            found==0 && eligible_song_tab(i) && mem[LOC_TAB_POPULATED+i] ? found=i;
+            i+=1;
+        );
+    );
+    found;
+);
 
 // =========================================================
 // GENERAL HELPER FUNCTIONS
@@ -536,7 +542,7 @@ local(inst_offset, i, m0, m1, m2, m3, target_pc, idx, rem)
 function check_tab_population(t_idx)
 local(ptr, k, has_d)
 (
-    has_d = 0;
+    has_d = (mem[tab_mute_base+t_idx] & 2) ? 1 : 0;
     ptr = grid_base + t_idx*vel_stride_tab;
     k = 0; 
     while (k < vel_stride_tab && has_d == 0) (
@@ -618,10 +624,10 @@ function get_t_name(idx, out) (
     idx == 23 ? strcpy(out, "1<") :
     idx == 24 ? strcpy(out, "1=") :
     idx == 25 ? strcpy(out, "1>") :
-    idx == 26 ? strcpy(out, "Def") :
-    idx == 27 ? strcpy(out, "1") :
-    idx == 28 ? strcpy(out, "2") :
-    idx == 29 ? strcpy(out, "3") :
+    idx == 26 ? strcpy(out, "Default") :
+    idx == 27 ? strcpy(out, "User 1") :
+    idx == 28 ? strcpy(out, "User 2") :
+    idx == 29 ? strcpy(out, "User 3") :
     idx == 30 ? strcpy(out, "4") :
     idx == 31 ? strcpy(out, "5") :
     idx == 32 ? strcpy(out, "Verse 2") :
@@ -667,10 +673,10 @@ function get_t_name(idx, out) (
     idx == 72 ? strcpy(out, "B") :
     idx == 73 ? strcpy(out, "C") :
     idx == 74 ? strcpy(out, "D") : 
-    idx == 75 ? strcpy(out, "rsv") :
-    idx == 76 ? strcpy(out, "rsv") :
-    idx == 77 ? strcpy(out, "rsv") :
-    idx == 78 ? strcpy(out, "rsv") :
+    idx == 75 ? strcpy(out, "Drop") :
+    idx == 76 ? strcpy(out, "Breakdown") :
+    idx == 77 ? strcpy(out, "Count-In") :
+    idx == 78 ? strcpy(out, "Fadeout") :
     idx == 79 ? strcpy(out, "rsv") :  
     sprintf(out, "%d", idx);
 );
@@ -1220,11 +1226,12 @@ freembuf(mem_pos);
 
 // Maps out patterns to flag if they qualify for Fallback behavior at all
 function needs_fallback(t) (
-    ((t >= 1 && t <= 20) || (t >= 32 && t <= 47) || (t >= 59 && t <= 74)) ? 1 : 0;
+    eligible_song_tab(t) ? 1 : 0;
 );
 
 function get_active_fallback(req_tab) local(ptr, i, found_tab, cand, current_t, last_cand, iter) (
     // 1. If it's Tab 0 (Off) or doesn't qualify for a fallback based on mapping list, return itself.
+    req_tab == 26 ? default_tab() :
     (req_tab == 0 || !needs_fallback(req_tab)) ? req_tab :
     
     // 2. Loop to resolve cascades
@@ -1262,7 +1269,7 @@ function get_active_fallback(req_tab) local(ptr, i, found_tab, cand, current_t, 
                         current_t = last_cand; // Cascade!
                     ) : (
                         // No fallbacks defined and target is empty -> Force Default
-                        found_tab = 26; 
+                        found_tab = default_tab(); 
                     );
                 );
             );
@@ -1270,7 +1277,7 @@ function get_active_fallback(req_tab) local(ptr, i, found_tab, cand, current_t, 
         );
         
         // Failsafe: Return populated tab, or 26 if the entire chain is empty
-        found_tab != -1 ? found_tab : 26;
+        found_tab != -1 ? found_tab : default_tab();
     );
 );
 
@@ -1412,6 +1419,69 @@ GMEM_REC_FLAG_ADDR = 5000100;
 rec_cues_active = 0;
 
 
+
+function factory_pattern(p,t) local(r,n,kick,snare,hat,i,step,sub,hit,v,ptr) (
+    kick=-1; snare=-1; hat=-1;
+    r=0; loop(MAX_ROWS,
+        n=mem[row_note_base+r];
+        (n==36||n==35) && kick<0 ? kick=r;
+        (n==38||n==40) && snare<0 ? snare=r;
+        n==42 && hat<0 ? hat=r;
+        r+=1;
+    );
+    kick<0 && snare<0 && hat<0 ? (gfx_showmenu("#No standard kick, snare or hi-hat MIDI notes found");) : (
+        memset(grid_base+t*vel_stride_tab,0,vel_stride_tab);
+        memset(vel_base+t*vel_stride_tab,0,vel_stride_tab);
+        memset(step_len_base+t*vel_stride_tab,0,vel_stride_tab);
+        sub=p==5?12:16;
+        mem[bars_ov_base+t]=1; mem[subdiv_ov_base+t]=sub==12?1:2;
+        mem[half_speed_ov_base+t]=0; mem[swing_ov_base+t]=0; mem[tab_mute_base+t]=0;
+        i=0; loop(sub,
+            step=i;
+            r=0; loop(MAX_ROWS,
+                hit=0; v=95;
+                r==kick ? (
+                    p==2||p==8 ? hit=step%4==0 :
+                    p==3 ? hit=step==0||step==6||step==10 :
+                    p==6 ? hit=step==0||step==3||step==7||step==10||step==14 :
+                    p==7 ? hit=step==0||step==7||step==10 :
+                    p==5 ? hit=step==0||step==6 : hit=step==0||step==8;
+                    v=108;
+                ) : r==snare && p!=8 ? (
+                    hit=p==3?step==8:p==4?step%4==2:p==5?(step==3||step==9):(step==4||step==12);
+                    v=105;
+                ) : r==hat && p!=8 ? (
+                    hit=p==5?(step%3==0||step%3==2):p==2?step%4==2:p==4||p==6?1:step%2==0;
+                    v=step%4==0?82:65;
+                );
+                hit ? (ptr=t*vel_stride_tab+r*vel_stride_row+step; mem[grid_base+ptr]=1; mem[vel_base+ptr]=v;);
+                r+=1;
+            ); i+=1;
+        );
+        scan_active_tab(); needs_tab_update=1;
+    );
+);
+function library_request(op,t) (
+    // Mailbox shared with Numbers2Notes; user pattern I/O is serviced by its Lua loop.
+    gmem[6200000]==0 && abs(time_precise()-gmem[6200008])<3 ? (
+        gmem[6200001]=slider5; gmem[6200002]=t;
+        gmem[6200003]=eff_bars(t); gmem[6200004]=eff_sub(t);
+        gmem[6200005]=eff_hum(t); gmem[6200006]=eff_swing(t); gmem[6200007]=eff_half(t);
+        lib_n=0; lib_r=0; loop(MAX_ROWS,
+            lib_s=0; loop(MAX_STEPS,
+                lib_p=t*vel_stride_tab+lib_r*vel_stride_row+lib_s;
+                op==1 && mem[grid_base+lib_p]>0 ? (
+                    lib_a=6200016+lib_n*6;
+                    gmem[lib_a]=mem[row_note_base+lib_r]; gmem[lib_a+1]=mem[row_chan_base+lib_r]; gmem[lib_a+2]=lib_s;
+                    gmem[lib_a+3]=mem[vel_base+lib_p]; gmem[lib_a+4]=mem[grid_base+lib_p]; gmem[lib_a+5]=mem[step_len_base+lib_p];
+                    lib_n+=1;
+                ); lib_s+=1;
+            ); lib_r+=1;
+        );
+        gmem[6200009]=lib_n; gmem[6200010]=mem[tab_mute_base+t]&2;
+        gmem[6200000]=op;
+    ) : gfx_showmenu("#Open Numbers2Notes first (or another library request is pending)");
+);
 
 @serialize
 preserved_id = slider5; 
@@ -1608,6 +1678,21 @@ mem[LOCAL_GROOVE_DB + 32] = max_gr;
 // =========================================================
 // CUE SYSTEM LOGIC
 // =========================================================
+(gmem[6200000]==3 && gmem[6200001]==slider5) ? (
+    lib_t=gmem[6200002]; lib_t>=1 && lib_t<TOTAL_TABS ? (
+        memset(grid_base+lib_t*vel_stride_tab,0,vel_stride_tab); memset(vel_base+lib_t*vel_stride_tab,0,vel_stride_tab); memset(step_len_base+lib_t*vel_stride_tab,0,vel_stride_tab);
+        mem[bars_ov_base+lib_t]=gmem[6200003]; lib_sub=gmem[6200004]; mem[subdiv_ov_base+lib_t]=lib_sub==8?0:lib_sub==12?1:lib_sub==16?2:lib_sub==24?3:4;
+        mem[hum_ov_base+lib_t]=gmem[6200005]; mem[swing_ov_base+lib_t]=gmem[6200006]; mem[half_speed_ov_base+lib_t]=gmem[6200007]; mem[tab_mute_base+lib_t]=gmem[6200010]&2;
+        lib_i=0; loop(min(16384,max(0,gmem[6200009])),
+            lib_a=6200016+lib_i*6; lib_r=0; lib_match=-1;
+            loop(MAX_ROWS, lib_match<0 && mem[row_note_base+lib_r]==gmem[lib_a] && mem[row_chan_base+lib_r]==gmem[lib_a+1] ? lib_match=lib_r; lib_r+=1;);
+            lib_s=gmem[lib_a+2]; lib_match>=0 && lib_s>=0 && lib_s<MAX_STEPS ? (
+                lib_p=lib_t*vel_stride_tab+lib_match*vel_stride_row+lib_s;
+                mem[vel_base+lib_p]=gmem[lib_a+3]; mem[grid_base+lib_p]=gmem[lib_a+4]; mem[step_len_base+lib_p]=gmem[lib_a+5];
+            ); lib_i+=1;
+        ); check_tab_population(lib_t); flush_inventory_to_gmem(); needs_tab_update=1;
+    ); gmem[6200000]=0;
+);
 
 // 1. REPORT TYPE (I am Drums)
 (slider5 > 0) ? ( gmem[GMEM_TYPE_REPORT + slider5 - 1] = MY_TYPE_ID; );
@@ -1735,6 +1820,7 @@ pos_in_bar = beat_position % 4.0;
 );
 
 // --- F. RESTORED AUDIO PREVIEW LOGIC ---
+preview_trig && mem[ui_power_off] ? preview_trig=0;
 preview_trig ? (
     preview_chan < 1 ? preview_chan = 1 : preview_chan > 16 ? preview_chan = 16;
     mem[kill_note + preview_note] > 0 ? ( k_ch = mem[kill_chan + preview_note]; midisend(0, 0x80 | (k_ch-1), preview_note); );
@@ -1765,6 +1851,7 @@ last_play_state = play_state;
 
 // --- OPTIMIZED TAB RESOLUTION ---
 raw_target = (mem[ui_locked_tab] == -1) ? mem[ui_play_prog_tab] : mem[ui_locked_tab];
+mem[ui_power_off] ? raw_target=0;
 
 (raw_target != last_raw_target || needs_tab_update) ? (
     // Check if THIS specific cue/tab is muted by the user
@@ -1776,11 +1863,16 @@ raw_target = (mem[ui_locked_tab] == -1) ? mem[ui_play_prog_tab] : mem[ui_locked_
         effective_play_tab = get_active_fallback(raw_target);
     );
     
+    (mem[tab_mute_base+effective_play_tab] & 2) ? effective_play_tab=0;
     update_active_row_list(effective_play_tab);
     last_raw_target = raw_target;
     needs_tab_update = 0;
 );
 
+mem[ui_power_off] && !last_power_off ? (
+    i_k=0; loop(128, mem[kill_note+i_k]>0 ? (k_ch=max(1,mem[kill_chan+i_k]); midisend(0,0x80|(k_ch-1),i_k); mem[kill_note+i_k]=0;); i_k+=1;);
+);
+last_power_off=mem[ui_power_off];
 t_pl = effective_play_tab; // Use the cached, efficient result for playback
 playing = (play_state & 1);
 
@@ -2179,26 +2271,16 @@ row1_y = UI_TOP_Y - 3;
 
 // --- Draw Background for row 1 ---
 track_num > 0 ? (
-    x_start = HDR_X + HDR_W + UI_GAP_X - 10 + 180;
-    rect(x_start+574, row1_y, 345, 22, track_r, track_g, track_b, 1);
-    //rect(x_start+760, row1_y+4, 63, 20,.1,.1,.1,1);
-
-    lum = (track_r * 0.299) + (track_g * 0.587) + (track_b * 0.114);
-    lum > 0.5 ? gfx_set(0,0,0,1) : gfx_set(1,1,1,1);
-    sprintf(#trk_str, "TRACK");
-    gfx_measurestr(#trk_str, tw, th);
-    gfx_x = x_start+681 + (60-tw)/2;
-    gfx_y = row1_y+ 1 + (18-th)/2;
-    gfx_setfont(1, os_font, titlefontsize, 'b');
+    track_label_w = 345-5*ttabw;
+    track_label_x = tab_start_x+6*5*ttabw-5-track_label_w;
+    rect(track_label_x,row1_y,track_label_w,22,track_r,track_g,track_b,1);
+    lum=(track_r*.299)+(track_g*.587)+(track_b*.114);
+    lum>.5 ? gfx_set(0,0,0,1) : gfx_set(1,1,1,1);
+    sprintf(#trk_str,"TRACK %d",track_num);
+    gfx_setfont(1,os_font,titlefontsize,'b');
+    gfx_measurestr(#trk_str,tw,th);
+    gfx_x=track_label_x+(track_label_w-tw)/2; gfx_y=row1_y+(22-th)/2;
     gfx_drawstr(#trk_str);
-
-
-    sprintf(#trk_str2, "%d", track_num);
-    gfx_measurestr(#trk_str2, tw, th);
-    gfx_x = x_start + 692 + (60-tw)/2 + 40;
-    gfx_y = row1_y + 1 +(18-th)/2;
-    gfx_setfont(1, os_font, titlefontsize+3, 'b');
-    gfx_drawstr(#trk_str2);
     gfx_setfont(0);
 );
 
@@ -2265,9 +2347,9 @@ item_w = 30; btn(draw_x, draw_y, item_w, "   >") ? ( gfx_set(1,0,0,1); export_n2
 draw_y = ROW2_Y; // Advance Y to Tab Area
 
 // VISUAL ONLY: show the currently playing cue's resolved pattern source.
-arrow_req = mem[ui_play_prog_tab];
+arrow_req = mem[ui_locked_tab]==-1 ? mem[ui_play_prog_tab] : mem[ui_locked_tab];
 arrow_eff = effective_play_tab;
-arrow_show = ((play_state & 1) && mem[ui_locked_tab] == -1 &&
+arrow_show = ((play_state & 1) && !mem[ui_power_off] &&
               arrow_req >= 0 && arrow_req < TOTAL_TABS &&
               arrow_eff >= 0 && arrow_eff < TOTAL_TABS &&
               arrow_req != arrow_eff && arrow_eff > 0);
@@ -2279,70 +2361,37 @@ loop(3,
     // LEFT COLUMN (REC Cues & Follow MIDI)
     // ------------------------------------------
     current_tab_row == 1 ? (
-        // ROW 2: REC CUES
-        rec_x = 64; rec_y = draw_y-1;
-        rect(rec_x+1, rec_y+1, 50, 26, 0.2, 0.2, 0.2, 1);
-        rec_cues_active ? (
-            rect(rec_x+1, rec_y+1, 52, 26, 0.8, 0, 0, 1);
-            draw_text(rec_x+12, rec_y+1, " REC", 1, 1, 1);
-            draw_text(rec_x+9, rec_y+11, " CUES", 1, 1, 1);
-        ) : (
-            draw_text(rec_x+12, rec_y+1, " REC", 0.8, 0.8, 0.8);
-            draw_text(rec_x+9, rec_y+11, " CUES", 0.8, 0.8, 0.8);
+        rec_cues_active=0;
+        power_x=64; power_y=draw_y;
+        rect(power_x,power_y,51,26,mem[ui_power_off]?0.75:0.22,0.2,0.2,1);
+        draw_text(power_x+5,power_y+6,"OFF",1,1,1);
+        gfx_set(0.9,0.9,0.9,1);
+        gfx_arc(power_x+39,power_y+13,7,0.6,5.68,1);
+        gfx_line(power_x+39,power_y+3,power_x+39,power_y+12,1);
+        (mb && !p_mb && mx>=power_x && mx<power_x+51 && my>=power_y && my<power_y+26) ? (
+            mem[ui_power_off]=!mem[ui_power_off]; needs_tab_update=1;
         );
-        rec_hit = (mx >= rec_x+1 && mx < rec_x + 53 && my >= rec_y+1 && my < rec_y + 27);
-        (mb && p_mb == 0 && rec_hit) ? (
-            rec_cues_active = !rec_cues_active;
-            rec_cues_active ? ( mem[ui_locked_tab] = -1; gmem[GM_BASE+1] = -1; gmem[GMEM_REC_FLAG_ADDR] = 1; ) 
-                            : ( gmem[GMEM_REC_FLAG_ADDR] = 0; mem[ui_locked_tab] = -1; gmem[GM_BASE+1] = -1; );
-            needs_tab_update = 1;
-        );
-    ) : 
-    current_tab_row == 2 ? (
-        // ROW 3: FOLLOW MIDI LABEL
-        mem[ui_locked_tab] == -1 ? mem[ui_edit_tab] = mem[ui_play_prog_tab]; 
-        is_follow = (mem[ui_locked_tab] == -1);
-        gfx_setfont(1, os_font, fontsize-1, 'b'); 
-        draw_text(FOLLOW_LBL_X+11, draw_y+17, "FOLLOW", 0.8,0.8,0.8);
-        draw_text(FOLLOW_LBL_X+6, draw_y+27, "MIDI CUES:", 0.8,0.8,0.8); 
-    ) : 
-    current_tab_row == 3 ? (
-        // ROW 4: FOLLOW MIDI LOCK BOX
-        gfx_set(0.9,0.9,0.9,1); 
-        gfx_circle(FOLLOW_BOX_X+25, draw_y-2, 7, 0); 
-        gfx_circle(FOLLOW_BOX_X+25, draw_y-12, 6.5, 0); 
-        gfx_circle(FOLLOW_BOX_X+25, draw_y-12, 6, 0); 
-        gfx_circle(FOLLOW_BOX_X+25, draw_y-12, 5.5, 0); 
-        gfx_circle(FOLLOW_BOX_X+25, draw_y-13, 5, 0); 
-        // Display only: erase the right side of the shackle while FOLLOW is enabled.
-        // Keep the lock body and its existing controls unchanged.
-        is_follow ? rect(FOLLOW_BOX_X+25, draw_y-15, 10, 11, 0, 0, 0, 1);
-        rect(FOLLOW_BOX_X+15, draw_y-10, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.5, 0.5, 0.5, 1);
-        // FOLLOW enabled: restore the original soft green/cyan fill.
-        // Black triangle replaces the X and is drawn after the fill.
-        is_follow ? (
-            rect(FOLLOW_BOX_X+15, draw_y-10, FOLLOW_BOX_W+1, FOLLOW_BOX_H, 0.2*bri, 1.0*bri, 1.0*bri, 1);
-            gfx_set(0, 0, 0, 1);
-            gfx_triangle(FOLLOW_BOX_X+22, draw_y-7, FOLLOW_BOX_X+22, draw_y+3, FOLLOW_BOX_X+30, draw_y-2);
-        );
-        gfx_setfont(1, os_font, fontsize, 'b'); 
-        
-        (mb && p_mb == 0 && !rec_hit && mx>=FOLLOW_BOX_X && mx<FOLLOW_BOX_X+FOLLOW_BOX_W+31 && my>=draw_y-33 && my<draw_y+FOLLOW_BOX_H+5) ? (
-            rec_cues_active == 0 ? ( 
-                mem[ui_locked_tab] == -1 ? mem[ui_locked_tab] = 26 : mem[ui_locked_tab] = -1; 
-                gmem[GM_BASE+1] = mem[ui_locked_tab]; 
-                needs_tab_update = 1;
-            );
+    ) : current_tab_row==2 ? (
+        draw_text(FOLLOW_LBL_X+11,draw_y+17,"FOLLOW",0.8,0.8,0.8);
+        draw_text(FOLLOW_LBL_X+6,draw_y+27,"SONG:",0.8,0.8,0.8);
+    ) : (
+        is_follow=mem[ui_locked_tab]==-1;
+        rect(FOLLOW_BOX_X+15,draw_y-10,FOLLOW_BOX_W+1,FOLLOW_BOX_H,is_follow?0.2:0.5,is_follow?0.9:0.5,is_follow?0.7:0.5,1);
+        gfx_set(0,0,0,1);
+        gfx_triangle(FOLLOW_BOX_X+22,draw_y-7,FOLLOW_BOX_X+22,draw_y+3,FOLLOW_BOX_X+30,draw_y-2);
+        (mb && !p_mb && mx>=FOLLOW_BOX_X && mx<FOLLOW_BOX_X+FOLLOW_BOX_W+31 && my>=draw_y-14 && my<draw_y+FOLLOW_BOX_H+5) ? (
+            mem[ui_locked_tab]=-1; gmem[GM_BASE+1]=-1; needs_tab_update=1;
         );
     );
+    !eligible_song_tab(mem[ui_edit_tab]) && mem[ui_edit_tab]!=26 && mem[ui_edit_tab]!=77 ? mem[ui_edit_tab]=26;
 
     // ------------------------------------------
     // DRAW THE TABS FOR THIS ROW (Reusing Code)
     // ------------------------------------------
     draw_x = tab_start_x; // Reset cursor to tab start
-    gui_t = 0;
-    
-    loop(TOTAL_TABS,
+    gui_i = 0;
+    loop(current_tab_row==3?22:19,
+        gui_t=visible_tab_at(current_tab_row,gui_i);
         my_row = mem[tab_ui_row_base + gui_t];
         
         (my_row == current_tab_row) ? (
@@ -2378,7 +2427,7 @@ loop(3,
                         mem[ui_locked_tab] = gui_t; mem[ui_edit_tab] = gui_t;   
                         gmem[GM_BASE+1] = mem[ui_locked_tab]; last_tab_clk = 0; 
                     ) : (
-                        mem[ui_locked_tab] != -1 ? ( mem[ui_edit_tab] = gui_t; mem[ui_play_offset] = 0; playback_shift = 0; );
+                        mem[ui_edit_tab] = gui_t;
                         mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; 
                         last_tab_clk = time_precise(); last_tab_idx = gui_t;
                         needs_tab_update = 1;
@@ -2416,6 +2465,7 @@ loop(3,
                 gfx_set(0.08, 0.15, 0.15, 1);
                 gfx_triangle(lx+6, ly+4, lx+6, ly+11, lx+12, ly+7.5);
             );
+            (mem[tab_mute_base+gui_t]&2) ? draw_text(draw_x+4,draw_y+14,"SILENT",1,0.5,0.5);
             mem[LOC_TAB_POPULATED + gui_t] ? (
                 // White content bracket: top and left only.
                 gfx_set(1, 1, 1, 1);
@@ -2428,7 +2478,7 @@ loop(3,
             
             draw_x += item_w; // FLOW: Advance cursor by tab width
         );
-        gui_t += 1;
+        gui_i += 1;
     );
     
     draw_y += 30; // Move down for the next row of tabs
@@ -2567,19 +2617,33 @@ t_e = mem[ui_edit_tab];
     draw_x += 57;
     gfx_setfont(1, os_font, fontsize, 'b'); 
     // MUTE BUTTON (Added here to flow sequence)
-    item_w = 50;
-    is_p_muted = mem[tab_mute_base + t_e];
+    item_w=50;
+    btn(draw_x,draw_y,item_w,"LIBRARY") ? (
+        gfx_x=draw_x; gfx_y=draw_y+20;
+        lib_sel=gfx_showmenu("Save Pattern... (Requires Numbers2Notes running)|Load Pattern... (Requires Numbers2Notes running)||Backbeat|Four on the Floor|Half-Time|Double-Time|Shuffle|Basic Funk|Basic Hip-Hop|Count-In||Force Silence|Inherit Pattern");
+        lib_sel==11 ? (
+            memset(curr_pat_g_ptr,0,vel_stride_tab); memset(curr_pat_v_ptr,0,vel_stride_tab); memset(curr_pat_l_ptr,0,vel_stride_tab);
+            mem[tab_mute_base+t_e]=2; scan_active_tab(); needs_tab_update=1;
+        ) : lib_sel==12 ? (
+            mem[tab_mute_base+t_e]=0; scan_active_tab(); needs_tab_update=1;
+        );
+        lib_sel>=3 && lib_sel<=10 ? factory_pattern(lib_sel-2,t_e);
+        lib_sel==1 || lib_sel==2 ? library_request(lib_sel,t_e);
+    );
+    draw_x+=item_w+ui_gap_small;
+    item_w = 40;
+    is_p_muted = mem[tab_mute_base + t_e] & 1;
     is_p_muted ? rect(draw_x, draw_y, item_w, btn_h, 1, .4, .4, .6) : rect(draw_x, draw_y, item_w, btn_h, 0.4, 0.3, 0.3, 1);
     gfx_set(1,1,1,1); gfx_x = draw_x + 9; gfx_y = draw_y + 2; gfx_drawstr("MUTE");
     (mb && p_mb == 0 && mx >= draw_x && mx < draw_x + item_w && my >= draw_y && my < draw_y + btn_h) ? (
-        mem[tab_mute_base + t_e] = !mem[tab_mute_base + t_e];
+        mem[tab_mute_base + t_e] = mem[tab_mute_base + t_e] ~ 1;
         needs_tab_update = 1;
     );
     draw_x += item_w + ui_gap_small;
 
     // ACCEPT SUGGESTED
-    item_w = BTN_W_ACCEPT + 21;
-    btn(draw_x, draw_y, item_w, "ACCEPT SUGGESTED PATTERN") ? ( 
+    item_w = BTN_W_ACCEPT - 24;
+    btn(draw_x, draw_y, item_w, "ACCEPT SUGGESTED") ? ( 
         is_ghosting ? (
             memcpy(curr_pat_v_ptr, fb_pat_v_ptr, vel_stride_tab);
             memcpy(curr_pat_g_ptr, fb_pat_g_ptr, vel_stride_tab);
@@ -3674,7 +3738,7 @@ circle_hit = (
 
 
 // --- PATTERN MUTE OVERLAY ---
-is_tab_muted_ui = mem[tab_mute_base + t_e];
+is_tab_muted_ui = mem[tab_mute_base + t_e] & 1;
 
 (t_e > 0 && is_tab_muted_ui) ? (
     // Coordinates for the entire lower grid area
@@ -3704,6 +3768,12 @@ is_tab_muted_ui = mem[tab_mute_base + t_e];
 
 
 
+mem[ui_power_off] ? (
+    rect(0,0,gfx_w,gfx_h,0,0,0,0.62);
+    rect(64,ROW2_Y,51,26,0.75,0.2,0.2,1);
+    draw_text(69,ROW2_Y+6,"OFF",1,1,1);
+    gfx_set(1,1,1,1); gfx_arc(103,ROW2_Y+13,7,0.6,5.68,1); gfx_line(103,ROW2_Y+3,103,ROW2_Y+12,1);
+);
 help_active ? (
     gfx_set(0,0,0,0.85); gfx_rect(0,0,gfx_w,gfx_h);
     
@@ -3723,7 +3793,7 @@ help_active ? (
     gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Tab's Lock Box: Green - Playback is locked to the Tab");
     gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Tab's Lock Box: Black - Playback is not locked to the Tab");
     gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Double-Click Tab: View Pattern AND Lock tab to playback");
-    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Follow [x]:: View and playback follow incoming MIDI commands");
+    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Follow [x]:: Playback follows song sections; editing is independent");
     gfx_y += 25; gfx_x = help_x+20; gfx_drawstr("GRID EDITING (PC):");
     gfx_x = help_x+20; gfx_y += 20; gfx_drawstr(" - Click+Drag: Paint steps and velocity bars");
     gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - CTRL+Drag: Edit all pattern Bars simultaneously");
