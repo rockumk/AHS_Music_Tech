@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.3
+-- @version 2.0.4-dev.1
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -1667,6 +1667,10 @@ function Get_Transport_Sections(header_text, chord_text)
 end 
 
 function IM_GUI_Loop()
+    if gmem_export then
+        gmem_export.PublishSongForm(Get_Stretched_ABCD_Index, false)
+        gmem_export.ServicePatternLibrary()
+    end
     local rv
     local rc
 
@@ -6380,10 +6384,15 @@ function place_special()
             update_section("Solo", region_type_upper:match("%d+"))
         elseif region_type_upper:match("^F%d*$") or region_type_upper == "FADEOUT" then
             update_section("Fadeout", region_type_upper:match("%d+"))
+        elseif region_type_upper == "X" or region_type_upper == "BREAKDOWN" then
+            display_name, base_color_name = "Breakdown", "Breakdown"
+        elseif region_type_upper:match("^[123]$") then
+            display_name = "User " .. region_type_upper
+            base_color_name = display_name
         end
 
         -- 2. Apply Colors using the expanded base_color_name!
-        local region_item_color = reaper.ColorToNative(80, 80, 100) | 0x1000000
+        local region_item_color = reaper.ColorToNative(133, 133, 133) | 0x1000000
 
         -- Pull the color dictionary from form.lua
         if form.sections_colors and form.sections_colors[base_color_name] then
@@ -6699,10 +6708,21 @@ function Generate_Arranger_Conductors()
     Resolve_Cue_Placement_Modes()
 
     place_special()
+    if gmem_export then gmem_export.PublishSongForm(Get_Stretched_ABCD_Index, true) end
 
     local drum_tracks = Find_All_Tracks_With_Drum_FX()
     for _, drum_track in ipairs(drum_tracks) do
-        Generate_Drum_Conductor_For_Track(drum_track)
+        -- New Drum Arranger follows GMEM. Keep the old cue writer available for legacy versions.
+        local new_drums = false
+        for fx=0,reaper.TrackFX_GetCount(drum_track)-1 do
+            local _,fx_name=reaper.TrackFX_GetFXName(drum_track,fx,"")
+            if fx_name:lower():find("n2n drum arranger",1,true) then
+                -- Slider 12 is the protocol marker on the new JSFX; old JSFX has no such slider.
+                local _,param_name=reaper.TrackFX_GetParamName(drum_track,fx,11,"")
+                if param_name:find("Song Form Protocol",1,true) then new_drums=true end
+            end
+        end
+        if new_drums then Clean_Drum_Track(drum_track) else Generate_Drum_Conductor_For_Track(drum_track) end
     end
 
     local arp_tracks = Find_All_Tracks_With_Arp_FX()
