@@ -1,5 +1,5 @@
 -- @description numbers2notes_form
--- @version 1.0.8
+-- @version 1.1.0
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -13,16 +13,21 @@ local form = {
 
     sections_colors = { 
         ["Chorus"] = {255, 102, 102},      -- Red 
-        ["Drop"] = {204, 77, 230},         -- 
+        ["Drop"] = {70, 70, 70},         -- 
         ["Ramp"] = {179, 102, 255},        -- Purple/Blue
-        ["Pre-Chorus"] = {179, 102, 255},  -- Purple/Blue
+        ["Pre-Chorus"] = {102, 153, 255},  -- Purple/Blue
         ["Intro"] = {51, 255, 255},        -- Cyan
         ["Solo"] = {36, 159, 40},          -- Green
         ["Bridge"] = {255, 230, 51},       -- Yellow/Orange
-        ["Middle 8"] = {204, 77, 230},     -- Magenta
+        ["Middle 8"] = {255, 230, 51},     -- Magenta
         ["Verse"] = {102, 153, 255},       -- Blue
         ["Outro"] = {128, 204, 179},       -- Teal/Green
-        ["Fadeout"] = {30, 30, 30},        -- Dark Gray
+        ["Fadeout"] = {70, 70, 70},
+        ["Breakdown"] = {70, 70, 70},
+        ["User 1"] = {70, 70, 70},
+        ["User 2"] = {70, 70, 70},
+        ["User 3"] = {70, 70, 70},
+        ["Count In"] = {133, 133, 133},        -- Dark Gray
         ["else"] = {133, 133, 133}         -- Medium Gray
     },
 
@@ -40,7 +45,11 @@ local form = {
             ["P"] = "Pre-Chorus",
             ["R"] = "Ramp",
             ["S"] = "Solo",
-            ["V"] = "Verse"
+            ["V"] = "Verse",
+            ["X"] = "Breakdown",
+            ["1"] = "User 1",
+            ["2"] = "User 2",
+            ["3"] = "User 3"
         }
         
         local verbose = false
