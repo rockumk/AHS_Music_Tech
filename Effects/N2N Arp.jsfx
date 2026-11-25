@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.3.0-dev.3
+version: 12.3.0-dev.4
 author: Rock Kennedy
 about:
-  # N2N Arp v12.3.0-dev.3
+  # N2N Arp v12.3.0-dev.4
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -26,7 +26,7 @@ slider14:0<0,2,1{Chords,Split (Chords and Bass),Bass}>-Input Mode
 
 @init
 scale_dirty = 0;
-thisversion = "v12.3.0-dev.3";
+thisversion = "v12.3.0-dev.4";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -216,6 +216,9 @@ popup_cooldown = 0; help_active = 0; drag_accum_gen = 0;
 drag_lock_row = -1; drag_mode = 0; last_drag_idx = -1;
 
 playback_shift = 0; last_play_tab = -1; last_play_offset = -1; pc_triggered = 0;
+// Separate visual snapshot from audio lookahead and the editor's selected tab.
+vis_seq=0; vis_audio_requested=-1; vis_audio_source=0; vis_audio_step=-1; vis_audio_phase=0; vis_audio_total=0; vis_audio_running=0;
+gfx_follow_target=-1; gfx_vis_source=0; gfx_vis_requested=-1; gfx_vis_step=-1; gfx_vis_phase=0; gfx_vis_total=0; gfx_vis_running=0;
 
 input_filter_mask = 32767; 
 global_out_mask = 1;       
@@ -1170,7 +1173,7 @@ function recalc_scale() local(i, max_v, best_tonic) (
 mem[ui_init_done] == 0 ? (
     // --- FIX: SET DEFAULTS HERE ---
     
-    mem[ui_follow_mode] = 0; // Editing is independent of song following.
+    mem[ui_follow_mode] = 1; // Follow mode displays the pattern being played.
     mem[ui_edit_tab] = 26;      // Start on Def instead of Off
     mem[ui_play_prog_tab] = 26; // Optional, but keeps things visually consistent
     
@@ -1822,7 +1825,7 @@ span_scan=span_first;
         p_step = grid_lookup_idx % lookup_mod;
         while(p_step < 0) ( p_step += lookup_mod; );
         
-        (start_b >= step_beat_time && start_b < step_beat_time + (1.0/(steps_per_beat_grid*scan_rate))) ? mem[ui_last_step] = p_step;
+        // Do not publish visual positions from this loop: it also scans neighboring sections.
 
         sw_amt = (bk_swing_v / 100) * 0.33; 
         step_in_beat = (grid_lookup_idx % steps_per_beat_grid) / steps_per_beat_grid; 
@@ -1938,6 +1941,25 @@ use_lh ? (
 );
 form_audio ? (form_at>=0 ? playback_shift=-mem[form_cache+form_at*3] : playback_shift=0;);
 t_pl=effective_play_tab;
+
+// Publish exactly one visual clock for the actual current section, never
+// for an adjacent span visited by the swing/groove lookahead.
+vis_seq+=1;
+vis_audio_requested=raw_target;
+vis_audio_source=effective_play_tab;
+vis_audio_running=(play_state&1) && !mem[ui_power_off] && effective_play_tab>0;
+vis_audio_step=-1; vis_audio_phase=0; vis_audio_total=0;
+vis_audio_source>0 ? (
+    vis_a_sub=eff_sub(vis_audio_source);
+    vis_a_bars=eff_bars(vis_audio_source);
+    vis_a_rate=eff_half(vis_audio_source)?0.5:1;
+    vis_audio_total=vis_a_sub*vis_a_bars;
+    vis_a_pos=(beat_position+playback_shift)*vis_a_rate*vis_a_sub/4;
+    vis_audio_phase=fmod_pos(vis_a_pos,vis_audio_total);
+    vis_audio_running ? vis_audio_step=min(vis_audio_total-1,max(0,floor(vis_audio_phase)));
+);
+mem[ui_last_step]=vis_audio_step;
+vis_seq+=1;
 
 @gfx 1420 740
 ext_noundo = 1;
@@ -2269,6 +2291,30 @@ row2_y = UI_TOP_Y + 24;
 // =========================================================
 // ROWS 2, 3, 4: CONSOLIDATED TABS AND LEFT INFO COLUMN
 // =========================================================
+// Read the same stable audio snapshot for the entire frame.
+gfx_seq_before=vis_seq;
+gfx_seq_before%2==0 ? (
+    gfx_tmp_requested=vis_audio_requested; gfx_tmp_source=vis_audio_source;
+    gfx_tmp_step=vis_audio_step; gfx_tmp_phase=vis_audio_phase;
+    gfx_tmp_total=vis_audio_total; gfx_tmp_running=vis_audio_running;
+    gfx_seq_before==vis_seq ? (
+        gfx_vis_requested=gfx_tmp_requested; gfx_vis_source=gfx_tmp_source;
+        gfx_vis_step=gfx_tmp_step; gfx_vis_phase=gfx_tmp_phase;
+        gfx_vis_total=gfx_tmp_total; gfx_vis_running=gfx_tmp_running;
+    );
+);
+// In Follow mode show the real source pattern (including inheritance).
+// Keep an active mouse gesture on its original tab until the user releases.
+mem[ui_locked_tab]==-1 && !mem[ui_power_off] ? (
+    gfx_next_tab=gfx_vis_source>0?gfx_vis_source:gfx_vis_requested;
+    gfx_next_tab>=1 && gfx_next_tab<TOTAL_TABS ? (
+        (gfx_vis_running || gfx_next_tab!=gfx_follow_target) && !mb && !rmb && !chan_popup_active && !color_popup_active ? (
+            mem[ui_edit_tab]=gfx_next_tab;
+            gfx_follow_target=gfx_next_tab;
+        );
+    );
+) : gfx_follow_target=-1;
+
 draw_y = ROW2_Y; // Advance Y to Tab Area
 FOLLOW_LBL_X=5; FOLLOW_BOX_X=65; FOLLOW_BOX_W=20; FOLLOW_BOX_H=16;
 
@@ -2317,7 +2363,7 @@ loop(3,
         );
         gfx_setfont(1,os_font,fontsize,'b');
         (mb && !p_mb && mx>=follow_group_x && mx<follow_group_x+follow_group_w && my>=follow_group_y && my<follow_group_y+follow_group_h) ? (
-            mem[ui_locked_tab]=-1; gmem[GM_BASE+1]=-1; cue_release_requested=1; needs_tab_update=1;
+            mem[ui_locked_tab]=-1; gmem[GM_BASE+1]=-1; mem[ui_follow_mode]=1; gfx_follow_target=-1; cue_release_requested=1; needs_tab_update=1;
         );
     );
 
@@ -2602,6 +2648,9 @@ curr_pat_l_ptr = step_len_base + t_e*vel_stride_tab;
 // --- GHOST / FALLBACK POINTERS ---
 fb_tab = (form_count>0 && !midi_form_override && mem[ui_locked_tab]==-1 && (eligible_song_tab(t_e)||t_e==26||t_e==77)) ? section_fallback(t_e) : get_active_fallback(t_e);
 is_ghosting = (t_e != fb_tab);
+// Highlight only the displayed, sounding source and its matching grid.
+gfx_highlight_actual=gfx_vis_running && !mem[ui_power_off] && t_e==gfx_vis_source;
+gfx_highlight_ghost=gfx_vis_running && !mem[ui_power_off] && t_e==gfx_vis_requested && fb_tab==gfx_vis_source && is_ghosting && eff_sub(t_e)==eff_sub(fb_tab) && eff_bars(t_e)==eff_bars(fb_tab) && eff_half(t_e)==eff_half(fb_tab);
 
 fb_pat_v_ptr = vel_base + fb_tab*vel_stride_tab; 
 fb_pat_g_ptr = grid_base + fb_tab*vel_stride_tab; 
@@ -3329,7 +3378,7 @@ gx_r = 0; loop(calc_rows,
                     ) : ( cr=0.8; cg=0.8; cb=0.8; );
                 );
                 min_b = (c_idx == 0) ? 0.60 : 0.50; v_scale = min_b + ((1-min_b) * (v_disp / 127)); 
-                ((play_state & 1) && gx_s == mem[ui_last_step]) ? ( gfx_set(1,1,1,0.95); ) : ( gfx_set(cr * v_scale, cg * v_scale, cb * v_scale, 1); );
+                (gfx_highlight_actual && !mem[row_mute_base+r_idx] && gx_s==gfx_vis_step) ? ( gfx_set(1,1,1,0.95); ) : ( gfx_set(cr * v_scale, cg * v_scale, cb * v_scale, 1); );
                 gfx_rect(cx, ry+1, w_px-1, ROW_HEIGHT-2); 
             ) : (!is_tail) ? ( 
                 (gx_s % steps_per_bar == 0) ? rect(cx, ry, cw, ROW_HEIGHT, 1, 1, 1, 0.20) : (gx_s % (steps_per_bar/4) == 0) ? rect(cx, ry, cw, ROW_HEIGHT, 1, 1, 1, 0.04) : 0; 
@@ -3364,7 +3413,7 @@ gx_s+=1;
                 min_b = (c_idx == 0) ? 0.60 : 0.50;
                 v_scale = min_b + ((1-min_b) * (v_disp / 127)); 
                 
-                ((play_state & 1) && s_g == mem[ui_last_step]) ? (
+                (gfx_highlight_ghost && !mem[row_mute_base+r_idx] && s_g==gfx_vis_step) ? (
                     gfx_set(1, 1, 1, 0.95); 
                 ) : (
                     gfx_set(cr*v_scale, cg*v_scale, cb*v_scale, 1); 
@@ -3487,16 +3536,13 @@ chan_popup_active ? draw_chan_popup(chan_popup_x - 20, chan_popup_y + 20, chan_p
 mouse_hwheel = 0; 
 
 
-(play_state & 1) && !mem[ui_power_off] ? ( 
-    t_pl = effective_play_tab; 
-    vis_beat = calc_vis_beat(t_pl); 
-    p_l = eff_bars(t_pl) * 4; 
-    t_pl>0 && p_l > 0 ? (
-        ph_x = grid_x + (vis_beat/p_l)*vel_w; 
-        grid_h = visible_rows * ROW_HEIGHT; 
-        (grid_y + grid_h > gfx_h) ? grid_h = gfx_h - grid_y; 
-        gfx_set(0, 1, 0, 0.9); gfx_rect(ph_x-1, grid_y, 2, grid_h); 
-    );
+// Use the same source and step clock as the note highlights.
+// Never draw an unrelated playhead over a manually browsed pattern.
+(gfx_highlight_actual || gfx_highlight_ghost) && gfx_vis_total>0 && st_v==gfx_vis_total ? (
+    ph_x=grid_x+(gfx_vis_phase/gfx_vis_total)*vel_w;
+    grid_h=visible_rows*ROW_HEIGHT;
+    grid_y+grid_h>gfx_h ? grid_h=gfx_h-grid_y;
+    gfx_set(0,1,0,0.9); gfx_rect(ph_x-1,grid_y,2,grid_h);
 );
 
 mem[ui_power_off] ? (rect(0,0,gfx_w,gfx_h,0,0,0,0.62); draw_power_button(10,ROW2_Y););
