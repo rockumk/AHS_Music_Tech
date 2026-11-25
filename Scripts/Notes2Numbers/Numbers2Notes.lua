@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.15
+-- @version 2.0.4-dev.16
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -4210,6 +4210,12 @@ function Build_Single_Track(tr)
             end
             plug_order = plug_order - 1
         end
+    end
+
+    -- Project-persistent Topline identification, independent of track name.
+    -- Type 41 is the Topline recipe; mark both new and reused tracks.
+    if tr_type == 41 then
+        reaper.GetSetMediaTrackInfo_String(track_to_use, "P_EXT:N2N:TOPLINE", "1", true)
     end
 
     -- Configure the Arp's existing Input Mode parameter after FX presets are loaded.
