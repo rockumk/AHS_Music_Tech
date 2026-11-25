@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.3
+-- @version 1.9.4
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -723,20 +723,24 @@ function export.DrawTracks(ctx,font)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),px(2),px(1))
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),px(2),px(1))
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_WindowPadding(),4,4)
-    r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ChildBg(),r.ImGui_GetStyleColor(ctx,r.ImGui_Col_FrameBg()))
+    r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ChildBg(),0x000000FF)
     local row_height=px(19)
     local border_flag=r.ImGui_ChildFlags_Borders and r.ImGui_ChildFlags_Borders()
         or r.ImGui_ChildFlags_Border and r.ImGui_ChildFlags_Border() or true
     local visible=r.ImGui_BeginChild(ctx,"##N2NTrackScroll",panel_width,panel_height,border_flag,r.ImGui_WindowFlags_AlwaysVerticalScrollbar())
     if visible then
+        -- Measure once at the child's starting cursor, not after the previous
+        -- track's buttons or separator. All tracks share one fixed geometry.
+        local row_x=r.ImGui_GetCursorPosX(ctx)
+        local width=math.min(px(340),r.ImGui_GetContentRegionAvail(ctx))
+        local fxw,idw,instw,arpw=px(25),px(52),px(35),px(40)
+        local namew=math.max(px(20),width-fxw-idw-instw-arpw-4*px(2))
         for _,t in ipairs(tracks) do
             local fx=locate(t)
             if fx then
                 t.fx=fx
+                r.ImGui_SetCursorPosX(ctx,row_x)
                 r.ImGui_PushID(ctx,t.guid)
-                local width=math.min(px(340),r.ImGui_GetContentRegionAvail(ctx))
-                local fxw,idw,instw,arpw=px(25),px(52),px(35),px(40)
-                local namew=math.max(px(20),width-fxw-idw-instw-arpw-4*px(2))
                 local label=("%d. %s"):format(t.number,t.name)
                 if r.ImGui_CalcTextSize(ctx,label)>namew-px(4) then
                     while #label>0 and r.ImGui_CalcTextSize(ctx,label.."…")>namew-px(4) do
@@ -778,9 +782,11 @@ function export.DrawTracks(ctx,font)
                     fx_hover=t
                     hover_until=r.time_precise()+.5
                 end
+                r.ImGui_SetCursorPosX(ctx,row_x)
                 if small_font then r.ImGui_PushFont(ctx,small_font) end
                 pattern_grid(ctx,t,width,scale)
                 if small_font then r.ImGui_PopFont(ctx) end
+                r.ImGui_SetCursorPosX(ctx,row_x)
                 r.ImGui_Separator(ctx)
                 r.ImGui_PopID(ctx)
             end
@@ -795,6 +801,7 @@ function export.DrawTracks(ctx,font)
     local footer_height,zoom_button,readout_width,launcher_width=22,24,52,180
     local readout=("%d%%"):format(percent)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),3,1)
+    r.ImGui_SetCursorPosY(ctx,r.ImGui_GetCursorPosY(ctx)+5)
     r.ImGui_SetCursorPosX(ctx,box_x+(panel_width-launcher_width)/2)
     if r.ImGui_Button(ctx,"OPEN N2NCUE",launcher_width,footer_height) then launch_cue() end
     r.ImGui_SameLine(ctx,box_x+panel_width-(2*zoom_button+readout_width+6))
