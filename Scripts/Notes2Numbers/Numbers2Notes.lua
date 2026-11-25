@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.7
+-- @version 2.0.4-dev.8
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -2270,6 +2270,10 @@ Form: I V C V C B C O]]
                 feedback_tab_mode = 9
                 r.ImGui_EndTabItem(ctx)
             end
+            if r.ImGui_BeginTabItem(ctx, "Tracks") then
+                feedback_tab_mode = 11
+                r.ImGui_EndTabItem(ctx)
+            end
             if r.ImGui_BeginTabItem(ctx, "Groove") then
                 feedback_tab_mode = 10
                 r.ImGui_EndTabItem(ctx)
@@ -2417,6 +2421,10 @@ Form: I V C V C B C O]]
 
             reaper.ImGui_Dummy(ctx, 0, 5) -- Add a tiny bit of vertical spacing
             Link("https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
+        end
+
+        if feedback_tab_mode == 11 then
+            gmem_export.DrawTracks(ctx, fontsmall)
         end
 
         if feedback_tab_mode == 0 then
