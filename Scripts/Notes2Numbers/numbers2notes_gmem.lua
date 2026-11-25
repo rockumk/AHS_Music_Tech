@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.8
+-- @version 1.9
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -249,7 +249,7 @@ function export.PublishSongForm(stretched_index, force)
     last_poll = now
     r.gmem_attach("N2N_Ecosystem_RSKennedy")
     local project = r.EnumProjects(-1, "")
-    local regions, keys, spans = {}, {}, {}
+    local regions, keys, spans, id_counts = {}, {}, {}, {}
     local _, markers, count = r.CountProjectMarkers(project)
     for i=0, markers+count-1 do
         local _, is_region, pos, finish, name = r.EnumProjectMarkers3(project,i)
@@ -290,11 +290,13 @@ function export.PublishSongForm(stretched_index, force)
                 local id=math.floor(r.TrackFX_GetParam(tr,fx,4)+0.5)
                 if id>=1 and id<=512 then
                     local key=r.gmem_read(8000000+id)
+                    id_counts[id]=(id_counts[id] or 0)+1
                     if key>0 then keys[id]=key end
                 end
             end
         end
     end
+    for id,n in pairs(id_counts) do if n>1 then keys[id]=nil end end
     local sig={tostring(project)}
     for _,v in ipairs(spans) do sig[#sig+1]=string.format("%.12f:%.12f:%d",v[1],v[2],v[3]) end
     for i=1,512 do if keys[i] then sig[#sig+1]=i..":"..keys[i] end end
@@ -486,67 +488,314 @@ function export.ServicePatternLibrary()
     service_pattern_library(ARP_LIB,true)
 end
 
--- 6. Track identity for Drum Arranger and Arp (same protocol as N2NCue).
--- 8200000 + (instance ID - 1)*4: track number, red, green, blue.
-local INFO_BASE = 8200000
+-- 6. Shared track inventory and compact management panel.
+local INFO_BASE, REG_BASE, INV_BASE, EDIT_BASE = 8200000, 8000000, 7500000, 8300000
+local tracks, duplicate, last_project_tracks = {}, {}, nil
 local identity_last_poll = -math.huge
-local identity_previous = {}
-
-function export.PublishTrackIdentity(force)
-    local r = reaper
-    local now = r.time_precise()
-    if not force and now-identity_last_poll < 0.5 then return end
-    identity_last_poll = now
-    r.gmem_attach("N2N_Ecosystem_RSKennedy")
-    local project = r.EnumProjects(-1, "")
-    local slots = {}
-    local duplicate = {}
-    for i=0,r.CountTracks(project)-1 do
-        local track = r.GetTrack(project,i)
-        local number = math.floor(r.GetMediaTrackInfo_Value(track,"IP_TRACKNUMBER"))
-        local native = r.GetTrackColor(track)
-        local red,green,blue = 0.5,0.5,0.5
+local fx_hover, hover_until, hover_pos, id_popup
+local function kind_of(track,fx)
+    local ok, name = reaper.TrackFX_GetFXName(track,fx,"")
+    if reaper.TrackFX_GetNamedConfigParm then
+        local got, ident = reaper.TrackFX_GetNamedConfigParm(track,fx,"fx_ident")
+        if got and ident and ident~="" then name=(name or "").." "..ident end
+    end
+    if not ok or not name then return end
+    local lower=name:lower()
+    if lower:find("n2n drum arranger",1,true) then return "DRUM" end
+    if lower:find("n2n arp",1,true) then return "ARP" end
+end
+local function scan(project)
+    local result, counts={},{}
+    for i=0,reaper.CountTracks(project)-1 do
+        local tr=reaper.GetTrack(project,i)
+        local _,name=reaper.GetTrackName(tr)
+        local native=reaper.GetTrackColor(tr)
+        local red,green,blue=.5,.5,.5
         if native and native~=0 then
-            local rr,gg,bb = r.ColorFromNative(native)
-            red,green,blue = rr/255,gg/255,bb/255
+            local rr,gg,bb=reaper.ColorFromNative(native)
+            red,green,blue=rr/255,gg/255,bb/255
         end
-        for fx=0,r.TrackFX_GetCount(track)-1 do
-            local ok,name = r.TrackFX_GetFXName(track,fx,"")
-            if ok and name then
-                local lower=name:lower()
-                if lower:find("n2n drum arranger",1,true) or lower:find("n2n arp",1,true) then
-                    local id = math.floor(r.TrackFX_GetParam(track,fx,4)+0.5)
-                    if id>=1 and id<=512 then
-                        if slots[id] then
-                            duplicate[id]=true
-                        else
-                            slots[id]={number,red,green,blue}
-                        end
+        for fx=0,reaper.TrackFX_GetCount(tr)-1 do
+            local kind=kind_of(tr,fx)
+            if kind then
+                local id=math.floor(reaper.TrackFX_GetParam(tr,fx,4)+.5)
+                local guid=reaper.TrackFX_GetFXGUID(tr,fx)
+                result[#result+1]={track=tr,fx=fx,guid=guid,name=name,number=i+1,kind=kind,id=id,r=red,g=green,b=blue}
+                counts[id]=(counts[id] or 0)+1
+            end
+        end
+    end
+    return result,counts
+end
+local function locate(t)
+    local project=reaper.EnumProjects(-1,"")
+    if not t or not reaper.ValidatePtr2(project,t.track,"MediaTrack*") then return end
+    for fx=0,reaper.TrackFX_GetCount(t.track)-1 do
+        if reaper.TrackFX_GetFXGUID(t.track,fx)==t.guid then return fx end
+    end
+end
+function export.PublishTrackIdentity(force)
+    local r=reaper
+    local now=r.time_precise()
+    local project=r.EnumProjects(-1,"")
+    if not force and project==last_project_tracks and now-identity_last_poll<.5 then return end
+    identity_last_poll,last_project_tracks=now,project
+    r.gmem_attach("N2N_Ecosystem_RSKennedy")
+    tracks,duplicate=scan(project)
+    local slots={}
+    for _,t in ipairs(tracks) do
+        if t.id>=1 and t.id<=512 and duplicate[t.id]==1 then slots[t.id]=t end
+    end
+    -- Clear stale identities on the first scan and on project/track changes.
+    for id=1,512 do
+        local t=slots[id]
+        local values=t and {t.number,t.r,t.g,t.b} or {0,0,0,0}
+        local base=INFO_BASE+(id-1)*4
+        for j=1,4 do
+            if r.gmem_read(base+j-1)~=values[j] then r.gmem_write(base+j-1,values[j]) end
+        end
+    end
+end
+local groups={
+    {{26,1,"Def",.7,.7,.9,25},{5,4,"V",.5,.7,1,36},{9,4,"P",.5,.7,1,48},{13,4,"C",1,.4,.4,60},{17,4,"B",1,.9,.2,72},{27,1,"U1",.55,.55,.55,27},{75,1,"D",.55,.55,.55,84}},
+    {{77,1,"#",.7,.7,.7,86},{32,4,"V",.5,.7,1,40},{36,4,"P",.5,.7,1,52},{40,4,"C",1,.4,.4,64},{44,4,"S",.2,.8,.3,76},{28,1,"U2",.55,.55,.55,28},{76,1,"X",.55,.55,.55,85}},
+    {{1,4,"I",.2,1,1,11},{59,4,"V",.5,.7,1,44},{63,4,"P",.5,.7,1,56},{67,4,"C",1,.4,.4,68},{71,4,"O",.5,.8,.7,80},{29,1,"U3",.55,.55,.55,29},{78,1,"F",.55,.55,.55,87}}
+}
+local names={{"Default","Verse 1","Pre-Chorus 1","Chorus 1","Bridge","User 1","Drop"},{"Count-In","Verse 2","Pre-Chorus 2","Chorus 2","Solo","User 2","Breakdown"},{"Intro","Verse 3","Pre-Chorus 3","Chorus 3","Outro","User 3","Fadeout"}}
+local function color(r,g,b,a)
+    return reaper.ImGui_ColorConvertDouble4ToU32(r,g,b,a or 1)
+end
+local function open_fx(track,fx)
+    if fx and fx>=0 then reaper.TrackFX_Show(track,fx,3) end
+end
+local function find_free_id()
+    local used={}
+    local i=0
+    while true do
+        local proj=reaper.EnumProjects(i,"")
+        if not proj then break end
+        local _,counts=scan(proj)
+        for id in pairs(counts) do used[id]=true end
+        i=i+1
+    end
+    for id=1,512 do
+        if not used[id] and reaper.gmem_read(REG_BASE+id)==0 then return id end
+    end
+end
+local function launch_cue()
+    local r=reaper
+    local function search(dir,depth)
+        if depth>7 then return end
+        local i=0
+        while true do
+            local file=r.EnumerateFiles(dir,i)
+            if not file then break end
+            local name=file:lower():gsub("[%s_%-]","")
+            if name=="n2ncue.lua" or name=="n2ncue" then return dir.."/"..file end
+            i=i+1
+        end
+        i=0
+        while true do
+            local sub=r.EnumerateSubdirectories(dir,i)
+            if not sub then break end
+            local found=search(dir.."/"..sub,depth+1)
+            if found then return found end
+            i=i+1
+        end
+    end
+    local path=search(r.GetResourcePath().."/Scripts",0)
+    if not path then
+        local accepted
+        accepted,path=r.GetUserFileNameForRead(r.GetResourcePath().."/Scripts/","Locate installed N2NCue script",".lua")
+        if not accepted then return end
+    end
+    local cmd=r.AddRemoveReaScript(true,0,path,true)
+    if cmd and cmd>0 then r.Main_OnCommand(cmd,0) else r.MB("Could not launch N2NCue.","N2N Tracks",0) end
+end
+local function pattern_grid(ctx,t,width)
+    local r=reaper
+    local dl=r.ImGui_GetWindowDrawList(ctx)
+    local x,y=r.ImGui_GetCursorScreenPos(ctx)
+    local groupw=(width-4)/6
+    local lastw=groupw/2
+    local h=10
+    local known=t.id>=1 and t.id<=512 and duplicate[t.id]==1 and r.gmem_read(REG_BASE+t.id)>0 and r.TrackFX_GetEnabled(t.track,t.fx)
+    local bits={}
+    if known then for i=0,3 do bits[i]=math.floor(r.gmem_read(INV_BASE+(t.id-1)*4+i)) end end
+    local mx,my=r.ImGui_GetMousePos(ctx)
+    local hovered
+    for row,gs in ipairs(groups) do
+        for gi,g in ipairs(gs) do
+            local gx=x+(gi<=5 and (gi-1)*groupw or 5*groupw+(gi-6)*lastw)
+            local gw=gi<=5 and groupw or lastw
+            local first=g[2]==4 and math.min(15,gw*.4) or gw-2
+            local mini=(gw-first-5)/3
+            for v=0,g[2]-1 do
+                local bx=gx+(v==0 and 0 or first+1+(v-1)*(mini+1))
+                local bw=v==0 and first or mini
+                local by=y+(row-1)*(h+2)
+                local bit=t.kind=="DRUM" and g[7]+v or g[1]+v
+                local populated=known and ((bits[bit//32] or 0)&(1<<(bit%32)))~=0
+                local shade=populated and 1 or .4
+                r.ImGui_DrawList_AddRectFilled(dl,bx,by,bx+bw,by+h,color(g[4]*shade,g[5]*shade,g[6]*shade))
+                if populated then r.ImGui_DrawList_AddRect(dl,bx+.5,by+.5,bx+bw-.5,by+h-.5,0xFFFFFFFF) end
+                if v==0 then
+                    local tw,th=r.ImGui_CalcTextSize(ctx,g[3])
+                    if tw<=bw then
+                        local lum=(g[4]*.299+g[5]*.587+g[6]*.114)*shade
+                        r.ImGui_DrawList_AddText(dl,bx+(bw-tw)/2,by+(h-th)/2,lum>.57 and 0x101010FF or 0xFFFFFFFF,g[3])
                     end
+                end
+                if mx>=bx and mx<bx+bw and my>=by and my<by+h then
+                    hovered={tab=g[1]+v,label=names[row][gi]..(g[2]==4 and " "..string.char(65+v) or ""),populated=populated}
                 end
             end
         end
     end
-    -- Do not assign ambiguous identities to duplicate instance IDs.
-    for id in pairs(duplicate) do slots[id]=nil end
-    for id in pairs(identity_previous) do
-        if not slots[id] then
-            local base=INFO_BASE+(id-1)*4
-            for offset=0,3 do r.gmem_write(base+offset,0) end
+    r.ImGui_InvisibleButton(ctx,"##pattern_grid",width,3*(h+2))
+    if hovered and r.ImGui_IsItemHovered(ctx) then
+        r.ImGui_SetTooltip(ctx,hovered.label..(not known and " (inventory unavailable)" or hovered.populated and " (populated)" or " (empty / inherited)").."\nClick to open pattern for editing")
+        if r.ImGui_IsItemClicked(ctx,0) then
+            local fx=locate(t)
+            if fx then
+                if known then
+                    local base=EDIT_BASE+(t.id-1)*2
+                    r.gmem_write(base,r.gmem_read(REG_BASE+t.id))
+                    r.gmem_write(base+1,hovered.tab+1)
+                end
+                open_fx(t.track,fx)
+            end
         end
     end
-    for id in pairs(duplicate) do
-        local base=INFO_BASE+(id-1)*4
-        for offset=0,3 do r.gmem_write(base+offset,0) end
-    end
-    for id,values in pairs(slots) do
-        local base=INFO_BASE+(id-1)*4
-        for offset=0,3 do
-            local value=values[offset+1]
-            if r.gmem_read(base+offset)~=value then r.gmem_write(base+offset,value) end
+end
+function export.DrawTracks(ctx,font)
+    local r=reaper
+    export.PublishTrackIdentity(false)
+    local conflict_count=0
+    for id,n in pairs(duplicate) do if n>1 or id<1 or id>512 then conflict_count=conflict_count+1 end end
+    if conflict_count>0 then
+        r.ImGui_TextColored(ctx,0xFF7777FF,("%d ID conflict(s)"):format(conflict_count))
+    else r.ImGui_TextColored(ctx,0xA0E0A0FF,("%d instances | IDs OK"):format(#tracks)) end
+    r.ImGui_SameLine(ctx)
+    if r.ImGui_SmallButton(ctx,"Refresh") then export.PublishTrackIdentity(true) end
+    r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),2,1)
+    r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),2,1)
+    local visible=r.ImGui_BeginChild(ctx,"##N2NTrackScroll",0,-29,0)
+    if visible then
+        for _,t in ipairs(tracks) do
+            local fx=locate(t)
+            if fx then
+                t.fx=fx
+                r.ImGui_PushID(ctx,t.guid)
+                local width=r.ImGui_GetContentRegionAvail(ctx)
+                local fxw,idw,instw,arpw=25,44,35,40
+                local namew=math.max(40,width-fxw-idw-instw-arpw-8)
+                local label=("%d. %s"):format(t.number,t.name)
+                while #label>4 and r.ImGui_CalcTextSize(ctx,label)>namew-4 do
+                    label=label:sub(1,-2)
+                    while #label>0 and label:byte(-1)>=128 and label:byte(-1)<192 do label=label:sub(1,-2) end
+                end
+                if label~=(("%d. %s"):format(t.number,t.name)) then label=label.."…" end
+                local lum=t.r*.299+t.g*.587+t.b*.114
+                r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),color(t.r,t.g,t.b))
+                r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Text(),lum>.55 and 0x101010FF or 0xFFFFFFFF)
+                if r.ImGui_Button(ctx,label,namew,19) then
+                    r.SetOnlyTrackSelected(t.track)
+                    r.Main_OnCommand(40913,0)
+                end
+                r.ImGui_PopStyleColor(ctx,2)
+                if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,t.name) end
+                r.ImGui_SameLine(ctx)
+                if r.ImGui_Button(ctx,t.kind,arpw,19) then open_fx(t.track,fx) end
+                r.ImGui_SameLine(ctx)
+                local inst=r.TrackFX_GetInstrument(t.track)
+                if inst<0 or inst==fx then r.ImGui_BeginDisabled(ctx) end
+                if r.ImGui_Button(ctx,"INST",instw,19) then open_fx(t.track,inst) end
+                if inst<0 or inst==fx then r.ImGui_EndDisabled(ctx) end
+                r.ImGui_SameLine(ctx)
+                local bad=(duplicate[t.id] or 0)>1 or t.id<1 or t.id>512
+                if bad then r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),0xA82828FF) end
+                if r.ImGui_Button(ctx,"ID "..t.id,idw,19) then id_popup=t end
+                if bad then r.ImGui_PopStyleColor(ctx) end
+                r.ImGui_SameLine(ctx)
+                local clicked=r.ImGui_Button(ctx,"FX",fxw,19)
+                if clicked or r.ImGui_IsItemHovered(ctx) then
+                    fx_hover=t
+                    hover_until=r.time_precise()+.35
+                    local _,bottom=r.ImGui_GetItemRectMax(ctx)
+                    local left=r.ImGui_GetItemRectMin(ctx)
+                    hover_pos={left,bottom}
+                end
+                if font then r.ImGui_PushFont(ctx,font) end
+                pattern_grid(ctx,t,math.max(150,width))
+                if font then r.ImGui_PopFont(ctx) end
+                r.ImGui_Separator(ctx)
+                r.ImGui_PopID(ctx)
+            end
         end
     end
-    identity_previous=slots
+    r.ImGui_EndChild(ctx)
+    if r.ImGui_Button(ctx,"OPEN N2NCUE",-1,22) then launch_cue() end
+    r.ImGui_PopStyleVar(ctx,2)
+    if id_popup then
+        r.ImGui_OpenPopup(ctx,"N2N Instance ID")
+        if r.ImGui_BeginPopupModal(ctx,"N2N Instance ID",true,r.ImGui_WindowFlags_AlwaysAutoResize()) then
+            local t=id_popup
+            local fx=locate(t)
+            r.ImGui_Text(ctx,t.name.." | "..t.kind.." | ID "..t.id)
+            for _,other in ipairs(tracks) do
+                if other.id==t.id and other.guid~=t.guid then r.ImGui_TextColored(ctx,0xFF7777FF,"Conflict: "..other.name.." ("..other.kind..")") end
+            end
+            r.ImGui_TextWrapped(ctx,"Assign a free ID while transport is stopped. Existing patterns are preserved.")
+            local free=find_free_id()
+            local disabled=not fx or not free or r.GetPlayState()~=0
+            if disabled then r.ImGui_BeginDisabled(ctx) end
+            if r.ImGui_Button(ctx,free and ("Assign ID "..free) or "No free registered ID") then
+                r.Undo_BeginBlock()
+                r.TrackFX_SetParam(t.track,fx,4,free)
+                r.Undo_EndBlock("N2N: Reassign arranger instance ID",-1)
+                export.PublishTrackIdentity(true)
+                id_popup=nil; r.ImGui_CloseCurrentPopup(ctx)
+            end
+            if disabled then r.ImGui_EndDisabled(ctx) end
+            r.ImGui_SameLine(ctx)
+            if r.ImGui_Button(ctx,"Close") then id_popup=nil; r.ImGui_CloseCurrentPopup(ctx) end
+            r.ImGui_EndPopup(ctx)
+        else id_popup=nil end
+    end
+    if fx_hover and r.time_precise()<=hover_until and locate(fx_hover) then
+        local t=fx_hover
+        r.ImGui_SetNextWindowPos(ctx,hover_pos[1],hover_pos[2])
+        local flags=r.ImGui_WindowFlags_NoTitleBar()|r.ImGui_WindowFlags_AlwaysAutoResize()|r.ImGui_WindowFlags_NoSavedSettings()|r.ImGui_WindowFlags_NoFocusOnAppearing()
+        local vis=r.ImGui_Begin(ctx,"##N2NHoverFX",true,flags)
+        if vis then
+            if r.ImGui_IsWindowHovered(ctx) then hover_until=r.time_precise()+.35 end
+            r.ImGui_Text(ctx,t.name.." FX")
+            r.ImGui_Separator(ctx)
+            for fx=0,r.TrackFX_GetCount(t.track)-1 do
+                local _,name=r.TrackFX_GetFXName(t.track,fx,"")
+                local enabled=r.TrackFX_GetEnabled(t.track,fx)
+                local offline=r.TrackFX_GetOffline(t.track,fx)
+                r.ImGui_PushID(ctx,fx)
+                r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Text(),offline and 0xFF6666FF or enabled and 0xFFFFFFFF or 0x888888FF)
+                if r.ImGui_Selectable(ctx,(offline and "[Offline] " or enabled and "" or "[Bypassed] ")..name,false) then
+                    if (r.ImGui_GetKeyMods(ctx)&r.ImGui_Mod_Shift())~=0 then
+                        if not offline then
+                            r.Undo_BeginBlock()
+                            r.TrackFX_SetEnabled(t.track,fx,not enabled)
+                            r.Undo_EndBlock("N2N: Toggle FX bypass",-1)
+                        end
+                    else open_fx(t.track,fx) end
+                    hover_until=r.time_precise()+.35
+                end
+                r.ImGui_PopStyleColor(ctx)
+                r.ImGui_PopID(ctx)
+            end
+            r.ImGui_Separator(ctx)
+            r.ImGui_TextDisabled(ctx,"Click: Open   Shift+Click: Bypass")
+        end
+        r.ImGui_End(ctx)
+    else fx_hover=nil end
 end
 
 return export
