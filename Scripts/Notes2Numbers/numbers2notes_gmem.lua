@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.7
+-- @version 1.8
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -320,10 +320,55 @@ local DRUM_LIB, ARP_LIB=6200000,6400000
 local function valid_number(n,a,b)
     return type(n)=="number" and n==n and n>=a and n<=b
 end
-local function pattern_path(is_arp)
+local ARP_MODES = {[0]="Chords", [1]="Split", [2]="Bass"}
+-- Catalogues occupy the space after the sparse payload, inside each mailbox.
+-- Each mode: revision, count, then up to 100 records of 100 bytes (length + text).
+local CATALOG_OFFSET, CATALOG_STRIDE, CATALOG_MAX, RECORD_SIZE = 100000, 16384, 100, 100
+local catalogues, catalog_poll = {}, -math.huge
+local function pattern_path(is_arp, mode, factory)
     local p=reaper.GetResourcePath().."/Data/AHS_Music_Tech/"..(is_arp and "Arp" or "DrumArranger").."/Patterns"
+    if factory then p=p.."/Factory" end
+    if is_arp then p=p.."/"..(ARP_MODES[mode] or ARP_MODES[0]) end
     reaper.RecursiveCreateDirectory(p,0)
     return p
+end
+local function update_catalogue(LIB,is_arp,mode)
+    local r=reaper
+    local dir=pattern_path(is_arp,mode,true)
+    local extension=is_arp and ".n2arppat" or ".n2drumpat"
+    local names={}
+    -- Reset REAPER's cached directory enumeration before rescanning.
+    r.EnumerateFiles(dir,-1)
+    local i=0
+    while true do
+        local name=r.EnumerateFiles(dir,i)
+        if not name then break end
+        if name:sub(-#extension):lower()==extension then names[#names+1]=name end
+        i=i+1
+    end
+    table.sort(names,function(a,b) if a:lower()==b:lower() then return a<b end return a:lower()<b:lower() end)
+    while #names>CATALOG_MAX do names[#names]=nil end
+    local base=LIB+CATALOG_OFFSET+mode*CATALOG_STRIDE
+    local key=table.concat(names,"\0")
+    local previous=catalogues[base]
+    if previous and previous.key==key and r.gmem_read(base)==previous.rev then return end
+    local rev=math.floor(r.gmem_read(base)/2)*2+2
+    if rev<2 or rev>2000000000 then rev=2 end
+    r.gmem_write(base,rev-1)
+    for index,name in ipairs(names) do
+        local label=name:sub(1,-#extension-1):gsub("[%c|]"," ")
+        if #label>=RECORD_SIZE then
+            local pos=100
+            while pos>1 and (label:byte(pos) or 0)>=128 and (label:byte(pos) or 0)<192 do pos=pos-1 end
+            label=label:sub(1,pos-1)
+        end
+        local addr=base+2+(index-1)*RECORD_SIZE
+        r.gmem_write(addr,#label)
+        for j=1,#label do r.gmem_write(addr+j,label:byte(j)) end
+    end
+    r.gmem_write(base+1,#names)
+    catalogues[base]={key=key,rev=rev,names=names,dir=dir}
+    r.gmem_write(base,rev)
 end
 local function service_pattern_library(LIB,is_arp)
     local r=reaper
@@ -337,7 +382,7 @@ local function service_pattern_library(LIB,is_arp)
         r.gmem_write(LIB,0)
         return
     end
-    if op~=1 and op~=2 then return end
+    if op~=1 and op~=2 and op~=4 and op~=6 and op~=7 then return end
     local id=math.floor(r.gmem_read(LIB+1))
     if id<1 or id>512 or r.gmem_read(8000000+id)~=r.gmem_read(LIB+12) then
         r.gmem_write(LIB,0)
@@ -345,9 +390,12 @@ local function service_pattern_library(LIB,is_arp)
     end
     r.gmem_write(LIB,5)
     local ok,err=pcall(function()
-        local dir=pattern_path(is_arp)
-        if op==1 then
-            local accepted,name=r.GetUserInputs("Save "..kind.." pattern",1,"Pattern name:", "My Pattern")
+        local mode=is_arp and math.floor(r.gmem_read(LIB+13)) or 0
+        if not ARP_MODES[mode] then error("Invalid Arp mode") end
+        local factory=op==4 or op==6 or op==7
+        local dir=pattern_path(is_arp,mode,factory)
+        if op==1 or op==4 then
+            local accepted,name=r.GetUserInputs((op==4 and "Export factory " or "Save ")..kind.." pattern"..(is_arp and " ("..ARP_MODES[mode]..")" or ""),1,"Pattern name:", "My Pattern")
             if not accepted then r.gmem_write(LIB,0); return end
             name=name:match("^%s*(.-)%s*$")
             if name=="" or name:find("[/\\:*?\"<>|%c]") or name=="." or name==".." then error("Invalid pattern name") end
@@ -370,9 +418,22 @@ local function service_pattern_library(LIB,is_arp)
             end
             local closed,why=file:close(); if not closed then error(why or "Could not finish writing") end
             r.gmem_write(LIB,0)
+            if op==4 then update_catalogue(LIB,is_arp,mode) end
         else
-            local accepted,path=r.GetUserFileNameForRead(dir.."/","Load "..kind.." pattern",extension)
-            if not accepted then r.gmem_write(LIB,0); return end
+            local path
+            if op==6 then
+                local base=LIB+CATALOG_OFFSET+mode*CATALOG_STRIDE
+                local cat=catalogues[base]
+                local index=math.floor(r.gmem_read(LIB+14))
+                if not cat or cat.rev~=r.gmem_read(LIB+15) or not cat.names[index] then
+                    error("Factory catalogue changed. Please reopen LIBRARY.")
+                end
+                path=cat.dir.."/"..cat.names[index]
+            else
+                local accepted
+                accepted,path=r.GetUserFileNameForRead(dir.."/","Load "..kind.." pattern"..(is_arp and " ("..ARP_MODES[mode]..")" or ""),extension)
+                if not accepted then r.gmem_write(LIB,0); return end
+            end
             local file,why=io.open(path,"rb"); if not file then error(why or "Cannot open pattern") end
             local data=file:read(2097153); file:close()
             if not data or #data>2097152 then error("Pattern file is too large") end
@@ -413,6 +474,14 @@ end
 
 
 function export.ServicePatternLibrary()
+    local r=reaper
+    r.gmem_attach("N2N_Ecosystem_RSKennedy")
+    if r.time_precise()-catalog_poll>=2 then
+        catalog_poll=r.time_precise()
+        -- Directory access failures must not interfere with song-form publishing.
+        pcall(update_catalogue,DRUM_LIB,false,0)
+        for mode=0,2 do pcall(update_catalogue,ARP_LIB,true,mode) end
+    end
     service_pattern_library(DRUM_LIB,false)
     service_pattern_library(ARP_LIB,true)
 end
