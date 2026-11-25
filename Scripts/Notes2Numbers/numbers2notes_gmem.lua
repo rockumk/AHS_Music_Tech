@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.5
+-- @version 1.6
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -406,6 +406,70 @@ function export.ServicePatternLibrary()
         end
     end)
     if not ok then r.gmem_write(LIB,0); r.MB(tostring(err),"Drum Pattern Library",0) end
+end
+
+
+-- 6. Track identity for Drum Arranger and Arp (same protocol as N2NCue).
+-- 8200000 + (instance ID - 1)*4: track number, red, green, blue.
+local INFO_BASE = 8200000
+local identity_last_poll = -math.huge
+local identity_previous = {}
+
+function export.PublishTrackIdentity(force)
+    local r = reaper
+    local now = r.time_precise()
+    if not force and now-identity_last_poll < 0.5 then return end
+    identity_last_poll = now
+    r.gmem_attach("N2N_Ecosystem_RSKennedy")
+    local project = r.EnumProjects(-1, "")
+    local slots = {}
+    local duplicate = {}
+    for i=0,r.CountTracks(project)-1 do
+        local track = r.GetTrack(project,i)
+        local number = math.floor(r.GetMediaTrackInfo_Value(track,"IP_TRACKNUMBER"))
+        local native = r.GetTrackColor(track)
+        local red,green,blue = 0.5,0.5,0.5
+        if native and native~=0 then
+            local rr,gg,bb = r.ColorFromNative(native)
+            red,green,blue = rr/255,gg/255,bb/255
+        end
+        for fx=0,r.TrackFX_GetCount(track)-1 do
+            local ok,name = r.TrackFX_GetFXName(track,fx,"")
+            if ok and name then
+                local lower=name:lower()
+                if lower:find("n2n drum arranger",1,true) or lower:find("n2n arp",1,true) then
+                    local id = math.floor(r.TrackFX_GetParam(track,fx,4)+0.5)
+                    if id>=1 and id<=512 then
+                        if slots[id] then
+                            duplicate[id]=true
+                        else
+                            slots[id]={number,red,green,blue}
+                        end
+                    end
+                end
+            end
+        end
+    end
+    -- Do not assign ambiguous identities to duplicate instance IDs.
+    for id in pairs(duplicate) do slots[id]=nil end
+    for id in pairs(identity_previous) do
+        if not slots[id] then
+            local base=INFO_BASE+(id-1)*4
+            for offset=0,3 do r.gmem_write(base+offset,0) end
+        end
+    end
+    for id in pairs(duplicate) do
+        local base=INFO_BASE+(id-1)*4
+        for offset=0,3 do r.gmem_write(base+offset,0) end
+    end
+    for id,values in pairs(slots) do
+        local base=INFO_BASE+(id-1)*4
+        for offset=0,3 do
+            local value=values[offset+1]
+            if r.gmem_read(base+offset)~=value then r.gmem_write(base+offset,value) end
+        end
+    end
+    identity_previous=slots
 end
 
 return export
