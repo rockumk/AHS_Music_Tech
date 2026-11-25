@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.5
+-- @version 2.0.4-dev.6
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -4204,6 +4204,28 @@ function Build_Single_Track(tr)
                 end
             end
             plug_order = plug_order - 1
+        end
+    end
+
+    -- Configure the Arp's existing Input Mode parameter after FX presets are loaded.
+    -- Use the recipe type (not the visible track name), and apply to reused tracks too.
+    local arp_input_mode = ({[16] = 0, [17] = 1, [20] = 2})[tr_type]
+    if arp_input_mode ~= nil and tr_mode == 1 then
+        for fx = 0, reaper.TrackFX_GetCount(track_to_use) - 1 do
+            local ok, fx_name = reaper.TrackFX_GetFXName(track_to_use, fx, "")
+            if ok and fx_name:lower():find("n2n arp", 1, true) then
+                -- Resolve by parameter name to avoid changing a different slider.
+                for p = 0, reaper.TrackFX_GetNumParams(track_to_use, fx) - 1 do
+                    local found, param_name = reaper.TrackFX_GetParamName(track_to_use, fx, p, "")
+                    if found and param_name:lower() == "input mode" then
+                        local current = reaper.TrackFX_GetParam(track_to_use, fx, p)
+                        if current ~= arp_input_mode then
+                            reaper.TrackFX_SetParam(track_to_use, fx, p, arp_input_mode)
+                        end
+                        break
+                    end
+                end
+            end
         end
     end
 
