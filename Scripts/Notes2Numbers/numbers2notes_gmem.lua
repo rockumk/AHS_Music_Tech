@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.6
+-- @version 1.7
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -286,7 +286,7 @@ function export.PublishSongForm(stretched_index, force)
         local tr=r.GetTrack(project,i)
         for fx=0,r.TrackFX_GetCount(tr)-1 do
             local _,name=r.TrackFX_GetFXName(tr,fx,"")
-            if name:lower():find("n2n drum arranger",1,true) then
+            if name:lower():find("n2n drum arranger",1,true) or name:lower():find("n2n arp",1,true) then
                 local id=math.floor(r.TrackFX_GetParam(tr,fx,4)+0.5)
                 if id>=1 and id<=512 then
                     local key=r.gmem_read(8000000+id)
@@ -316,17 +316,20 @@ end
 
 -- 5. Pattern library mailbox, serviced only while the Numbers2Notes GUI is running.
 -- Sparse note/channel/step/velocity/grid/duration tuples; never execute loaded text.
-local LIB=6200000
+local DRUM_LIB, ARP_LIB=6200000,6400000
 local function valid_number(n,a,b)
     return type(n)=="number" and n==n and n>=a and n<=b
 end
-local function pattern_path()
-    local p=reaper.GetResourcePath().."/Data/AHS_Music_Tech/DrumArranger/Patterns"
+local function pattern_path(is_arp)
+    local p=reaper.GetResourcePath().."/Data/AHS_Music_Tech/"..(is_arp and "Arp" or "DrumArranger").."/Patterns"
     reaper.RecursiveCreateDirectory(p,0)
     return p
 end
-function export.ServicePatternLibrary()
+local function service_pattern_library(LIB,is_arp)
     local r=reaper
+    local kind=is_arp and "arp" or "drum"
+    local extension=is_arp and ".n2arppat" or ".n2drumpat"
+    local signature=is_arp and "N2N_ARP_PATTERN 1" or "N2N_DRUM_PATTERN 1"
     r.gmem_attach("N2N_Ecosystem_RSKennedy")
     r.gmem_write(LIB+8,r.time_precise())
     local op=r.gmem_read(LIB)
@@ -342,18 +345,18 @@ function export.ServicePatternLibrary()
     end
     r.gmem_write(LIB,5)
     local ok,err=pcall(function()
-        local dir=pattern_path()
+        local dir=pattern_path(is_arp)
         if op==1 then
-            local accepted,name=r.GetUserInputs("Save drum pattern",1,"Pattern name:", "My Pattern")
+            local accepted,name=r.GetUserInputs("Save "..kind.." pattern",1,"Pattern name:", "My Pattern")
             if not accepted then r.gmem_write(LIB,0); return end
             name=name:match("^%s*(.-)%s*$")
             if name=="" or name:find("[/\\:*?\"<>|%c]") or name=="." or name==".." then error("Invalid pattern name") end
-            local path=dir.."/"..name..".n2drumpat"
+            local path=dir.."/"..name..extension
             local old=io.open(path,"rb")
             if old then old:close(); if r.MB("Replace the existing pattern?","Save Pattern",4)~=6 then r.gmem_write(LIB,0); return end end
             local file,why=io.open(path,"wb")
             if not file then error(why or "Cannot save pattern") end
-            file:write("N2N_DRUM_PATTERN 1\n")
+            file:write(signature,"\n")
             local header={}
             for i=3,7 do header[#header+1]=r.gmem_read(LIB+i) end
             header[#header+1]=r.gmem_read(LIB+10)
@@ -368,14 +371,14 @@ function export.ServicePatternLibrary()
             local closed,why=file:close(); if not closed then error(why or "Could not finish writing") end
             r.gmem_write(LIB,0)
         else
-            local accepted,path=r.GetUserFileNameForRead(dir.."/","Load drum pattern",".n2drumpat")
+            local accepted,path=r.GetUserFileNameForRead(dir.."/","Load "..kind.." pattern",extension)
             if not accepted then r.gmem_write(LIB,0); return end
             local file,why=io.open(path,"rb"); if not file then error(why or "Cannot open pattern") end
             local data=file:read(2097153); file:close()
             if not data or #data>2097152 then error("Pattern file is too large") end
             local lines={}
             for line in data:gmatch("[^\r\n]+") do lines[#lines+1]=line end
-            if lines[1]~="N2N_DRUM_PATTERN 1" then error("Unrecognized pattern format") end
+            if lines[1]~=signature then error("Unrecognized pattern format") end
             local function fields(line,n)
                 local out={}
                 for v in (line or ""):gmatch("%S+") do
@@ -405,9 +408,14 @@ function export.ServicePatternLibrary()
             r.gmem_write(LIB,3)
         end
     end)
-    if not ok then r.gmem_write(LIB,0); r.MB(tostring(err),"Drum Pattern Library",0) end
+    if not ok then r.gmem_write(LIB,0); r.MB(tostring(err),kind.." Pattern Library",0) end
 end
 
+
+function export.ServicePatternLibrary()
+    service_pattern_library(DRUM_LIB,false)
+    service_pattern_library(ARP_LIB,true)
+end
 
 -- 6. Track identity for Drum Arranger and Arp (same protocol as N2NCue).
 -- 8200000 + (instance ID - 1)*4: track number, red, green, blue.
