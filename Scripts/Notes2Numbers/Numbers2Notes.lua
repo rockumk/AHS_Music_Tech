@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.1
+-- @version 2.0.4-dev.2
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -6710,20 +6710,8 @@ function Generate_Arranger_Conductors()
     place_special()
     if gmem_export then gmem_export.PublishSongForm(Get_Stretched_ABCD_Index, true) end
 
-    local drum_tracks = Find_All_Tracks_With_Drum_FX()
-    for _, drum_track in ipairs(drum_tracks) do
-        -- New Drum Arranger follows GMEM. Keep the old cue writer available for legacy versions.
-        local new_drums = false
-        for fx=0,reaper.TrackFX_GetCount(drum_track)-1 do
-            local _,fx_name=reaper.TrackFX_GetFXName(drum_track,fx,"")
-            if fx_name:lower():find("n2n drum arranger",1,true) then
-                -- Slider 12 is the protocol marker on the new JSFX; old JSFX has no such slider.
-                local _,param_name=reaper.TrackFX_GetParamName(drum_track,fx,11,"")
-                if param_name:find("Song Form Protocol",1,true) then new_drums=true end
-            end
-        end
-        if new_drums then Clean_Drum_Track(drum_track) else Generate_Drum_Conductor_For_Track(drum_track) end
-    end
+    -- Drum Arranger follows GMEM by default. Do not create or delete MIDI cues here;
+    -- existing or manually supplied channel-16 cues remain available as overrides.
 
     local arp_tracks = Find_All_Tracks_With_Arp_FX()
     for _, arp_track in ipairs(arp_tracks) do
