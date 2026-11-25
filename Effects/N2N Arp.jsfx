@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.4.0-dev.4
+version: 12.4.0-dev.5
 author: Rock Kennedy
 about:
-  # N2N Arp v12.4.0-dev.4
+  # N2N Arp v12.4.0-dev.5
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -26,7 +26,8 @@ slider14:0<0,2,1{Chords,Split (Chords and Bass),Bass}>-Input Mode
 
 @init
 scale_dirty = 0;
-thisversion = "v12.4.0-dev.4";
+last_input_mode = -1;
+thisversion = "v12.4.0-dev.5";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -1725,6 +1726,12 @@ pos_in_bar = beat_position % 4.0;
 // =========================================================
 
 
+// Rebuild pitch lanes after host parameter changes as well as incoming MIDI.
+// The MODE control is slider14 (Input Mode): Chords=0, Split=1, Bass=2.
+slider14 != last_input_mode ? (
+    last_input_mode = slider14;
+    input_dirty = 1;
+);
 input_dirty ? analyze_input();
 
 (play_state == 0 || mem[ui_power_off]) ? ( 
