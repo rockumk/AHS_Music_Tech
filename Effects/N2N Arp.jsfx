@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.4.0-dev.5
+version: 12.4.0-dev.6
 author: Rock Kennedy
 about:
-  # N2N Arp v12.4.0-dev.5
+  # N2N Arp v12.4.0-dev.6
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -27,7 +27,7 @@ slider14:0<0,2,1{Chords,Split (Chords and Bass),Bass}>-Input Mode
 @init
 scale_dirty = 0;
 last_input_mode = -1;
-thisversion = "v12.4.0-dev.5";
+thisversion = "v12.4.0-dev.6";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -1283,8 +1283,16 @@ function factory_pattern(p,t) local(i,r,step,role,ptr) (
         p==4 && step%4==0 ? r=step%8==0?61:70;
         p==6 ? r=step%4==0?61:step%4==1?58:step%4==2?55:58;
         p==7 && (step==0||step==3||step==6||step==10||step==14) ? r=step%3==0?61:step%2==0?55:58;
+        // Split presets use separate chord and LH bass lanes (LH octave zero).
+        p==8 && step%4==0 ? r=step%8==0?97:94;
+        p==9 && step%2==0 ? r=step%8==0?97:step%8==2?61:step%8==4?58:55;
+        p==10 && (step==0||step==6||step==8||step==14) ? r=step==0||step==8?97:58;
+        p==11 && step%4==0 ? r=61;
+        p==12 && step%2==0 ? r=61;
+        p==13 && (step==0||step==3||step==6||step==10||step==14) ? r=61;
+        p==14 && step%2==0 ? r=step%4==0?61:52;
         r>=0 ? (ptr=t*vel_stride_tab+r*vel_stride_row+step; mem[grid_base+ptr]=1; mem[vel_base+ptr]=step%4==0?105:84;);
-        p==5 && step%4==0 ? (
+        (p==5 || p==8) && step%4==0 ? (
             role=0; loop(3,
                 ptr=t*vel_stride_tab+(55+role*3)*vel_stride_row+step;
                 mem[grid_base+ptr]=1; mem[vel_base+ptr]=95;
@@ -1295,14 +1303,15 @@ function factory_pattern(p,t) local(i,r,step,role,ptr) (
     );
     scan_active_tab();
 );
-function library_request(op,t) local(n,r,k,p,a) (
+function library_request(op,t,entry,revision) local(n,r,k,p,a) (
     gmem[6400000]==0 && abs(time_precise()-gmem[6400008])<3 ? (
-        gmem[6400001]=slider5; gmem[6400002]=t; gmem[6400011]=time_precise(); gmem[6400012]=my_key;
+        gmem[6400001]=slider5; gmem[6400002]=t;
+        gmem[6400013]=slider14; gmem[6400014]=entry; gmem[6400015]=revision; gmem[6400011]=time_precise(); gmem[6400012]=my_key;
         gmem[6400003]=eff_bars(t); gmem[6400004]=eff_sub(t); gmem[6400005]=eff_hum(t); gmem[6400006]=eff_swing(t); gmem[6400007]=eff_half(t);
         n=0; r=0; loop(MAX_ROWS,
             k=0; loop(MAX_STEPS,
                 p=t*vel_stride_tab+r*vel_stride_row+k;
-                op==1 && mem[grid_base+p]>0 ? (
+                (op==1 || op==4) && mem[grid_base+p]>0 ? (
                     a=6400016+n*6; gmem[a]=r; gmem[a+1]=1; gmem[a+2]=k;
                     gmem[a+3]=mem[vel_base+p]; gmem[a+4]=mem[grid_base+p]; gmem[a+5]=mem[step_len_base+p]; n+=1;
                 ); k+=1;
@@ -1310,6 +1319,55 @@ function library_request(op,t) local(n,r,k,p,a) (
         );
         gmem[6400009]=n; gmem[6400010]=mem[tab_mute_base+t]&2; gmem[6400000]=op;
     ) : gfx_showmenu("#Open Numbers2Notes first (or another request is pending)");
+);
+
+
+function show_pattern_library(t) local(base,rev,count,k,j,n,addr,builtins,first_file,sel,mode,p) (
+    mode=slider14;
+    strcpy(#lib_menu,"Save Pattern...|Load Pattern...|Export Factory Pattern...|Browse Factory Patterns...|Force Silence|Inherit (clear pattern)");
+    mode==0 ? (
+        strcat(#lib_menu,"|Ascending|Descending|Up and Down|Block Chords|Broken Chords|Syncopated"); builtins=6;
+    ) : mode==1 ? (
+        strcat(#lib_menu,"|Chords + Alternating Bass|Broken Chords + Bass|Syncopated Chords + Bass"); builtins=3;
+    ) : (
+        strcat(#lib_menu,"|Quarter Notes|Eighth Notes|Syncopated Bass|Octave Bass"); builtins=4;
+    );
+    base=6500000+mode*16384;
+    rev=gmem[base]; count=0;
+    abs(time_precise()-gmem[6400008])<3 && rev>0 && !(rev%2) ? (
+        strcpy(#lib_base_menu,#lib_menu);
+        count=min(100,max(0,floor(gmem[base+1])));
+        k=0; loop(count,
+            addr=base+2+k*100;
+            strcat(#lib_menu,"|Factory: ");
+            n=min(99,max(0,floor(gmem[addr])));
+            j=1; loop(n,
+                str_setchar(#lib_menu,strlen(#lib_menu),gmem[addr+j]);
+                j+=1;
+            );
+            k+=1;
+        );
+        gmem[base]!=rev ? (strcpy(#lib_menu,#lib_base_menu); count=0;);
+    );
+    sel=gfx_showmenu(#lib_menu);
+    sel==1 || sel==2 ? library_request(sel,t,0,0) :
+    sel==3 ? library_request(4,t,0,0) :
+    sel==4 ? library_request(7,t,0,0) :
+    sel==5 || sel==6 ? (
+        memset(grid_base+t*vel_stride_tab,0,vel_stride_tab);
+        memset(vel_base+t*vel_stride_tab,0,vel_stride_tab);
+        memset(step_len_base+t*vel_stride_tab,0,vel_stride_tab);
+        mem[tab_mute_base+t]=sel==5?2:0;
+        scan_active_tab(); needs_tab_update=1;
+    ) :
+    sel>=7 && sel<=6+builtins ? (
+        p=sel-6;
+        mode==0 ? (p>=4 ? p+=1;) : mode==1 ? (p+=7;) : (p+=10;);
+        factory_pattern(p,t);
+    ) :
+    sel>6+builtins && sel<=6+builtins+count ? (
+        library_request(6,t,sel-6-builtins,rev);
+    );
 );
 
 @serialize
@@ -2683,13 +2741,7 @@ fb_pat_l_ptr = step_len_base + fb_tab*vel_stride_tab;
         item_w=sectw-5;
         centered_btn(x2,ctrl_y,item_w,18,"LIBRARY") ? (
             gfx_x=x2; gfx_y=ctrl_y+20;
-            lib_sel=gfx_showmenu("Save Pattern... (Requires Numbers2Notes running)|Load Pattern... (Requires Numbers2Notes running)||Ascending|Descending|Up and Down|Alternating Bass|Block Chords|Broken Chords|Syncopated||Force Silence|Inherit (clear pattern)");
-            lib_sel==1||lib_sel==2 ? library_request(lib_sel,t_e);
-            lib_sel>=3 && lib_sel<=9 ? factory_pattern(lib_sel-2,t_e);
-            lib_sel==10||lib_sel==11 ? (
-                memset(curr_pat_g_ptr,0,vel_stride_tab); memset(curr_pat_v_ptr,0,vel_stride_tab); memset(curr_pat_l_ptr,0,vel_stride_tab);
-                mem[tab_mute_base+t_e]=lib_sel==10?2:0; scan_active_tab();
-            );
+            show_pattern_library(t_e);
         );
         x2+=item_w+ui_gap_small;
         item_w = 3*ttabw-5;
