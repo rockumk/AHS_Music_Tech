@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.10
+version: 7.8.0-dev.11
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.10 -
+  # N2N Drum Arranger v7.8.0-dev.11 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -134,7 +134,7 @@ slider11:14<10,30,1>-Grid Row Height
 slider12:1<0,1,1>-Song Form Protocol
 
 @init
-version_display = "v7.8.0-dev.10";
+version_display = "v7.8.0-dev.11";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -1491,16 +1491,17 @@ function factory_pattern(p,t) local(r,n,kick,snare,hat,i,step,sub,hit,v,ptr,name
         scan_active_tab(); needs_tab_update=1;
     );
 );
-function library_request(op,t) (
+function library_request(op,t,entry,revision) (
     // Mailbox shared with Numbers2Notes; user pattern I/O is serviced by its Lua loop.
     gmem[6200000]==0 && abs(time_precise()-gmem[6200008])<3 ? (
-        gmem[6200001]=slider5; gmem[6200002]=t; gmem[6200011]=time_precise(); gmem[6200012]=my_key;
+        gmem[6200001]=slider5; gmem[6200002]=t;
+        gmem[6200013]=0; gmem[6200014]=entry; gmem[6200015]=revision; gmem[6200011]=time_precise(); gmem[6200012]=my_key;
         gmem[6200003]=eff_bars(t); gmem[6200004]=eff_sub(t);
         gmem[6200005]=eff_hum(t); gmem[6200006]=eff_swing(t); gmem[6200007]=eff_half(t);
         lib_n=0; lib_r=0; loop(MAX_ROWS,
             lib_s=0; loop(MAX_STEPS,
                 lib_p=t*vel_stride_tab+lib_r*vel_stride_row+lib_s;
-                op==1 && mem[grid_base+lib_p]>0 ? (
+                (op==1 || op==4) && mem[grid_base+lib_p]>0 ? (
                     lib_a=6200016+lib_n*6;
                     gmem[lib_a]=mem[row_note_base+lib_r]; gmem[lib_a+1]=mem[row_chan_base+lib_r]; gmem[lib_a+2]=lib_s;
                     gmem[lib_a+3]=mem[vel_base+lib_p]; gmem[lib_a+4]=mem[grid_base+lib_p]; gmem[lib_a+5]=mem[step_len_base+lib_p];
@@ -1511,6 +1512,49 @@ function library_request(op,t) (
         gmem[6200009]=lib_n; gmem[6200010]=mem[tab_mute_base+t]&2;
         gmem[6200000]=op;
     ) : gfx_showmenu("#Open Numbers2Notes first (or another library request is pending)");
+);
+
+
+function show_pattern_library(t) local(base,rev,count,k,j,n,addr,builtins,first_file,sel,mode,p) (
+    mode=0;
+    strcpy(#lib_menu,"Save Pattern...|Load Pattern...|Export Factory Pattern...|Browse Factory Patterns...|Force Silence|Inherit (clear pattern)");
+    strcat(#lib_menu,"|Backbeat|Four on the Floor|Half-Time|Double-Time|Shuffle|Basic Funk|Basic Hip-Hop|Count-In"); builtins=8;
+    base=6300000+mode*16384;
+    rev=gmem[base]; count=0;
+    abs(time_precise()-gmem[6200008])<3 && rev>0 && !(rev%2) ? (
+        strcpy(#lib_base_menu,#lib_menu);
+        count=min(100,max(0,floor(gmem[base+1])));
+        k=0; loop(count,
+            addr=base+2+k*100;
+            strcat(#lib_menu,"|Factory: ");
+            n=min(99,max(0,floor(gmem[addr])));
+            j=1; loop(n,
+                str_setchar(#lib_menu,strlen(#lib_menu),gmem[addr+j]);
+                j+=1;
+            );
+            k+=1;
+        );
+        gmem[base]!=rev ? (strcpy(#lib_menu,#lib_base_menu); count=0;);
+    );
+    sel=gfx_showmenu(#lib_menu);
+    sel==1 || sel==2 ? library_request(sel,t,0,0) :
+    sel==3 ? library_request(4,t,0,0) :
+    sel==4 ? library_request(7,t,0,0) :
+    sel==5 || sel==6 ? (
+        memset(grid_base+t*vel_stride_tab,0,vel_stride_tab);
+        memset(vel_base+t*vel_stride_tab,0,vel_stride_tab);
+        memset(step_len_base+t*vel_stride_tab,0,vel_stride_tab);
+        mem[tab_mute_base+t]=sel==5?2:0;
+        scan_active_tab(); needs_tab_update=1;
+    ) :
+    sel>=7 && sel<=6+builtins ? (
+        p=sel-6;
+        
+        factory_pattern(p,t);
+    ) :
+    sel>6+builtins && sel<=6+builtins+count ? (
+        library_request(6,t,sel-6-builtins,rev);
+    );
 );
 
 @serialize
@@ -2741,16 +2785,7 @@ t_e = mem[ui_edit_tab];
     item_w=mem[tab_w_base+1]-ui_gap_small;
     centered_btn(draw_x,draw_y,item_w,"LIBRARY") ? (
         gfx_x=draw_x; gfx_y=draw_y+20;
-        lib_sel=gfx_showmenu("Save Pattern... (Requires Numbers2Notes running)|Load Pattern... (Requires Numbers2Notes running)||Backbeat|Four on the Floor|Half-Time|Double-Time|Shuffle|Basic Funk|Basic Hip-Hop|Count-In||Force Silence|Inherit (clear pattern)");
-        lib_sel==11 ? (
-            memset(curr_pat_g_ptr,0,vel_stride_tab); memset(curr_pat_v_ptr,0,vel_stride_tab); memset(curr_pat_l_ptr,0,vel_stride_tab);
-            mem[tab_mute_base+t_e]=2; scan_active_tab(); needs_tab_update=1;
-        ) : lib_sel==12 ? (
-            memset(curr_pat_g_ptr,0,vel_stride_tab); memset(curr_pat_v_ptr,0,vel_stride_tab); memset(curr_pat_l_ptr,0,vel_stride_tab);
-            mem[tab_mute_base+t_e]=0; scan_active_tab(); needs_tab_update=1;
-        );
-        lib_sel>=3 && lib_sel<=10 ? factory_pattern(lib_sel-2,t_e);
-        lib_sel==1 || lib_sel==2 ? library_request(lib_sel,t_e);
+        show_pattern_library(t_e);
     );
     draw_x+=item_w+ui_gap_small;
     // ACCEPT SUGGESTED
