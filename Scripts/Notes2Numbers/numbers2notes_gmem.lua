@@ -492,7 +492,7 @@ end
 local INFO_BASE, REG_BASE, INV_BASE, EDIT_BASE = 8200000, 8000000, 7500000, 8300000
 local tracks, duplicate, last_project_tracks = {}, {}, nil
 local identity_last_poll = -math.huge
-local fx_hover, hover_until, hover_pos, id_popup
+local fx_hover, hover_until, hover_pos, id_popup, id_popup_open, id_suggestion
 local function kind_of(track,fx)
     local ok, name = reaper.TrackFX_GetFXName(track,fx,"")
     if reaper.TrackFX_GetNamedConfigParm then
@@ -619,7 +619,7 @@ local function pattern_grid(ctx,t,width)
     local groupw=(width-4)/6
     local lastw=groupw/2
     local h=10
-    local known=t.id>=1 and t.id<=512 and duplicate[t.id]==1 and r.gmem_read(REG_BASE+t.id)>0 and r.TrackFX_GetEnabled(t.track,t.fx)
+    local known=t.id>=1 and t.id<=512 and duplicate[t.id]==1 and r.gmem_read(REG_BASE+t.id)>0 and r.TrackFX_GetEnabled(t.track,t.fx) and not r.TrackFX_GetOffline(t.track,t.fx)
     local bits={}
     if known then for i=0,3 do bits[i]=math.floor(r.gmem_read(INV_BASE+(t.id-1)*4+i)) end end
     local mx,my=r.ImGui_GetMousePos(ctx)
@@ -680,7 +680,8 @@ function export.DrawTracks(ctx,font)
     if r.ImGui_SmallButton(ctx,"Refresh") then export.PublishTrackIdentity(true) end
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),2,1)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),2,1)
-    local visible=r.ImGui_BeginChild(ctx,"##N2NTrackScroll",0,-29,0)
+    local panel_width=math.min(340,r.ImGui_GetContentRegionAvail(ctx))
+    local visible=r.ImGui_BeginChild(ctx,"##N2NTrackScroll",panel_width,-29,0)
     if visible then
         for _,t in ipairs(tracks) do
             local fx=locate(t)
@@ -691,17 +692,19 @@ function export.DrawTracks(ctx,font)
                 local fxw,idw,instw,arpw=25,44,35,40
                 local namew=math.max(40,width-fxw-idw-instw-arpw-8)
                 local label=("%d. %s"):format(t.number,t.name)
-                while #label>4 and r.ImGui_CalcTextSize(ctx,label)>namew-4 do
-                    label=label:sub(1,-2)
-                    while #label>0 and label:byte(-1)>=128 and label:byte(-1)<192 do label=label:sub(1,-2) end
+                if r.ImGui_CalcTextSize(ctx,label)>namew-4 then
+                    while #label>0 and r.ImGui_CalcTextSize(ctx,label.."…")>namew-4 do
+                        local pos=utf8.offset(label,-1)
+                        label=label:sub(1,(pos or #label)-1)
+                    end
+                    label=label.."…"
                 end
-                if label~=(("%d. %s"):format(t.number,t.name)) then label=label.."…" end
                 local lum=t.r*.299+t.g*.587+t.b*.114
                 r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),color(t.r,t.g,t.b))
                 r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Text(),lum>.55 and 0x101010FF or 0xFFFFFFFF)
                 if r.ImGui_Button(ctx,label,namew,19) then
                     r.SetOnlyTrackSelected(t.track)
-                    r.Main_OnCommand(40913,0)
+                    r.TrackList_AdjustWindows(false)
                 end
                 r.ImGui_PopStyleColor(ctx,2)
                 if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,t.name) end
@@ -715,7 +718,7 @@ function export.DrawTracks(ctx,font)
                 r.ImGui_SameLine(ctx)
                 local bad=(duplicate[t.id] or 0)>1 or t.id<1 or t.id>512
                 if bad then r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),0xA82828FF) end
-                if r.ImGui_Button(ctx,"ID "..t.id,idw,19) then id_popup=t end
+                if r.ImGui_Button(ctx,"ID "..t.id,idw,19) then id_popup=t; id_popup_open=true; id_suggestion=find_free_id() end
                 if bad then r.ImGui_PopStyleColor(ctx) end
                 r.ImGui_SameLine(ctx)
                 local clicked=r.ImGui_Button(ctx,"FX",fxw,19)
@@ -727,19 +730,19 @@ function export.DrawTracks(ctx,font)
                     hover_pos={left,bottom}
                 end
                 if font then r.ImGui_PushFont(ctx,font) end
-                pattern_grid(ctx,t,math.max(150,width))
+                pattern_grid(ctx,t,width)
                 if font then r.ImGui_PopFont(ctx) end
                 r.ImGui_Separator(ctx)
                 r.ImGui_PopID(ctx)
             end
         end
+        r.ImGui_EndChild(ctx)
     end
-    r.ImGui_EndChild(ctx)
-    if r.ImGui_Button(ctx,"OPEN N2NCUE",-1,22) then launch_cue() end
+    if r.ImGui_Button(ctx,"OPEN N2NCUE",panel_width,22) then launch_cue() end
     r.ImGui_PopStyleVar(ctx,2)
     if id_popup then
-        r.ImGui_OpenPopup(ctx,"N2N Instance ID")
-        if r.ImGui_BeginPopupModal(ctx,"N2N Instance ID",true,r.ImGui_WindowFlags_AlwaysAutoResize()) then
+        if id_popup_open then r.ImGui_OpenPopup(ctx,"N2N Instance ID"); id_popup_open=false end
+        if r.ImGui_BeginPopupModal(ctx,"N2N Instance ID",nil,r.ImGui_WindowFlags_AlwaysAutoResize()) then
             local t=id_popup
             local fx=locate(t)
             r.ImGui_Text(ctx,t.name.." | "..t.kind.." | ID "..t.id)
@@ -747,15 +750,19 @@ function export.DrawTracks(ctx,font)
                 if other.id==t.id and other.guid~=t.guid then r.ImGui_TextColored(ctx,0xFF7777FF,"Conflict: "..other.name.." ("..other.kind..")") end
             end
             r.ImGui_TextWrapped(ctx,"Assign a free ID while transport is stopped. Existing patterns are preserved.")
-            local free=find_free_id()
+            local free=id_suggestion
             local disabled=not fx or not free or r.GetPlayState()~=0
             if disabled then r.ImGui_BeginDisabled(ctx) end
             if r.ImGui_Button(ctx,free and ("Assign ID "..free) or "No free registered ID") then
-                r.Undo_BeginBlock()
-                r.TrackFX_SetParam(t.track,fx,4,free)
-                r.Undo_EndBlock("N2N: Reassign arranger instance ID",-1)
-                export.PublishTrackIdentity(true)
-                id_popup=nil; r.ImGui_CloseCurrentPopup(ctx)
+                local now_free=find_free_id()
+                if now_free==free then
+                    r.Undo_BeginBlock()
+                    local ok=r.TrackFX_SetParam(t.track,fx,4,free)
+                    r.Undo_EndBlock("N2N: Reassign arranger instance ID",-1)
+                    export.PublishTrackIdentity(true)
+                    if ok then id_popup=nil; r.ImGui_CloseCurrentPopup(ctx)
+                    else r.MB("The instance rejected the ID change.","N2N Tracks",0) end
+                else id_suggestion=now_free end
             end
             if disabled then r.ImGui_EndDisabled(ctx) end
             r.ImGui_SameLine(ctx)
@@ -793,8 +800,8 @@ function export.DrawTracks(ctx,font)
             end
             r.ImGui_Separator(ctx)
             r.ImGui_TextDisabled(ctx,"Click: Open   Shift+Click: Bypass")
+            r.ImGui_End(ctx)
         end
-        r.ImGui_End(ctx)
     else fx_hover=nil end
 end
 
