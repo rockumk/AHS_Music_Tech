@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.14
+-- @version 2.0.4-dev.15
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -1304,13 +1304,12 @@ local function Pop_N2N_Styles(context)
 end
 -----------------------------------------------                 IMGUI LOOP FUNCTION
 
--- The chart editor loses keyboard focus when an entry/audition button is
--- clicked. Retain its byte-offset cursor and selection separately for each
--- chart. Perform visible insertions through ReaImGui's editor callback so
--- the text buffer, undo history and cursor advance together.
+-- Keep the last real editor cursor/selection even while clicking chord
+-- buttons elsewhere. Insert directly into the Lua chart string rather
+-- than waiting for an InputText callback to become active again.
 local chart_editors = {
-    [1] = {label="##chord_charting_area", pending=""},
-    [7] = {label="##chord_charting_area_letters", pending=""}
+    [1] = {label="##chord_charting_area", revision=0},
+    [7] = {label="##chord_charting_area_letters", revision=0}
 }
 local function get_chart_text(mode)
     return (mode==7 and chord_charting_area_letters or chord_charting_area) or ""
@@ -1328,17 +1327,19 @@ end
 local function queue_chart_insert(value,mode)
     mode=mode or (charting_tab_mode==7 and 7 or 1)
     local state=chart_editors[mode]
-    if charting_tab_mode==mode then
-        state.pending=state.pending..value
-    else
-        -- A hidden chart cannot receive an ImGui callback.
-        local buffer=get_chart_text(mode)
-        local a,b=chart_range(state,buffer)
-        local result=buffer:sub(1,a)..value..buffer:sub(b+1)
-        set_chart_text(mode,result)
-        state.buffer=result
-        state.first=a+#value
-        state.last=state.first
+    local buffer=get_chart_text(mode)
+    local a,b=chart_range(state,buffer)
+    local result=buffer:sub(1,a)..value..buffer:sub(b+1)
+    set_chart_text(mode,result)
+    state.buffer=result
+    state.first=a+#value
+    state.last=state.first
+    -- An active ImGui text field can otherwise write its old internal
+    -- buffer back over an external edit. Give it a fresh ID only when
+    -- a programmatic edit interrupts active keyboard editing.
+    if state.active then
+        state.revision=state.revision+1
+        state.active=false
     end
 end
 local function insert_number_text(value)
@@ -1346,32 +1347,8 @@ local function insert_number_text(value)
         queue_chart_insert(numbers_to_letters(set_the_key(header_area),value),7)
     else queue_chart_insert(value,1) end
 end
-local function flush_hidden_chart(mode)
-    local state=chart_editors[mode]
-    if state.pending=="" then return end
-    local buffer=get_chart_text(mode)
-    local a,b=chart_range(state,buffer)
-    local value=state.pending
-    local result=buffer:sub(1,a)..value..buffer:sub(b+1)
-    set_chart_text(mode,result)
-    state.pending=""
-    state.buffer=result
-    state.first=a+#value
-    state.last=state.first
-end
 local chart_callback=r.ImGui_CreateFunctionFromEEL([[
     callback_ran=1;
-    apply_pending ? (
-        a=max(0,min(strlen(#Buf),insert_first));
-        b=max(a,min(strlen(#Buf),insert_last));
-        b>a ? InputTextCallback_DeleteChars(a,b-a);
-        InputTextCallback_InsertChars(a,#insert_text);
-        CursorPos=a+strlen(#insert_text);
-        SelectionStart=CursorPos;
-        SelectionEnd=CursorPos;
-        applied=1;
-        apply_pending=0;
-    );
     saved_first=min(SelectionStart,SelectionEnd);
     saved_last=max(SelectionStart,SelectionEnd);
     saved_first==saved_last ? (
@@ -1383,25 +1360,14 @@ r.ImGui_Attach(ctx,chart_callback)
 local function draw_chart_editor(mode,width,height)
     local state=chart_editors[mode]
     local buffer=get_chart_text(mode)
-    -- Do not take focus while a chord audition button is held or released.
-    -- Applying on the following frame preserves its mouse-up behavior.
-    local apply=state.pending~="" and not r.ImGui_IsMouseDown(ctx,0)
-        and not r.ImGui_IsMouseReleased(ctx,0)
     r.ImGui_Function_SetValue(chart_callback,"callback_ran",0)
-    r.ImGui_Function_SetValue(chart_callback,"applied",0)
-    r.ImGui_Function_SetValue(chart_callback,"apply_pending",apply and 1 or 0)
-    if apply then
-        local a,b=chart_range(state,buffer)
-        r.ImGui_Function_SetValue(chart_callback,"insert_first",a)
-        r.ImGui_Function_SetValue(chart_callback,"insert_last",b)
-        r.ImGui_Function_SetValue_String(chart_callback,"#insert_text",state.pending)
-        r.ImGui_SetKeyboardFocusHere(ctx)
-    end
-    local changed,new_text=r.ImGui_InputTextMultiline(ctx,state.label,buffer,width,height,
+    local changed,new_text=r.ImGui_InputTextMultiline(ctx,state.label.."_"..state.revision,buffer,width,height,
         r.ImGui_InputTextFlags_AllowTabInput()|r.ImGui_InputTextFlags_CallbackAlways(),chart_callback)
     if changed then set_chart_text(mode,new_text) end
-    if r.ImGui_Function_GetValue(chart_callback,"applied")~=0 then state.pending="" end
-    if r.ImGui_Function_GetValue(chart_callback,"callback_ran")~=0 then
+    state.active=r.ImGui_IsItemActive(ctx)
+    -- A callback during deactivation must not replace the last genuine
+    -- caret position with a stale or reset position from the editor.
+    if state.active and r.ImGui_Function_GetValue(chart_callback,"callback_ran")~=0 then
         state.buffer=get_chart_text(mode)
         state.first=r.ImGui_Function_GetValue(chart_callback,"saved_first")
         state.last=r.ImGui_Function_GetValue(chart_callback,"saved_last")
@@ -1925,7 +1891,7 @@ function IM_GUI_Loop()
 
         if r.ImGui_BeginTabItem(ctx, "Chord #") then
             if last_charting_tab == 7 then
-                flush_hidden_chart(7)
+
                 local cur_key = set_the_key(header_area)
                 chord_charting_area = letters_to_numbers(cur_key, chord_charting_area_letters)
             end
@@ -1937,7 +1903,7 @@ function IM_GUI_Loop()
 
         if r.ImGui_BeginTabItem(ctx, "Letters") then
             if last_charting_tab == 1 then
-                flush_hidden_chart(1)
+
                 local cur_key = set_the_key(header_area)
                 chord_charting_area_letters = numbers_to_letters(cur_key, chord_charting_area)
             end
@@ -1959,8 +1925,6 @@ function IM_GUI_Loop()
             r.ImGui_EndTabItem(ctx)
         end
 
-        if charting_tab_mode~=1 then flush_hidden_chart(1) end
-        if charting_tab_mode~=7 then flush_hidden_chart(7) end
 
         -- Draw the Sticky Chord Bar on the far right of the Tab Bar line!
         Draw_Sticky_Mini_Chord_Bar(ctx)
@@ -3789,8 +3753,8 @@ Form: I V C V C B C O]]
     if open then
         r.defer(IM_GUI_Loop)
     else
-        flush_hidden_chart(1)
-        flush_hidden_chart(7)
+
+
         ctx = nil
         Autosave()
         SaveLastNumbers2NotesChart()
