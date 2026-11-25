@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.5
+version: 7.8.0-dev.6
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.5 -
+  # N2N Drum Arranger v7.8.0-dev.6 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -134,7 +134,7 @@ slider11:14<10,30,1>-Grid Row Height
 slider12:1<0,1,1>-Song Form Protocol
 
 @init
-version_display = "v7.8.0-dev.5";
+version_display = "v7.8.0-dev.6";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -2096,7 +2096,7 @@ loop(128,
 
 
 
-@gfx 1290 780
+@gfx 1383 780
 gfx_setfont(1, "Trebuchet MS", fontsize , 'b');
 gfx_measurestr("This is a test to determine if the text is being rendered on PC or Mac.", str_w, str_h);
 gfx_set(1,1,1,1); 
@@ -2276,6 +2276,22 @@ function calc_vis_beat(t_in) (
     play_state & 1 ? fmod_pos(visual_pos + offset_add, p_l) * spd_m : 0;
 );
 
+function draw_power_button(x,y) (
+    gfx_setfont(1,os_font,fontsize,'b');
+    rect(x,y,51,26,mem[ui_power_off]?0.75:0.22,0.2,0.2,1);
+    draw_text(x+5,y+6,"OFF",1,1,1);
+    gfx_set(0.9,0.9,0.9,1);
+    gfx_arc(x+39,y+13,7,0.6,5.68,1);
+    gfx_line(x+39,y+3,x+39,y+12,1);
+);
+function centered_btn(x,y,w,txt) local(tw,th) (
+    gfx_setfont(1,os_font,fontsize,'b');
+    rect(x,y,w,BTN_H,0.3,0.3,0.3,1);
+    gfx_measurestr(txt,tw,th);
+    draw_text(x+(w-tw)/2,y+3,txt,1,1,1);
+    (mb && p_mb==0 && mx>=x && mx<x+w && my>=y && my<y+BTN_H);
+);
+
 function btn(x,y,w,txt) (
     rect(x,y,w,BTN_H, 0.3,0.3,0.3,1);
     draw_text(x+5,y+3,txt,1,1,1);
@@ -2349,7 +2365,12 @@ bri = .9;
 ui_gap_small = 5;  // Gap between tightly packed buttons
 ui_gap_large = 15; // Gap between distinct sections (e.g., copying vs pattern settings)
 btn_h = 20;        // Standard button height
-tab_start_x = 120; // Where the Tabs and Pattern rows begin horizontally
+// Align Intro D with the original MAX ROWS background. Preserve original
+// core group positions and right-align the two supplemental columns.
+max_rows_x = HDR_X + HDR_W + UI_GAP_X - 29 - hw + 95 + ui_gap_large;
+tab_start_x = max_rows_x - 4*ttabw;
+tab_right_x = 120 + ftabs + 25*ttabw + 5*hww - ui_gap_small;
+special_group_gap = max(0,tab_right_x-(tab_start_x+27*ttabw+special_tab_w-ui_gap_small));
 
 
 // =========================================================
@@ -2360,7 +2381,7 @@ row1_y = UI_TOP_Y - 3;
 // --- Draw Background for row 1 ---
 track_num > 0 ? (
     track_label_w = 345-5*ttabw;
-    track_label_x = tab_start_x+(5*5+2)*ttabw+special_tab_w-5-track_label_w;
+    track_label_x = tab_right_x-track_label_w;
     rect(track_label_x,row1_y,track_label_w,22,track_r,track_g,track_b,1);
     lum=(track_r*.299)+(track_g*.587)+(track_b*.114);
     lum>.5 ? gfx_set(0,0,0,1) : gfx_set(1,1,1,1);
@@ -2450,24 +2471,34 @@ loop(3,
     // ------------------------------------------
     current_tab_row == 1 ? (
         rec_cues_active=0;
-        power_x=64; power_y=draw_y;
-        rect(power_x,power_y,51,26,mem[ui_power_off]?0.75:0.22,0.2,0.2,1);
-        draw_text(power_x+5,power_y+6,"OFF",1,1,1);
-        gfx_set(0.9,0.9,0.9,1);
-        gfx_arc(power_x+39,power_y+13,7,0.6,5.68,1);
-        gfx_line(power_x+39,power_y+3,power_x+39,power_y+12,1);
+        power_x=10; power_y=draw_y;
+        draw_power_button(power_x,power_y);
         (mb && !p_mb && mx>=power_x && mx<power_x+51 && my>=power_y && my<power_y+26) ? (
             mem[ui_power_off]=!mem[ui_power_off]; needs_tab_update=1;
         );
     ) : current_tab_row==2 ? (
+        // Use the standard GUI font, not the default graphics font.
+        gfx_setfont(1,os_font,fontsize,'b');
         draw_text(FOLLOW_LBL_X+11,draw_y+17,"FOLLOW",0.8,0.8,0.8);
-        draw_text(FOLLOW_LBL_X+6,draw_y+27,"SONG:",0.8,0.8,0.8);
+        draw_text(FOLLOW_LBL_X+11,draw_y+29,"SONG:",0.8,0.8,0.8);
     ) : (
         is_follow=mem[ui_locked_tab]==-1 && !midi_form_override;
-        rect(FOLLOW_BOX_X+15,draw_y-10,FOLLOW_BOX_W+1,FOLLOW_BOX_H,is_follow?0.2:0.5,is_follow?0.9:0.5,is_follow?0.7:0.5,1);
-        gfx_set(0,0,0,1);
-        gfx_triangle(FOLLOW_BOX_X+22,draw_y-7,FOLLOW_BOX_X+22,draw_y+3,FOLLOW_BOX_X+30,draw_y-2);
-        (mb && !p_mb && mx>=FOLLOW_BOX_X && mx<FOLLOW_BOX_X+FOLLOW_BOX_W+31 && my>=draw_y-14 && my<draw_y+FOLLOW_BOX_H+5) ? (
+        // Original shackle/body geometry: open shackle while following.
+        gfx_set(0.9,0.9,0.9,1);
+        gfx_circle(FOLLOW_BOX_X+25,draw_y-2,7,0);
+        gfx_circle(FOLLOW_BOX_X+25,draw_y-12,6.5,0);
+        gfx_circle(FOLLOW_BOX_X+25,draw_y-12,6,0);
+        gfx_circle(FOLLOW_BOX_X+25,draw_y-12,5.5,0);
+        gfx_circle(FOLLOW_BOX_X+25,draw_y-13,5,0);
+        is_follow ? rect(FOLLOW_BOX_X+25,draw_y-15,10,11,0,0,0,1);
+        rect(FOLLOW_BOX_X+15,draw_y-10,FOLLOW_BOX_W+1,FOLLOW_BOX_H,0.5,0.5,0.5,1);
+        is_follow ? (
+            rect(FOLLOW_BOX_X+15,draw_y-10,FOLLOW_BOX_W+1,FOLLOW_BOX_H,0.2*bri,1.0*bri,1.0*bri,1);
+            gfx_set(0,0,0,1);
+            gfx_triangle(FOLLOW_BOX_X+22,draw_y-7,FOLLOW_BOX_X+22,draw_y+3,FOLLOW_BOX_X+30,draw_y-2);
+        );
+        gfx_setfont(1,os_font,fontsize,'b');
+        (mb && !p_mb && mx>=FOLLOW_BOX_X && mx<FOLLOW_BOX_X+FOLLOW_BOX_W+31 && my>=draw_y-33 && my<draw_y+FOLLOW_BOX_H+5) ? (
             mem[ui_locked_tab]=-1; gmem[GM_BASE+1]=-1; cue_release_requested=1; needs_tab_update=1;
         );
     );
@@ -2480,6 +2511,7 @@ loop(3,
     gui_i = 0;
     loop(current_tab_row==3?22:19,
         gui_t=visible_tab_at(current_tab_row,gui_i);
+        gui_i==(current_tab_row==3?20:17) ? draw_x+=special_group_gap;
         my_row = mem[tab_ui_row_base + gui_t];
         
         (my_row == current_tab_row) ? (
@@ -2673,7 +2705,7 @@ arrow_show && arrow_req_x >= 0 && arrow_eff_x >= 0 ? (
 // =========================================================
 // ROW 5: PATTERN SETTINGS (Flow Refactored)
 // =========================================================
-draw_x = tab_start_x - 112; // Reset cursor to tab line
+draw_x = 8; // Keep the Pattern Settings bar independent of the section-row inset.
 
 t_e = mem[ui_edit_tab];
 (t_e == 0) ? (
@@ -2708,7 +2740,9 @@ t_e = mem[ui_edit_tab];
     item_w = 50;
     is_p_muted = mem[tab_mute_base + t_e] & 1;
     is_p_muted ? rect(draw_x, draw_y, item_w, btn_h, 1, .4, .4, .6) : rect(draw_x, draw_y, item_w, btn_h, 0.4, 0.3, 0.3, 1);
-    gfx_set(1,1,1,1); gfx_x = draw_x + 9; gfx_y = draw_y + 2; gfx_drawstr("MUTE");
+    gfx_setfont(1,os_font,fontsize,'b');
+    gfx_measurestr("MUTE",mute_tw,mute_th);
+    draw_text(draw_x+(item_w-mute_tw)/2,draw_y+3,"MUTE",1,1,1);
     (mb && p_mb == 0 && mx >= draw_x && mx < draw_x + item_w && my >= draw_y && my < draw_y + btn_h) ? (
         mem[tab_mute_base + t_e] = mem[tab_mute_base + t_e] ~ 1;
         needs_tab_update = 1;
@@ -2717,7 +2751,7 @@ t_e = mem[ui_edit_tab];
 
     // LIBRARY: match the drawn width of Intro A (tab allocation minus its gap).
     item_w=mem[tab_w_base+1]-ui_gap_small;
-    btn(draw_x,draw_y,item_w,"LIBRARY") ? (
+    centered_btn(draw_x,draw_y,item_w,"LIBRARY") ? (
         gfx_x=draw_x; gfx_y=draw_y+20;
         lib_sel=gfx_showmenu("Save Pattern... (Requires Numbers2Notes running)|Load Pattern... (Requires Numbers2Notes running)||Backbeat|Four on the Floor|Half-Time|Double-Time|Shuffle|Basic Funk|Basic Hip-Hop|Count-In||Force Silence|Inherit (clear pattern)");
         lib_sel==11 ? (
@@ -2735,7 +2769,7 @@ t_e = mem[ui_edit_tab];
     // Three tab columns, at the standard button font size.
     item_w = 3*ttabw-ui_gap_small;
     gfx_setfont(1,os_font,fontsize,'b');
-    btn(draw_x, draw_y, item_w, "ACCEPT SUGGESTED") ? ( 
+    centered_btn(draw_x, draw_y, item_w, "USE SUGGESTED") ? ( 
         is_ghosting ? (
             memcpy(curr_pat_v_ptr, fb_pat_v_ptr, vel_stride_tab);
             memcpy(curr_pat_g_ptr, fb_pat_g_ptr, vel_stride_tab);
@@ -3863,9 +3897,7 @@ is_tab_muted_ui = mem[tab_mute_base + t_e] & 1;
 
 mem[ui_power_off] ? (
     rect(0,0,gfx_w,gfx_h,0,0,0,0.62);
-    rect(64,ROW2_Y,51,26,0.75,0.2,0.2,1);
-    draw_text(69,ROW2_Y+6,"OFF",1,1,1);
-    gfx_set(1,1,1,1); gfx_arc(103,ROW2_Y+13,7,0.6,5.68,1); gfx_line(103,ROW2_Y+3,103,ROW2_Y+12,1);
+    draw_power_button(10,ROW2_Y);
 );
 help_active ? (
     gfx_set(0,0,0,0.85); gfx_rect(0,0,gfx_w,gfx_h);
