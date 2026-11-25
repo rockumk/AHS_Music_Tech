@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.6
+version: 7.8.0-dev.7
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.6 -
+  # N2N Drum Arranger v7.8.0-dev.7 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -134,7 +134,7 @@ slider11:14<10,30,1>-Grid Row Height
 slider12:1<0,1,1>-Song Form Protocol
 
 @init
-version_display = "v7.8.0-dev.6";
+version_display = "v7.8.0-dev.7";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -2368,8 +2368,9 @@ btn_h = 20;        // Standard button height
 // Align Intro D with the original MAX ROWS background. Preserve original
 // core group positions and right-align the two supplemental columns.
 max_rows_x = HDR_X + HDR_W + UI_GAP_X - 29 - hw + 95 + ui_gap_large;
-tab_start_x = max_rows_x - 4*ttabw;
-tab_right_x = 120 + ftabs + 25*ttabw + 5*hww - ui_gap_small;
+tab_start_x = max_rows_x - 4*ttabw + 2;
+// Keep the supplemental columns at the far right, including when the FX window is wider.
+tab_right_x = max(120 + ftabs + 25*ttabw + 5*hww - ui_gap_small + 5, gfx_w-3);
 special_group_gap = max(0,tab_right_x-(tab_start_x+27*ttabw+special_tab_w-ui_gap_small));
 
 
@@ -2455,10 +2456,10 @@ item_w = 30; btn(draw_x, draw_y, item_w, "   >") ? ( gfx_set(1,0,0,1); export_n2
 // =========================================================
 draw_y = ROW2_Y; // Advance Y to Tab Area
 
-// VISUAL ONLY: show the currently playing cue's resolved pattern source.
+// VISUAL ONLY: show the current requested pattern's inheritance, even with transport parked.
 arrow_req = mem[ui_locked_tab]==-1 ? mem[ui_play_prog_tab] : mem[ui_locked_tab];
-arrow_eff = effective_play_tab;
-arrow_show = ((play_state & 1) && !mem[ui_power_off] &&
+arrow_eff = (play_state & 1) ? effective_play_tab : (arrow_req>=0 && arrow_req<TOTAL_TABS ? resolve_pattern(arrow_req) : 0);
+arrow_show = (!mem[ui_power_off] &&
               arrow_req >= 0 && arrow_req < TOTAL_TABS &&
               arrow_eff >= 0 && arrow_eff < TOTAL_TABS &&
               arrow_req != arrow_eff && arrow_eff > 0);
@@ -2705,7 +2706,7 @@ arrow_show && arrow_req_x >= 0 && arrow_eff_x >= 0 ? (
 // =========================================================
 // ROW 5: PATTERN SETTINGS (Flow Refactored)
 // =========================================================
-draw_x = 8; // Keep the Pattern Settings bar independent of the section-row inset.
+draw_x = tab_start_x - 112; // Move Pattern Settings by the same section-row inset.
 
 t_e = mem[ui_edit_tab];
 (t_e == 0) ? (
