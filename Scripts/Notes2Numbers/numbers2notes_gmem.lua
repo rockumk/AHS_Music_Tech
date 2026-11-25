@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.5
+-- @version 1.9.6
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -850,12 +850,14 @@ function export.DrawTracks(ctx,font)
         for i=1,5 do
             if i>1 then r.ImGui_SameLine(ctx) end
             r.ImGui_SetNextItemWidth(ctx,37)
-            local changed,value=r.ImGui_InputInt(ctx,"##track_width_"..i,actual_widths[i],0,0,r.ImGui_InputTextFlags_EnterReturnsTrue())
-            if changed then
+            -- EnterReturnsTrue is supported by InputText, not InputInt.
+            local submitted,entered=r.ImGui_InputText(ctx,"##track_width_"..i,tostring(actual_widths[i]),r.ImGui_InputTextFlags_CharsDecimal()|r.ImGui_InputTextFlags_EnterReturnsTrue())
+            local value=tonumber(entered)
+            if submitted and value and value==value and math.abs(value)<math.huge then
                 local other=0
                 for j=1,5 do if j~=i then other=other+actual_widths[j] end end
                 local maximum=math.max(px(10),max_header_width-other)
-                set_header_width(i,math.max(px(10),math.min(maximum,value)),scale)
+                set_header_width(i,math.max(px(10),math.min(maximum,math.floor(value+.5))),scale)
             end
             if r.ImGui_IsItemHovered(ctx) then
                 r.ImGui_SetTooltip(ctx,header_names[i].." width (pixels)\nType a value and press Enter")
