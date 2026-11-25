@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.8
+-- @version 1.9.9
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -504,6 +504,13 @@ local function kind_of(track,fx)
     if lower:find("n2n drum arranger",1,true) then return "DRUM" end
     if lower:find("n2n arp",1,true) then return "ARP" end
 end
+local function is_topline(tr,name)
+    if name=="__N2N_Topline_Hidden" or name=="__N2N_Melody_Engine_Hidden" then return false end
+    local _,tag=reaper.GetSetMediaTrackInfo_String(tr,"P_EXT:N2N:TOPLINE","",false)
+    local _,recipe=reaper.GetSetMediaTrackInfo_String(tr,"P_EXT:N2N:ID","",false)
+    return tag=="1" or (recipe or ""):match("^41_")~=nil
+        or (name or ""):lower():find("n2n topline",1,true)~=nil
+end
 local function scan(project)
     local result, counts={},{}
     for i=0,reaper.CountTracks(project)-1 do
@@ -514,6 +521,9 @@ local function scan(project)
         if native and native~=0 then
             local rr,gg,bb=reaper.ColorFromNative(native)
             red,green,blue=rr/255,gg/255,bb/255
+        end
+        if is_topline(tr,name) then
+            result[#result+1]={track=tr,guid=reaper.GetTrackGUID(tr),name=name,number=i+1,kind="Topline",r=red,g=green,b=blue}
         end
         for fx=0,reaper.TrackFX_GetCount(tr)-1 do
             local kind=kind_of(tr,fx)
@@ -544,7 +554,7 @@ function export.PublishTrackIdentity(force)
     tracks,duplicate=scan(project)
     local slots={}
     for _,t in ipairs(tracks) do
-        if t.id>=1 and t.id<=512 and duplicate[t.id]==1 then slots[t.id]=t end
+        if t.id and t.id>=1 and t.id<=512 and duplicate[t.id]==1 then slots[t.id]=t end
     end
     -- Clear stale identities on the first scan and on project/track changes.
     for id=1,512 do
@@ -582,7 +592,7 @@ local function find_free_id()
         if not used[id] and reaper.gmem_read(REG_BASE+id)==0 then return id end
     end
 end
-local function launch_cue()
+local function find_script(wanted)
     local r=reaper
     local function search(dir,depth)
         if depth>7 then return end
@@ -591,7 +601,7 @@ local function launch_cue()
             local file=r.EnumerateFiles(dir,i)
             if not file then break end
             local name=file:lower():gsub("[%s_%-]","")
-            if name=="n2ncue.lua" or name=="n2ncue" then return dir.."/"..file end
+            if name==wanted..".lua" or name==wanted then return dir.."/"..file end
             i=i+1
         end
         i=0
@@ -603,7 +613,11 @@ local function launch_cue()
             i=i+1
         end
     end
-    local path=search(r.GetResourcePath().."/Scripts",0)
+    return search(r.GetResourcePath().."/Scripts",0)
+end
+local function launch_cue()
+    local r=reaper
+    local path=find_script("n2ncue")
     if not path then
         local accepted
         accepted,path=r.GetUserFileNameForRead(r.GetResourcePath().."/Scripts/","Locate installed N2NCue script",".lua")
@@ -611,6 +625,89 @@ local function launch_cue()
     end
     local cmd=r.AddRemoveReaScript(true,0,path,true)
     if cmd and cmd>0 then r.Main_OnCommand(cmd,0) else r.MB("Could not launch N2NCue.","N2N Tracks",0) end
+end
+-- Topline is region based, rather than a library of repeating A-D patterns.
+local function valid_topline(t)
+    return reaper.ValidatePtr2(reaper.EnumProjects(-1,""),t.track,"MediaTrack*")
+        and reaper.GetTrackGUID(t.track)==t.guid
+end
+local function launch_topline(t,region)
+    local r=reaper
+    if not valid_topline(t) then return end
+    local project=r.EnumProjects(-1,"")
+    local sec="N2N_TOPLINE_HUB"
+    local owner=r.GetExtState(sec,"owner")
+    local heartbeat=tonumber(r.GetExtState(sec,"heartbeat"))
+    local running=owner~="" and heartbeat and math.abs(r.time_precise()-heartbeat)<2
+    if running and owner:match("^[^\t]+")~=tostring(project) then
+        r.MB("Close Topline in the other project before opening this track.","N2N Topline",0)
+        return
+    end
+    local path
+    if not running then
+        if r.JS_Window_Find and r.JS_Window_Find("N2N Topline",true) then
+            r.MB("Close the existing Topline window and reopen it from Tracks to enable navigation.","N2N Topline",0)
+            return
+        end
+        -- Prefer the script beside this package before searching other scripts.
+        local source=debug.getinfo(1,"S").source:sub(2)
+        local dir=source:match("^(.*[/\\])")
+        local sibling=dir and dir.."../N2N Topline.lua"
+        if sibling then local file=io.open(sibling,"rb"); if file then file:close(); path=sibling end end
+        path=path or find_script("n2ntopline")
+        if not path then
+            r.MB("Install N2N Topline.lua first.","N2N Tracks",0)
+            return
+        end
+    end
+    r.GetSetMediaTrackInfo_String(t.track,"P_EXT:N2N:TOPLINE","1",true)
+    r.SetExtState(sec,"request",table.concat({tostring(project),t.guid,tostring(region or -1),tostring(r.time_precise())},"\t"),false)
+    if not running then
+        local cmd=r.AddRemoveReaScript(true,0,path,true)
+        if cmd and cmd>0 then r.Main_OnCommand(cmd,0)
+        else r.DeleteExtState(sec,"request",false); r.MB("Could not launch N2N Topline.","N2N Tracks",0) end
+    end
+end
+local function topline_regions()
+    local r=reaper
+    local list,i={},0
+    while true do
+        local ok,is_region,pos,ending,name,id,native=r.EnumProjectMarkers3(0,i)
+        if ok==0 then break end
+        if is_region and ending>pos then
+            local rr,gg,bb=.45,.52,.62
+            if native and native~=0 then local a,b,c=r.ColorFromNative(native); rr,gg,bb=a/255,b/255,c/255 end
+            list[#list+1]={pos=pos,id=id,name=name~="" and name or "Region "..id,r=rr,g=gg,b=bb}
+        end
+        i=i+1
+    end
+    table.sort(list,function(a,b) return a.pos==b.pos and a.id<b.id or a.pos<b.pos end)
+    return list
+end
+local function topline_grid(ctx,t,regions,width,scale,gap)
+    local r=reaper
+    local x=r.ImGui_GetCursorPosX(ctx)
+    local cols=7
+    local w=(width-(cols-1)*gap)/cols
+    local h=math.floor(10*scale+.5)
+    if #regions==0 then
+        r.ImGui_TextDisabled(ctx,"No song regions. Render the song form first.")
+        return
+    end
+    for i,sec in ipairs(regions) do
+        if (i-1)%cols~=0 then r.ImGui_SameLine(ctx) else r.ImGui_SetCursorPosX(ctx,x) end
+        local label=sec.name:gsub("Pre%-Chorus","Pre"):gsub("Breakdown","Break"):gsub("Count%-In","Count")
+        while #label>0 and r.ImGui_CalcTextSize(ctx,label)>w-4 do
+            local p=utf8.offset(label,-1); label=label:sub(1,(p or #label)-1)
+        end
+        r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),color(sec.r,sec.g,sec.b))
+        r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ButtonHovered(),color(math.min(1,sec.r+.12),math.min(1,sec.g+.12),math.min(1,sec.b+.12)))
+        r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ButtonActive(),color(sec.r*.85,sec.g*.85,sec.b*.85))
+        r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Text(),(sec.r*.299+sec.g*.587+sec.b*.114)>.55 and 0x101010FF or 0xFFFFFFFF)
+        if r.ImGui_Button(ctx,label.."##topline_region_"..sec.id,w,h) then launch_topline(t,sec.id) end
+        r.ImGui_PopStyleColor(ctx,4)
+        if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,sec.name.."\nOpen this region in N2N Topline") end
+    end
 end
 -- Independent Tracks-tab zoom. Fonts are attached once, outside the frame.
 local TRACK_SCALE_MIN, TRACK_SCALE_MAX, TRACK_SCALE_STEP, TRACK_SCALE_DEFAULT = 75, 175, 5, 170
@@ -768,10 +865,12 @@ function export.DrawTracks(ctx,font)
         -- Avoid shrinking the pattern buttons to an unusable width when
         -- experimenting with exceptionally narrow header fields.
         local pattern_width=math.min(available,math.max(width,px(200)))
+        local regions
         for _,t in ipairs(tracks) do
-            local fx=locate(t)
-            if fx then
-                t.fx=fx
+            local top=t.kind=="Topline"
+            local fx=not top and locate(t)
+            if (top and valid_topline(t)) or fx then
+                if not top then t.fx=fx end
                 r.ImGui_SetCursorPosX(ctx,row_x)
                 r.ImGui_PushID(ctx,t.guid)
                 local label=("%d. %s"):format(t.number,t.name)
@@ -796,12 +895,15 @@ function export.DrawTracks(ctx,font)
                 r.ImGui_PopStyleVar(ctx)
                 if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,t.name) end
                 r.ImGui_SameLine(ctx)
-                if r.ImGui_Button(ctx,t.kind,arpw,row_height) then open_fx(t.track,fx) end
+                if r.ImGui_Button(ctx,t.kind,arpw,row_height) then
+                    if top then launch_topline(t) else open_fx(t.track,fx) end
+                end
                 r.ImGui_SameLine(ctx)
                 local inst=r.TrackFX_GetInstrument(t.track)
                 if inst<0 or inst==fx then r.ImGui_BeginDisabled(ctx) end
-                if r.ImGui_Button(ctx,"Instrument",instw,row_height) then open_fx(t.track,inst) end
+                if r.ImGui_Button(ctx,"Instrument",top and instw+idw+track_gap or instw,row_height) then open_fx(t.track,inst) end
                 if inst<0 or inst==fx then r.ImGui_EndDisabled(ctx) end
+                if not top then
                 r.ImGui_SameLine(ctx)
                 local bad=(duplicate[t.id] or 0)>1 or t.id<1 or t.id>512
                 if bad then
@@ -813,6 +915,7 @@ function export.DrawTracks(ctx,font)
                     r.ImGui_PopStyleColor(ctx)
                     r.ImGui_PopStyleVar(ctx)
                     if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,"Instance ID conflict") end
+                end
                 end
                 r.ImGui_SameLine(ctx)
                 -- Hover alone opens the interactive flyout. There is no click-open menu.
@@ -829,7 +932,10 @@ function export.DrawTracks(ctx,font)
                 r.ImGui_PopStyleColor(ctx,4)
                 r.ImGui_SetCursorPosX(ctx,row_x)
                 if small_font then r.ImGui_PushFont(ctx,small_font) end
-                pattern_grid(ctx,t,pattern_width,scale,track_gap)
+                if top then
+                    regions=regions or topline_regions()
+                    topline_grid(ctx,t,regions,pattern_width,scale,track_gap)
+                else pattern_grid(ctx,t,pattern_width,scale,track_gap) end
                 if small_font then r.ImGui_PopFont(ctx) end
                 r.ImGui_SetCursorPosX(ctx,row_x)
                 r.ImGui_Separator(ctx)
@@ -898,7 +1004,8 @@ function export.DrawTracks(ctx,font)
     -- Use an input-capable floating window, rather than a menu or a
     -- standard tooltip (which cannot receive clicks reliably).
     if id_popup then fx_hover=nil end
-    if fx_hover and r.time_precise()<=hover_until and locate(fx_hover) then
+    if fx_hover and r.time_precise()<=hover_until and
+        ((fx_hover.kind=="Topline" and valid_topline(fx_hover)) or locate(fx_hover)) then
         local t=fx_hover
         r.ImGui_SetNextWindowPos(ctx,hover_pos[1],hover_pos[2])
         local flags=r.ImGui_WindowFlags_NoTitleBar()|r.ImGui_WindowFlags_AlwaysAutoResize()|r.ImGui_WindowFlags_NoSavedSettings()|r.ImGui_WindowFlags_NoFocusOnAppearing()|r.ImGui_WindowFlags_NoMove()|r.ImGui_WindowFlags_NoResize()
