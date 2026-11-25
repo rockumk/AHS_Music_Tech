@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.7
+-- @version 1.9.8
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -620,17 +620,12 @@ track_scale = math.max(TRACK_SCALE_MIN, math.min(TRACK_SCALE_MAX,
 local track_fonts, track_small_fonts = {}, {}
 -- Header rectangle widths in unscaled pixels, in display order.
 -- The five footer fields show/edit their actual scaled pixel widths.
-local header_names={"Track","Arp / Drum","Instrument","ID","FX"}
 -- User-approved widths at 170%; normalize to the zoom reference.
 local header_defaults={278/1.7,91/1.7,91/1.7,44/1.7,44/1.7}
 local HEADER_WIDTH_KEY="TracksHeaderWidthV2"
 local header_widths={}
 for i,default in ipairs(header_defaults) do
     header_widths[i]=math.max(10,math.min(500,tonumber(reaper.GetExtState("Numbers2Notes",HEADER_WIDTH_KEY..i)) or default))
-end
-local function set_header_width(i,pixels,scale)
-    header_widths[i]=pixels/scale
-    reaper.SetExtState("Numbers2Notes",HEADER_WIDTH_KEY..i,tostring(header_widths[i]),true)
 end
 function export.InitTrackFonts(ctx, family, normal_size, small_size)
     local cache = {}
@@ -846,38 +841,16 @@ function export.DrawTracks(ctx,font)
     r.ImGui_PopStyleColor(ctx)
     r.ImGui_PopStyleVar(ctx,3)
     if normal_font then r.ImGui_PopFont(ctx) end
-    -- Keep the launcher centered under the fixed container. Size controls
-    -- remain at the right end of the same footer and do not scroll.
-    local zoom_button,readout_width,launcher_width=24,52,180
+    -- Launch advanced cueing in place of the temporary width fields.
+    -- Size controls remain at the right end of the non-scrolling footer.
+    local zoom_button,readout_width,launcher_width=24,52,220
     local readout=("%d%%"):format(percent)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),3,1)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),2,2)
     r.ImGui_SetCursorPosY(ctx,r.ImGui_GetCursorPosY(ctx)+footer_gap)
     r.ImGui_SetCursorPosX(ctx,box_x)
-    -- Five editable pixel widths, left to right as in the track header.
-    -- Commit with Enter; clamp so the entire header stays inside the box.
-    if max_header_width>0 then
-        for i=1,5 do
-            if i>1 then r.ImGui_SameLine(ctx) end
-            r.ImGui_SetNextItemWidth(ctx,37)
-            -- EnterReturnsTrue is supported by InputText, not InputInt.
-            local submitted,entered=r.ImGui_InputText(ctx,"##track_width_"..i,tostring(actual_widths[i]),r.ImGui_InputTextFlags_CharsDecimal()|r.ImGui_InputTextFlags_EnterReturnsTrue())
-            local value=tonumber(entered)
-            if submitted and value and value==value and math.abs(value)<math.huge then
-                local other=0
-                for j=1,5 do if j~=i then other=other+actual_widths[j] end end
-                local maximum=math.max(px(10),max_header_width-other)
-                set_header_width(i,math.max(px(10),math.min(maximum,math.floor(value+.5))),scale)
-            end
-            if r.ImGui_IsItemHovered(ctx) then
-                r.ImGui_SetTooltip(ctx,header_names[i].." width (pixels)\nType a value and press Enter")
-            end
-        end
-        r.ImGui_SameLine(ctx,box_x+(panel_width-launcher_width)/2)
-    else
-        r.ImGui_SetCursorPosX(ctx,box_x+(panel_width-launcher_width)/2)
-    end
-    if r.ImGui_Button(ctx,"OPEN N2NCUE",launcher_width,footer_height) then launch_cue() end
+    if r.ImGui_Button(ctx,"N2N Advanced Cueing",launcher_width,footer_height) then launch_cue() end
+    if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,"Open N2NCue for manual cue placement and live cueing") end
     r.ImGui_SameLine(ctx,box_x+panel_width-(2*zoom_button+readout_width+6))
     if percent<=TRACK_SCALE_MIN then r.ImGui_BeginDisabled(ctx) end
     if r.ImGui_Button(ctx,"-##track_zoom",zoom_button,footer_height) then adjust_track_scale(-TRACK_SCALE_STEP) end
