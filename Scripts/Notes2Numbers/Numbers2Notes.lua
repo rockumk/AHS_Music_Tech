@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.3
+-- @version 2.0.4-dev.4
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -6714,12 +6714,7 @@ function Generate_Arranger_Conductors()
     -- Drum Arranger follows GMEM by default. Do not create or delete MIDI cues here;
     -- existing or manually supplied channel-16 cues remain available as overrides.
 
-    local arp_tracks = Find_All_Tracks_With_Arp_FX()
-    for _, arp_track in ipairs(arp_tracks) do
-        if arp_track then
-            Generate_Arp_Conductor(arp_track)
-        end
-    end
+    -- Arp also follows GMEM. Leave existing manually supplied MIDI cues untouched.
 end
 
 function Generate_Spectrums(grid_take, lead_take)
