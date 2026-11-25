@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9
+-- @version 1.9.1
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -721,13 +721,16 @@ function export.DrawTracks(ctx,font)
                 if r.ImGui_Button(ctx,"ID "..t.id,idw,19) then id_popup=t; id_popup_open=true; id_suggestion=find_free_id() end
                 if bad then r.ImGui_PopStyleColor(ctx) end
                 r.ImGui_SameLine(ctx)
-                local clicked=r.ImGui_Button(ctx,"FX",fxw,19)
-                if clicked or r.ImGui_IsItemHovered(ctx) then
+                -- Hover alone opens the interactive flyout. There is no click-open menu.
+                r.ImGui_Button(ctx,"FX",fxw,19)
+                if r.ImGui_IsItemHovered(ctx) then
+                    if not fx_hover or fx_hover.guid~=t.guid then
+                        local right=r.ImGui_GetItemRectMax(ctx)
+                        local _,top=r.ImGui_GetItemRectMin(ctx)
+                        hover_pos={right+3,top}
+                    end
                     fx_hover=t
-                    hover_until=r.time_precise()+.35
-                    local _,bottom=r.ImGui_GetItemRectMax(ctx)
-                    local left=r.ImGui_GetItemRectMin(ctx)
-                    hover_pos={left,bottom}
+                    hover_until=r.time_precise()+.5
                 end
                 if font then r.ImGui_PushFont(ctx,font) end
                 pattern_grid(ctx,t,width)
@@ -770,13 +773,18 @@ function export.DrawTracks(ctx,font)
             r.ImGui_EndPopup(ctx)
         else id_popup=nil end
     end
+    -- Use an input-capable floating window, rather than a menu or a
+    -- standard tooltip (which cannot receive clicks reliably).
+    if id_popup then fx_hover=nil end
     if fx_hover and r.time_precise()<=hover_until and locate(fx_hover) then
         local t=fx_hover
         r.ImGui_SetNextWindowPos(ctx,hover_pos[1],hover_pos[2])
-        local flags=r.ImGui_WindowFlags_NoTitleBar()|r.ImGui_WindowFlags_AlwaysAutoResize()|r.ImGui_WindowFlags_NoSavedSettings()|r.ImGui_WindowFlags_NoFocusOnAppearing()
-        local vis=r.ImGui_Begin(ctx,"##N2NHoverFX",true,flags)
+        local flags=r.ImGui_WindowFlags_NoTitleBar()|r.ImGui_WindowFlags_AlwaysAutoResize()|r.ImGui_WindowFlags_NoSavedSettings()|r.ImGui_WindowFlags_NoFocusOnAppearing()|r.ImGui_WindowFlags_NoMove()|r.ImGui_WindowFlags_NoResize()
+        local vis=r.ImGui_Begin(ctx,"##N2NHoverFX",nil,flags)
         if vis then
-            if r.ImGui_IsWindowHovered(ctx) then hover_until=r.time_precise()+.35 end
+            -- Keep the flyout alive as the mouse travels from the FX
+            -- button into the window or interacts with its rows.
+            if r.ImGui_IsWindowHovered(ctx) then hover_until=r.time_precise()+.5 end
             r.ImGui_Text(ctx,t.name.." FX")
             r.ImGui_Separator(ctx)
             for fx=0,r.TrackFX_GetCount(t.track)-1 do
@@ -793,7 +801,7 @@ function export.DrawTracks(ctx,font)
                             r.Undo_EndBlock("N2N: Toggle FX bypass",-1)
                         end
                     else open_fx(t.track,fx) end
-                    hover_until=r.time_precise()+.35
+                    hover_until=r.time_precise()+.5
                 end
                 r.ImGui_PopStyleColor(ctx)
                 r.ImGui_PopID(ctx)
