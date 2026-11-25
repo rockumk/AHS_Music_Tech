@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.3.0-dev.1
+version: 12.3.0-dev.2
 author: Rock Kennedy
 about:
-  # N2N Arp v12.3.0-dev.1
+  # N2N Arp v12.3.0-dev.2
   - FEATURE: Velocity Scaling
 provides:
   [main] .
@@ -26,7 +26,7 @@ slider14:0<0,2,1{Chords,Split (Chords and Bass),Bass}>-Input Mode
 
 @init
 scale_dirty = 0;
-thisversion = "v12.3.0-dev.1";
+thisversion = "v12.3.0-dev.2";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -1263,7 +1263,53 @@ function resolve_requested(t) local(out) (
     out=t<=0||mem[tab_mute_base+t]?0:get_active_fallback(t);
     out>0 && mem[tab_mute_base+out] ? 0 : out;
 );
+
+function factory_pattern(p,t) local(i,r,step,role,ptr) (
+    memset(grid_base+t*vel_stride_tab,0,vel_stride_tab);
+    memset(vel_base+t*vel_stride_tab,0,vel_stride_tab);
+    memset(step_len_base+t*vel_stride_tab,0,vel_stride_tab);
+    mem[bars_ov_base+t]=1; mem[subdiv_ov_base+t]=2;
+    mem[half_speed_ov_base+t]=0; mem[tab_mute_base+t]=0;
+    // Lane set 0 is rows 54..62; H/M/L are offsets 1/4/7.
+    i=0; loop(16,
+        step=i; r=-1;
+        p==1 && step%2==0 ? r=step%6==0?61:step%6==2?58:55;
+        p==2 && step%2==0 ? r=step%6==0?55:step%6==2?58:61;
+        p==3 && step%2==0 ? r=step%8==0?61:step%8==4?55:58;
+        p==4 && step%4==0 ? r=step%8==0?61:70;
+        p==6 ? r=step%4==0?61:step%4==1?58:step%4==2?55:58;
+        p==7 && (step==0||step==3||step==6||step==10||step==14) ? r=step%3==0?61:step%2==0?55:58;
+        r>=0 ? (ptr=t*vel_stride_tab+r*vel_stride_row+step; mem[grid_base+ptr]=1; mem[vel_base+ptr]=step%4==0?105:84;);
+        p==5 && step%4==0 ? (
+            role=0; loop(3,
+                ptr=t*vel_stride_tab+(55+role*3)*vel_stride_row+step;
+                mem[grid_base+ptr]=1; mem[vel_base+ptr]=95;
+                role+=1;
+            );
+        );
+        i+=1;
+    );
+    scan_active_tab();
+);
+function library_request(op,t) local(n,r,k,p,a) (
+    gmem[6400000]==0 && abs(time_precise()-gmem[6400008])<3 ? (
+        gmem[6400001]=slider5; gmem[6400002]=t; gmem[6400011]=time_precise(); gmem[6400012]=my_key;
+        gmem[6400003]=eff_bars(t); gmem[6400004]=eff_sub(t); gmem[6400005]=eff_hum(t); gmem[6400006]=eff_swing(t); gmem[6400007]=eff_half(t);
+        n=0; r=0; loop(MAX_ROWS,
+            k=0; loop(MAX_STEPS,
+                p=t*vel_stride_tab+r*vel_stride_row+k;
+                op==1 && mem[grid_base+p]>0 ? (
+                    a=6400016+n*6; gmem[a]=r; gmem[a+1]=1; gmem[a+2]=k;
+                    gmem[a+3]=mem[vel_base+p]; gmem[a+4]=mem[grid_base+p]; gmem[a+5]=mem[step_len_base+p]; n+=1;
+                ); k+=1;
+            ); r+=1;
+        );
+        gmem[6400009]=n; gmem[6400010]=mem[tab_mute_base+t]&2; gmem[6400000]=op;
+    ) : gfx_showmenu("#Open Numbers2Notes first (or another request is pending)");
+);
+
 @serialize
+arp_loading=file_avail(0)>0;
 file_mem(0, ui_base, 32);
 file_mem(0, row_mute_base, MAX_ROWS); file_mem(0, row_solo_base, MAX_ROWS); 
 file_mem(0, row_chan_base, MAX_ROWS); 
@@ -1274,27 +1320,41 @@ file_mem(0, half_speed_ov_base, MAX_TABS);
 file_mem(0, vel_base, TOTAL_TABS * MAX_ROWS * MAX_STEPS); file_mem(0, grid_base, TOTAL_TABS * MAX_ROWS * MAX_STEPS); file_mem(0, step_len_base, TOTAL_TABS * MAX_ROWS * MAX_STEPS);
 file_var(0, input_filter_mask);
 file_var(0, global_out_mask);
-file_avail(0)>0 ? (
+arp_loading ? (
+    file_avail(0)>0 ? (
     file_var(0,arp_ext_magic);
     arp_ext_magic==24632 ? (
         file_mem(0,tab_mute_base,TOTAL_TABS);
         file_var(0,form_count); form_count=max(0,min(FORM_MAX,floor(form_count)));
         form_count>0 ? file_mem(0,form_cache,form_count*3);
     );
+    );
     form_rev=-1;
     scan_all_tabs();
 ) : (
-    file_avail(0)==0 ? (
         form_refresh(); arp_ext_magic=24632; file_var(0,arp_ext_magic);
         file_mem(0,tab_mute_base,TOTAL_TABS); file_var(0,form_count);
         form_count>0 ? file_mem(0,form_cache,form_count*3);
-    );
 );
 
 
 
 
 @block
+(gmem[6400000]==3 && gmem[6400001]==slider5 && gmem[6400012]==my_key) ? (
+    lib_t=gmem[6400002]; lib_t>=1 && lib_t<TOTAL_TABS ? (
+        memset(grid_base+lib_t*vel_stride_tab,0,vel_stride_tab); memset(vel_base+lib_t*vel_stride_tab,0,vel_stride_tab); memset(step_len_base+lib_t*vel_stride_tab,0,vel_stride_tab);
+        mem[bars_ov_base+lib_t]=gmem[6400003]; lib_sub=gmem[6400004]; mem[subdiv_ov_base+lib_t]=lib_sub==8?0:lib_sub==12?1:lib_sub==16?2:lib_sub==24?3:4;
+        mem[hum_ov_base+lib_t]=gmem[6400005]; mem[swing_ov_base+lib_t]=gmem[6400006]; mem[half_speed_ov_base+lib_t]=gmem[6400007]; mem[tab_mute_base+lib_t]=gmem[6400010]&2;
+        lib_i=0; loop(min(16384,max(0,gmem[6400009])),
+            lib_a=6400016+lib_i*6; lib_r=gmem[lib_a]; lib_s=gmem[lib_a+2];
+            lib_r>=0 && lib_r<MAX_ROWS && lib_s>=0 && lib_s<MAX_STEPS ? (
+                lib_p=lib_t*vel_stride_tab+lib_r*vel_stride_row+lib_s;
+                mem[vel_base+lib_p]=gmem[lib_a+3]; mem[grid_base+lib_p]=gmem[lib_a+4]; mem[step_len_base+lib_p]=gmem[lib_a+5];
+            ); lib_i+=1;
+        ); check_tab_population(lib_t); flush_inventory_to_gmem();
+    ); gmem[6400000]=0;
+);
 // --- SEND QUEUED RECORDING NOTES ---
 midi_trigger_queued >= 0 ? (
     midisend(0, 0x9F, midi_trigger_queued | (1 << 8));   // Note On Ch 16 at Velocity 1
@@ -1879,7 +1939,7 @@ use_lh ? (
 form_audio ? (form_at>=0 ? playback_shift=-mem[form_cache+form_at*3] : playback_shift=0;);
 t_pl=effective_play_tab;
 
-@gfx 1470 740
+@gfx 1420 740
 ext_noundo = 1;
 
 
@@ -2520,7 +2580,7 @@ arrow_show && arrow_req_x >= 0 && arrow_eff_x >= 0 ? (
 );
 
 ctrl_y = draw_y; // Pass vertical position to the Pattern Settings row
-x2 = UI_TOP_X;
+x2 = tab_start_x-112;
 
 
 
@@ -2551,10 +2611,8 @@ fb_pat_l_ptr = step_len_base + fb_tab*vel_stride_tab;
 
         gfx_setfont(1, os_font, fontsize-2, 'b'); 
         gfx_set(0.8,0.8,0.8,1); 
-        gfx_x = x2 + 6; gfx_y = ctrl_y - 1; 
-        gfx_drawstr("PATTERN");
-        gfx_x = x2 + 2; gfx_y = ctrl_y + 8; 
-        gfx_drawstr("SETTINGS:");
+        gfx_x=x2-46; gfx_y=ctrl_y+4;
+        gfx_drawstr("PATTERN SETTINGS:");
         x2 += 56;
 
         
@@ -2563,29 +2621,40 @@ fb_pat_l_ptr = step_len_base + fb_tab*vel_stride_tab;
             
                 // MUTE BUTTON
                 item_w = 50;
-                is_p_muted = mem[tab_mute_base + t_e];
+                is_p_muted = mem[tab_mute_base + t_e]&1;
                 is_p_muted ? rect(x2, ctrl_y, item_w, 18, 1, .4, .4, .6) : rect(x2, ctrl_y, item_w, 18, 0.4, 0.3, 0.3, 1);
-                gfx_set(1,1,1,1); gfx_x = x2 + 9; gfx_y = ctrl_y + 2; gfx_drawstr("MUTE");
+                gfx_measurestr("MUTE",mute_tw,mute_th); draw_text(x2+(item_w-mute_tw)/2,ctrl_y+2,"MUTE",1,1,1);
                 (mb && p_mb == 0 && mx >= x2 && mx < x2 + item_w && my >= ctrl_y && my < ctrl_y + 18) ? (
-                    mem[tab_mute_base + t_e] = !mem[tab_mute_base + t_e];
+                    mem[tab_mute_base + t_e] = mem[tab_mute_base + t_e] ~ 1;
                     capture_id = -2;
                 );
-                x2 += item_w + ui_gap_small -1;
-         
-        item_w = 163;
+                x2 += item_w + ui_gap_small;
+        item_w=sectw-5;
+        centered_btn(x2,ctrl_y,item_w,18,"LIBRARY") ? (
+            gfx_x=x2; gfx_y=ctrl_y+20;
+            lib_sel=gfx_showmenu("Save Pattern... (Requires Numbers2Notes running)|Load Pattern... (Requires Numbers2Notes running)||Ascending|Descending|Up and Down|Alternating Bass|Block Chords|Broken Chords|Syncopated||Force Silence|Inherit (clear pattern)");
+            lib_sel==1||lib_sel==2 ? library_request(lib_sel,t_e);
+            lib_sel>=3 && lib_sel<=9 ? factory_pattern(lib_sel-2,t_e);
+            lib_sel==10||lib_sel==11 ? (
+                memset(curr_pat_g_ptr,0,vel_stride_tab); memset(curr_pat_v_ptr,0,vel_stride_tab); memset(curr_pat_l_ptr,0,vel_stride_tab);
+                mem[tab_mute_base+t_e]=lib_sel==10?2:0; scan_active_tab();
+            );
+        );
+        x2+=item_w+ui_gap_small;
+        item_w = 3*ttabw-5;
   
     is_ghosting ? (
-        btn(x2, ctrl_y, item_w, 18, "ACCEPT SUGGESTED PATTERN") ? ( 
+        centered_btn(x2, ctrl_y, item_w, 18, "USE SUGGESTED") ? ( 
             memcpy(curr_pat_v_ptr, fb_pat_v_ptr, vel_stride_tab);
             memcpy(curr_pat_g_ptr, fb_pat_g_ptr, vel_stride_tab);
             memcpy(curr_pat_l_ptr, fb_pat_l_ptr, vel_stride_tab);
-            scan_active_tab();
+            mem[tab_mute_base+t_e]=0; scan_active_tab();
             is_ghosting = 0; 
         ); 
     ) : (
         // Inactive placeholder
         rect(x2, ctrl_y, item_w, 18, 0.15, 0.15, 0.15, 1);
-        draw_text(x2+5, ctrl_y+2, "ACCEPT SUGGESTED PATTERN", 0.4, 0.4, 0.4);
+        gfx_measurestr("USE SUGGESTED",tw,th); draw_text(x2+(item_w-tw)/2,ctrl_y+2,"USE SUGGESTED",0.4,0.4,0.4);
     );
     
     x2 += item_w + ui_gap_small -1;
@@ -2600,7 +2669,7 @@ fb_pat_l_ptr = step_len_base + fb_tab*vel_stride_tab;
     x2+=item_w + ui_gap_small;
     
     item_w = 112;
-    btn(x2, ctrl_y, item_w, 18, "   CLEAR PATTERN") ? ( memset(curr_pat_g_ptr, 0, vel_stride_tab); memset(curr_pat_v_ptr, 0, vel_stride_tab); memset(curr_pat_l_ptr, 0, vel_stride_tab); scan_all_tabs(); ); 
+    btn(x2, ctrl_y, item_w, 18, "   CLEAR PATTERN") ? ( memset(curr_pat_g_ptr, 0, vel_stride_tab); memset(curr_pat_v_ptr, 0, vel_stride_tab); memset(curr_pat_l_ptr, 0, vel_stride_tab); mem[tab_mute_base+t_e]=0; scan_active_tab(); ); 
     x2+=item_w + ui_gap_small;
     
 
@@ -2667,27 +2736,40 @@ x2 += item_w + ui_gap_small;
 
 
     curr_sub_val = eff_sub(t_e);
+    hf_x=tab_right_x+5; track_label_w=90;
+    track_num>0 ? (
+        rect(hf_x,row1_y,track_label_w,22,track_r,track_g,track_b,1);
+        lum=track_r*.299+track_g*.587+track_b*.114;
+        gfx_setfont(1,os_font,fontsize,'b'); gfx_measurestr("TRACK",tw,th);
+        draw_text(hf_x+(track_label_w-tw)/2,row1_y+(22-th)/2,"TRACK",lum>.5?0:1,lum>.5?0:1,lum>.5?0:1);
+        sprintf(#track_num_text,"%d",track_num);
+        gfx_setfont(1,os_font,76,'b'); gfx_measurestr(#track_num_text,tw,th);
+        ns=min(1,min(82/max(1,tw),82/max(1,th)));
+        ns<1 ? (gfx_setfont(1,os_font,max(12,floor(76*ns)),'b'); gfx_measurestr(#track_num_text,tw,th););
+        draw_text(hf_x+(90-tw)/2,ROW2_Y+(86-th)/2,#track_num_text,1,1,1);
+        gfx_setfont(1,os_font,fontsize,'b');
+    );
     (curr_sub_val == 24 || curr_sub_val == 32) ? (
-        hf_x = x2-2; box_h = 19; hf_act = eff_half(t_e);
-        rect(hf_x, ctrl_y, 75, box_h, 0.2, 0.2, 0.2, 1);
+         box_h = 19; hf_act = eff_half(t_e);
+        rect(hf_x, ctrl_y, 90, box_h, 0.2, 0.2, 0.2, 1);
 
-    (mb && p_mb == 0 && mx>=hf_x && mx<hf_x+75 && my>=ctrl_y && my<ctrl_y+box_h) ? (
+    (mb && p_mb == 0 && mx>=hf_x && mx<hf_x+90 && my>=ctrl_y && my<ctrl_y+box_h) ? (
         mem[half_speed_ov_base+t_e] = !mem[half_speed_ov_base+t_e];
     );
 
-        !hf_act ? ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(hf_x, ctrl_y, 36, box_h); ); 
-        hf_act  ? ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(hf_x+37, ctrl_y, 36, box_h); ); 
+        !hf_act ? ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(hf_x, ctrl_y, 45, box_h); ); 
+        hf_act  ? ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(hf_x+45, ctrl_y, 45, box_h); ); 
         !hf_act ? gfx_set(0,0,0,1 ) : gfx_set(0.5,0.5,0.5,1); draw_text(hf_x+10, ctrl_y+2, "1x", 0,0,0);
-        hf_act ? gfx_set(0,0,0,1) : gfx_set(0.5,0.5,0.5,1); draw_text(hf_x+49, ctrl_y+2, "1/2", 0,0,0);
-        gfx_set(0,0,0,1); gfx_line(hf_x+36, ctrl_y, hf_x+36, ctrl_y+box_h);
+        hf_act ? gfx_set(0,0,0,1) : gfx_set(0.5,0.5,0.5,1); draw_text(hf_x+55, ctrl_y+2, "1/2", 0,0,0);
+        gfx_set(0,0,0,1); gfx_line(hf_x+45, ctrl_y, hf_x+45, ctrl_y+box_h);
     );
 
 
 
 
 
-    st_x = x2 + 76;
-    btn(st_x, ctrl_y, 73, 19, "  STRETCH") ? ( 
+    st_x = tab_right_x-stretch_w;
+    btn(st_x, ctrl_y, stretch_w, 19, "  STRETCH") ? ( 
         gfx_x = st_x; gfx_y = ctrl_y + 20;
         sel_stretch = gfx_showmenu("Stretch Pattern 2x (Short)|Stretch Pattern 2x (Long)|Stretch Pattern 4x (Short)|Stretch Pattern 4x (Long)||Stretch Selected Lane 2x (Short)|Stretch Selected Lane 2x (Long)|Stretch Selected Lane 4x (Short)|Stretch Selected Lane 4x (Long)");
         
@@ -2721,12 +2803,13 @@ x2 += item_w + ui_gap_small;
 
 // We define fixed positions for the view toggles so they don't jump around on Tab 0
 
-mode_x = st_x + 73 + ui_gap_small;
-mode_w = 112;
+mode_x = drawhold_x;
+mode_w = 96;
 mode_h = 19;
+mode_y=row1_y+3;
 
-rect(mode_x, ctrl_y, mode_w, mode_h, 0.2, 0.2, 0.2, 1);
-draw_text(mode_x+5, ctrl_y+3, "MODE:", 0.7,0.7,0.7);
+rect(mode_x, mode_y, mode_w, mode_h, 0.2, 0.2, 0.2, 1);
+draw_text(mode_x+5, mode_y+3, "MODE:", 0.7,0.7,0.7);
 
 // Determine short label name
 slider14 == 0 ? strcpy(#md, "CHORDS") : 
@@ -2735,9 +2818,9 @@ slider14 == 1 ? strcpy(#md, "SPLIT") :
 
 // Green for split, Orange/Yellow for standard single-engine modes
 slider14 == 1 ? gfx_set(0,1,0,1) : gfx_set(1,0.8,0.2,1);
-gfx_x = mode_x + 50; gfx_y = ctrl_y+3; gfx_drawstr(#md);
+gfx_x = mode_x + 43; gfx_y = mode_y+3; gfx_drawstr(#md);
 
-(mb && p_mb == 0 && mx >= mode_x && mx < mode_x + mode_w && my >= ctrl_y && my < ctrl_y + mode_h) ? (
+(mb && p_mb == 0 && mx >= mode_x && mx < mode_x + mode_w && my >= mode_y && my < mode_y + mode_h) ? (
     gfx_x = mx; gfx_y = my;
     sel_mode = gfx_showmenu("Chords|Split (Chords and Bass)|Bass");
     sel_mode > 0 ? (
@@ -2749,16 +2832,17 @@ gfx_x = mode_x + 50; gfx_y = ctrl_y+3; gfx_drawstr(#md);
     );
     capture_id = -2;
 );
-vw_x =  st_x + 73 + ui_gap_small;
+vw_x = mode_x+mode_w+5;
 ctrl_y += 23;
-vw_w = 112;
+vw_y=mode_y;
+vw_w = 100;
 vw_h = 19;
 
-rect(vw_x, ctrl_y, vw_w, vw_h, 0.2, 0.2, 0.2, 1);
-draw_text(vw_x+5, ctrl_y+3, "VIEW:", 0.7, 0.7, 0.7);
-mem[ui_tab_view_mode] == 0 ? draw_text(vw_x + 49, ctrl_y+3, "SLOTS", 0,1,1) : draw_text(vw_x + 49, ctrl_y+3, "SECTIONS", 1,0.6,0);
+rect(vw_x, vw_y, vw_w, vw_h, 0.2, 0.2, 0.2, 1);
+draw_text(vw_x+5, vw_y+3, "VIEW:", 0.7, 0.7, 0.7);
+mem[ui_tab_view_mode] == 0 ? draw_text(vw_x + 37, vw_y+3, "SLOTS", 0,1,1) : draw_text(vw_x + 37, vw_y+3, "SECTIONS", 1,0.6,0);
 
-(mb && p_mb == 0 && mx >= vw_x && mx < vw_x + vw_w && my >= ctrl_y && my < ctrl_y + vw_h) ? (
+(mb && p_mb == 0 && mx >= vw_x && mx < vw_x + vw_w && my >= vw_y && my < vw_y + vw_h) ? (
     mem[ui_tab_view_mode] = !mem[ui_tab_view_mode];
     capture_id = -2;
 );
@@ -3340,7 +3424,7 @@ gfx_setfont(1, os_font, fontsize +1 , 'b');
 
 
 // --- PATTERN MUTE OVERLAY ---
-is_tab_muted_ui = mem[tab_mute_base + t_e];
+is_tab_muted_ui = mem[tab_mute_base + t_e]&1;
 
 (t_e > 0 && is_tab_muted_ui) ? (
     ov_x = grid_x; 
