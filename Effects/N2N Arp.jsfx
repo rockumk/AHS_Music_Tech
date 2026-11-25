@@ -1,9 +1,9 @@
 desc:N2N Arp
-version: 12.3.0-dev.2
+version: 12.3.0-dev.3
 author: Rock Kennedy
 about:
-  # N2N Arp v12.3.0-dev.2
-  - FEATURE: Velocity Scaling
+  # N2N Arp v12.3.0-dev.3
+  - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
 
@@ -26,7 +26,7 @@ slider14:0<0,2,1{Chords,Split (Chords and Bass),Bass}>-Input Mode
 
 @init
 scale_dirty = 0;
-thisversion = "v12.3.0-dev.2";
+thisversion = "v12.3.0-dev.3";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -1170,7 +1170,7 @@ function recalc_scale() local(i, max_v, best_tonic) (
 mem[ui_init_done] == 0 ? (
     // --- FIX: SET DEFAULTS HERE ---
     
-    mem[ui_follow_mode] = 1; // Default Follow: ON
+    mem[ui_follow_mode] = 0; // Editing is independent of song following.
     mem[ui_edit_tab] = 26;      // Start on Def instead of Off
     mem[ui_play_prog_tab] = 26; // Optional, but keeps things visually consistent
     
@@ -1256,7 +1256,7 @@ function form_refresh() local(rev,n,i,p,tmp) (
 );
 function resolve_pattern(t) local(out) (
     out=t<=0||mem[tab_mute_base+t] ? 0 : section_fallback(t);
-    out>0 && (mem[tab_mute_base+out]&2) ? 0 : out;
+    out>0 && mem[tab_mute_base+out] ? 0 : out;
 ); // Ensure this has its own space
 
 function resolve_requested(t) local(out) (
@@ -1987,7 +1987,7 @@ function calc_vis_beat(t_in) local(sub_v, bar_v, p_l, playing_tab, offset_add, i
     
     l_tab = mem[ui_locked_tab];
     playing_tab = (l_tab >= 0) ? l_tab : mem[ui_play_prog_tab];
-    offset_add = 0; (play_state & 1 && t_in == playing_tab) ? ( offset_add = playback_shift; );
+    offset_add = 0; (play_state & 1 && (t_in == playing_tab || t_in==effective_play_tab)) ? ( offset_add = playback_shift; );
     
     buffer_beats = (samplesblock / srate) * (tempo / 60);
     visual_pos = beat_position - buffer_beats;
@@ -2270,7 +2270,7 @@ row2_y = UI_TOP_Y + 24;
 // ROWS 2, 3, 4: CONSOLIDATED TABS AND LEFT INFO COLUMN
 // =========================================================
 draw_y = ROW2_Y; // Advance Y to Tab Area
-FOLLOW_LBL_X=UI_TOP_X; FOLLOW_BOX_X=UI_TOP_X + 60; FOLLOW_BOX_W=20; FOLLOW_BOX_H=16;
+FOLLOW_LBL_X=5; FOLLOW_BOX_X=65; FOLLOW_BOX_W=20; FOLLOW_BOX_H=16;
 
 // Display inheritance even when parked.
 arrow_req=mem[ui_locked_tab]>=0?mem[ui_locked_tab]:mem[ui_play_prog_tab];
@@ -2390,6 +2390,7 @@ loop(3,
                     gfx_set(0.08, 0.15, 0.15, 1);
                     gfx_triangle(lx+6, ly+4, lx+6, ly+11, lx+12, ly+7.5);
                 );
+                (mem[tab_mute_base+gui_t]&2) ? (gfx_set(1,0.45,0.45,1); gfx_line(draw_x+5,draw_y+21,draw_x+14,draw_y+12,1););
                 mem[LOC_TAB_POPULATED + gui_t] ? (
                     // White content bracket: top and left only.
                     gfx_set(1, 1, 1, 1);
@@ -2451,6 +2452,7 @@ loop(3,
             (i) >= 100 ? ( sprintf(#lbl, "%d", floor(((i)%100)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : (i) >= 10 ? ( sprintf(#lbl, "%d", floor((i)/10)); draw_text(px+1, py+1, #lbl, 0.9,0.9,0.9); sprintf(#lbl, "%d", (i)%10); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); ) : ( sprintf(#lbl, "%d", i); draw_text(px+1, py+8, #lbl, 0.9,0.9,0.9); );
         );
 
+        (mem[tab_mute_base+i]&2) ? (gfx_set(1,0.45,0.45,1); gfx_line(px+3,py+15,px+pat_w-3,py+5,1););
         mem[LOC_TAB_POPULATED + i] ? ( gfx_set(1, 1, 1, 1); gfx_rect(px+2, py+17, pat_w-4, 3); );
         
         f_amt = mem[tab_flash_base + i];
@@ -2598,7 +2600,7 @@ curr_pat_g_ptr = grid_base + t_e*vel_stride_tab;
 curr_pat_l_ptr = step_len_base + t_e*vel_stride_tab;
 
 // --- GHOST / FALLBACK POINTERS ---
-fb_tab = get_active_fallback(t_e);
+fb_tab = (form_count>0 && !midi_form_override && mem[ui_locked_tab]==-1 && (eligible_song_tab(t_e)||t_e==26||t_e==77)) ? section_fallback(t_e) : get_active_fallback(t_e);
 is_ghosting = (t_e != fb_tab);
 
 fb_pat_v_ptr = vel_base + fb_tab*vel_stride_tab; 
@@ -2661,11 +2663,15 @@ fb_pat_l_ptr = step_len_base + fb_tab*vel_stride_tab;
 
 
     item_w = 112;
-    btn(x2, ctrl_y, item_w, 18, "   COPY PATTERN") ? ( memcpy(copy_tab_v_buf, curr_pat_v_ptr, vel_stride_tab); memcpy(copy_tab_g_buf, curr_pat_g_ptr, vel_stride_tab); memcpy(copy_tab_l_buf, curr_pat_l_ptr, vel_stride_tab); ); 
+    btn(x2, ctrl_y, item_w, 18, "   COPY PATTERN") ? ( memcpy(copy_tab_v_buf, curr_pat_v_ptr, vel_stride_tab); memcpy(copy_tab_g_buf, curr_pat_g_ptr, vel_stride_tab); memcpy(copy_tab_l_buf, curr_pat_l_ptr, vel_stride_tab);
+        cp_valid=1; cp_mute=mem[tab_mute_base+t_e]; cp_bars=mem[bars_ov_base+t_e]; cp_sub=mem[subdiv_ov_base+t_e]; cp_hum=mem[hum_ov_base+t_e]; cp_sw=mem[swing_ov_base+t_e]; cp_half=mem[half_speed_ov_base+t_e];
+    ); 
     x2+=item_w + ui_gap_small;
     
     item_w = 113;  
-    btn(x2, ctrl_y, item_w, 18, "   PASTE PATTERN") ? ( memcpy(curr_pat_v_ptr, copy_tab_v_buf, vel_stride_tab); memcpy(curr_pat_g_ptr, copy_tab_g_buf, vel_stride_tab); memcpy(curr_pat_l_ptr, copy_tab_l_buf, vel_stride_tab); scan_all_tabs(); ); 
+    btn(x2, ctrl_y, item_w, 18, "   PASTE PATTERN") && cp_valid ? ( memcpy(curr_pat_v_ptr, copy_tab_v_buf, vel_stride_tab); memcpy(curr_pat_g_ptr, copy_tab_g_buf, vel_stride_tab); memcpy(curr_pat_l_ptr, copy_tab_l_buf, vel_stride_tab);
+        mem[tab_mute_base+t_e]=cp_mute; mem[bars_ov_base+t_e]=cp_bars; mem[subdiv_ov_base+t_e]=cp_sub; mem[hum_ov_base+t_e]=cp_hum; mem[swing_ov_base+t_e]=cp_sw; mem[half_speed_ov_base+t_e]=cp_half; scan_active_tab();
+    ); 
     x2+=item_w + ui_gap_small;
     
     item_w = 112;
@@ -3485,7 +3491,7 @@ mouse_hwheel = 0;
     t_pl = effective_play_tab; 
     vis_beat = calc_vis_beat(t_pl); 
     p_l = eff_bars(t_pl) * 4; 
-    p_l > 0 ? (
+    t_pl>0 && p_l > 0 ? (
         ph_x = grid_x + (vis_beat/p_l)*vel_w; 
         grid_h = visible_rows * ROW_HEIGHT; 
         (grid_y + grid_h > gfx_h) ? grid_h = gfx_h - grid_y; 
