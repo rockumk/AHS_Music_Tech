@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.8
+-- @version 2.0.4-dev.9
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -684,6 +684,7 @@ local font = r.ImGui_CreateFont(font_name, font_size)
 local fontsmall = r.ImGui_CreateFont(font_name, font_small_size)
 r.ImGui_Attach(ctx, font)
 r.ImGui_Attach(ctx, fontsmall)
+if gmem_export.InitTrackFonts then gmem_export.InitTrackFonts(ctx, font_name, font_size, font_small_size) end
 
 local click_count, text = 0, ""
 local window_flags =  r.ImGui_WindowFlags_NoResize() | r.ImGui_WindowFlags_MenuBar()
