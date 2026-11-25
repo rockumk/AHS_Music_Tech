@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.11
+version: 7.8.0-dev.12
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.11 -
+  # N2N Drum Arranger v7.8.0-dev.12 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -134,7 +134,7 @@ slider11:14<10,30,1>-Grid Row Height
 slider12:1<0,1,1>-Song Form Protocol
 
 @init
-version_display = "v7.8.0-dev.11";
+version_display = "v7.8.0-dev.12";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -517,7 +517,8 @@ local(avail_height, calc_rows)
 function flush_inventory_to_gmem()
 local(inst_offset, i, m0, m1, m2, m3, target_pc, idx, rem)
 (
-    inst_offset = GMEM_INV_BASE + (floor(slider5) - 1) * 4;
+    inst_offset = GMEM_INV_BASE + (floor(my_slot) - 1) * 4;
+    gmem[reg_base+my_slot]==my_key ? (
     m0=0; m1=0; m2=0; m3=0;
     i=0; loop(TOTAL_TABS, 
         mem[LOC_TAB_POPULATED + i] ? (
@@ -537,6 +538,7 @@ local(inst_offset, i, m0, m1, m2, m3, target_pc, idx, rem)
     gmem[inst_offset+1] = m1;
     gmem[inst_offset+2] = m2;
     gmem[inst_offset+3] = m3;
+    );
 );
 
 function check_tab_population(t_idx)
@@ -1726,16 +1728,27 @@ midi_trigger_queued >= 0 ? (
     init_gate += 1;
 );
 
-(slider5 != last_reported_id) ? (
-    scan_all_tabs();
-    last_reported_id = slider5;
+// Accept deliberate host ID changes only when the destination slot is unowned.
+// Keep the pattern data and local playback/lock state intact.
+id_requested=max(1,min(512,floor(slider5+0.5)));
+id_requested!=my_slot ? (
+    (gmem[reg_base+id_requested]==0 || gmem[reg_base+id_requested]==my_key) ? (
+        id_old=my_slot;
+        gmem[reg_base+id_requested]=my_key;
+        gmem[reg_base+id_old]==my_key ? gmem[reg_base+id_old]=0;
+        my_slot=id_requested;
+        slider5=my_slot;
+        id_gm=7000000+(my_slot-1)*16;
+        gmem[id_gm]=0x44504531;
+        gmem[id_gm+1]=mem[ui_locked_tab];
+        gmem[id_gm+2]=mem[ui_play_prog_tab];
+        form_rev=-1;
+        flush_inventory_to_gmem();
+        needs_tab_update=1;
+    ) : slider5=my_slot;
+    sliderchange(slider5);
 );
-
-// INSTANCE ID LOCK (Self-Healing Logic)
-(slider5 != my_slot) ? (
-    slider5 = my_slot;
-    slider_automate(slider5);
-);
+last_reported_id=slider5;
 
 // TRACK IDENTITY
 GMEM_INFO_BASE = 8200000;
@@ -2141,6 +2154,17 @@ loop(128,
 
 
 @gfx 1420 780
+// Hub pattern navigation: keyed by registration token; never writes a cue or lock.
+hub_edit_addr=8300000+(my_slot-1)*2;
+hub_edit_cmd=gmem[hub_edit_addr+1];
+hub_edit_cmd>0 && gmem[hub_edit_addr]==my_key && gmem[reg_base+my_slot]==my_key ? (
+    hub_edit_tab=floor(hub_edit_cmd)-1;
+    hub_edit_tab>=1 && hub_edit_tab<TOTAL_TABS ? (
+        mem[ui_edit_tab]=hub_edit_tab;
+        
+    );
+    gmem[hub_edit_addr+1]=0;
+);
 gfx_setfont(1, "Trebuchet MS", fontsize , 'b');
 gfx_measurestr("This is a test to determine if the text is being rendered on PC or Mac.", str_w, str_h);
 gfx_set(1,1,1,1); 
