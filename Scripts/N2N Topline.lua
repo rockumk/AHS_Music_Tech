@@ -1,5 +1,5 @@
 -- @description N2N Topline
--- @version 5.3
+-- @version 5.4-dev.1
 -- @author Rock Kennedy and Gemini 4 Hydrogen (which did an absolutely fabulous job of transforming the vision into solid Lua code)
 -- @about
 --   Numbers2Notes Topline Melody Editor (1200x640 minimum):
@@ -65,6 +65,12 @@ local DEFAULT_OUT_TRACK   = "N2N Topline"
 local EXT_GLOBAL_SEC      = "N2N_MIDI_EDITOR_PREFS"
 local EXT_PROJ_SEC        = "N2N_MIDI_EDITOR_PROJ"
 local EXT_PROJ_KEY        = "STATE_V4"
+-- Transient launch/navigation mailbox, separate from saved draft data.
+local HUB_EXT_SEC = "N2N_TOPLINE_HUB"
+local owner_project = reaper.EnumProjects(-1,"")
+local owner_project_key = tostring(owner_project)
+local hub_token = owner_project_key.."\t"..tostring(reaper.time_precise())
+local hub_exited = false
 local MOD_CHOICES         = { "None", "Shift", "Ctrl", "Alt", "Ctrl+Shift" }
 
 local CONFIG = {
@@ -238,7 +244,7 @@ local function save_project_state()
   local sec_data, note_data = {}, {}
   for _, s in ipairs(state.sections) do table.insert(sec_data, {uid=s.uid,markrgn_num=s.markrgn_num,name=s.name,start_qn=s.start_qn,end_qn=s.end_qn,bar_qn=s.bar_qn,rgb=s.rgb,deleted=s.deleted}) end
   for _, n in ipairs(state.notes) do table.insert(note_data, serialize_note(n)) end
-  reaper.SetProjExtState(0, EXT_PROJ_SEC, EXT_PROJ_KEY, serialize_val({
+  reaper.SetProjExtState(owner_project, EXT_PROJ_SEC, EXT_PROJ_KEY, serialize_val({
     next_note_id=state.next_note_id, next_section_seq=state.next_section_seq,
     selected_section_uid=state.selected_section_uid, output_track_guid=state.output_track_guid,
     auto_arm_preview=state.auto_arm_preview, commit_state=state.commit_state, audition_mode=state.audition_mode,
@@ -852,7 +858,7 @@ end
 
 local function restore_auto_arm_track()
   for tr, s in pairs(state.saved_track_states) do
-    if reaper.ValidatePtr2(0, tr, "MediaTrack*") then reaper.SetMediaTrackInfo_Value(tr, "I_RECARM", s.recarm); reaper.SetMediaTrackInfo_Value(tr, "I_RECMON", s.recmon); reaper.SetMediaTrackInfo_Value(tr, "I_RECINPUT", s.recinput) end
+    if reaper.ValidatePtr2(owner_project, tr, "MediaTrack*") then reaper.SetMediaTrackInfo_Value(tr, "I_RECARM", s.recarm); reaper.SetMediaTrackInfo_Value(tr, "I_RECMON", s.recmon); reaper.SetMediaTrackInfo_Value(tr, "I_RECINPUT", s.recinput) end
   end
   state.saved_track_states = {}
 end
@@ -908,9 +914,23 @@ local function update_previews()
 end
 
 local function on_script_exit()
+  if hub_exited then return end
+  hub_exited=true
+  if reaper.GetExtState(HUB_EXT_SEC,"owner")==hub_token then
+    reaper.DeleteExtState(HUB_EXT_SEC,"owner",false)
+    reaper.DeleteExtState(HUB_EXT_SEC,"heartbeat",false)
+  end
   for _, pr in ipairs(state.previews) do send_midi_note_off(pr.pitch, pr.chan) end; state.previews = {}
   if state.kbd_held_pitch then send_midi_note_off(state.kbd_held_pitch, state.kbd_held_chan); state.kbd_held_pitch = nil end
-  restore_auto_arm_track(); save_global_prefs(); save_project_state()
+  restore_auto_arm_track(); save_global_prefs()
+  -- The original project may have been closed. Never save into a different tab.
+  local i=0
+  while true do
+    local p=reaper.EnumProjects(i,"")
+    if not p then break end
+    if p==owner_project then save_project_state(); break end
+    i=i+1
+  end
 end
 
 local function apply_n2n_default_key()
@@ -2224,7 +2244,52 @@ end
 --------------------------------------------------------------------------------
 -- 14. MAIN LOOP & INIT
 --------------------------------------------------------------------------------
+local function read_hub_request()
+  local raw=reaper.GetExtState(HUB_EXT_SEC,"request")
+  if raw=="" then return end
+  local project,guid,region,stamp=raw:match("^([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)$")
+  if project~=owner_project_key then return end
+  reaper.DeleteExtState(HUB_EXT_SEC,"request",false)
+  if not tonumber(stamp) or math.abs(reaper.time_precise()-tonumber(stamp))>15 then return end
+  for i=0,reaper.CountTracks(owner_project)-1 do
+    local tr=reaper.GetTrack(owner_project,i)
+    if reaper.GetTrackGUID(tr)==guid then return tr,tonumber(region) end
+  end
+end
+local function apply_hub_request(tr,region)
+  if not tr or not reaper.ValidatePtr2(owner_project,tr,"MediaTrack*") then return end
+  local guid=reaper.GetTrackGUID(tr)
+  if state.output_track_guid~="" and state.output_track_guid~=guid
+      or state.output_track_guid=="" and (#state.notes>0 or state.commit_state~="none") then
+    reaper.MB("Topline currently has one draft per project. It is already associated with another track (or an unassigned draft). No notes or routing have been changed. Independent Topline tracks are not yet supported.","N2N Topline",0)
+    return
+  end
+  if state.output_track~=tr then select_output_track(tr) end
+  reaper.GetSetMediaTrackInfo_String(tr,"P_EXT:N2N:TOPLINE","1",true)
+  if region and region>=0 then
+    refresh_regions_and_sections()
+    for _,sec in ipairs(state.sections) do
+      if not sec.deleted and sec.markrgn_num==region then
+        state.selected_section_uid=sec.uid
+        state.selected_phrase=nil
+        state.scroll_x_qn=math.max(0,sec.start_qn)
+        state.auto_scroll=false
+        state.section_glow_uid=sec.uid
+        state.section_glow_until=reaper.time_precise()+.65
+        state.status_msg="Jumped to ["..sec.name.."]"
+        break
+      end
+    end
+  end
+  if state.hwnd and reaper.JS_Window_SetFocus then reaper.JS_Window_SetFocus(state.hwnd) end
+end
 local function main()
+  if reaper.EnumProjects(-1,"")~=owner_project then gfx.quit(); on_script_exit(); return end
+  reaper.SetExtState(HUB_EXT_SEC,"heartbeat",tostring(reaper.time_precise()),false)
+  if not state.drag and (gfx.mouse_cap&3)==0 then
+    local requested,region=read_hub_request()
+    if requested then apply_hub_request(requested,region) end
+  end
   state.ui_controls = {}
   update_previews()
   if not handle_keyboard() then gfx.quit(); on_script_exit(); return end
@@ -2306,6 +2371,11 @@ local function setup_frameless_dark_titlebar()
 end
 
 local function init()
+  local previous=reaper.GetExtState(HUB_EXT_SEC,"owner")
+  local heartbeat=tonumber(reaper.GetExtState(HUB_EXT_SEC,"heartbeat"))
+  if previous~="" and heartbeat and math.abs(reaper.time_precise()-heartbeat)<2 then return end
+  reaper.SetExtState(HUB_EXT_SEC,"owner",hub_token,false)
+  reaper.SetExtState(HUB_EXT_SEC,"heartbeat",tostring(reaper.time_precise()),false)
   load_global_prefs()
   local had_proj_state = load_project_state()
   refresh_regions_and_sections()
@@ -2316,7 +2386,15 @@ local function init()
   rebuild_row_layout()
 
   ensure_hidden_track()
-  restore_output_track_by_guid_or_default()
+  local requested,region=read_hub_request()
+  -- For a fresh empty editor, bind the requested track before any default
+  -- selection. For an existing draft, restore its owner and validate request.
+  if requested and state.output_track_guid=="" and #state.notes==0 and state.commit_state=="none" then
+    select_output_track(requested)
+  else
+    restore_output_track_by_guid_or_default()
+  end
+  if requested then apply_hub_request(requested,region) end
   update_hidden_track_send()
   compute_section_overflows()
   sync_section_clips()
