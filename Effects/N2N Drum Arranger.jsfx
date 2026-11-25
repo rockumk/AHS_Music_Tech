@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.8
+version: 7.8.0-dev.9
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.8 -
+  # N2N Drum Arranger v7.8.0-dev.9 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -134,7 +134,7 @@ slider11:14<10,30,1>-Grid Row Height
 slider12:1<0,1,1>-Song Form Protocol
 
 @init
-version_display = "v7.8.0-dev.8";
+version_display = "v7.8.0-dev.9";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -2096,7 +2096,7 @@ loop(128,
 
 
 
-@gfx 1383 780
+@gfx 1418 780
 gfx_setfont(1, "Trebuchet MS", fontsize , 'b');
 gfx_measurestr("This is a test to determine if the text is being rendered on PC or Mac.", str_w, str_h);
 gfx_set(1,1,1,1); 
@@ -2298,7 +2298,7 @@ function btn(x,y,w,txt) (
     (mb && p_mb == 0 && mx>=x && mx<x+w && my>=y && my<y+BTN_H);
 );
 
-(mb && capture_id != 0 && capture_id != 9999 && capture_id != 12 && capture_id != 13 && capture_id != 12012 && capture_id != 42424 && capture_id != 99999 && capture_id != 88888 && capture_id != 77777 && capture_id != 11111 && capture_id != 2000) ? (
+(mb && capture_id != 0 && capture_id != 9999 && capture_id != 12 && capture_id != 13 && capture_id != 12012 && capture_id != 42424 && capture_id != 99999 && capture_id != 88888 && capture_id != 77777 && capture_id != 11111 && capture_id != 2000 && capture_id != 2001) ? (
     drag_sens = (capture_max - capture_min) > 60 ? 1.0 : 5.0;
     capture_mode == 2 ? drag_sens = 5.0;
     drag_accum_gen += (mx - p_mx);
@@ -2375,21 +2375,6 @@ tab_right_x = tab_start_x+27*ttabw+special_tab_w-ui_gap_small;
 // ROW 1: GLOBAL SETTINGS (Flow Refactored)
 // =========================================================
 row1_y = UI_TOP_Y - 3; 
-
-// --- Draw Background for row 1 ---
-track_num > 0 ? (
-    track_label_w = 345-5*ttabw;
-    track_label_x = tab_right_x-track_label_w;
-    rect(track_label_x,row1_y,track_label_w,22,track_r,track_g,track_b,1);
-    lum=(track_r*.299)+(track_g*.587)+(track_b*.114);
-    lum>.5 ? gfx_set(0,0,0,1) : gfx_set(1,1,1,1);
-    sprintf(#trk_str,"TRACK %d",track_num);
-    gfx_setfont(1,os_font,titlefontsize,'b');
-    gfx_measurestr(#trk_str,tw,th);
-    gfx_x=track_label_x+(track_label_w-tw)/2; gfx_y=row1_y+(22-th)/2;
-    gfx_drawstr(#trk_str);
-    gfx_setfont(0);
-);
 
 // --- Row 1 Flow Setup ---
 draw_x = HDR_X + HDR_W + UI_GAP_X - 28 - hw; // Start X for Flow
@@ -2483,8 +2468,8 @@ loop(3,
         is_follow=mem[ui_locked_tab]==-1 && !midi_form_override;
         follow_lock_y=draw_y-3;
         // Outline the label and lock as a single control.
-        follow_group_x=10; follow_group_y=draw_y-22;
-        follow_group_w=tab_start_x-follow_group_x-5; follow_group_h=44;
+        follow_group_x=10; follow_group_y=draw_y-30;
+        follow_group_w=tab_start_x-follow_group_x-5; follow_group_h=30+26;
         gfx_set(0.45,0.45,0.45,1);
         gfx_rect(follow_group_x,follow_group_y,follow_group_w,follow_group_h,0);
         // Original shackle/body geometry: open shackle while following.
@@ -2944,11 +2929,34 @@ t_e = mem[ui_edit_tab];
     draw_x += item_w + ui_gap_small;
     
     
+    // TRACK identity occupies the unused two-button-wide area above half-speed.
+    // Use the actual flow position so it stays aligned with both speed buttons.
+    track_label_x=draw_x; track_label_w=90;
+    track_num>0 ? (
+        rect(track_label_x,row1_y,track_label_w,22,track_r,track_g,track_b,1);
+        lum=track_r*.299+track_g*.587+track_b*.114;
+        gfx_setfont(1,os_font,fontsize,'b');
+        gfx_measurestr("TRACK",track_tw,track_th);
+        draw_text(track_label_x+(track_label_w-track_tw)/2,row1_y+(22-track_th)/2,"TRACK",lum>.5?0:1,lum>.5?0:1,lum>.5?0:1);
+        track_num_y=ROW2_Y; track_num_h=2*30+26;
+        sprintf(#track_num_text,"%d",track_num);
+        track_num_font=76;
+        gfx_setfont(1,os_font,track_num_font,'b');
+        gfx_measurestr(#track_num_text,track_tw,track_th);
+        track_num_scale=min(1,min((track_label_w-8)/max(1,track_tw),(track_num_h-4)/max(1,track_th)));
+        track_num_scale<1 ? (
+            gfx_setfont(1,os_font,max(12,floor(track_num_font*track_num_scale)),'b');
+            gfx_measurestr(#track_num_text,track_tw,track_th);
+        );
+        draw_text(track_label_x+(track_label_w-track_tw)/2,track_num_y+(track_num_h-track_th)/2,#track_num_text,1,1,1);
+        gfx_setfont(1,os_font,fontsize,'b');
+    );
+
     // HALF SPEED (Conditional)
     curr_sub_val = eff_sub(mem[ui_edit_tab]);
     st_v = eff_bars(mem[ui_edit_tab]) * curr_sub_val; 
     (curr_sub_val == 24 || curr_sub_val == 32) ? (
-        item_w = 90;
+        item_w = track_label_w;
         hf_act = eff_half(mem[ui_edit_tab]);
         (mb && p_mb == 0 && mx>=draw_x && mx<draw_x+item_w && my>=draw_y && my<draw_y+btn_h) ? (
             t_addr = half_speed_ov_base + mem[ui_edit_tab];
@@ -2987,7 +2995,12 @@ ty = draw_y;
     sel_r = mem[ui_selected_row]; 
     sel_r >= MAX_ROWS ? (sel_r = MAX_ROWS - 1; mem[ui_selected_row] = sel_r;);
     ty+=25; 
-    pk_w = (gfx_w-20)/128; 
+    pk_w = (gfx_w-20)/128;
+    // Keyboard must own the initial mouse-down; other drags cannot audition
+    // or change the row note when they cross into the piano keyboard.
+    (mb && !p_mb && !rmb && capture_id==0 && mx>=10 && mx<gfx_w-10 && my>=ty && my<ty+32) ? (
+        capture_id=2001;
+    );
     rect(10, ty, gfx_w-20, 32, 0.02, 0.02, 0.02, 1);
     i_p=0; 
     loop(128,
@@ -3001,7 +3014,7 @@ ty = draw_y;
             is_sel ? rect(px, ty, pk_w-1, 30, 0.46, 0.78, 0.88, 1) : rect(px, ty, pk_w-1, 30, 0.8, 0.8, 0.8, 1);
         );
         is_hover = (mx>=px && mx<px+pk_w && my>=ty && my<ty+32);
-        (mb && is_hover && (p_mb == 0 || last_preview_note != i_p)) ? ( 
+        (mb && capture_id==2001 && is_hover && (p_mb == 0 || last_preview_note != i_p)) ? ( 
             mem[row_note_base+sel_r]=i_p; 
             preview_note = i_p; 
             preview_chan = mem[row_chan_base+sel_r]; 
