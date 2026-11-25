@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.1
+-- @version 1.9.2
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -612,13 +612,40 @@ local function launch_cue()
     local cmd=r.AddRemoveReaScript(true,0,path,true)
     if cmd and cmd>0 then r.Main_OnCommand(cmd,0) else r.MB("Could not launch N2NCue.","N2N Tracks",0) end
 end
-local function pattern_grid(ctx,t,width)
+-- Independent Tracks-tab zoom. Fonts are attached once, outside the frame.
+local TRACK_SCALE_MIN, TRACK_SCALE_MAX, TRACK_SCALE_STEP = 75, 175, 5
+local track_scale = tonumber(reaper.GetExtState("Numbers2Notes","TracksPanelScale")) or 100
+track_scale = math.max(TRACK_SCALE_MIN, math.min(TRACK_SCALE_MAX,
+    math.floor(track_scale/TRACK_SCALE_STEP+.5)*TRACK_SCALE_STEP))
+local track_fonts, track_small_fonts = {}, {}
+function export.InitTrackFonts(ctx, family, normal_size, small_size)
+    local cache = {}
+    local function font_at(size)
+        size=math.max(7,math.floor(size+.5))
+        if not cache[size] then
+            cache[size]=reaper.ImGui_CreateFont(family,size)
+            reaper.ImGui_Attach(ctx,cache[size])
+        end
+        return cache[size]
+    end
+    for percent=TRACK_SCALE_MIN,TRACK_SCALE_MAX,TRACK_SCALE_STEP do
+        track_fonts[percent]=font_at(normal_size*percent/100)
+        track_small_fonts[percent]=font_at(small_size*percent/100)
+    end
+end
+local function adjust_track_scale(delta)
+    track_scale=math.max(TRACK_SCALE_MIN,math.min(TRACK_SCALE_MAX,track_scale+delta))
+    reaper.SetExtState("Numbers2Notes","TracksPanelScale",tostring(track_scale),true)
+end
+local function pattern_grid(ctx,t,width,scale)
     local r=reaper
     local dl=r.ImGui_GetWindowDrawList(ctx)
     local x,y=r.ImGui_GetCursorScreenPos(ctx)
-    local groupw=(width-4)/6
+    local groupw=(width-4*scale)/6
     local lastw=groupw/2
-    local h=10
+    local h=math.floor(10*scale+.5)
+    local gap=math.max(1,math.floor(2*scale+.5))
+    local subgap=math.max(1,scale)
     local known=t.id>=1 and t.id<=512 and duplicate[t.id]==1 and r.gmem_read(REG_BASE+t.id)>0 and r.TrackFX_GetEnabled(t.track,t.fx) and not r.TrackFX_GetOffline(t.track,t.fx)
     local bits={}
     if known then for i=0,3 do bits[i]=math.floor(r.gmem_read(INV_BASE+(t.id-1)*4+i)) end end
@@ -628,12 +655,12 @@ local function pattern_grid(ctx,t,width)
         for gi,g in ipairs(gs) do
             local gx=x+(gi<=5 and (gi-1)*groupw or 5*groupw+(gi-6)*lastw)
             local gw=gi<=5 and groupw or lastw
-            local first=g[2]==4 and math.min(15,gw*.4) or gw-2
-            local mini=(gw-first-5)/3
+            local first=g[2]==4 and math.min(15*scale,gw*.4) or gw-gap
+            local mini=(gw-first-5*subgap)/3
             for v=0,g[2]-1 do
-                local bx=gx+(v==0 and 0 or first+1+(v-1)*(mini+1))
+                local bx=gx+(v==0 and 0 or first+subgap+(v-1)*(mini+subgap))
                 local bw=v==0 and first or mini
-                local by=y+(row-1)*(h+2)
+                local by=y+(row-1)*(h+gap)
                 local bit=t.kind=="DRUM" and g[7]+v or g[1]+v
                 local populated=known and ((bits[bit//32] or 0)&(1<<(bit%32)))~=0
                 local shade=populated and 1 or .4
@@ -652,7 +679,7 @@ local function pattern_grid(ctx,t,width)
             end
         end
     end
-    r.ImGui_InvisibleButton(ctx,"##pattern_grid",width,3*(h+2))
+    r.ImGui_InvisibleButton(ctx,"##pattern_grid",width,3*(h+gap))
     if hovered and r.ImGui_IsItemHovered(ctx) then
         r.ImGui_SetTooltip(ctx,hovered.label..(not known and " (inventory unavailable)" or hovered.populated and " (populated)" or " (empty / inherited)").."\nClick to open pattern for editing")
         if r.ImGui_IsItemClicked(ctx,0) then
@@ -670,6 +697,12 @@ local function pattern_grid(ctx,t,width)
 end
 function export.DrawTracks(ctx,font)
     local r=reaper
+    local percent=track_scale
+    local scale=percent/100
+    local normal_font=track_fonts[percent]
+    local small_font=track_small_fonts[percent] or font
+    local function px(n) return math.max(1,math.floor(n*scale+.5)) end
+    if normal_font then r.ImGui_PushFont(ctx,normal_font) end
     export.PublishTrackIdentity(false)
     local conflict_count=0
     for id,n in pairs(duplicate) do if n>1 or id<1 or id>512 then conflict_count=conflict_count+1 end end
@@ -678,10 +711,12 @@ function export.DrawTracks(ctx,font)
     else r.ImGui_TextColored(ctx,0xA0E0A0FF,("%d instances | IDs OK"):format(#tracks)) end
     r.ImGui_SameLine(ctx)
     if r.ImGui_SmallButton(ctx,"Refresh") then export.PublishTrackIdentity(true) end
-    r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),2,1)
-    r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),2,1)
-    local panel_width=math.min(340,r.ImGui_GetContentRegionAvail(ctx))
-    local visible=r.ImGui_BeginChild(ctx,"##N2NTrackScroll",panel_width,-29,0)
+    r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),px(2),px(1))
+    r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),px(2),px(1))
+    local panel_width=math.min(px(340),r.ImGui_GetContentRegionAvail(ctx))
+    local row_height=px(19)
+    local footer_height=px(22)
+    local visible=r.ImGui_BeginChild(ctx,"##N2NTrackScroll",panel_width,-(footer_height+px(7)),0)
     if visible then
         for _,t in ipairs(tracks) do
             local fx=locate(t)
@@ -689,11 +724,11 @@ function export.DrawTracks(ctx,font)
                 t.fx=fx
                 r.ImGui_PushID(ctx,t.guid)
                 local width=r.ImGui_GetContentRegionAvail(ctx)
-                local fxw,idw,instw,arpw=25,44,35,40
-                local namew=math.max(40,width-fxw-idw-instw-arpw-8)
+                local fxw,idw,instw,arpw=px(25),px(52),px(35),px(40)
+                local namew=math.max(px(20),width-fxw-idw-instw-arpw-4*px(2))
                 local label=("%d. %s"):format(t.number,t.name)
-                if r.ImGui_CalcTextSize(ctx,label)>namew-4 then
-                    while #label>0 and r.ImGui_CalcTextSize(ctx,label.."…")>namew-4 do
+                if r.ImGui_CalcTextSize(ctx,label)>namew-px(4) then
+                    while #label>0 and r.ImGui_CalcTextSize(ctx,label.."…")>namew-px(4) do
                         local pos=utf8.offset(label,-1)
                         label=label:sub(1,(pos or #label)-1)
                     end
@@ -702,27 +737,27 @@ function export.DrawTracks(ctx,font)
                 local lum=t.r*.299+t.g*.587+t.b*.114
                 r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),color(t.r,t.g,t.b))
                 r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Text(),lum>.55 and 0x101010FF or 0xFFFFFFFF)
-                if r.ImGui_Button(ctx,label,namew,19) then
+                if r.ImGui_Button(ctx,label,namew,row_height) then
                     r.SetOnlyTrackSelected(t.track)
                     r.TrackList_AdjustWindows(false)
                 end
                 r.ImGui_PopStyleColor(ctx,2)
                 if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,t.name) end
                 r.ImGui_SameLine(ctx)
-                if r.ImGui_Button(ctx,t.kind,arpw,19) then open_fx(t.track,fx) end
+                if r.ImGui_Button(ctx,t.kind,arpw,row_height) then open_fx(t.track,fx) end
                 r.ImGui_SameLine(ctx)
                 local inst=r.TrackFX_GetInstrument(t.track)
                 if inst<0 or inst==fx then r.ImGui_BeginDisabled(ctx) end
-                if r.ImGui_Button(ctx,"INST",instw,19) then open_fx(t.track,inst) end
+                if r.ImGui_Button(ctx,"INST",instw,row_height) then open_fx(t.track,inst) end
                 if inst<0 or inst==fx then r.ImGui_EndDisabled(ctx) end
                 r.ImGui_SameLine(ctx)
                 local bad=(duplicate[t.id] or 0)>1 or t.id<1 or t.id>512
                 if bad then r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),0xA82828FF) end
-                if r.ImGui_Button(ctx,"ID "..t.id,idw,19) then id_popup=t; id_popup_open=true; id_suggestion=find_free_id() end
+                if r.ImGui_Button(ctx,"ID "..t.id,idw,row_height) then id_popup=t; id_popup_open=true; id_suggestion=find_free_id() end
                 if bad then r.ImGui_PopStyleColor(ctx) end
                 r.ImGui_SameLine(ctx)
                 -- Hover alone opens the interactive flyout. There is no click-open menu.
-                r.ImGui_Button(ctx,"FX",fxw,19)
+                r.ImGui_Button(ctx,"FX",fxw,row_height)
                 if r.ImGui_IsItemHovered(ctx) then
                     if not fx_hover or fx_hover.guid~=t.guid then
                         local right=r.ImGui_GetItemRectMax(ctx)
@@ -732,16 +767,34 @@ function export.DrawTracks(ctx,font)
                     fx_hover=t
                     hover_until=r.time_precise()+.5
                 end
-                if font then r.ImGui_PushFont(ctx,font) end
-                pattern_grid(ctx,t,width)
-                if font then r.ImGui_PopFont(ctx) end
+                if small_font then r.ImGui_PushFont(ctx,small_font) end
+                pattern_grid(ctx,t,width,scale)
+                if small_font then r.ImGui_PopFont(ctx) end
                 r.ImGui_Separator(ctx)
                 r.ImGui_PopID(ctx)
             end
         end
         r.ImGui_EndChild(ctx)
     end
-    if r.ImGui_Button(ctx,"OPEN N2NCUE",panel_width,22) then launch_cue() end
+    -- Fixed footer: the scrolling list cannot push the zoom controls away.
+    local zoom_button=px(25)
+    local readout=("%d%%"):format(percent)
+    local readout_width=math.max(px(46),r.ImGui_CalcTextSize(ctx,readout)+px(8))
+    local launcher_width=math.max(px(70),panel_width-2*zoom_button-readout_width-3*px(2))
+    if r.ImGui_Button(ctx,"OPEN N2NCUE",launcher_width,footer_height) then launch_cue() end
+    r.ImGui_SameLine(ctx)
+    if percent<=TRACK_SCALE_MIN then r.ImGui_BeginDisabled(ctx) end
+    if r.ImGui_Button(ctx,"-##track_zoom",zoom_button,footer_height) then adjust_track_scale(-TRACK_SCALE_STEP) end
+    if percent<=TRACK_SCALE_MIN then r.ImGui_EndDisabled(ctx) end
+    r.ImGui_SameLine(ctx)
+    if r.ImGui_Button(ctx,readout.."##track_zoom_reset",readout_width,footer_height) then adjust_track_scale(100-percent) end
+    if r.ImGui_IsItemHovered(ctx) then
+        r.ImGui_SetTooltip(ctx,("Tracks size: %d%% | Panel width: %.0f px\nClick to reset to 100%%"):format(percent,panel_width))
+    end
+    r.ImGui_SameLine(ctx)
+    if percent>=TRACK_SCALE_MAX then r.ImGui_BeginDisabled(ctx) end
+    if r.ImGui_Button(ctx,"+##track_zoom",zoom_button,footer_height) then adjust_track_scale(TRACK_SCALE_STEP) end
+    if percent>=TRACK_SCALE_MAX then r.ImGui_EndDisabled(ctx) end
     r.ImGui_PopStyleVar(ctx,2)
     if id_popup then
         if id_popup_open then r.ImGui_OpenPopup(ctx,"N2N Instance ID"); id_popup_open=false end
@@ -811,6 +864,7 @@ function export.DrawTracks(ctx,font)
             r.ImGui_End(ctx)
         end
     else fx_hover=nil end
+    if normal_font then r.ImGui_PopFont(ctx) end
 end
 
 return export
