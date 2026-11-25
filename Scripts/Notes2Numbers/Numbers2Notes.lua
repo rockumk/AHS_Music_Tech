@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.2
+-- @version 2.0.4-dev.3
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -1669,6 +1669,7 @@ end
 function IM_GUI_Loop()
     if gmem_export then
         gmem_export.PublishSongForm(Get_Stretched_ABCD_Index, false)
+        gmem_export.PublishTrackIdentity(false)
         gmem_export.ServicePatternLibrary()
     end
     local rv
