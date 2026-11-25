@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.4.0-dev.6
+version: 12.4.0-dev.7
 author: Rock Kennedy
 about:
-  # N2N Arp v12.4.0-dev.6
+  # N2N Arp v12.4.0-dev.7
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -27,7 +27,7 @@ slider14:0<0,2,1{Chords,Split (Chords and Bass),Bass}>-Input Mode
 @init
 scale_dirty = 0;
 last_input_mode = -1;
-thisversion = "v12.4.0-dev.6";
+thisversion = "v12.4.0-dev.7";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -924,7 +924,8 @@ function flush_inventory_to_gmem()
 local(inst_offset, i, m0, m1, m2, m3, mask_idx, rem)
 (
     // Calculate GMEM address for this instance (matches Drum Arranger logic)
-    inst_offset = GMEM_INV_BASE + (floor(slider5) - 1) * 4;
+    inst_offset = GMEM_INV_BASE + (floor(my_slot) - 1) * 4;
+    gmem[reg_base+my_slot]==my_key ? (
     m0=0; m1=0; m2=0; m3=0;
     
     i=0; loop(TOTAL_TABS, 
@@ -945,6 +946,7 @@ local(inst_offset, i, m0, m1, m2, m3, mask_idx, rem)
     gmem[inst_offset+1] = m1;
     gmem[inst_offset+2] = m2;
     gmem[inst_offset+3] = m3;
+    );
 );
 
 function check_tab_population(t_idx)
@@ -1403,6 +1405,26 @@ arp_loading ? (
 
 
 @block
+// Accept deliberate host ID changes only when the destination slot is unowned.
+// Keep the pattern data and local playback/lock state intact.
+id_requested=max(1,min(512,floor(slider5+0.5)));
+id_requested!=my_slot ? (
+    (gmem[reg_base+id_requested]==0 || gmem[reg_base+id_requested]==my_key) ? (
+        id_old=my_slot;
+        gmem[reg_base+id_requested]=my_key;
+        gmem[reg_base+id_old]==my_key ? gmem[reg_base+id_old]=0;
+        my_slot=id_requested;
+        slider5=my_slot;
+        id_gm=7000000+(my_slot-1)*16;
+        gmem[id_gm]=0x44504531;
+        gmem[id_gm+1]=mem[ui_locked_tab];
+        gmem[id_gm+2]=mem[ui_play_prog_tab];
+        form_rev=-1;
+        flush_inventory_to_gmem();
+        needs_tab_update=1;
+    ) : slider5=my_slot;
+    sliderchange(slider5);
+);
 (gmem[6400000]==3 && gmem[6400001]==slider5 && gmem[6400012]==my_key) ? (
     lib_t=gmem[6400002]; lib_t>=1 && lib_t<TOTAL_TABS ? (
         memset(grid_base+lib_t*vel_stride_tab,0,vel_stride_tab); memset(vel_base+lib_t*vel_stride_tab,0,vel_stride_tab); memset(step_len_base+lib_t*vel_stride_tab,0,vel_stride_tab);
@@ -2222,7 +2244,7 @@ draw_x += height_w + ui_gap_small;
 
 // INSTANCE ID
 id_w = 73;
-dr_slider(draw_x, draw_y, id_w, "INST ID:", slider5, 1, 64, 0, 5, 0); 
+dr_slider(draw_x, draw_y, id_w, "INST ID:", slider5, 1, 512, 0, 5, 0); 
 draw_x += id_w + ui_gap_small;
 
 // TRANSPOSE
@@ -2361,11 +2383,23 @@ gfx_seq_before%2==0 ? (
         gfx_vis_total=gfx_tmp_total; gfx_vis_running=gfx_tmp_running;
     );
 );
+// Hub pattern navigation: keyed by registration token; never writes a cue or lock.
+hub_edit_addr=8300000+(my_slot-1)*2;
+hub_edit_cmd=gmem[hub_edit_addr+1];
+hub_edit_cmd>0 && gmem[hub_edit_addr]==my_key && gmem[reg_base+my_slot]==my_key ? (
+    hub_edit_tab=floor(hub_edit_cmd)-1;
+    hub_edit_tab>=1 && hub_edit_tab<TOTAL_TABS ? (
+        mem[ui_edit_tab]=hub_edit_tab;
+        hub_browse=1; hub_browse_source=vis_audio_source; hub_browse_request=vis_audio_requested;
+    );
+    gmem[hub_edit_addr+1]=0;
+);
 // In Follow mode show the real source pattern (including inheritance).
 // Keep an active mouse gesture on its original tab until the user releases.
 mem[ui_locked_tab]==-1 && !mem[ui_power_off] ? (
     gfx_next_tab=gfx_vis_source>0?gfx_vis_source:gfx_vis_requested;
-    gfx_next_tab>=1 && gfx_next_tab<TOTAL_TABS ? (
+    hub_browse && (gfx_vis_source!=hub_browse_source || gfx_vis_requested!=hub_browse_request) ? hub_browse=0;
+    !hub_browse && gfx_next_tab>=1 && gfx_next_tab<TOTAL_TABS ? (
         (gfx_vis_running || gfx_next_tab!=gfx_follow_target) && !mb && !rmb && !chan_popup_active && !color_popup_active ? (
             mem[ui_edit_tab]=gfx_next_tab;
             gfx_follow_target=gfx_next_tab;
@@ -2421,7 +2455,7 @@ loop(3,
         );
         gfx_setfont(1,os_font,fontsize,'b');
         (mb && !p_mb && mx>=follow_group_x && mx<follow_group_x+follow_group_w && my>=follow_group_y && my<follow_group_y+follow_group_h) ? (
-            mem[ui_locked_tab]=-1; gmem[GM_BASE+1]=-1; mem[ui_follow_mode]=1; gfx_follow_target=-1; cue_release_requested=1; needs_tab_update=1;
+            mem[ui_locked_tab]=-1; gmem[GM_BASE+1]=-1; mem[ui_follow_mode]=1; gfx_follow_target=-1; hub_browse=0; cue_release_requested=1; needs_tab_update=1;
         );
     );
 
