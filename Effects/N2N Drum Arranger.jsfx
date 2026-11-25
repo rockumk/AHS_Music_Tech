@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.2
+version: 7.8.0-dev.3
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.2 -
+  # N2N Drum Arranger v7.8.0-dev.3 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -134,7 +134,7 @@ slider11:14<10,30,1>-Grid Row Height
 slider12:1<0,1,1>-Song Form Protocol
 
 @init
-version_display = "v7.8.0-dev.2";
+version_display = "v7.8.0-dev.3";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -1742,6 +1742,19 @@ mem[LOCAL_GROOVE_DB + 32] = max_gr;
 
 
 // --- A. MIDI INPUT & IMMEDIATE MAPPING ---
+cue_transport_playing=play_state&1;
+cue_block_qn=samplesblock/srate*max(tempo,0.001)/60;
+cue_discontinuity=cue_transport_playing && cue_prev_playing &&
+    abs(beat_position-cue_expected_qn)>max(0.01,2*max(cue_prev_block_qn,cue_block_qn));
+(cue_prev_playing && !cue_transport_playing || cue_discontinuity || cue_release_requested) ? (
+    midi_form_override=0;
+    cue_armed=0; midi_cue_tab=-1; midi_cue_source=-1;
+    last_bar_checked=-998; last_play_tab=-99; needs_tab_update=1;
+    cue_release_requested=0;
+);
+cue_prev_playing=cue_transport_playing;
+cue_prev_block_qn=cue_block_qn;
+cue_expected_qn=beat_position+cue_block_qn;
 while (midirecv(off, m1, m23)) (
     status = m1 & 0xF0;
     ch = (m1 & 0x0F) + 1;
@@ -1807,8 +1820,9 @@ form_refresh();
 form_count>0 ? (
     form_at=form_find(beat_position);
     form_raw=form_at>=0?mem[form_cache+form_at*3+2]:0;
-    mem[ui_play_prog_tab]!=form_raw ? (mem[ui_play_prog_tab]=form_raw; gmem[GM_BASE+2]=form_raw; needs_tab_update=1;);
-    midi_cue_tab=-1; midi_cue_source=-1; cue_armed=0;
+    !midi_form_override && mem[ui_play_prog_tab]!=form_raw ? (
+        mem[ui_play_prog_tab]=form_raw; gmem[GM_BASE+2]=form_raw; needs_tab_update=1;
+    );
 );
 final_target_tab = -1;
 final_source_type = -1; 
@@ -1817,7 +1831,7 @@ final_source_type = -1;
     final_target_tab = midi_cue_tab;
     final_source_type = 0;
 ) :
-(gmem_cue_tab > -1 && gmem_source_addr != cue_clear_addr) ? (
+(form_count==0 && gmem_cue_tab > -1 && gmem_source_addr != cue_clear_addr) ? (
     final_target_tab = gmem_cue_tab;
     final_source_type = 1;
 ) :
@@ -1826,9 +1840,10 @@ final_source_type = -1;
     final_source_type = 2;
 );
 
-(final_target_tab > -1 && form_count==0) ? (
+(final_target_tab > -1) ? (
     cue_armed = 1;
     cue_target_tab = final_target_tab;
+    cue_pending_midi = final_source_type==0 || final_source_type==2;
     (cue_target_tab != mem[ui_play_prog_tab] && final_source_type == 1) ? (
          mem[ui_locked_tab] = -1; 
          gmem[GM_BASE+1] = -1; 
@@ -1847,6 +1862,8 @@ current_bar_num = floor(check_pos / 4);
 (current_bar_num != last_bar_checked) ? (
     last_bar_checked = current_bar_num;
     (cue_armed) ? (
+        cue_pending_midi ? (midi_form_override=1; needs_tab_update=1;);
+        cue_pending_midi=0;
         mem[ui_play_prog_tab] = cue_target_tab;
         mem[ui_play_offset] = 0;
         playback_shift = 0;
@@ -1928,7 +1945,7 @@ playing = (play_state & 1);
 
 // --- START PLAYBACK ENGINE ---
 // A map span owns its nominal steps. Schedule nearby spans too for negative timing offsets.
-form_audio=(form_count>0 && mem[ui_locked_tab]==-1 && !mem[ui_power_off]);
+form_audio=(form_count>0 && !midi_form_override && mem[ui_locked_tab]==-1 && !mem[ui_power_off]);
 span_scan=0; span_first=0; span_last=0;
 form_audio ? (
     span_first=max(0,form_find(beat_position-4));
@@ -2445,12 +2462,12 @@ loop(3,
         draw_text(FOLLOW_LBL_X+11,draw_y+17,"FOLLOW",0.8,0.8,0.8);
         draw_text(FOLLOW_LBL_X+6,draw_y+27,"SONG:",0.8,0.8,0.8);
     ) : (
-        is_follow=mem[ui_locked_tab]==-1;
+        is_follow=mem[ui_locked_tab]==-1 && !midi_form_override;
         rect(FOLLOW_BOX_X+15,draw_y-10,FOLLOW_BOX_W+1,FOLLOW_BOX_H,is_follow?0.2:0.5,is_follow?0.9:0.5,is_follow?0.7:0.5,1);
         gfx_set(0,0,0,1);
         gfx_triangle(FOLLOW_BOX_X+22,draw_y-7,FOLLOW_BOX_X+22,draw_y+3,FOLLOW_BOX_X+30,draw_y-2);
         (mb && !p_mb && mx>=FOLLOW_BOX_X && mx<FOLLOW_BOX_X+FOLLOW_BOX_W+31 && my>=draw_y-14 && my<draw_y+FOLLOW_BOX_H+5) ? (
-            mem[ui_locked_tab]=-1; gmem[GM_BASE+1]=-1; needs_tab_update=1;
+            mem[ui_locked_tab]=-1; gmem[GM_BASE+1]=-1; cue_release_requested=1; needs_tab_update=1;
         );
     );
     !eligible_song_tab(mem[ui_edit_tab]) && mem[ui_edit_tab]!=26 && mem[ui_edit_tab]!=77 ? mem[ui_edit_tab]=26;
@@ -2686,8 +2703,19 @@ t_e = mem[ui_edit_tab];
     gfx_drawstr("SETTINGS:");
     draw_x += 57;
     gfx_setfont(1, os_font, fontsize, 'b'); 
-    // MUTE BUTTON (Added here to flow sequence)
-    item_w=50;
+    // MUTE returns to its original position and width.
+    item_w = 50;
+    is_p_muted = mem[tab_mute_base + t_e] & 1;
+    is_p_muted ? rect(draw_x, draw_y, item_w, btn_h, 1, .4, .4, .6) : rect(draw_x, draw_y, item_w, btn_h, 0.4, 0.3, 0.3, 1);
+    gfx_set(1,1,1,1); gfx_x = draw_x + 9; gfx_y = draw_y + 2; gfx_drawstr("MUTE");
+    (mb && p_mb == 0 && mx >= draw_x && mx < draw_x + item_w && my >= draw_y && my < draw_y + btn_h) ? (
+        mem[tab_mute_base + t_e] = mem[tab_mute_base + t_e] ~ 1;
+        needs_tab_update = 1;
+    );
+    draw_x += item_w + ui_gap_small;
+
+    // LIBRARY: match the drawn width of Intro A (tab allocation minus its gap).
+    item_w=mem[tab_w_base+1]-ui_gap_small;
     btn(draw_x,draw_y,item_w,"LIBRARY") ? (
         gfx_x=draw_x; gfx_y=draw_y+20;
         lib_sel=gfx_showmenu("Save Pattern... (Requires Numbers2Notes running)|Load Pattern... (Requires Numbers2Notes running)||Backbeat|Four on the Floor|Half-Time|Double-Time|Shuffle|Basic Funk|Basic Hip-Hop|Count-In||Force Silence|Inherit (clear pattern)");
@@ -2702,18 +2730,11 @@ t_e = mem[ui_edit_tab];
         lib_sel==1 || lib_sel==2 ? library_request(lib_sel,t_e);
     );
     draw_x+=item_w+ui_gap_small;
-    item_w = 40;
-    is_p_muted = mem[tab_mute_base + t_e] & 1;
-    is_p_muted ? rect(draw_x, draw_y, item_w, btn_h, 1, .4, .4, .6) : rect(draw_x, draw_y, item_w, btn_h, 0.4, 0.3, 0.3, 1);
-    gfx_set(1,1,1,1); gfx_x = draw_x + 9; gfx_y = draw_y + 2; gfx_drawstr("MUTE");
-    (mb && p_mb == 0 && mx >= draw_x && mx < draw_x + item_w && my >= draw_y && my < draw_y + btn_h) ? (
-        mem[tab_mute_base + t_e] = mem[tab_mute_base + t_e] ~ 1;
-        needs_tab_update = 1;
-    );
-    draw_x += item_w + ui_gap_small;
-
     // ACCEPT SUGGESTED
-    item_w = BTN_W_ACCEPT - 24;
+    // Preserve the original combined width, including the three gaps.
+    item_w = BTN_W_ACCEPT + 21 - (mem[tab_w_base+1]-ui_gap_small) - ui_gap_small;
+    gfx_measurestr("ACCEPT SUGGESTED", accept_tw, accept_th);
+    accept_tw > item_w-8 ? gfx_setfont(1,os_font,max(7,floor(fontsize*(item_w-8)/accept_tw)),'b');
     btn(draw_x, draw_y, item_w, "ACCEPT SUGGESTED") ? ( 
         is_ghosting ? (
             memcpy(curr_pat_v_ptr, fb_pat_v_ptr, vel_stride_tab);
@@ -2722,6 +2743,7 @@ t_e = mem[ui_edit_tab];
             mem[tab_mute_base + t_e] = 0; scan_active_tab(); is_ghosting = 0; needs_tab_update = 1;
         );
     ); 
+    gfx_setfont(1,os_font,fontsize,'b');
     draw_x += item_w + ui_gap_small;
 
     // COPY
@@ -3864,7 +3886,7 @@ help_active ? (
     gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Tab's Lock Box: Green - Playback is locked to the Tab");
     gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Tab's Lock Box: Black - Playback is not locked to the Tab");
     gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Double-Click Tab: View Pattern AND Lock tab to playback");
-    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Follow [x]:: Playback follows song sections; editing is independent");
+    gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - Follow [x]:: Follow song sections; MIDI cues override until stop, seek or Follow");
     gfx_y += 25; gfx_x = help_x+20; gfx_drawstr("GRID EDITING (PC):");
     gfx_x = help_x+20; gfx_y += 20; gfx_drawstr(" - Click+Drag: Paint steps and velocity bars");
     gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - CTRL+Drag: Edit all pattern Bars simultaneously");
