@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.4
+-- @version 2.0.4-dev.5
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -107,13 +107,12 @@ if rv3 > 0 and saved_arp_cue ~= "" then
     G_ARP_CUE_PLACEMENT = saved_arp_cue
 end
 
--- Inject loaded states into the UI Recipe so dropdowns match upon boot
-for _, tr in ipairs(config.track_recipe) do
-    if tr.type == 32 and rv2 > 0 then
-        tr.drum_arp_mode = saved_drum_cue
-    end
-    if tr.type == 33 and rv3 > 0 then
-        tr.drum_arp_mode = saved_arp_cue
+-- Keep legacy recipe positions for compatibility, but retire automatic cues.
+do
+    local _, saved = reaper.GetProjExtState(0, "N2N", "ManualCueTrackState")
+    for i, tr in ipairs(config.track_recipe) do
+        tr.manual_cue = saved:sub(i,i) == "1"
+        if tr.type == 32 or tr.type == 33 then tr.active = false end
     end
 end
 
@@ -977,9 +976,6 @@ local function Draw_Dropdown(id, current_val, options, tr_ref, field_name)
     return changed, new_val
 end
 
--- State tracking for Auto-Reselect logic
-local last_has_drum = true
-local last_has_arp = true
 is_track_builder_open = false -- Global state
 
 local track_builder_was_open = false
@@ -1023,25 +1019,6 @@ function Draw_Track_Builder_Modal()
         reaper.ImGui_Separator(ctx)
         reaper.ImGui_Dummy(ctx, 0, 5)
 
-        local has_drum_arranger = false
-        local has_arp = false
-
-        for _, tr in ipairs(track_recipe) do
-            if tr.active then
-                if tr.type == 31 then
-                    has_drum_arranger = true
-                end
-                if tr.mode and (tr.mode == "Arpeggiated - N2N Arp" or tr.mode == "N2N Arp") then
-                    has_arp = true
-                end
-            end
-        end
-
-        local drum_just_enabled = (has_drum_arranger and not last_has_drum)
-        local arp_just_enabled = (has_arp and not last_has_arp)
-        last_has_drum = has_drum_arranger
-        last_has_arp = has_arp
-
         local actions = {}
 
         reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_ChildBg(), 0x242933FF)
@@ -1049,24 +1026,9 @@ function Draw_Track_Builder_Modal()
         -- Adjusted height down to 400 so it doesn't stretch past small laptop screens!
         if reaper.ImGui_BeginChild(ctx, "track_list_scroll", 0, 580, 0) then
             for i, tr in ipairs(track_recipe) do
+                -- Hide retired automatic cue rows without shifting recipe indices.
+                if tr.type ~= 32 and tr.type ~= 33 then
                 reaper.ImGui_PushID(ctx, i)
-
-                local is_drum_cue = (tr.type == 32)
-                local is_arp_cue = (tr.type == 33)
-
-                if is_drum_cue and drum_just_enabled then
-                    tr.active = true
-                end
-                if is_arp_cue and arp_just_enabled then
-                    tr.active = true
-                end
-
-                local force_disable = (is_drum_cue and not has_drum_arranger) or (is_arp_cue and not has_arp)
-
-                if force_disable then
-                    reaper.ImGui_BeginDisabled(ctx)
-                    tr.active = false
-                end
 
                 if tr.IndentMIDI == -1 then
                     if tr.divider_before then
@@ -1123,13 +1085,6 @@ function Draw_Track_Builder_Modal()
                 -- Custom display: Shorten the text if it's too long, or just let it clip cleanly
                 reaper.ImGui_Text(ctx, display_label)
 
-                if force_disable then
-                    reaper.ImGui_EndDisabled(ctx)
-                    if reaper.ImGui_IsItemHovered(ctx, reaper.ImGui_HoveredFlags_AllowWhenDisabled()) then
-                        reaper.ImGui_SetTooltip(ctx, "Requires the parent arranger track to be active.")
-                    end
-                end
-
                 local dropdown_x_offset = 480
 
                 local list = tr.vsti_list or tr.vst_list or tr.audio_list
@@ -1153,22 +1108,6 @@ function Draw_Track_Builder_Modal()
                         Draw_Dropdown("##presetpick", tr.preset_choice, tr.preset_list, tr, "preset_choice")
                     if preset_changed then
                         tr.preset_choice = new_preset
-                    end
-                    dropdown_x_offset = dropdown_x_offset + 340
-                end
-
-                if tr.drum_arp_mode then
-                    reaper.ImGui_SameLine(ctx, dropdown_x_offset)
-                    local arp_mode_changed, new_arp_mode =
-                        Draw_Dropdown("##drum_arp", tr.drum_arp_mode, drum_arp_mode_options, tr, "drum_arp_mode")
-                    if arp_mode_changed then
-                        tr.drum_arp_mode = new_arp_mode
-                        if tr.type == 32 then
-                            reaper.SetProjExtState(0, "N2N", "DrumCueMode", new_arp_mode)
-                        end
-                        if tr.type == 33 then
-                            reaper.SetProjExtState(0, "N2N", "ArpCueMode", new_arp_mode)
-                        end
                     end
                     dropdown_x_offset = dropdown_x_offset + 340
                 end
@@ -1207,7 +1146,7 @@ function Draw_Track_Builder_Modal()
                                     preset_choice = tr.preset_choice,
                                     preset_list = tr.preset_list,
                                     mode = tr.mode,
-                                    drum_arp_mode = tr.drum_arp_mode,
+                                    manual_cue = false,
                                     is_clone = true,
                                     addchain = tr.addchain,
                                     IndentMIDI = tr.IndentMIDI
@@ -1224,7 +1163,34 @@ function Draw_Track_Builder_Modal()
                     end
                 end
 
+                -- Per instrument, including clones and mode changes.
+                local mode_key = 1
+                if tr.mode then
+                    for idx, name in ipairs(mode_options) do
+                        if tr.mode == name then mode_key = idx; break end
+                    end
+                end
+                local template = config.track_table[tr.type] and config.track_table[tr.type][mode_key]
+                local has_arranger = false
+                if template and template[5] then
+                    for _, fx in ipairs(template[5]) do
+                        local name = (fx[1] or ""):lower()
+                        if name:find("n2n drum arranger",1,true) or name:find("n2n arp",1,true) then
+                            has_arranger = true; break
+                        end
+                    end
+                end
+                if tr.active and has_arranger then
+                    reaper.ImGui_Dummy(ctx, tr.IndentMIDI >= 0 and 180 or 30, 0)
+                    reaper.ImGui_SameLine(ctx)
+                    local changed, enabled = reaper.ImGui_Checkbox(ctx, "Advanced - Include a manual cueing track", tr.manual_cue == true)
+                    if changed then tr.manual_cue = enabled end
+                    if reaper.ImGui_IsItemHovered(ctx) then
+                        reaper.ImGui_SetTooltip(ctx, "Adds an empty Your Cues child track for manual MIDI overrides. Song following works without it. Existing cue tracks are preserved.")
+                    end
+                end
                 reaper.ImGui_PopID(ctx)
+                end
             end
             reaper.ImGui_EndChild(ctx)
         end
@@ -1257,6 +1223,9 @@ function Draw_Track_Builder_Modal()
                 state_str = state_str .. (tr.active and "1" or "0")
             end
             reaper.SetProjExtState(0, "N2N", "RecipeState", state_str)
+            local manual_state = {}
+            for i, tr in ipairs(config.track_recipe) do manual_state[i] = tr.manual_cue and "1" or "0" end
+            reaper.SetProjExtState(0, "N2N", "ManualCueTrackState", table.concat(manual_state))
 
             is_track_builder_open = false
             reaper.ImGui_CloseCurrentPopup(ctx)
@@ -3916,6 +3885,7 @@ function Compile_Dynamic_Track_Table(recipe)
         -- Lock the IDs into the track data so the Builder knows what it is!
         t.type_id = type_id
         t.mode_id = mode_id
+        t.manual_cue = mode_id > 0 and tr_data and tr_data.manual_cue == true
 
         -- SPACER LOGIC (Source vs Receiver)
         if tr_data and tr_data.Tr_divider_before then
@@ -3965,7 +3935,7 @@ function Compile_Dynamic_Track_Table(recipe)
     end
 
     for _, tr in ipairs(recipe) do
-        if tr.active and config.track_table[tr.type] then
+        if tr.active and tr.type ~= 32 and tr.type ~= 33 and config.track_table[tr.type] then
             -- =========================================================
             -- ROUTING CONSOLIDATION: Force Types 16 & 20 to use 17's Source
             -- =========================================================
@@ -4271,8 +4241,13 @@ function Build_Single_Track(tr)
 
     tr.track_ptr = track_to_use
 
+    -- Preserve existing manual cue children during rebuilds.
+    -- New children are created only when requested for this instrument.
     if Track_Needs_Cue_Child(tr) then
-        tr.cue_track_ptr = Ensure_Cue_Child_Track(track_to_use, tr, unique_id)
+        tr.cue_track_ptr = Find_Cue_Child_By_Unique_ID(unique_id)
+        if tr.manual_cue and not tr.cue_track_ptr then
+            tr.cue_track_ptr = Ensure_Cue_Child_Track(track_to_use, tr, unique_id)
+        end
     end
 
     return is_new
