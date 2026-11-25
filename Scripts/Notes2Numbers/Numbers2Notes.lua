@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.13
+-- @version 2.0.4-dev.14
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -1304,6 +1304,110 @@ local function Pop_N2N_Styles(context)
 end
 -----------------------------------------------                 IMGUI LOOP FUNCTION
 
+-- The chart editor loses keyboard focus when an entry/audition button is
+-- clicked. Retain its byte-offset cursor and selection separately for each
+-- chart. Perform visible insertions through ReaImGui's editor callback so
+-- the text buffer, undo history and cursor advance together.
+local chart_editors = {
+    [1] = {label="##chord_charting_area", pending=""},
+    [7] = {label="##chord_charting_area_letters", pending=""}
+}
+local function get_chart_text(mode)
+    return (mode==7 and chord_charting_area_letters or chord_charting_area) or ""
+end
+local function set_chart_text(mode,value)
+    if mode==7 then chord_charting_area_letters=value
+    else chord_charting_area=value end
+end
+local function chart_range(state,buffer)
+    if state.buffer~=buffer then return #buffer,#buffer end
+    local a=math.max(0,math.min(#buffer,state.first or #buffer))
+    local b=math.max(0,math.min(#buffer,state.last or a))
+    return math.min(a,b),math.max(a,b)
+end
+local function queue_chart_insert(value,mode)
+    mode=mode or (charting_tab_mode==7 and 7 or 1)
+    local state=chart_editors[mode]
+    if charting_tab_mode==mode then
+        state.pending=state.pending..value
+    else
+        -- A hidden chart cannot receive an ImGui callback.
+        local buffer=get_chart_text(mode)
+        local a,b=chart_range(state,buffer)
+        local result=buffer:sub(1,a)..value..buffer:sub(b+1)
+        set_chart_text(mode,result)
+        state.buffer=result
+        state.first=a+#value
+        state.last=state.first
+    end
+end
+local function insert_number_text(value)
+    if charting_tab_mode==7 then
+        queue_chart_insert(numbers_to_letters(set_the_key(header_area),value),7)
+    else queue_chart_insert(value,1) end
+end
+local function flush_hidden_chart(mode)
+    local state=chart_editors[mode]
+    if state.pending=="" then return end
+    local buffer=get_chart_text(mode)
+    local a,b=chart_range(state,buffer)
+    local value=state.pending
+    local result=buffer:sub(1,a)..value..buffer:sub(b+1)
+    set_chart_text(mode,result)
+    state.pending=""
+    state.buffer=result
+    state.first=a+#value
+    state.last=state.first
+end
+local chart_callback=r.ImGui_CreateFunctionFromEEL([[
+    callback_ran=1;
+    apply_pending ? (
+        a=max(0,min(strlen(#Buf),insert_first));
+        b=max(a,min(strlen(#Buf),insert_last));
+        b>a ? InputTextCallback_DeleteChars(a,b-a);
+        InputTextCallback_InsertChars(a,#insert_text);
+        CursorPos=a+strlen(#insert_text);
+        SelectionStart=CursorPos;
+        SelectionEnd=CursorPos;
+        applied=1;
+        apply_pending=0;
+    );
+    saved_first=min(SelectionStart,SelectionEnd);
+    saved_last=max(SelectionStart,SelectionEnd);
+    saved_first==saved_last ? (
+        saved_first=CursorPos;
+        saved_last=CursorPos;
+    );
+]])
+r.ImGui_Attach(ctx,chart_callback)
+local function draw_chart_editor(mode,width,height)
+    local state=chart_editors[mode]
+    local buffer=get_chart_text(mode)
+    -- Do not take focus while a chord audition button is held or released.
+    -- Applying on the following frame preserves its mouse-up behavior.
+    local apply=state.pending~="" and not r.ImGui_IsMouseDown(ctx,0)
+        and not r.ImGui_IsMouseReleased(ctx,0)
+    r.ImGui_Function_SetValue(chart_callback,"callback_ran",0)
+    r.ImGui_Function_SetValue(chart_callback,"applied",0)
+    r.ImGui_Function_SetValue(chart_callback,"apply_pending",apply and 1 or 0)
+    if apply then
+        local a,b=chart_range(state,buffer)
+        r.ImGui_Function_SetValue(chart_callback,"insert_first",a)
+        r.ImGui_Function_SetValue(chart_callback,"insert_last",b)
+        r.ImGui_Function_SetValue_String(chart_callback,"#insert_text",state.pending)
+        r.ImGui_SetKeyboardFocusHere(ctx)
+    end
+    local changed,new_text=r.ImGui_InputTextMultiline(ctx,state.label,buffer,width,height,
+        r.ImGui_InputTextFlags_AllowTabInput()|r.ImGui_InputTextFlags_CallbackAlways(),chart_callback)
+    if changed then set_chart_text(mode,new_text) end
+    if r.ImGui_Function_GetValue(chart_callback,"applied")~=0 then state.pending="" end
+    if r.ImGui_Function_GetValue(chart_callback,"callback_ran")~=0 then
+        state.buffer=get_chart_text(mode)
+        state.first=r.ImGui_Function_GetValue(chart_callback,"saved_first")
+        state.last=r.ImGui_Function_GetValue(chart_callback,"saved_last")
+    end
+end
+
 local function Draw_Sticky_Mini_Chord_Bar(context)
     local is_ctrl_down = reaper.ImGui_IsKeyDown(context, reaper.ImGui_Mod_Ctrl())
 
@@ -1399,12 +1503,12 @@ local function Draw_Sticky_Mini_Chord_Bar(context)
         if reaper.ImGui_IsItemActivated(context) or f_pressed then
             if is_ctrl_down then
                 if charting_tab_mode == 1 then
-                    chord_charting_area = chord_charting_area .. current_root .. clean_name .. "  "
+                    queue_chart_insert(current_root .. clean_name .. "  ",1)
                 elseif charting_tab_mode == 7 then
                     local cur_key = set_the_key(header_area)
                     local fake_chord = current_root .. clean_name
                     local letter_chord = numbers_to_letters(cur_key, fake_chord)
-                    chord_charting_area_letters = chord_charting_area_letters .. letter_chord .. "  "
+                    queue_chart_insert(letter_chord .. "  ",7)
                 end
             end
 
@@ -1821,6 +1925,7 @@ function IM_GUI_Loop()
 
         if r.ImGui_BeginTabItem(ctx, "Chord #") then
             if last_charting_tab == 7 then
+                flush_hidden_chart(7)
                 local cur_key = set_the_key(header_area)
                 chord_charting_area = letters_to_numbers(cur_key, chord_charting_area_letters)
             end
@@ -1832,6 +1937,7 @@ function IM_GUI_Loop()
 
         if r.ImGui_BeginTabItem(ctx, "Letters") then
             if last_charting_tab == 1 then
+                flush_hidden_chart(1)
                 local cur_key = set_the_key(header_area)
                 chord_charting_area_letters = numbers_to_letters(cur_key, chord_charting_area)
             end
@@ -1852,6 +1958,9 @@ function IM_GUI_Loop()
             work_zone = notes_charting_area
             r.ImGui_EndTabItem(ctx)
         end
+
+        if charting_tab_mode~=1 then flush_hidden_chart(1) end
+        if charting_tab_mode~=7 then flush_hidden_chart(7) end
 
         -- Draw the Sticky Chord Bar on the far right of the Tab Bar line!
         Draw_Sticky_Mini_Chord_Bar(ctx)
@@ -1877,11 +1986,9 @@ function IM_GUI_Loop()
                         end
         
                         if charting_tab_mode == 1 then
-                            local changed_c, new_c = r.ImGui_InputTextMultiline(ctx, "##chord_charting_area", chord_charting_area, text_area_width, height_with_headers, reaper.ImGui_InputTextFlags_AllowTabInput())
-                            if changed_c then chord_charting_area = new_c end
+                            draw_chart_editor(1,text_area_width,height_with_headers)
                         else
-                            local changed_c, new_c = r.ImGui_InputTextMultiline(ctx, "##chord_charting_area_letters", chord_charting_area_letters, text_area_width, height_with_headers, reaper.ImGui_InputTextFlags_AllowTabInput())
-                            if changed_c then chord_charting_area_letters = new_c end
+                            draw_chart_editor(7,text_area_width,height_with_headers)
                         end
                     else
                         if r.ImGui_Button(ctx, "Display Header Info", nil, nil) then
@@ -1889,11 +1996,9 @@ function IM_GUI_Loop()
                         end
                         
                         if charting_tab_mode == 1 then
-                            local changed_c, new_c = r.ImGui_InputTextMultiline(ctx, "##chord_charting_area", chord_charting_area, text_area_width, height_no_headers, reaper.ImGui_InputTextFlags_AllowTabInput())
-                            if changed_c then chord_charting_area = new_c end
+                            draw_chart_editor(1,text_area_width,height_no_headers)
                         else
-                            local changed_c, new_c = r.ImGui_InputTextMultiline(ctx, "##chord_charting_area_letters", chord_charting_area_letters, text_area_width, height_no_headers, reaper.ImGui_InputTextFlags_AllowTabInput())
-                            if changed_c then chord_charting_area_letters = new_c end
+                            draw_chart_editor(7,text_area_width,height_no_headers)
                         end
                     end
         elseif charting_tab_mode == 2 then
@@ -2241,24 +2346,13 @@ Form: I V C V C B C O]]
             if r.ImGui_BeginTabItem(ctx, "Entry") then
                 feedback_tab_mode = 1
                 r.ImGui_EndTabItem(ctx)
-            end -- TABS                                  -- TABS
-
-            --[[
-     if r.ImGui_BeginTabItem(ctx, "Options") then
-        feedback_tab_mode = 2
-        r.ImGui_EndTabItem(ctx)
             end
-      if r.ImGui_BeginTabItem(ctx, "Arrange") then
-        feedback_tab_mode = 3
-        r.ImGui_EndTabItem(ctx)
-            end            
-      ]]
-            if r.ImGui_BeginTabItem(ctx, "Import") then
-                feedback_tab_mode = 4
+            if r.ImGui_BeginTabItem(ctx, "Tracks") then
+                feedback_tab_mode = 11
                 r.ImGui_EndTabItem(ctx)
             end
-            if r.ImGui_BeginTabItem(ctx, "Export") then
-                feedback_tab_mode = 5
+            if r.ImGui_BeginTabItem(ctx, "Groove") then
+                feedback_tab_mode = 10
                 r.ImGui_EndTabItem(ctx)
             end
             if r.ImGui_BeginTabItem(ctx, "Theory") then
@@ -2269,81 +2363,18 @@ Form: I V C V C B C O]]
                 feedback_tab_mode = 7
                 r.ImGui_EndTabItem(ctx)
             end
+            if r.ImGui_BeginTabItem(ctx, "Import") then
+                feedback_tab_mode = 4
+                r.ImGui_EndTabItem(ctx)
+            end
+            if r.ImGui_BeginTabItem(ctx, "Export") then
+                feedback_tab_mode = 5
+                r.ImGui_EndTabItem(ctx)
+            end
             if r.ImGui_BeginTabItem(ctx, "Help") then
                 feedback_tab_mode = 8
                 r.ImGui_EndTabItem(ctx)
             end
-            if r.ImGui_BeginTabItem(ctx, "Beta Users") then
-                feedback_tab_mode = 9
-                r.ImGui_EndTabItem(ctx)
-            end
-            if r.ImGui_BeginTabItem(ctx, "Tracks") then
-                feedback_tab_mode = 11
-                r.ImGui_EndTabItem(ctx)
-            end
-            if r.ImGui_BeginTabItem(ctx, "Groove") then
-                feedback_tab_mode = 10
-                r.ImGui_EndTabItem(ctx)
-            end
-
-            --[[      
-
-
-      if onemotionimport ~= "" then
-        feedback_zone = onemotionimport
-        else
-        feedback_zone = 'While at the OneMotion.com Chord Player go to "Edit all" and copy the contents.'
-        end
-        
-                   -- if r.ImGui_BeginTabItem(ctx, "Chordsheet.com") then
-            --    r.ImGui_EndTabItem(ctx)
-      --  feedback_tab_mode = 5        
-      --  feedback_zone = help.Chordsheet_output
-            --end                                -- TABS
-      
-              feedback_zone = help.Sample_song
-      
-                if onemotionimport ~= "" then
-        feedback_zone = onemotionimport
-        else
-        feedback_zone = 'While at the OneMotion.com Chord Player go to "Edit all" and copy the contents.'
-        end
-        
-                if onemotionoutput ~= "" then
-        feedback_zone = onemotionoutput
-        else
-        feedback_zone = help.Onemotion_output
-        end
-        
-        ]]
-            --if r.ImGui_BeginTabItem(ctx, "Help") then
-            --feedback_tab_mode = 6
-            --feedback_zone = help.Template
-            --  r.ImGui_EndTabItem(ctx)
-            --end
-            -- if r.ImGui_BeginTabItem(ctx, "Code Help") then
-            --    r.ImGui_EndTabItem(ctx)
-            --  feedback_tab_mode = 8
-            --  feedback_zone = help.Code_help
-            -- end                                -- TABS
-            --  if r.ImGui_BeginTabItem(ctx, "Section Help") then
-            --      r.ImGui_EndTabItem(ctx)
-            --  feedback_tab_mode = 9
-            --  feedback_zone = help.Section_help
-            --  end
-            --  if r.ImGui_BeginTabItem(ctx, "Chord Help") then
-            --        r.ImGui_EndTabItem(ctx)
-            --    feedback_tab_mode = 10
-            --    feedback_zone = help.Chord_help
-            --    end
-            --    if r.ImGui_BeginTabItem(ctx, "Rhythm Help") then
-            --         r.ImGui_EndTabItem(ctx)
-            --    feedback_tab_mode = 11
-            --    feedback_zone = help.Rhythm_help
-            --     end
-            --if r.ImGui_BeginTabItem(ctx, "Swing Help") then
-            -- r.ImGui_EndTabItem(ctx)
-            --end                                -- TABS
             r.ImGui_EndTabBar(ctx)
         end
         if feedback_tab_mode == 4 then
@@ -2384,7 +2415,13 @@ Form: I V C V C B C O]]
             end
         end
 
+        local help_content_height=597
         if feedback_tab_mode == 8 then
+            local top_y=r.ImGui_GetCursorPosY(ctx)
+            r.ImGui_TextColored(ctx,verylightgray,"REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 2.0.3")
+            Link("https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
+            r.ImGui_Separator(ctx)
+            help_content_height=math.max(100,597-(r.ImGui_GetCursorPosY(ctx)-top_y))
             if r.ImGui_BeginTabBar(ctx, "Help", r.ImGui_TabBarFlags_None()) then
                 if r.ImGui_BeginTabItem(ctx, "Sample Song") then
                     help_tab_mode = 1
@@ -2417,19 +2454,6 @@ Form: I V C V C B C O]]
                 r.ImGui_EndTabBar(ctx)
             end
         end
-        if feedback_tab_mode == 9 then
-            reaper.ImGui_Dummy(ctx, 0, 5) -- Add a tiny bit of vertical spacing
-            local white_color = reaper.ImGui_ColorConvertDouble4ToU32(1, 1, 1, 1)
-            reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Text(), white_color)
-
-            reaper.ImGui_Text(ctx, "REQUIRED PLUGINS FOR THE DEFAULT PROJECT - Version 2.0.3")
-
-            reaper.ImGui_PopStyleColor(ctx)
-
-            reaper.ImGui_Dummy(ctx, 0, 5) -- Add a tiny bit of vertical spacing
-            Link("https://rockumk.github.io/AHS_Music_Tech/Numbers2Notes.html")
-        end
-
         if feedback_tab_mode == 11 then
             gmem_export.DrawTracks(ctx, fontsmall)
         end
@@ -2471,11 +2495,11 @@ Form: I V C V C B C O]]
             reaper.ImGui_Dummy(ctx, 3, 5)
             r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), thecolor)
             if r.ImGui_Button(ctx, "Rest", wx, hx) then
-                chord_charting_area = chord_charting_area .. "-  "
+                insert_number_text("-  ")
             end
             r.ImGui_SameLine(ctx)
             if r.ImGui_Button(ctx, "Return", wx, hx) then
-                chord_charting_area = chord_charting_area .. string.char(10)
+                insert_number_text(string.char(10))
             end
 
             r.ImGui_PopStyleColor(ctx, 1)
@@ -3291,11 +3315,11 @@ Form: I V C V C B C O]]
                 r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), thecolor)
                 if i < 10 then
                     if r.ImGui_Button(ctx, "Add #" .. i .. "  -->", nil) then
-                        chord_charting_area = chord_charting_area .. "\n" .. v[2] .. "\n"
+                        insert_number_text("\n" .. v[2] .. "\n")
                     end
                 else
                     if r.ImGui_Button(ctx, "Add #" .. i .. " -->", nil) then
-                        chord_charting_area = chord_charting_area .. "\n" .. v[2] .. "\n"
+                        insert_number_text("\n" .. v[2] .. "\n")
                     end
                 end
 
@@ -3325,7 +3349,7 @@ Form: I V C V C B C O]]
                 "##helpsample",
                 help.Sample_song,
                 592,
-                597,
+                help_content_height,
                 reaper.ImGui_InputTextFlags_AllowTabInput()
             )
         end
@@ -3335,7 +3359,7 @@ Form: I V C V C B C O]]
                 "##helptemplate",
                 help.Template,
                 592,
-                597,
+                help_content_height,
                 reaper.ImGui_InputTextFlags_AllowTabInput()
             )
         end
@@ -3345,7 +3369,7 @@ Form: I V C V C B C O]]
                 "##helpcode",
                 help.Code_help,
                 592,
-                597,
+                help_content_height,
                 reaper.ImGui_InputTextFlags_AllowTabInput()
             )
         end
@@ -3355,7 +3379,7 @@ Form: I V C V C B C O]]
                 "##helpsection",
                 help.Section_help,
                 592,
-                597,
+                help_content_height,
                 reaper.ImGui_InputTextFlags_AllowTabInput()
             )
         end
@@ -3365,7 +3389,7 @@ Form: I V C V C B C O]]
                 "##helpchord",
                 help.Chord_help,
                 592,
-                597,
+                help_content_height,
                 reaper.ImGui_InputTextFlags_AllowTabInput()
             )
         end
@@ -3375,7 +3399,7 @@ Form: I V C V C B C O]]
                 "##helpsrhythm",
                 help.Rhythm_help,
                 592,
-                597,
+                help_content_height,
                 reaper.ImGui_InputTextFlags_AllowTabInput()
             )
         end
@@ -3765,6 +3789,8 @@ Form: I V C V C B C O]]
     if open then
         r.defer(IM_GUI_Loop)
     else
+        flush_hidden_chart(1)
+        flush_hidden_chart(7)
         ctx = nil
         Autosave()
         SaveLastNumbers2NotesChart()
@@ -7222,7 +7248,7 @@ function play_button_midi(v_in, play_root_in, do_glow)
     -- MOUSE DOWN
     if r.ImGui_IsItemActivated(ctx) then
         if reaper.ImGui_IsKeyDown(ctx, reaper.ImGui_Mod_Ctrl()) then
-            chord_charting_area = chord_charting_area .. play_root_in .. clean_name .. "  "
+            insert_number_text(play_root_in .. clean_name .. "  ")
         end
 
         Kill_All_Audition_Notes()
