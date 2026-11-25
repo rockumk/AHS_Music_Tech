@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.6
+-- @version 1.9.7
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -621,14 +621,16 @@ local track_fonts, track_small_fonts = {}, {}
 -- Header rectangle widths in unscaled pixels, in display order.
 -- The five footer fields show/edit their actual scaled pixel widths.
 local header_names={"Track","Arp / Drum","Instrument","ID","FX"}
-local header_defaults={148,40,60,52,25}
+-- User-approved widths at 170%; normalize to the zoom reference.
+local header_defaults={278/1.7,91/1.7,91/1.7,44/1.7,44/1.7}
+local HEADER_WIDTH_KEY="TracksHeaderWidthV2"
 local header_widths={}
 for i,default in ipairs(header_defaults) do
-    header_widths[i]=math.max(10,math.min(500,tonumber(reaper.GetExtState("Numbers2Notes","TracksHeaderWidth"..i)) or default))
+    header_widths[i]=math.max(10,math.min(500,tonumber(reaper.GetExtState("Numbers2Notes",HEADER_WIDTH_KEY..i)) or default))
 end
 local function set_header_width(i,pixels,scale)
     header_widths[i]=pixels/scale
-    reaper.SetExtState("Numbers2Notes","TracksHeaderWidth"..i,tostring(header_widths[i]),true)
+    reaper.SetExtState("Numbers2Notes",HEADER_WIDTH_KEY..i,tostring(header_widths[i]),true)
 end
 function export.InitTrackFonts(ctx, family, normal_size, small_size)
     local cache = {}
@@ -651,15 +653,15 @@ local function adjust_track_scale(delta)
     track_scale=math.max(TRACK_SCALE_MIN,math.min(TRACK_SCALE_MAX,track_scale+delta))
     reaper.SetExtState("Numbers2Notes","TracksPanelScale",tostring(track_scale),true)
 end
-local function pattern_grid(ctx,t,width,scale)
+local function pattern_grid(ctx,t,width,scale,gap)
     local r=reaper
     local dl=r.ImGui_GetWindowDrawList(ctx)
     local x,y=r.ImGui_GetCursorScreenPos(ctx)
-    local groupw=(width-4*scale)/6
+    -- Seven section groups separated by the same gap as the header.
+    -- The final two single-button groups each get half a full group.
+    local groupw=(width-6*gap)/6
     local lastw=groupw/2
     local h=math.floor(10*scale+.5)
-    local gap=math.max(1,math.floor(2*scale+.5))
-    local subgap=math.max(1,scale)
     local known=t.id>=1 and t.id<=512 and duplicate[t.id]==1 and r.gmem_read(REG_BASE+t.id)>0 and r.TrackFX_GetEnabled(t.track,t.fx) and not r.TrackFX_GetOffline(t.track,t.fx)
     local bits={}
     if known then for i=0,3 do bits[i]=math.floor(r.gmem_read(INV_BASE+(t.id-1)*4+i)) end end
@@ -667,12 +669,12 @@ local function pattern_grid(ctx,t,width,scale)
     local hovered
     for row,gs in ipairs(groups) do
         for gi,g in ipairs(gs) do
-            local gx=x+(gi<=5 and (gi-1)*groupw or 5*groupw+(gi-6)*lastw)
+            local gx=x+(gi<=5 and (gi-1)*(groupw+gap) or 5*(groupw+gap)+(gi-6)*(lastw+gap))
             local gw=gi<=5 and groupw or lastw
-            local first=g[2]==4 and math.min(15*scale,gw*.4) or gw-gap
-            local mini=(gw-first-5*subgap)/3
+            local first=g[2]==4 and math.min(15*scale,gw*.4,(gw-3*gap)*.55) or gw
+            local mini=(gw-first-3*gap)/3
             for v=0,g[2]-1 do
-                local bx=gx+(v==0 and 0 or first+subgap+(v-1)*(mini+subgap))
+                local bx=gx+(v==0 and 0 or first+gap+(v-1)*(mini+gap))
                 local bw=v==0 and first or mini
                 local by=y+(row-1)*(h+gap)
                 local bit=t.kind=="DRUM" and g[7]+v or g[1]+v
@@ -693,7 +695,7 @@ local function pattern_grid(ctx,t,width,scale)
             end
         end
     end
-    r.ImGui_InvisibleButton(ctx,"##pattern_grid",width,3*(h+gap))
+    r.ImGui_InvisibleButton(ctx,"##pattern_grid",width,3*h+2*gap+math.max(0,math.floor(2*scale+.5)+2*math.floor(scale+.5)-2*gap))
     if hovered and r.ImGui_IsItemHovered(ctx) then
         r.ImGui_SetTooltip(ctx,hovered.label..(not known and " (inventory unavailable)" or hovered.populated and " (populated)" or " (empty / inherited)").."\nClick to open pattern for editing")
         if r.ImGui_IsItemClicked(ctx,0) then
@@ -736,7 +738,10 @@ function export.DrawTracks(ctx,font)
     r.ImGui_PopStyleVar(ctx)
     local box_x=r.ImGui_GetCursorPosX(ctx)
     if normal_font then r.ImGui_PushFont(ctx,normal_font) end
-    r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),px(2),px(1))
+    -- Four pixels at 170%: old two-pixel vertical gap plus two.
+    -- All intra-track gaps, including between variants, are identical.
+    local track_gap=math.max(1,math.floor(4*percent/170+.5))
+    r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),track_gap,track_gap)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),px(2),px(1))
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_WindowPadding(),4,4)
     r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ChildBg(),0x000000FF)
@@ -751,8 +756,7 @@ function export.DrawTracks(ctx,font)
         -- track's buttons or separator. All tracks share one fixed geometry.
         local row_x=r.ImGui_GetCursorPosX(ctx)
         local available=r.ImGui_GetContentRegionAvail(ctx)
-        local width=math.min(px(340),available)
-        max_header_width=math.floor(available-4*px(2))
+        max_header_width=math.floor(available-4*track_gap)
         local total=0
         for i,v in ipairs(header_widths) do actual_widths[i]=px(v); total=total+actual_widths[i] end
         -- Fit a narrower host viewport without letting the header overflow.
@@ -765,6 +769,10 @@ function export.DrawTracks(ctx,font)
             end
         end
         local namew,arpw,instw,idw,fxw=table.unpack(actual_widths)
+        local width=namew+arpw+instw+idw+fxw+4*track_gap
+        -- Avoid shrinking the pattern buttons to an unusable width when
+        -- experimenting with exceptionally narrow header fields.
+        local pattern_width=math.min(available,math.max(width,px(200)))
         for _,t in ipairs(tracks) do
             local fx=locate(t)
             if fx then
@@ -785,10 +793,12 @@ function export.DrawTracks(ctx,font)
                 r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ButtonHovered(),color(math.min(1,t.r+.12),math.min(1,t.g+.12),math.min(1,t.b+.12)))
                 r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ButtonActive(),color(t.r*.85,t.g*.85,t.b*.85))
                 r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Text(),lum>.55 and 0x101010FF or 0xFFFFFFFF)
+                r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ButtonTextAlign(),0,.5)
                 if r.ImGui_Button(ctx,label,namew,row_height) then
                     r.SetOnlyTrackSelected(t.track)
                     r.TrackList_AdjustWindows(false)
                 end
+                r.ImGui_PopStyleVar(ctx)
                 if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,t.name) end
                 r.ImGui_SameLine(ctx)
                 if r.ImGui_Button(ctx,t.kind,arpw,row_height) then open_fx(t.track,fx) end
@@ -824,7 +834,7 @@ function export.DrawTracks(ctx,font)
                 r.ImGui_PopStyleColor(ctx,4)
                 r.ImGui_SetCursorPosX(ctx,row_x)
                 if small_font then r.ImGui_PushFont(ctx,small_font) end
-                pattern_grid(ctx,t,width,scale)
+                pattern_grid(ctx,t,pattern_width,scale,track_gap)
                 if small_font then r.ImGui_PopFont(ctx) end
                 r.ImGui_SetCursorPosX(ctx,row_x)
                 r.ImGui_Separator(ctx)
