@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.3.0-dev.4
+version: 12.4.0-dev.4
 author: Rock Kennedy
 about:
-  # N2N Arp v12.3.0-dev.4
+  # N2N Arp v12.4.0-dev.4
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -26,7 +26,7 @@ slider14:0<0,2,1{Chords,Split (Chords and Bass),Bass}>-Input Mode
 
 @init
 scale_dirty = 0;
-thisversion = "v12.3.0-dev.4";
+thisversion = "v12.4.0-dev.4";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -2123,7 +2123,7 @@ row1_y = UI_TOP_Y - 3;
 
 // --- N2N ARP TITLE ---
 gfx_setfont(1, os_font, titlefontsize+8, 'b'); 
-draw_text(HDR_X+3, HDR_Y-3, "N2N ARP", COL_H_R*1.9, COL_H_G*1.9, COL_H_B*1.9); 
+draw_text(HDR_X, HDR_Y-5, "N2N ARP", COL_H_R*1.9, COL_H_G*1.9, COL_H_B*1.9); 
 gfx_setfont(1, os_font, fontsize , 'b');
 
 // --- Row 1 Flow Setup ---
@@ -2132,19 +2132,13 @@ draw_y = row1_y + 3;
 
 gfx_setfont(1, os_font, fontsize-2, 'b'); 
 gfx_set(0.8,0.8,0.8,1); 
-gfx_x = draw_x + 45; gfx_y = draw_y + 0; 
+gfx_x = draw_x + 45; gfx_y = draw_y -2 ; 
 gfx_drawstr("GLOBAL");
-gfx_x = draw_x + 40; gfx_y = draw_y + 10; 
+gfx_x = draw_x + 40; gfx_y = draw_y + 8; 
 gfx_drawstr("SETTINGS:");
-draw_x += 110 + ui_gap_small;
+draw_x += 112 + ui_gap_small;
 
 gfx_setfont(1, os_font, fontsize, 'b'); 
-
-
-
-
-
-
 
 
 
@@ -2156,7 +2150,6 @@ slider10 == 0 ? ( draw_text(draw_x+40, draw_y+4, "N2N", 0,1,1); ) : ( draw_text(
 // Fixed hitbox logic
 (mb && p_mb == 0 && mx>=draw_x+35 && mx<draw_x+70 && my>=draw_y && my<draw_y+20) ? ( slider10 = !slider10; slider_automate(10); );
 draw_x += 70 + ui_gap_small;
-
 // GRID HEIGHT
 height_w = 73;
 dr_slider(draw_x, draw_y, height_w, "HEIGHT:", slider11, 10, 30, 0, 11, 0); 
@@ -2858,7 +2851,7 @@ x2 += item_w + ui_gap_small;
 
 // We define fixed positions for the view toggles so they don't jump around on Tab 0
 
-mode_x = drawhold_x;
+mode_x = drawhold_x - 10;
 mode_w = 96;
 mode_h = 19;
 mode_y=row1_y+3;
