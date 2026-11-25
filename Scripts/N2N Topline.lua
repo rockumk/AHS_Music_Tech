@@ -1,5 +1,5 @@
 -- @description N2N Topline
--- @version 5.4-dev.1
+-- @version 5.4-dev.2
 -- @author Rock Kennedy and Gemini 4 Hydrogen (which did an absolutely fabulous job of transforming the vision into solid Lua code)
 -- @about
 --   Numbers2Notes Topline Melody Editor (1200x640 minimum):
@@ -922,13 +922,13 @@ local function on_script_exit()
   end
   for _, pr in ipairs(state.previews) do send_midi_note_off(pr.pitch, pr.chan) end; state.previews = {}
   if state.kbd_held_pitch then send_midi_note_off(state.kbd_held_pitch, state.kbd_held_chan); state.kbd_held_pitch = nil end
-  restore_auto_arm_track(); save_global_prefs()
+  save_global_prefs()
   -- The original project may have been closed. Never save into a different tab.
   local i=0
   while true do
     local p=reaper.EnumProjects(i,"")
     if not p then break end
-    if p==owner_project then save_project_state(); break end
+    if p==owner_project then restore_auto_arm_track(); save_project_state(); break end
     i=i+1
   end
 end
@@ -2378,6 +2378,19 @@ local function init()
   reaper.SetExtState(HUB_EXT_SEC,"heartbeat",tostring(reaper.time_precise()),false)
   load_global_prefs()
   local had_proj_state = load_project_state()
+  local requested,region=read_hub_request()
+  if requested then
+    local guid=reaper.GetTrackGUID(requested)
+    local hidden=find_track_by_name(HIDDEN_TRACK_NAME) or find_track_by_name(LEGACY_HIDDEN_NAME)
+    local unassigned=state.output_track_guid=="" and
+      (#state.notes>0 or state.commit_state~="none" or (hidden and reaper.CountTrackMediaItems(hidden)>0))
+    if (state.output_track_guid~="" and state.output_track_guid~=guid) or unassigned then
+      reaper.DeleteExtState(HUB_EXT_SEC,"owner",false)
+      reaper.DeleteExtState(HUB_EXT_SEC,"heartbeat",false)
+      reaper.MB("This project already has a Topline draft associated with another track (or an unassigned draft). Open the original track to continue. Independent Topline tracks are not yet supported.","N2N Topline",0)
+      return
+    end
+  end
   refresh_regions_and_sections()
   if not had_proj_state then migrate_legacy_hidden_clip_if_needed() end
   refresh_chord_charts()
@@ -2386,10 +2399,9 @@ local function init()
   rebuild_row_layout()
 
   ensure_hidden_track()
-  local requested,region=read_hub_request()
   -- For a fresh empty editor, bind the requested track before any default
   -- selection. For an existing draft, restore its owner and validate request.
-  if requested and state.output_track_guid=="" and #state.notes==0 and state.commit_state=="none" then
+  if requested then
     select_output_track(requested)
   else
     restore_output_track_by_guid_or_default()
