@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.9
+-- @version 2.0.4-dev.10
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -1651,8 +1651,14 @@ function IM_GUI_Loop()
     Push_N2N_Styles(ctx)
     reaper.ImGui_PushFont(ctx, font)
 
+    -- The Tracks tab owns its own scrolling region; don't pass its wheel
+    -- gestures to the outer Numbers2Notes window.
+    local active_window_flags = window_flags
+    if feedback_tab_mode == 11 then
+        active_window_flags = active_window_flags | r.ImGui_WindowFlags_NoScrollWithMouse()
+    end
     local visible, open =
-        reaper.ImGui_Begin(ctx, "Numbers2Notes - Nashville Number Charts for Reaper", true, window_flags)
+        reaper.ImGui_Begin(ctx, "Numbers2Notes - Nashville Number Charts for Reaper", true, active_window_flags)
 
 
 
