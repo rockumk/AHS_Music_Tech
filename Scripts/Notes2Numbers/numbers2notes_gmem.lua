@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.2
+-- @version 1.9.3
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -613,8 +613,8 @@ local function launch_cue()
     if cmd and cmd>0 then r.Main_OnCommand(cmd,0) else r.MB("Could not launch N2NCue.","N2N Tracks",0) end
 end
 -- Independent Tracks-tab zoom. Fonts are attached once, outside the frame.
-local TRACK_SCALE_MIN, TRACK_SCALE_MAX, TRACK_SCALE_STEP = 75, 175, 5
-local track_scale = tonumber(reaper.GetExtState("Numbers2Notes","TracksPanelScale")) or 100
+local TRACK_SCALE_MIN, TRACK_SCALE_MAX, TRACK_SCALE_STEP, TRACK_SCALE_DEFAULT = 75, 175, 5, 170
+local track_scale = tonumber(reaper.GetExtState("Numbers2Notes","TracksPanelScale")) or TRACK_SCALE_DEFAULT
 track_scale = math.max(TRACK_SCALE_MIN, math.min(TRACK_SCALE_MAX,
     math.floor(track_scale/TRACK_SCALE_STEP+.5)*TRACK_SCALE_STEP))
 local track_fonts, track_small_fonts = {}, {}
@@ -629,8 +629,11 @@ function export.InitTrackFonts(ctx, family, normal_size, small_size)
         return cache[size]
     end
     for percent=TRACK_SCALE_MIN,TRACK_SCALE_MAX,TRACK_SCALE_STEP do
-        track_fonts[percent]=font_at(normal_size*percent/100)
-        track_small_fonts[percent]=font_at(small_size*percent/100)
+        -- Buttons retain their full zoom; text increases much more gently.
+        -- At 170%, font sizes are 121% of the original (18/12 px on Windows).
+        local text_scale=1+(percent-100)*.003
+        track_fonts[percent]=font_at(normal_size*text_scale)
+        track_small_fonts[percent]=font_at(small_size*text_scale)
     end
 end
 local function adjust_track_scale(delta)
@@ -702,8 +705,12 @@ function export.DrawTracks(ctx,font)
     local normal_font=track_fonts[percent]
     local small_font=track_small_fonts[percent] or font
     local function px(n) return math.max(1,math.floor(n*scale+.5)) end
-    if normal_font then r.ImGui_PushFont(ctx,normal_font) end
     export.PublishTrackIdentity(false)
+    -- Match the Render Feedback tab's heading and 592 x 598 content area.
+    local panel_width,panel_height=592,598
+    r.ImGui_Dummy(ctx,0,0)
+    r.ImGui_TextColored(ctx,0xE6E6E6FF,"Tracks:")
+    r.ImGui_SameLine(ctx)
     local conflict_count=0
     for id,n in pairs(duplicate) do if n>1 or id<1 or id>512 then conflict_count=conflict_count+1 end end
     if conflict_count>0 then
@@ -711,19 +718,23 @@ function export.DrawTracks(ctx,font)
     else r.ImGui_TextColored(ctx,0xA0E0A0FF,("%d instances | IDs OK"):format(#tracks)) end
     r.ImGui_SameLine(ctx)
     if r.ImGui_SmallButton(ctx,"Refresh") then export.PublishTrackIdentity(true) end
+    local box_x=r.ImGui_GetCursorPosX(ctx)
+    if normal_font then r.ImGui_PushFont(ctx,normal_font) end
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),px(2),px(1))
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),px(2),px(1))
-    local panel_width=math.min(px(340),r.ImGui_GetContentRegionAvail(ctx))
+    r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_WindowPadding(),4,4)
+    r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ChildBg(),r.ImGui_GetStyleColor(ctx,r.ImGui_Col_FrameBg()))
     local row_height=px(19)
-    local footer_height=px(22)
-    local visible=r.ImGui_BeginChild(ctx,"##N2NTrackScroll",panel_width,-(footer_height+px(7)),0)
+    local border_flag=r.ImGui_ChildFlags_Borders and r.ImGui_ChildFlags_Borders()
+        or r.ImGui_ChildFlags_Border and r.ImGui_ChildFlags_Border() or true
+    local visible=r.ImGui_BeginChild(ctx,"##N2NTrackScroll",panel_width,panel_height,border_flag,r.ImGui_WindowFlags_AlwaysVerticalScrollbar())
     if visible then
         for _,t in ipairs(tracks) do
             local fx=locate(t)
             if fx then
                 t.fx=fx
                 r.ImGui_PushID(ctx,t.guid)
-                local width=r.ImGui_GetContentRegionAvail(ctx)
+                local width=math.min(px(340),r.ImGui_GetContentRegionAvail(ctx))
                 local fxw,idw,instw,arpw=px(25),px(52),px(35),px(40)
                 local namew=math.max(px(20),width-fxw-idw-instw-arpw-4*px(2))
                 local label=("%d. %s"):format(t.number,t.name)
@@ -776,26 +787,30 @@ function export.DrawTracks(ctx,font)
         end
         r.ImGui_EndChild(ctx)
     end
-    -- Fixed footer: the scrolling list cannot push the zoom controls away.
-    local zoom_button=px(25)
+    r.ImGui_PopStyleColor(ctx)
+    r.ImGui_PopStyleVar(ctx,3)
+    if normal_font then r.ImGui_PopFont(ctx) end
+    -- Keep the launcher centered under the fixed container. Size controls
+    -- remain at the right end of the same footer and do not scroll.
+    local footer_height,zoom_button,readout_width,launcher_width=22,24,52,180
     local readout=("%d%%"):format(percent)
-    local readout_width=math.max(px(46),r.ImGui_CalcTextSize(ctx,readout)+px(8))
-    local launcher_width=math.max(px(70),panel_width-2*zoom_button-readout_width-3*px(2))
+    r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),3,1)
+    r.ImGui_SetCursorPosX(ctx,box_x+(panel_width-launcher_width)/2)
     if r.ImGui_Button(ctx,"OPEN N2NCUE",launcher_width,footer_height) then launch_cue() end
-    r.ImGui_SameLine(ctx)
+    r.ImGui_SameLine(ctx,box_x+panel_width-(2*zoom_button+readout_width+6))
     if percent<=TRACK_SCALE_MIN then r.ImGui_BeginDisabled(ctx) end
     if r.ImGui_Button(ctx,"-##track_zoom",zoom_button,footer_height) then adjust_track_scale(-TRACK_SCALE_STEP) end
     if percent<=TRACK_SCALE_MIN then r.ImGui_EndDisabled(ctx) end
     r.ImGui_SameLine(ctx)
-    if r.ImGui_Button(ctx,readout.."##track_zoom_reset",readout_width,footer_height) then adjust_track_scale(100-percent) end
+    if r.ImGui_Button(ctx,readout.."##track_zoom_reset",readout_width,footer_height) then adjust_track_scale(TRACK_SCALE_DEFAULT-percent) end
     if r.ImGui_IsItemHovered(ctx) then
-        r.ImGui_SetTooltip(ctx,("Tracks size: %d%% | Panel width: %.0f px\nClick to reset to 100%%"):format(percent,panel_width))
+        r.ImGui_SetTooltip(ctx,("Tracks size: %d%% | Target row width: %.0f px\nClick to reset to %d%%"):format(percent,px(340),TRACK_SCALE_DEFAULT))
     end
     r.ImGui_SameLine(ctx)
     if percent>=TRACK_SCALE_MAX then r.ImGui_BeginDisabled(ctx) end
     if r.ImGui_Button(ctx,"+##track_zoom",zoom_button,footer_height) then adjust_track_scale(TRACK_SCALE_STEP) end
     if percent>=TRACK_SCALE_MAX then r.ImGui_EndDisabled(ctx) end
-    r.ImGui_PopStyleVar(ctx,2)
+    r.ImGui_PopStyleVar(ctx)
     if id_popup then
         if id_popup_open then r.ImGui_OpenPopup(ctx,"N2N Instance ID"); id_popup_open=false end
         if r.ImGui_BeginPopupModal(ctx,"N2N Instance ID",nil,r.ImGui_WindowFlags_AlwaysAutoResize()) then
@@ -864,7 +879,6 @@ function export.DrawTracks(ctx,font)
             r.ImGui_End(ctx)
         end
     else fx_hover=nil end
-    if normal_font then r.ImGui_PopFont(ctx) end
 end
 
 return export
