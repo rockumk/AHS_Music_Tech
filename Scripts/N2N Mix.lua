@@ -119,9 +119,29 @@ local function get_owned(t)
   local _,g=r.GetSetMediaTrackInfo_String(t,"P_EXT:N2N_MIX_FX","",false)
   return g~="" and g or nil
 end
+local function project_layout_signature()
+  local parts={}
+  local function add(...) local v={...};for i=1,#v do v[i]=tostring(v[i]) end;parts[#parts+1]=table.concat(v,"|") end
+  for i=0,r.CountTracks(proj)-1 do
+    local t=r.GetTrack(proj,i);local _,name=r.GetTrackName(t)
+    add(track_key(t),name,r.GetMediaTrackInfo_Value(t,"B_SHOWINMIXER"),r.GetMediaTrackInfo_Value(t,"B_MAINSEND"),r.GetMediaTrackInfo_Value(t,"I_FOLDERDEPTH"))
+    for k=0,r.GetTrackNumSends(t,0)-1 do
+      local dest=r.GetTrackSendInfo_Value(t,0,k,"P_DESTTRACK")
+      add(dest and track_key(dest) or "",r.GetTrackSendInfo_Value(t,0,k,"I_SRCCHAN"),r.GetTrackSendInfo_Value(t,0,k,"I_SENDMODE"),r.GetTrackSendInfo_Value(t,0,k,"B_MUTE"))
+    end
+  end
+  local i=0
+  while true do
+    local ok,region,a,b,name,id,col=r.EnumProjectMarkers3(proj,i)
+    if ok==0 then break end
+    if region then add(id,a,b,name,col,r.TimeMap2_timeToQN(proj,a),r.TimeMap2_timeToQN(proj,b)) end
+    i=i+1
+  end
+  return table.concat(parts,"\n")
+end
 local function refresh()
-  local a,err=read_sections()
-  if not a then status=err;return false end
+  layout_sig=project_layout_signature()  local a,err=read_sections()
+  if not a then sections={};rows={};groups={};status=err;return false end
   sections=a; rows={}; groups={}; dirty={}; transition_start=nil
   local byptr={}
   for i=0,r.CountTracks(proj)-1 do
@@ -197,7 +217,7 @@ local function refresh()
       groups[d]=groups[d] or {};groups[d][#groups[d]+1]=row
     end
   end)
-  if not ok then status=tostring(e);return false end
+  if not ok then groups={};status=tostring(e);return false end
   local t=r.GetMasterTrack(proj)
   master={track=t,key=track_key(t),name="Master",fxguid=get_owned(t),reports={}}
   if #rows==0 or #rows>MAX then status="Need 1–256 MCP-visible tracks.";return false end
@@ -243,7 +263,7 @@ local function ensure_fx(t)
   r.GetSetMediaTrackInfo_String(t.track,"P_EXT:N2N_MIX_FX",t.fxguid,true)
   return f
 end
-local function envelope(t)
+local function envelope(t,live)
   local f=ensure_fx(t)
   local env=r.GetFXEnvelope(t.track,f,0,true)
   if not env then error("Cannot create gain envelope: "..t.name) end
@@ -256,6 +276,7 @@ local function envelope(t)
   c=c:gsub("([\r\n]ACT%s+)%d+", function(p) return p.."1" end,1)
   c=c:gsub("([\r\n]VIS%s+)%d+", function(p) return p.."0" end,1)
   c=c:gsub("([\r\n]ARM%s+)%d+", function(p) return p.."0" end,1)
+  if live then return env,lo,hi,c end
   if not r.SetEnvelopeStateChunk(env,c,false) then error("Cannot configure gain envelope: "..t.name) end
   env=r.GetFXEnvelope(t.track,f,0,false)
   if r.CountAutomationItems(env)>0 then error("Unexpected automation items: "..t.name) end
@@ -263,7 +284,24 @@ local function envelope(t)
   return env,lo,hi
 end
 local function write_points(t,pts)
-  local env,lo,hi=envelope(t)
+  local live=(r.GetPlayStateEx(proj)&1)~=0
+  local env,lo,hi,chunk=envelope(t,live)
+  if live then
+    -- Replace the point list in one host update during playback, rather than
+    -- leaving a temporarily empty gain envelope between individual calls.
+    if r.CountAutomationItems(env)>0 then error("Unexpected automation items: "..t.name) end
+    chunk=chunk:gsub("\r\n","\n"):gsub("\n[ \t]*PT[ \t][^\n]*","")
+    local close=chunk:match("()>%s*$")
+    if not close then error("Invalid envelope chunk: "..t.name) end
+    local lines={}
+    for _,p in ipairs(pts) do
+      local raw=lo+(clamp(p[2],-60,30)+60)/90*(hi-lo)
+      lines[#lines+1]=string.format("PT %.12f %.12f %d 0 0",p[1],raw,p[3] or 0)
+    end
+    local replacement=chunk:sub(1,close-1):gsub("%s*$","").."\n"..table.concat(lines,"\n").."\n"..chunk:sub(close)
+    if not r.SetEnvelopeStateChunk(env,replacement,false) then error("Cannot update live gain envelope: "..t.name) end
+    return
+  end
   for _,p in ipairs(pts) do
     local db=clamp(p[2],-60,30)
     local raw=lo+(db+60)/90*(hi-lo)
@@ -483,7 +521,13 @@ local function complete_pass(stats)
     if peak>peak_ceiling+0.1 then
       local g=num("mastergain",0)-(peak-peak_ceiling)
       flat(master,g);put("mastergain",g)
-      last_verified=last_verified.." Additional peak correction applied; run Auto Mix again to verify."
+      job.verify_retries=(job.verify_retries or 0)+1
+      if job.verify_retries<=2 then
+        job.queue[#job.queue+1]={kind="verify",name="Master peak recheck",rows={master}}
+        last_verified=last_verified.." Additional peak correction; verifying again."
+      else
+        last_verified=last_verified.." Peak correction applied but not reverified; inspect the final master."
+      end
     end
     note(last_verified)
   end
@@ -763,7 +807,7 @@ local function set_intensity(j,b,v)
   end
   for _,t in ipairs(rows) do if t.depth==0 then dirty[t]=true end end
 end
-local function intensity_cell(c,contour)
+local function intensity_cell(c,contour,ci)
   local s=sections[c.j]
   local v=c.b and s.bars[c.b].int or s.bars[1].int
   if not c.b then for _,bar in ipairs(s.bars) do if bar.int~=v then v=0;break end end end
@@ -772,7 +816,7 @@ local function intensity_cell(c,contour)
   local dl=r.ImGui_GetWindowDrawList(ctx)
   local x,y=r.ImGui_GetCursorScreenPos(ctx)
   local clicked=r.ImGui_InvisibleButton(ctx,id,c.w,CELL_H)
-  local hover=r.ImGui_IsItemHovered(ctx)
+  local hover=r.ImGui_IsItemHovered(ctx,r.ImGui_HoveredFlags_AllowWhenBlockedByActiveItem())
   local light,dark=0xDADADAFF,0x858585FF
   r.ImGui_DrawList_AddRectFilled(dl,x,y,x+c.w,y+CELL_H,light,0)
   local function f(d) return clamp(0.25+0.75*(d+3)/7,0,1) end
@@ -789,9 +833,16 @@ local function intensity_cell(c,contour)
   end
   r.ImGui_DrawList_AddRect(dl,x,y,x+c.w,y+CELL_H,hover and 0xFFFFFFFF or 0x303030FF,0,0,1)
   if label~="" then centered(dl,x,y,c.w,CELL_H,label,0x101010FF,0xFFFFFFFF) end
-  if clicked and not job and not s.countin then
-    if tool==9 then set_intensity(c.j,c.b,5)
-    else set_intensity(c.j,c.b,v>=1 and v<=4 and v%4+1 or 2) end
+  if not job and not s.countin then
+    if hover and r.ImGui_IsMouseClicked(ctx,0) then
+      local chosen=tool==9 and 5 or (v>=1 and v<=4 and v%4+1 or 2)
+      stroke={kind="intensity",ci=ci,value=chosen};set_intensity(c.j,c.b,chosen)
+    elseif hover and stroke and stroke.kind=="intensity" and r.ImGui_IsMouseDown(ctx,0) and stroke.ci~=ci then
+      for k=math.min(ci,stroke.ci),math.max(ci,stroke.ci) do
+        local col=display_cols[k];if col then set_intensity(col.j,col.b,stroke.value) end
+      end
+      stroke.ci=ci
+    end
   end
   if not job and not s.countin and r.ImGui_BeginPopupContextItem(ctx,"##opts"..id) then
     for k,name in ipairs(intens_names) do if r.ImGui_Selectable(ctx,name,v==k) then set_intensity(c.j,c.b,k) end end
@@ -990,7 +1041,7 @@ local function draw()
         r.ImGui_TableNextRow(ctx,0,CELL_H)
         r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Section intensity")
         local contour=intensity_contour()
-        r.ImGui_TableSetColumnIndex(ctx,1);across(function(c) intensity_cell(c,contour) end)
+        r.ImGui_TableSetColumnIndex(ctx,1);across(function(c,ci) intensity_cell(c,contour,ci) end)
         for ri,t in ipairs(rows) do
           r.ImGui_TableNextRow(ctx,0,CELL_H)
           r.ImGui_TableSetColumnIndex(ctx,0)
@@ -1028,7 +1079,7 @@ local function draw()
   if ui_font then r.ImGui_PopFont(ctx) end
   r.ImGui_PopStyleColor(ctx,2);r.ImGui_PopStyleVar(ctx,4)
   if not r.ImGui_IsMouseDown(ctx,0) then
-    if stroke and stroke.tool==9 and not job then
+    if stroke and stroke.kind=="level" and stroke.tool==9 and not job then
       local s=stroke
       if s.endj and (s.j~=s.endj or s.b~=s.endb) then
         transition_start={t=s.t,j=s.j,b=s.b};edit_cell(s.t,s.endj,s.endb,9)
@@ -1055,6 +1106,10 @@ traditional=num("traditional",0)==1
 refresh()
 local function loop()
   if r.EnumProjects(-1,"")~=proj then if job then fail("Project changed") end;return end
+  if not job and not stroke and not transition_start and not next(dirty) and r.time_precise()>=refresh_at and stopped() then
+    refresh_at=r.time_precise()+0.75
+    if project_layout_signature()~=layout_sig then refresh() end
+  end
   if job then
     local ok,e=pcall(step)
     if not ok then fail(e) end
