@@ -593,6 +593,8 @@ local function start()
       flat(t,0)
     end
     note(string.format("Audio routing: %d track layers, master and verification.",#q-2))
+    -- Give the notice its full display interval after preparation finishes.
+    job.ready_at=r.time_precise()+1.4;alert_until=job.ready_at
   end)
   if not ok then fail(e) end
 end
@@ -984,7 +986,7 @@ local function draw()
     if not job then button("Auto Mix",start)
     else button("Cancel",function() finish("Cancelled. Undo to revert partial changes.") end) end
     r.ImGui_PopStyleColor(ctx,nmono)
-    same();r.ImGui_Text(ctx,status)
+    same();r.ImGui_TextWrapped(ctx,status)
     if job then
       local d,n=poll()
       r.ImGui_ProgressBar(ctx,n>0 and d/n or 0,-1,0,string.format("Stage %d/%d | %d/%d reports",job.index,#job.queue,d,n))
