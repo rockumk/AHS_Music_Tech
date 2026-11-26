@@ -30,7 +30,7 @@ local stroke=nil
 local ui_font=nil
 local UI_SIZE=13
 local CELL_H=26
-local LEFT_W=348
+local LEFT_W=380
 local GAP=3
 local display_cols={}
 local font_new_api=nil
@@ -595,29 +595,29 @@ local function centered(dl,x,y,w,h,label,col,outline)
   r.ImGui_DrawList_AddText(dl,tx,ty,col,label)
 end
 local function line(dl,x1,y1,x2,y2)
-  r.ImGui_DrawList_AddLine(dl,x1,y1,x2,y2,0xFFFFFFD0,5.5)
-  r.ImGui_DrawList_AddLine(dl,x1,y1,x2,y2,0x151515FF,3)
+  r.ImGui_DrawList_AddLine(dl,x1,y1,x2,y2,0xFFFFFFD0,4)
+  r.ImGui_DrawList_AddLine(dl,x1,y1,x2,y2,0x151515FF,2.2)
 end
 local function symbol(dl,x,y,w,h,v)
   local cx,cy=x+w/2,y+h/2
   if v==0 then centered(dl,x,y,w,h,"...",0x101010FF,0xFFFFFFFF)
   elseif v==1 then
-    r.ImGui_DrawList_AddCircle(dl,cx,cy,8,0xFFFFFFFF,0,5)
-    r.ImGui_DrawList_AddCircle(dl,cx,cy,8,0x151515FF,0,2.5)
-    line(dl,cx-5,cy+5,cx+5,cy-5)
+    r.ImGui_DrawList_AddCircle(dl,cx,cy,6,0xFFFFFFFF,0,3.5)
+    r.ImGui_DrawList_AddCircle(dl,cx,cy,6,0x151515FF,0,1.8)
+    line(dl,cx-4,cy+4,cx+4,cy-4)
   elseif v==4 then
-    r.ImGui_DrawList_AddCircleFilled(dl,cx,cy,5,0xFFFFFFFF)
-    r.ImGui_DrawList_AddCircleFilled(dl,cx,cy,3.5,0x151515FF)
+    r.ImGui_DrawList_AddCircleFilled(dl,cx,cy,4,0xFFFFFFFF)
+    r.ImGui_DrawList_AddCircleFilled(dl,cx,cy,2.5,0x151515FF)
   elseif v==8 then
     local pts={}
     for i=0,9 do
       local ang=-math.pi/2+i*math.pi/5
-      local rad=i%2==0 and 12 or 5
+      local rad=i%2==0 and 9 or 3.8
       pts[i+1]={cx+math.cos(ang)*rad,cy+math.sin(ang)*rad}
     end
     for i=1,10 do
       local p,q=pts[i],pts[i%10+1]
-      r.ImGui_DrawList_AddLine(dl,p[1],p[2],q[1],q[2],0xFFFFFFFF,3.4)
+      r.ImGui_DrawList_AddLine(dl,p[1],p[2],q[1],q[2],0xFFFFFFFF,2.4)
     end
     for i=1,10 do
       local p,q=pts[i],pts[i%10+1]
@@ -632,12 +632,12 @@ local function symbol(dl,x,y,w,h,v)
     local n=v==2 and 2 or v==3 and 1 or v-4
     local up=v>4
     for i=1,n do
-      local xx=cx+(i-(n+1)/2)*12
-      local tip=cy+(up and -9 or 9)
-      local tail=cy+(up and 8 or -8)
-      local wing=tip+(up and 6 or -6)
+      local xx=cx+(i-(n+1)/2)*9
+      local tip=cy+(up and -7 or 7)
+      local tail=cy+(up and 6 or -6)
+      local wing=tip+(up and 4.5 or -4.5)
       line(dl,xx,tail,xx,tip)
-      line(dl,xx-5,wing,xx,tip);line(dl,xx+5,wing,xx,tip)
+      line(dl,xx-3.5,wing,xx,tip);line(dl,xx+3.5,wing,xx,tip)
     end
   end
 end
@@ -818,7 +818,7 @@ end
 local function track_header(t)
   local dl=r.ImGui_GetWindowDrawList(ctx)
   local x,y=r.ImGui_GetCursorScreenPos(ctx)
-  local w=230
+  local w=161
   r.ImGui_InvisibleButton(ctx,"##track"..t.key,w,CELL_H)
   local rr,gg,bb=rgb(r.GetTrackColor(t.track))
   r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+CELL_H,rgba(rr,gg,bb,255),3)
@@ -831,11 +831,11 @@ end
 local function tool_button(i)
   local dl=r.ImGui_GetWindowDrawList(ctx)
   local x,y=r.ImGui_GetCursorScreenPos(ctx)
-  local w=i==9 and 108 or 44
+  local w=i==9 and 82 or 32
   local clicked=r.ImGui_InvisibleButton(ctx,"##tool"..i,w,CELL_H)
   local hover=r.ImGui_IsItemHovered(ctx)
-  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+CELL_H,tool==i and 0xD3B86DFF or hover and 0xB5BEC8FF or 0x8F9BA7FF,4)
-  r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+CELL_H,tool==i and 0xFFFFFFFF or 0x11111180,4,0,tool==i and 2.5 or 1)
+  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+CELL_H,tool==i and 0xBDBDBDFF or hover and 0xE5E5E5FF or 0xFFFFFFFF,4)
+  r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+CELL_H,0x111111FF,3,0,tool==i and 2.5 or 1)
   if i==9 then centered(dl,x,y,w,CELL_H,"Transition",0x101010FF,0xFFFFFFFF)
   else symbol(dl,x,y,w,CELL_H,i) end
   if hover then r.ImGui_SetTooltip(ctx,i==9 and "Transition" or simple[i]) end
@@ -857,20 +857,58 @@ local function apply_dirty()
   dirty={}
   if not ok then note("Grid update stopped: "..tostring(e)) end
 end
-local function report_log()
-  local a={table.concat(log,"\n"),"Track\tSection\tLUFS-I\tPeak dBFS\tCalibration dB\tCoverage"}
-  for _,t in ipairs(rows) do for j,s in ipairs(sections) do
-    local v=t.reports[j]
-    a[#a+1]=table.concat({t.name,s.name,v and v.state==1 and string.format("%.2f",v.lufs) or "",v and v.peak>-120 and string.format("%.2f",v.peak) or "",t.base[j] and string.format("%+.2f",t.base[j]) or "",v and string.format("%.2f%%",v.coverage*100) or ""},"\t")
-  end end
-  r.ShowConsoleMsg(table.concat(a,"\n").."\n")
-end
 local function same() r.ImGui_SameLine(ctx) end
 local function button(s,fn)
   if r.ImGui_Button(ctx,s) then fn() end
 end
+local function mono_push(gray)
+  local base=gray and 0xC4C4C4FF or 0xFFFFFFFF
+  local colors={
+    {r.ImGui_Col_Text(),0x111111FF},
+    {r.ImGui_Col_Button(),base},
+    {r.ImGui_Col_ButtonHovered(),0xE0E0E0FF},
+    {r.ImGui_Col_ButtonActive(),0xABABABFF},
+    {r.ImGui_Col_FrameBg(),base},
+    {r.ImGui_Col_FrameBgHovered(),0xE5E5E5FF},
+    {r.ImGui_Col_FrameBgActive(),0xD4D4D4FF},
+    {r.ImGui_Col_PopupBg(),base},
+    {r.ImGui_Col_Header(),0xB8B8B8FF},
+    {r.ImGui_Col_HeaderHovered(),0xD4D4D4FF},
+    {r.ImGui_Col_HeaderActive(),0xA0A0A0FF},
+    {r.ImGui_Col_Border(),0x202020FF},
+    {r.ImGui_Col_TextSelectedBg(),0xAAAAAAFF},
+  }
+  for _,x in ipairs(colors) do r.ImGui_PushStyleColor(ctx,x[1],x[2]) end
+  return #colors
+end
+local function radio(label,value)
+  local dl=r.ImGui_GetWindowDrawList(ctx)
+  local x,y=r.ImGui_GetCursorScreenPos(ctx)
+  local tw,th=r.ImGui_CalcTextSize(ctx,label)
+  local clicked=r.ImGui_InvisibleButton(ctx,"##notation"..label,tw+22,CELL_H)
+  local cy=y+CELL_H/2
+  r.ImGui_DrawList_AddCircleFilled(dl,x+8,cy,7,0xFFFFFFFF)
+  r.ImGui_DrawList_AddCircle(dl,x+8,cy,7,0x111111FF,0,1.5)
+  if traditional==value then r.ImGui_DrawList_AddCircleFilled(dl,x+8,cy,3.8,0x111111FF) end
+  local text_color=r.ImGui_GetStyleColor(ctx,r.ImGui_Col_Text())
+  r.ImGui_DrawList_AddText(dl,x+19,y+(CELL_H-th)/2,text_color,label)
+  if clicked then traditional=value;put("traditional",value and 1 or 0) end
+end
+local function alert_banner()
+  if alert_text=="" or r.time_precise()>=alert_until then return end
+  local dl=r.ImGui_GetWindowDrawList(ctx)
+  local x,y=r.ImGui_GetCursorScreenPos(ctx)
+  local w=r.ImGui_GetContentRegionAvail(ctx)
+  r.ImGui_Dummy(ctx,w,30)
+  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+30,0xF5F5F5FF,3)
+  r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+30,0x111111FF,3,0,1.5)
+  centered(dl,x,y,w,30,alert_text,0x111111FF)
+end
 local function draw()
   r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_Alpha(),1)
+  r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),4,3)
+  r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),4,3)
+  r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_CellPadding(),3,2)
   local bg=r.ImGui_GetStyleColor(ctx,r.ImGui_Col_WindowBg()) | 0xff
   r.ImGui_PushStyleColor(ctx,r.ImGui_Col_WindowBg(),bg)
   r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ChildBg(),bg)
@@ -887,56 +925,48 @@ local function draw()
       r.ImGui_PushFont(ctx,ui_font)
     end
   end
-  r.ImGui_SetNextWindowSize(ctx,1350,650,r.ImGui_Cond_FirstUseEver())
+  r.ImGui_SetNextWindowSize(ctx,1000,480,r.ImGui_Cond_FirstUseEver())
   r.ImGui_SetNextWindowBgAlpha(ctx,1)
   local visible,open=r.ImGui_Begin(ctx,"N2N Mix",true)
   if visible then
-    if not job then
-      button("Fine Tune All",function() start("All") end);same()
-      button("Instruments",function() start("Instruments") end);same()
-      button("Busses & FX",function() start("Busses & FX") end);same()
-      button("Master",function() start("Master") end);same()
-      button(selected_mode,function() selected_mode=selected_mode=="Offline" and "Real time" or "Offline" end);same()
-      button("Refresh",refresh)
-    else
-      button("Cancel",function() finish("Cancelled. Undo to revert partial changes.") end)
-    end
-    same();button("Report",report_log)
-    r.ImGui_TextWrapped(ctx,status)
-    if last_stats~="" then r.ImGui_TextWrapped(ctx,last_stats) end
-    if last_verified~="" then r.ImGui_TextWrapped(ctx,last_verified) end
+    local nmono=mono_push(false)
+    if not job then button("Auto Mix",start)
+    else button("Cancel",function() finish("Cancelled. Undo to revert partial changes.") end) end
+    r.ImGui_PopStyleColor(ctx,nmono)
+    same();r.ImGui_Text(ctx,status)
     if job then
       local d,n=poll()
       r.ImGui_ProgressBar(ctx,n>0 and d/n or 0,-1,0,string.format("Stage %d/%d | %d/%d reports",job.index,#job.queue,d,n))
     else
-      r.ImGui_SetNextItemWidth(ctx,160)
-      if r.ImGui_BeginCombo(ctx,"Master target",presets[preset][1]) then
+      r.ImGui_Text(ctx,"Master Target");same()
+      nmono=mono_push(false)
+      r.ImGui_SetNextItemWidth(ctx,205)
+      if r.ImGui_BeginCombo(ctx,"##mastertarget",presets[preset][1]) then
         for i,p in ipairs(presets) do if r.ImGui_Selectable(ctx,p[1],i==preset) then preset=i;put("preset",i) end end
         r.ImGui_EndCombo(ctx)
       end
-      same()
       if preset==#presets then
-        r.ImGui_SetNextItemWidth(ctx,90)
-        local ch,v=r.ImGui_InputDouble(ctx,"LUFS",custom,1,1,"%.1f")
+        same();r.ImGui_SetNextItemWidth(ctx,145)
+        local ch,v=r.ImGui_InputDouble(ctx,"##customlufs",custom,1,1,"%.1f")
         if ch then custom=clamp(v,-35,-8);put("custom",custom) end
-        same()
       end
-      r.ImGui_Text(ctx,string.format("Target %.1f LUFS | sample peak guard %.1f dBFS",master_target(),peak_ceiling))
-      local ch,v=r.ImGui_Checkbox(ctx,"Traditional",traditional)
-      if ch then traditional=v;put("traditional",v and 1 or 0) end
+      r.ImGui_PopStyleColor(ctx,nmono)
+      same();r.ImGui_Text(ctx,string.format("%.1f LUFS | sample peak %.1f dBFS",master_target(),peak_ceiling))
+      radio("Simple",false);same();radio("Traditional",true)
       for i=1,9 do same();tool_button(i) end
-      r.ImGui_TextWrapped(ctx,"Paint levels by dragging. Transition: click start and end on one track. Click a section heading to expand bars.")
     end
+    alert_banner()
+    r.ImGui_Separator(ctx)
     if #sections>0 then
       local cols,total={},0
       for j,s in ipairs(sections) do
         if expanded[s.key] then
           for b=1,#s.bars do
-            local w=b==1 and math.max(130,r.ImGui_CalcTextSize(ctx,s.name.." −")+20) or 100
+            local w=b==1 and math.max(92,r.ImGui_CalcTextSize(ctx,s.name.." −")+14) or 70
             cols[#cols+1]={j=j,b=b,w=w};total=total+w+GAP
           end
         else
-          local w=math.max(132,r.ImGui_CalcTextSize(ctx,s.name.." +")+20)
+          local w=math.max(94,r.ImGui_CalcTextSize(ctx,s.name.." +")+14)
           cols[#cols+1]={j=j,w=w};total=total+w+GAP
         end
       end
@@ -966,7 +996,8 @@ local function draw()
           r.ImGui_TableSetColumnIndex(ctx,0)
           track_header(t)
           r.ImGui_SameLine(ctx,0,GAP)
-          r.ImGui_SetNextItemWidth(ctx,152)
+          local role_colors=mono_push(true)
+          r.ImGui_SetNextItemWidth(ctx,150)
           if r.ImGui_BeginCombo(ctx,"##role"..t.key,roles[t.role]) then
             for i,name in ipairs(roles) do
               if r.ImGui_Selectable(ctx,name,i==t.role) and not job then
@@ -977,7 +1008,8 @@ local function draw()
             end
             r.ImGui_EndCombo(ctx)
           end
-          r.ImGui_SameLine(ctx,0,GAP);r.ImGui_SetNextItemWidth(ctx,70)
+          r.ImGui_PopStyleColor(ctx,role_colors)
+          r.ImGui_SameLine(ctx,0,GAP);r.ImGui_SetNextItemWidth(ctx,57)
           local ch,v=r.ImGui_InputDouble(ctx,"##target"..t.key,t.target,0,0,"%.1f")
           if ch and not job then
             local old=t.target;t.target=clamp(v,-60,-8);put("target:"..t.key,t.target)
@@ -994,7 +1026,7 @@ local function draw()
     r.ImGui_End(ctx)
   end
   if ui_font then r.ImGui_PopFont(ctx) end
-  r.ImGui_PopStyleColor(ctx,2);r.ImGui_PopStyleVar(ctx)
+  r.ImGui_PopStyleColor(ctx,2);r.ImGui_PopStyleVar(ctx,4)
   if not r.ImGui_IsMouseDown(ctx,0) then
     if stroke and stroke.tool==9 and not job then
       local s=stroke
