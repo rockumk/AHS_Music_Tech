@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.1.2
+-- @version 0.1.3
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -33,7 +33,7 @@ local CELL_H=36
 local LEFT_W=465
 local GAP=4
 local display_cols={}
-local font_new_api=false
+local font_new_api=nil
 local preset=1
 local custom=-16
 local peak_ceiling=-2 -- sample-peak guard; not a true-peak guarantee
@@ -800,7 +800,17 @@ local function draw()
   r.ImGui_PushStyleColor(ctx,r.ImGui_Col_WindowBg(),bg)
   r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ChildBg(),bg)
   if ui_font then
-    if font_new_api then r.ImGui_PushFont(ctx,ui_font,UI_SIZE) else r.ImGui_PushFont(ctx,ui_font) end
+    -- Probe PushFont itself: CreateFont can accept a numeric flags argument
+    -- in 0.10, so successful font creation does not identify the API version.
+    if font_new_api==nil then
+      local ok=pcall(r.ImGui_PushFont,ctx,ui_font,UI_SIZE)
+      font_new_api=ok
+      if not ok then r.ImGui_PushFont(ctx,ui_font) end
+    elseif font_new_api then
+      r.ImGui_PushFont(ctx,ui_font,UI_SIZE)
+    else
+      r.ImGui_PushFont(ctx,ui_font)
+    end
   end
   r.ImGui_SetNextWindowSize(ctx,1350,650,r.ImGui_Cond_FirstUseEver())
   r.ImGui_SetNextWindowBgAlpha(ctx,1)
@@ -922,10 +932,13 @@ local function draw()
 end
 if not r.ImGui_CreateContext then r.MB("ReaImGui is required.","N2N Mix",0);return end
 ctx=r.ImGui_CreateContext("N2N Mix")
--- ReaImGui 0.9 uses a font size at creation; 0.10 uses a size at PushFont.
-local ok_font,font=pcall(r.ImGui_CreateFont,"sans-serif",UI_SIZE)
-if ok_font and font then ui_font=font else
-  ui_font=r.ImGui_CreateFont("sans-serif");font_new_api=true
+-- ReaImGui 0.10: CreateFont(family[, flags]), PushFont(ctx,font,size).
+-- ReaImGui 0.9: CreateFont(family,size[, flags]), PushFont(ctx,font).
+local ok_font,font=pcall(r.ImGui_CreateFont,"sans-serif")
+if ok_font and font then
+  ui_font=font
+else
+  ui_font=r.ImGui_CreateFont("sans-serif",UI_SIZE)
 end
 r.ImGui_Attach(ctx,ui_font)
 preset=clamp(num("preset",1),1,#presets)
