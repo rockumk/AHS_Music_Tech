@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.10
+-- @version 1.9.11
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -242,17 +242,6 @@ local function section_slot(name)
 end
 export.SectionSlot = section_slot
 
-local function kind_of(track,fx)
-    local ok, name = reaper.TrackFX_GetFXName(track,fx,"")
-    if reaper.TrackFX_GetNamedConfigParm then
-        local got, ident = reaper.TrackFX_GetNamedConfigParm(track,fx,"fx_ident")
-        if got and ident and ident~="" then name=(name or "").." "..ident end
-    end
-    if not ok or not name then return end
-    local lower=name:lower()
-    if lower:find("n2n drum arranger",1,true) then return "DRUM" end
-    if lower:find("n2n arp",1,true) then return "ARP" end
-end
 function export.PublishSongForm(stretched_index, force)
     local r = reaper
     local now = r.time_precise()
@@ -296,8 +285,8 @@ function export.PublishSongForm(stretched_index, force)
     for i=0,r.CountTracks(project)-1 do
         local tr=r.GetTrack(project,i)
         for fx=0,r.TrackFX_GetCount(tr)-1 do
-            -- Use the same underlying FX identity as the Tracks panel.
-            if kind_of(tr,fx) then
+            local _,name=r.TrackFX_GetFXName(tr,fx,"")
+            if name:lower():find("n2n drum arranger",1,true) or name:lower():find("n2n arp",1,true) then
                 local id=math.floor(r.TrackFX_GetParam(tr,fx,4)+0.5)
                 if id>=1 and id<=512 then
                     local key=r.gmem_read(8000000+id)
@@ -312,11 +301,7 @@ function export.PublishSongForm(stretched_index, force)
     for _,v in ipairs(spans) do sig[#sig+1]=string.format("%.12f:%.12f:%d",v[1],v[2],v[3]) end
     for i=1,512 do if keys[i] then sig[#sig+1]=i..":"..keys[i] end end
     sig=table.concat(sig,"|")
-    -- A different script instance or a reset can invalidate the shared map
-    -- without changing the local signature. Confirm the published revision.
-    if not force and sig==last_sig and project==last_project
-        and r.gmem_read(FORM_BASE)==0x4E324631
-        and r.gmem_read(FORM_BASE+1)==export._published_form_rev then return true end
+    if not force and sig==last_sig and project==last_project then return true end
     local rev=math.floor(r.gmem_read(FORM_BASE+1)/2)*2+2
     r.gmem_write(FORM_BASE+1,rev-1)
     r.gmem_write(FORM_BASE,0x4E324631)
@@ -328,7 +313,6 @@ function export.PublishSongForm(stretched_index, force)
     end
     r.gmem_write(FORM_BASE+1,rev)
     last_sig,last_project=sig,project
-    export._published_form_rev=rev
     return true
 end
 
@@ -509,6 +493,17 @@ local INFO_BASE, REG_BASE, INV_BASE, EDIT_BASE = 8200000, 8000000, 7500000, 8300
 local tracks, duplicate, last_project_tracks = {}, {}, nil
 local identity_last_poll = -math.huge
 local fx_hover, hover_until, hover_pos, id_popup, id_popup_open, id_suggestion
+local function kind_of(track,fx)
+    local ok, name = reaper.TrackFX_GetFXName(track,fx,"")
+    if reaper.TrackFX_GetNamedConfigParm then
+        local got, ident = reaper.TrackFX_GetNamedConfigParm(track,fx,"fx_ident")
+        if got and ident and ident~="" then name=(name or "").." "..ident end
+    end
+    if not ok or not name then return end
+    local lower=name:lower()
+    if lower:find("n2n drum arranger",1,true) then return "DRUM" end
+    if lower:find("n2n arp",1,true) then return "ARP" end
+end
 local function is_topline(tr,name)
     if name=="__N2N_Topline_Hidden" or name=="__N2N_Melody_Engine_Hidden" then return false end
     local _,tag=reaper.GetSetMediaTrackInfo_String(tr,"P_EXT:N2N:TOPLINE","",false)
