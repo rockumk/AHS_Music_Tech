@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.4.0-dev.7
+version: 12.4.0-dev.8
 author: Rock Kennedy
 about:
-  # N2N Arp v12.4.0-dev.7
+  # N2N Arp v12.4.0-dev.8
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -27,7 +27,7 @@ slider14:0<0,2,1{Chords,Split (Chords and Bass),Bass}>-Input Mode
 @init
 scale_dirty = 0;
 last_input_mode = -1;
-thisversion = "v12.4.0-dev.7";
+thisversion = "v12.4.0-dev.8";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -2390,17 +2390,17 @@ hub_edit_cmd>0 && gmem[hub_edit_addr]==my_key && gmem[reg_base+my_slot]==my_key 
     hub_edit_tab=floor(hub_edit_cmd)-1;
     hub_edit_tab>=1 && hub_edit_tab<TOTAL_TABS ? (
         mem[ui_edit_tab]=hub_edit_tab;
-        hub_browse=1; hub_browse_source=vis_audio_source; hub_browse_request=vis_audio_requested;
+        hub_browse=1; hub_browse_source=gfx_vis_source; hub_browse_request=gfx_vis_requested;
     );
     gmem[hub_edit_addr+1]=0;
 );
-// In Follow mode show the real source pattern (including inheritance).
+// In Follow mode select the requested song section, not its inherited source.
 // Keep an active mouse gesture on its original tab until the user releases.
 mem[ui_locked_tab]==-1 && !mem[ui_power_off] ? (
-    gfx_next_tab=gfx_vis_source>0?gfx_vis_source:gfx_vis_requested;
+    gfx_next_tab=gfx_vis_requested;
     hub_browse && (gfx_vis_source!=hub_browse_source || gfx_vis_requested!=hub_browse_request) ? hub_browse=0;
     !hub_browse && gfx_next_tab>=1 && gfx_next_tab<TOTAL_TABS ? (
-        (gfx_vis_running || gfx_next_tab!=gfx_follow_target) && !mb && !rmb && !chan_popup_active && !color_popup_active ? (
+        ((play_state&1) || gfx_next_tab!=gfx_follow_target) && !mb && !rmb && !chan_popup_active && !color_popup_active ? (
             mem[ui_edit_tab]=gfx_next_tab;
             gfx_follow_target=gfx_next_tab;
         );
@@ -2742,7 +2742,7 @@ fb_tab = (form_count>0 && !midi_form_override && mem[ui_locked_tab]==-1 && (elig
 is_ghosting = (t_e != fb_tab);
 // Highlight only the displayed, sounding source and its matching grid.
 gfx_highlight_actual=gfx_vis_running && !mem[ui_power_off] && t_e==gfx_vis_source;
-gfx_highlight_ghost=gfx_vis_running && !mem[ui_power_off] && t_e==gfx_vis_requested && fb_tab==gfx_vis_source && is_ghosting && eff_sub(t_e)==eff_sub(fb_tab) && eff_bars(t_e)==eff_bars(fb_tab) && eff_half(t_e)==eff_half(fb_tab);
+gfx_highlight_ghost=gfx_vis_running && !mem[ui_power_off] && t_e==gfx_vis_requested && fb_tab==gfx_vis_source && is_ghosting;
 
 fb_pat_v_ptr = vel_base + fb_tab*vel_stride_tab; 
 fb_pat_g_ptr = grid_base + fb_tab*vel_stride_tab; 
@@ -3474,12 +3474,14 @@ gx_s+=1;
     ); 
 
 // --- DRAW FALLBACK GHOST NOTES ---
-    is_ghosting ? (
-        s_g = 0; 
-        loop(st_v,
+    is_ghosting && fb_tab>0 ? (
+        s_g = 0;
+        ghost_steps=max(1,eff_bars(fb_tab)*eff_sub(fb_tab));
+        ghost_cw=grid_w/ghost_steps;
+        loop(ghost_steps,
             idx_ghost = r_idx*vel_stride_row + s_g; 
             mem[fb_pat_g_ptr + idx_ghost] ? (
-                cx_g = grid_x + s_g*cw; 
+                cx_g = grid_x + s_g*ghost_cw; 
                 
                 c_idx = mem[row_color_base+r_idx];
                 get_palette_values(c_idx); 
@@ -3508,9 +3510,9 @@ gx_s+=1;
                 fb_l = mem[fb_pat_l_ptr + idx_ghost];
                 fb_l < 1 ? fb_l = 1;
                 
-                ghost_w = (cw * fb_l) - (cw * (2/3));
+                ghost_w = (ghost_cw * min(fb_l,ghost_steps-s_g)) - (ghost_cw * (2/3));
                 ghost_h = ROW_HEIGHT / 3;
-                g_x = cx_g + (cw / 3);
+                g_x = cx_g + (ghost_cw / 3);
                 g_y = ry + (ROW_HEIGHT / 3);
                 
                 gfx_rect(g_x, g_y, ghost_w, ghost_h);
@@ -3624,7 +3626,7 @@ mouse_hwheel = 0;
 
 // Use the same source and step clock as the note highlights.
 // Never draw an unrelated playhead over a manually browsed pattern.
-(gfx_highlight_actual || gfx_highlight_ghost) && gfx_vis_total>0 && st_v==gfx_vis_total ? (
+(gfx_highlight_actual || gfx_highlight_ghost) && gfx_vis_total>0 ? (
     ph_x=grid_x+(gfx_vis_phase/gfx_vis_total)*vel_w;
     grid_h=visible_rows*ROW_HEIGHT;
     grid_y+grid_h>gfx_h ? grid_h=gfx_h-grid_y;
