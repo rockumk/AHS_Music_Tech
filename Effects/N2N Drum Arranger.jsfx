@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.13
+version: 7.8.0-dev.14
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.13 -
+  # N2N Drum Arranger v7.8.0-dev.14 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -134,7 +134,7 @@ slider11:14<10,30,1>-Grid Row Height
 slider12:1<0,1,1>-Song Form Protocol
 
 @init
-version_display = "v7.8.0-dev.13";
+version_display = "v7.8.0-dev.14";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -2529,6 +2529,12 @@ gfx_seq_before%2==0 ? (
         gfx_vis_total=gfx_tmp_total; gfx_vis_running=gfx_tmp_running;
     );
 );
+// The requested section is already published in the existing UI state by
+// the cue engine. Use that same authoritative value for the underline and
+// selection; a delayed audio-phase snapshot must not freeze the editor.
+gfx_requested_tab=mem[ui_locked_tab]==-1?mem[ui_play_prog_tab]:mem[ui_locked_tab];
+gfx_requested_source=(play_state&1)?effective_play_tab:
+    (gfx_requested_tab>=0 && gfx_requested_tab<TOTAL_TABS?resolve_pattern(gfx_requested_tab):0);
 // Hub navigation is an editing operation, never a playback cue.
 hub_edit_addr=8300000+(my_slot-1)*2;
 hub_edit_cmd=gmem[hub_edit_addr+1];
@@ -2536,15 +2542,15 @@ hub_edit_cmd>0 && gmem[hub_edit_addr]==my_key && gmem[reg_base+my_slot]==my_key 
     hub_edit_tab=floor(hub_edit_cmd)-1;
     hub_edit_tab>=1 && hub_edit_tab<TOTAL_TABS ? (
         mem[ui_edit_tab]=hub_edit_tab;
-        hub_browse=1; hub_browse_source=gfx_vis_source; hub_browse_request=gfx_vis_requested;
+        hub_browse=1; hub_browse_source=gfx_requested_source; hub_browse_request=gfx_requested_tab;
     );
     gmem[hub_edit_addr+1]=0;
 );
 // Keep the requested section visible, including its inherited ghost notes.
 // Do not change the edit tab in the middle of a mouse gesture.
 mem[ui_locked_tab]==-1 && !mem[ui_power_off] ? (
-    gfx_next_tab=gfx_vis_requested;
-    hub_browse && (gfx_vis_source!=hub_browse_source || gfx_vis_requested!=hub_browse_request) ? hub_browse=0;
+    gfx_next_tab=gfx_requested_tab;
+    hub_browse && gfx_requested_tab!=hub_browse_request ? hub_browse=0;
     !hub_browse && gfx_next_tab>=1 && gfx_next_tab<TOTAL_TABS ? (
         ((play_state&1) || gfx_next_tab!=gfx_follow_target) && !mb && !rmb && !color_popup_active && !help_active ? (
             mem[ui_edit_tab]=gfx_next_tab;
@@ -2556,8 +2562,8 @@ mem[ui_locked_tab]==-1 && !mem[ui_power_off] ? (
 draw_y = ROW2_Y; // Advance Y to Tab Area
 
 // VISUAL ONLY: show the current requested pattern's inheritance, even with transport parked.
-arrow_req = mem[ui_locked_tab]==-1 ? mem[ui_play_prog_tab] : mem[ui_locked_tab];
-arrow_eff = (play_state & 1) ? effective_play_tab : (arrow_req>=0 && arrow_req<TOTAL_TABS ? resolve_pattern(arrow_req) : 0);
+arrow_req=gfx_requested_tab;
+arrow_eff=gfx_requested_source;
 arrow_show = (!mem[ui_power_off] &&
               arrow_req >= 0 && arrow_req < TOTAL_TABS &&
               arrow_eff >= 0 && arrow_eff < TOTAL_TABS &&
@@ -2827,8 +2833,27 @@ t_e = mem[ui_edit_tab];
     
     fb_tab = get_active_fallback(t_e);
     is_ghosting = (t_e != fb_tab);
-    gfx_highlight_actual=gfx_vis_running && !mem[ui_power_off] && t_e==gfx_vis_source;
-    gfx_highlight_ghost=gfx_vis_running && !mem[ui_power_off] && t_e==gfx_vis_requested && fb_tab==gfx_vis_source && is_ghosting;
+    // Select and highlight from the same request/source as the tab row.
+    // Prefer the coherent audio snapshot; if it has not caught up yet,
+    // calculate a frame-local phase from the current sounding pattern.
+    gfx_phase_source=gfx_requested_source;
+    gfx_phase_running=(play_state&1) && !mem[ui_power_off] && gfx_phase_source>0;
+    gfx_phase_steps=0; gfx_phase_step=-1; gfx_phase_pos=0;
+    gfx_phase_running ? (
+        gfx_vis_running && gfx_vis_requested==gfx_requested_tab && gfx_vis_source==gfx_phase_source && gfx_vis_total>0 ? (
+            gfx_phase_steps=gfx_vis_total;
+            gfx_phase_step=gfx_vis_step;
+            gfx_phase_pos=gfx_vis_phase;
+        ) : (
+            gfx_phase_sub=eff_sub(gfx_phase_source);
+            gfx_phase_steps=max(1,eff_bars(gfx_phase_source)*gfx_phase_sub);
+            gfx_phase_rate=eff_half(gfx_phase_source)?0.5:1;
+            gfx_phase_pos=fmod_pos((beat_position+playback_shift)*gfx_phase_rate*gfx_phase_sub/4,gfx_phase_steps);
+            gfx_phase_step=floor(gfx_phase_pos);
+        );
+    );
+    gfx_highlight_actual=gfx_phase_running && t_e==gfx_phase_source;
+    gfx_highlight_ghost=gfx_phase_running && t_e==gfx_requested_tab && fb_tab==gfx_phase_source && is_ghosting;
     
     fb_pat_v_ptr = vel_base + fb_tab*vel_stride_tab; 
     fb_pat_g_ptr = grid_base + fb_tab*vel_stride_tab; 
@@ -3179,7 +3204,7 @@ ty = draw_y;
     s_v=eff_sub(t_e); 
     st_v=eff_bars(t_e)*s_v;
     // Actual note highlights and ghost note highlights use the same audio clock.
-    play_step_idx=gfx_highlight_actual?gfx_vis_step:-1;
+    play_step_idx=gfx_highlight_actual?gfx_phase_step:-1;
 
     btn(10, ty+2, 77, " COPY ROW") ? ( 
         memcpy(copy_row_v_buf, curr_pat_v_ptr + sel_r*vel_stride_row, MAX_STEPS); 
@@ -3754,7 +3779,7 @@ circle_hit = (
                     v_scale = min_b + (rng_b * (v_disp / 127)); 
                     
                     // Flash playhead white, otherwise use row color
-                    (gfx_highlight_ghost && gfx_vis_step == s_g) ? (
+                    (gfx_highlight_ghost && gfx_phase_step == s_g) ? (
                         gfx_set(1, 1, 1, 0.95); 
                     ) : (
                         gfx_set(cr*v_scale, cg*v_scale, cb*v_scale, 1); 
@@ -3787,8 +3812,8 @@ circle_hit = (
     gfx_rect(sb_x + 2, draw_y, sb_w - 4, draw_h);
     
     // Draw the sounding pattern's phase on its actual or inherited view.
-    (gfx_highlight_actual || gfx_highlight_ghost) && gfx_vis_total>0 ? (
-        phx=gx_s+(gfx_vis_phase/gfx_vis_total)*gx_w;
+    (gfx_highlight_actual || gfx_highlight_ghost) && gfx_phase_steps>0 ? (
+        phx=gx_s+(gfx_phase_pos/gfx_phase_steps)*gx_w;
         rect(phx-1,grid_y,3,visible_rows*row_h,0,1,0,0.4);
     );
 
@@ -4070,6 +4095,13 @@ help_active ? (
     //gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - => : Export Pattern Bank (.n2drumpats)");
     
     // UPDATED THESE VARIABLES AS WELL
+    // Compact read-only diagnostics for song-form/view troubleshooting.
+    gfx_setfont(1,os_font,fontsize-1,'b');
+    gfx_set(0.65,0.85,0.85,1);
+    sprintf(#form_diag,"FORM: %d spans | ID %d | key %s | MIDI override %d",form_count,my_slot,gmem[FORM_BASE+10+my_slot]==my_key?"OK":"missing",midi_form_override);
+    gfx_x=help_x+20; gfx_y=help_y+help_h-58; gfx_drawstr(#form_diag);
+    sprintf(#form_diag,"Request %d | Source %d | View %d | Lock %d",gfx_requested_tab,gfx_requested_source,mem[ui_edit_tab],mem[ui_locked_tab]);
+    gfx_x=help_x+20; gfx_y=help_y+help_h-42; gfx_drawstr(#form_diag);
     ok_w = 60; ok_h = 25; ok_x = help_x + help_w - ok_w - 20; ok_y = help_y + help_h - ok_h - 20;
     rect(ok_x, ok_y, ok_w, ok_h, 0.4, 0.4, 0.4, 1);
     gfx_set(1,1,1,1); gfx_x = ok_x + 18; gfx_y = ok_y + 5; gfx_drawstr("OK");
