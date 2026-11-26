@@ -1,15 +1,16 @@
 desc:N2N Mix Meter (diagnostic)
-version: 0.1.0
+version: 0.1.1
 author: Rock Kennedy
 about:
   Stereo K-weighted gated energy measurement and gain control.
   Reference: ITU-R BS.1770, Annex 1. Sample peak only, not true peak.
   Diagnostic protocol v1: section times in seconds; results per occurrence.
+  Read-only display; gain is managed by Numbers2Notes and N2N Mix.
 provides:
   [main] .
 
 options:gmem=N2N_Mix_Analysis_v1
-slider1:0<-60,30,0.01>Gain (dB)
+slider1:0<-60,30,0.01>-Gain (dB)
 slider2:0<0,256,1>-Instance slot
 slider3:0<0,2147483647,1>-Run token
 in_pin:Left
@@ -164,3 +165,32 @@ active ? (
 gain+=(gain_target-gain)*smooth;
 spl0*=gain;
 spl1*=gain;
+
+@gfx 460 180
+// Display only. No mouse handling, menus, slider writes or automation writes.
+gfx_clear = 0.1;
+
+gfx_set(0.8, 0.8, 0.8, 1);
+gfx_setfont(1, "Arial", 18, 'b');
+gfx_x = 20; gfx_y = 20;
+gfx_drawstr("Used by Numbers2Notes");
+
+gfx_set(0.7, 0.7, 0.7, 1);
+gfx_setfont(2, "Arial", 15);
+gfx_x = 20; gfx_y = 50;
+gfx_drawstr("This FX measures loudness and applies automatic mix gain.");
+gfx_x = 20; gfx_y = 70;
+gfx_drawstr("Use N2N Mix or the track fader to adjust the mix.");
+
+gfx_set(1.0, 0.3, 0.3, 1);
+gfx_setfont(3, "Arial", 15, 'b');
+gfx_x = 20; gfx_y = 100;
+gfx_drawstr("NEEDED - DO NOT DELETE.");
+
+gfx_set(0.8, 0.8, 0.8, 1);
+gfx_setfont(2, "Arial", 15);
+gfx_x = 20; gfx_y = 145;
+gfx_drawstr("Current gain:  ");
+gfx_set(0.4, 0.8, 0.9, 1);
+gfx_setfont(3, "Arial", 15, 'b');
+gfx_printf("%+.2f dB", slider1);
