@@ -85,7 +85,7 @@ local function poll_reports()
     for j,s in ipairs(sections) do
       total=total+1
       local addr=4096+((t.slot-1)*256+j-1)*8
-      if t.installed and gmem_read_safe(addr)==token then
+      if t.installed and r.gmem_read(addr)==token then
         local n,rate=r.gmem_read(addr+4),r.gmem_read(addr+5)
         local coverage=rate>0 and n/rate/(s.b-s.a) or 0
         t.results[j]={state=r.gmem_read(addr+1),lufs=r.gmem_read(addr+2),
@@ -98,7 +98,6 @@ local function poll_reports()
   return done,total
 end
 -- One writer per slot; JSFX publishes the run token after its payload.
-function gmem_read_safe(addr) return r.gmem_read(addr) end
 local function restore_transport()
   if not restore then return end
   if mode=="Real time" then
@@ -133,8 +132,9 @@ local function add_track(t,slot)
   local _,name=r.GetTrackName(t)
   local row={track=t,name=name,slot=slot,results={},channels=r.GetMediaTrackInfo_Value(t,"I_NCHAN")}
   -- Explicitly append a fresh instance, never reuse or overwrite an existing one.
-  local fx=r.TrackFX_AddByName(t,"JS: N2N Mix Meter.jsfx",false,-1)
-  if fx<0 then fx=r.TrackFX_AddByName(t,"JS: N2N Mix Meter (diagnostic)",false,-1) end
+  local at=-1000-r.TrackFX_GetCount(t)
+  local fx=r.TrackFX_AddByName(t,"JS: N2N Mix Meter.jsfx",false,at)
+  if fx<0 then fx=r.TrackFX_AddByName(t,"JS: N2N Mix Meter (diagnostic)",false,at) end
   if fx>=0 then
     row.fxguid=r.TrackFX_GetFXGUID(t,fx)
     r.TrackFX_SetParam(t,fx,0,0)
@@ -281,9 +281,9 @@ local function loop()
         end
       end
       r.ImGui_EndChild(ctx)
-    elseif #sections>0 then r.ImGui_EndChild(ctx) end
+    end
+    r.ImGui_End(ctx)
   end
-  r.ImGui_End(ctx)
   if open then r.defer(loop) end
 end
 r.atexit(function()
