@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.14
+version: 7.8.0-dev.15
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.14 -
+  # N2N Drum Arranger v7.8.0-dev.15 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -134,7 +134,7 @@ slider11:14<10,30,1>-Grid Row Height
 slider12:1<0,1,1>-Song Form Protocol
 
 @init
-version_display = "v7.8.0-dev.14";
+version_display = "v7.8.0-dev.15";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -170,20 +170,22 @@ my_key == 0 ? (
     my_key = floor(rand(9000000)) + 1; 
 );
 
-reg_done = 0; curr_id = slider5;
-// Safety loop to find a slot or claim the current one
-while (reg_done == 0 && curr_id <= 512) (
+reg_done = 0; curr_id = max(1,min(512,floor(slider5+0.5))); reg_scan=0;
+// Search all slots, including those below the requested ID.
+while (reg_done == 0 && reg_scan < 512) (
     slot_val = gmem[reg_base + curr_id];
     (slot_val == 0 || slot_val == my_key) ? (
         gmem[reg_base + curr_id] = my_key;
         slider5 = curr_id;
         reg_done = 1;
     ) : (
-        curr_id += 1;
+        curr_id=curr_id%512+1;
     );
+    reg_scan+=1;
 );
-slider5 > 512 ? slider5 = 512;
 my_slot = slider5; // STORE THE ASSIGNED SLOT
+// Notify the host if the registration assigned a new slider value.
+reg_notify=1;
 
 // =========================================================
 // MEMORY MANAGEMENT
@@ -1737,6 +1739,22 @@ midi_trigger_queued >= 0 ? (
 // Accept deliberate host ID changes only when the destination slot is unowned.
 // Keep the pattern data and local playback/lock state intact.
 id_requested=max(1,min(512,floor(slider5+0.5)));
+// A registry reset or stale collision must not leave this instance without
+// a valid registration. Reclaim an empty slot, never another owner's key.
+gmem[reg_base+my_slot]==0 ? (
+    gmem[reg_base+my_slot]=my_key;
+    form_rev=-1; reg_notify=1;
+    flush_inventory_to_gmem();
+);
+gmem[reg_base+my_slot]!=my_key ? (
+    reg_scan=0; reg_candidate=my_slot; reg_found=0;
+    while(reg_scan<512 && !reg_found) (
+        reg_candidate=reg_candidate%512+1;
+        (gmem[reg_base+reg_candidate]==0 || gmem[reg_base+reg_candidate]==my_key) ? reg_found=1;
+        reg_scan+=1;
+    );
+    reg_found ? id_requested=reg_candidate;
+);
 id_requested!=my_slot ? (
     (gmem[reg_base+id_requested]==0 || gmem[reg_base+id_requested]==my_key) ? (
         id_old=my_slot;
@@ -1752,7 +1770,11 @@ id_requested!=my_slot ? (
         flush_inventory_to_gmem();
         needs_tab_update=1;
     ) : slider5=my_slot;
+    reg_notify=1;
+);
+reg_notify ? (
     sliderchange(slider5);
+    reg_notify=0;
 );
 last_reported_id=slider5;
 
@@ -4098,7 +4120,7 @@ help_active ? (
     // Compact read-only diagnostics for song-form/view troubleshooting.
     gfx_setfont(1,os_font,fontsize-1,'b');
     gfx_set(0.65,0.85,0.85,1);
-    sprintf(#form_diag,"FORM: %d spans | ID %d | key %s | MIDI override %d",form_count,my_slot,gmem[FORM_BASE+10+my_slot]==my_key?"OK":"missing",midi_form_override);
+    sprintf(#form_diag,"FORM: %d/%d spans | ID %d | reg %d | key %d | MIDI %d",form_count,gmem[FORM_BASE+2],my_slot,gmem[reg_base+my_slot]==my_key,gmem[FORM_BASE+10+my_slot]==my_key,midi_form_override);
     gfx_x=help_x+20; gfx_y=help_y+help_h-58; gfx_drawstr(#form_diag);
     sprintf(#form_diag,"Request %d | Source %d | View %d | Lock %d",gfx_requested_tab,gfx_requested_source,mem[ui_edit_tab],mem[ui_locked_tab]);
     gfx_x=help_x+20; gfx_y=help_y+help_h-42; gfx_drawstr(#form_diag);
