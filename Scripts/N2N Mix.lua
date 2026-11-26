@@ -875,7 +875,7 @@ local function line(dl,x1,y1,x2,y2)
 end
 local function symbol(dl,x,y,w,h,v)
   local cx,cy=x+w/2,y+h/2
-  if v==0 then centered(dl,x,y,w,h,"...",0x101010FF,0xFFFFFFFF)
+  if v==0 then centered(dl,x,y,w,h,"...",0x101010FF)
   elseif v==1 then
     r.ImGui_DrawList_AddCircle(dl,cx,cy,6,0xFFFFFFFF,0,3.5)
     r.ImGui_DrawList_AddCircle(dl,cx,cy,6,0x151515FF,0,1.8)
@@ -902,7 +902,7 @@ local function symbol(dl,x,y,w,h,v)
     line(dl,cx-10,cy+6,cx+10,cy-6)
     line(dl,cx+4,cy-6,cx+10,cy-6)
     line(dl,cx+10,cy-6,cx+10,cy)
-  elseif traditional then centered(dl,x,y,w,h,trad[v],0x101010FF,0xFFFFFFFF)
+  elseif traditional then centered(dl,x,y,w,h,trad[v],0x101010FF)
   else
     local n=v==2 and 2 or v==3 and 1 or math.min(v-4,2)
     local up=v>4
@@ -983,15 +983,16 @@ local function cell(t,j,b,w,fills,ri,ci)
   r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+h,light,0)
   if not s.countin then
     if v==9 then
-      local f0=b and fills[j][b].f0 or fills[j][1].f0
-      local f1=b and fills[j][b].f1 or fills[j][#s.bars].f1
-      if f0>0 or f1>0 then
-        if f0==0 then
-          r.ImGui_DrawList_AddTriangleFilled(dl,x,y+h,x+w,y+h*(1-f1),x+w,y+h,dark)
-        elseif f1==0 then
-          r.ImGui_DrawList_AddTriangleFilled(dl,x,y+h*(1-f0),x+w,y+h,x,y+h,dark)
-        else
-          r.ImGui_DrawList_AddQuadFilled(dl,x,y+h*(1-f0),x+w,y+h*(1-f1),x+w,y+h,x,y+h,dark)
+      local first,last=b or 1,b or #s.bars
+      local ta,tz=s.bars[first].a,s.bars[last].b
+      for k=first,last do
+        local f0,f1=fills[j][k].f0,fills[j][k].f1
+        local xa=x+w*(s.bars[k].a-ta)/(tz-ta)
+        local xb=x+w*(s.bars[k].b-ta)/(tz-ta)
+        if f0>0 or f1>0 then
+          if f0==0 then r.ImGui_DrawList_AddTriangleFilled(dl,xa,y+h,xb,y+h*(1-f1),xb,y+h,dark)
+          elseif f1==0 then r.ImGui_DrawList_AddTriangleFilled(dl,xa,y+h*(1-f0),xb,y+h,xa,y+h,dark)
+          else r.ImGui_DrawList_AddQuadFilled(dl,xa,y+h*(1-f0),xb,y+h*(1-f1),xb,y+h,xa,y+h,dark) end
         end
       end
     else
@@ -1002,8 +1003,8 @@ local function cell(t,j,b,w,fills,ri,ci)
   r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+h,hovered and 0xFFFFFFFF or 0x00000050,0,0,hovered and 2 or 1)
   local report=t.reports[j]
   if job then
-    centered(dl,x,y,w,h,report and (report.state==1 and string.format("%.1f",report.lufs) or "OK") or "·",0x101010FF,0xFFFFFFFF)
-  elseif s.countin then centered(dl,x,y,w,h,"—",0x101010FF,0xFFFFFFFF)
+    centered(dl,x,y,w,h,report and (report.state==1 and string.format("%.1f",report.lufs) or "OK") or "·",0x101010FF)
+  elseif s.countin then centered(dl,x,y,w,h,"—",0x101010FF)
   elseif v~=9 then symbol(dl,x,y,w,h,v) end
   if not job and not s.countin then
     if hovered and r.ImGui_IsMouseClicked(ctx,0) then
@@ -1043,7 +1044,7 @@ local function set_intensity(j,b,v,ramp)
   for _,t in ipairs(rows) do if t.depth==0 then dirty[t]=true end end
   master_dirty=true
 end
-local function draw_section_tile(dl,x,y,w,h,f0,f1,label,selected,hover)
+local function draw_section_tile(dl,x,y,w,h,f0,f1,label,selected,hover,segments)
   local light=selected and 0xE5D6A3FF or 0xDADADAFF
   local dark=selected and 0xB89B4EFF or 0x858585FF
   local rim=selected and 0xD3B86DFF or hover and 0xEEEEEEFF or 0x303030FF
@@ -1051,7 +1052,16 @@ local function draw_section_tile(dl,x,y,w,h,f0,f1,label,selected,hover)
   r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+h,light,rad)
   -- Keep the sloped interior inside the rounded silhouette. Fill the central
   -- polygon, then cover the lower corners using a rounded base where needed.
-  if f0>0 or f1>0 then
+  if segments then
+    local inset=2;local bot=y+h-inset
+    for _,seg in ipairs(segments) do
+      local a=x+inset+(w-2*inset)*seg.a
+      local b=x+inset+(w-2*inset)*seg.b
+      local ya=y+inset+(h-2*inset)*(1-seg.f0)
+      local yb=y+inset+(h-2*inset)*(1-seg.f1)
+      if seg.f0>0 or seg.f1>0 then r.ImGui_DrawList_AddQuadFilled(dl,a,ya,b,yb,b,bot,a,bot,dark) end
+    end
+  elseif f0>0 or f1>0 then
     if f0==f1 then
       local top=y+h*(1-f0)
       r.ImGui_DrawList_AddRectFilled(dl,x,top,x+w,y+h,dark,math.min(rad,(y+h-top)*0.5),f0==1 and 0 or r.ImGui_DrawFlags_RoundCornersBottom())
@@ -1085,7 +1095,15 @@ local function intensity_cell(c,contour,ci)
   elseif v==0 then f0,f1=0.5,0.5
   elseif not s.countin then f0,f1=section_fill[v],section_fill[v]
   else f0,f1=0,0 end
-  draw_section_tile(dl,x,y,c.w,CELL_H,f0,f1,label,false,hover)
+  local segments
+  if v==5 and not c.b then
+    segments={}
+    for k,bar in ipairs(s.bars) do
+      local d=contour[c.j][k]
+      segments[#segments+1]={a=(bar.a-s.a)/(s.b-s.a),b=(bar.b-s.a)/(s.b-s.a),f0=d.f0,f1=d.f1}
+    end
+  end
+  draw_section_tile(dl,x,y,c.w,CELL_H,f0,f1,label,false,hover,segments)
   if not job and not s.countin then
     if hover and r.ImGui_IsMouseClicked(ctx,0) then
       local chosen=intensity_tool
@@ -1258,10 +1276,11 @@ local function draw()
     alert_x,alert_y=wx+ww/2,wy+wh/2
     local nmono=mono_push(true)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),5)
+    r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),0xDADADAFF)
     if not job then button("Auto Mix",request_start)
     else button("Cancel",function() finish("Cancelled. Undo to revert partial changes.") end) end
     r.ImGui_PopStyleVar(ctx)
-    r.ImGui_PopStyleColor(ctx,nmono)
+    r.ImGui_PopStyleColor(ctx,nmono+1)
     same();r.ImGui_TextWrapped(ctx,status)
     if job then
       local d,n=poll()
@@ -1376,9 +1395,8 @@ local function draw()
       w=w+4*(#tool_ids-1)
       local x=r.ImGui_GetCursorPosX(ctx);local avail=r.ImGui_GetContentRegionAvail(ctx)
       radio("Simple",false);same();radio("Traditional",true)
-      local end_x=r.ImGui_GetCursorPosX(ctx)
-      local radio_w=r.ImGui_CalcTextSize(ctx,"Traditional")+26
-      r.ImGui_SameLine(ctx,math.max(end_x+radio_w,x+(avail-w)/2))
+      local radio_w=r.ImGui_CalcTextSize(ctx,"Simple")+r.ImGui_CalcTextSize(ctx,"Traditional")+52
+      r.ImGui_SameLine(ctx,math.max(x+radio_w,x+(avail-w)/2))
       for k,i in ipairs(tool_ids) do if k>1 then same() end;tool_button(i) end
     end
     r.ImGui_End(ctx)
