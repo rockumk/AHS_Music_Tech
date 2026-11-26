@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.1.6
+-- @version 0.1.7
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -239,6 +239,7 @@ local function active_env(env)
 end
 local function safe_row(t)
   if not valid(t.track) then return false,"Track no longer exists: "..t.name end
+  if r.GetMediaTrackInfo_Value(t.track,"I_FXEN")==0 then return false,"Track FX chain bypassed: "..t.name end
   local mode=r.GetMediaTrackInfo_Value(t.track,"I_AUTOMODE")
   if mode>1 then return false,"Change automation mode to Trim/Read or Read: "..t.name end
   local e=r.GetTrackEnvelopeByChunkName(t.track,"<VOLENV2")
@@ -530,6 +531,7 @@ end
 local function cleanup()
   attach();r.gmem_write(0,0)
   if job then
+    for t,flags in pairs(job.perf or {}) do if valid(t) then r.SetMediaTrackInfo_Value(t,"I_PERFFLAGS",flags) end end
     r.GetSet_LoopTimeRange2(proj,true,false,job.a,job.b,false)
     r.GetSetRepeatEx(proj,job.repeat_state)
     r.SetEditCurPos2(proj,job.cursor,false,false)
@@ -549,6 +551,16 @@ local function stats_value(s,k) return tonumber((s or ""):match(k..":([%+%-%.%d]
 local function master_target()
   return preset==#presets and custom or presets[preset][2]
 end
+local function track_diagnostic(t,i,p)
+  local f=fx_index(t)
+  local slot=f and r.TrackFX_GetParam(t.track,f,1) or -1
+  local tok=f and r.TrackFX_GetParam(t.track,f,2) or -1
+  local ab
+  if f then local ok,v=r.TrackFX_GetNamedConfigParm(t.track,f,"force_auto_bypass");if ok then ab=v end end
+  local addr=1024+(i-1)*8
+  local beat=r.gmem_read(addr)==p.token
+  return string.format("%s: mute=%d, recarm=%d, chain=%d, main=%d, sends=%d, slot=%.0f/%d, token=%.0f/%d, auto-bypass=%s, meter heartbeat=%s, blocks=%d, active blocks=%d",t.name,r.GetMediaTrackInfo_Value(t.track,"B_MUTE"),r.GetMediaTrackInfo_Value(t.track,"I_RECARM"),r.GetMediaTrackInfo_Value(t.track,"I_FXEN"),r.GetMediaTrackInfo_Value(t.track,"B_MAINSEND"),r.GetTrackNumSends(t.track,0),slot,i,tok,p.token,tostring(ab),beat and "yes" or "no",beat and r.gmem_read(addr+1) or 0,beat and r.gmem_read(addr+2) or 0)
+end
 local function complete_pass(stats)
   if not job or not pass then return end
   local done,total=poll()
@@ -558,23 +570,30 @@ local function complete_pass(stats)
   -- Track calibration requires per-section reports. Master/verification use
   -- REAPER's native rendered-output statistics, not the meter's pre-gain reports.
   if p.kind=="track" then
-    local failures={}
-    for _,t in ipairs(p.rows) do
+    local failures,diagnostics,missing_rows={},{},{}
+    for i,t in ipairs(p.rows) do
+      local failed=false
       for j,s in ipairs(sections) do
         local v=t.reports[j]
         local reason
         if not v then reason="missing report"
         elseif v.state~=1 and v.state~=2 then reason="meter status "..tostring(v.state)
         elseif math.abs(v.coverage-1)>0.02 then reason=string.format("%.1f%% coverage",v.coverage*100) end
-        if reason then failures[#failures+1]=t.name.." / "..s.name..": "..reason end
+        if reason then failures[#failures+1]=t.name.." / "..s.name..": "..reason;failed=true end
       end
+      if failed then missing_rows[#missing_rows+1]=t;diagnostics[#diagnostics+1]=track_diagnostic(t,i,p) end
     end
     if #failures>0 then
       local detail=p.name..": "..done.."/"..total.." reports; "..#failures.." incomplete.\n"..table.concat(failures,"\n")
-      r.ShowConsoleMsg("N2N Mix analysis:\n"..detail.."\nNative render stats: "..tostring(stats).."\n")
+      r.ShowConsoleMsg("N2N Mix analysis:\n"..detail.."\nTrack state:\n"..table.concat(diagnostics,"\n").."\nNative render stats: "..tostring(stats).."\n")
       if not p.retried then
         p.retried=true
-        note(p.name..": incomplete reports; retrying offline once.")
+        for _,t in ipairs(missing_rows) do
+          local flags=math.floor(r.GetMediaTrackInfo_Value(t.track,"I_PERFFLAGS"))
+          if job.perf[t.track]==nil then job.perf[t.track]=flags end
+          r.SetMediaTrackInfo_Value(t.track,"I_PERFFLAGS",flags|2)
+        end
+        note(p.name..": incomplete reports; retrying with anticipative FX disabled on affected tracks.")
         return
       end
       error(p.name..": "..#failures.." incomplete; "..failures[1]..". Full details in REAPER console",0)
@@ -632,7 +651,14 @@ local function arm(p)
   for i,t in ipairs(p.kind=="track" and p.rows or {}) do
     t.reports={}
     local f=ensure_fx(t)
-    r.TrackFX_SetParam(t.track,f,1,i);r.TrackFX_SetParam(t.track,f,2,tok)
+    r.TrackFX_SetNamedConfigParm(t.track,f,"force_auto_bypass","0")
+    if not r.TrackFX_SetParam(t.track,f,1,i) or not r.TrackFX_SetParam(t.track,f,2,tok) then error("Cannot arm meter: "..t.name,0) end
+    local slot_now=r.TrackFX_GetParam(t.track,f,1)
+    local token_now=r.TrackFX_GetParam(t.track,f,2)
+    if math.abs(slot_now-i)>0.1 or math.abs(token_now-tok)>0.1 then
+      error(string.format("Meter parameter mismatch: %s (slot %.2f/%d, token %.2f/%d)",t.name,slot_now,i,token_now,tok),0)
+    end
+    for k=0,7 do r.gmem_write(1024+(i-1)*8+k,0) end
     for j=1,#sections do r.gmem_write(4096+((i-1)*256+j-1)*8,0) end
   end
   if p.kind=="master" then apply_master(0) end
@@ -654,6 +680,7 @@ end
 local function start()
   if next(dirty) or master_dirty then status="Finish current grid edit first.";return end
   if not stopped() then status="Stop transport before Auto Mix.";return end
+  if r.AnyTrackSolo(proj) then status="Clear track solos before Auto Mix.";return end
   if not refresh() then return end
   if math.abs(r.Master_GetPlayRate(proj)-1)>0.0001 then status="Set project play rate to 1.0.";return end
   if r.GetGlobalAutomationOverride()>1 then status="Disable global automation write/bypass override.";return end
@@ -661,20 +688,37 @@ local function start()
   if r.gmem_read(0)==1 then status="Another analysis is armed.";return end
   local cmd=action_id()
   if not cmd then status="Native dry-run action not found.";return end
-  local q,selected={},{}
+  local q,selected,skipped={},{},{}
+  local function skip_muted(t)
+    if r.GetMediaTrackInfo_Value(t.track,"B_MUTE")==0 then return false end
+    -- A muted track can still supply pre-fader audio depending on REAPER's
+    -- preferences. Never assume that such a send is silent.
+    for i=0,r.GetTrackNumSends(t.track,0)-1 do
+      if r.GetTrackSendInfo_Value(t.track,0,i,"I_SRCCHAN")>=0 and
+         r.GetTrackSendInfo_Value(t.track,0,i,"B_MUTE")==0 and
+         r.GetTrackSendInfo_Value(t.track,0,i,"I_SENDMODE")~=0 then return false end
+    end
+    return true
+  end
   for d=0,#rows do
-    if groups[d] and #groups[d]>0 then
+    local eligible={}
+    for _,t in ipairs(groups[d] or {}) do
+      if skip_muted(t) then skipped[#skipped+1]=t.name else eligible[#eligible+1]=t end
+    end
+    if #eligible>0 then
       local label=d==0 and "Source tracks" or ("Downstream audio layer "..d)
-      q[#q+1]={kind="track",name=label.." ("..#groups[d].." tracks)",rows=groups[d]}
+      q[#q+1]={kind="track",name=label.." ("..#eligible.." tracks)",rows=eligible}
     end
   end
+  if #skipped>0 then r.ShowConsoleMsg("N2N Mix: preserving muted tracks: "..table.concat(skipped,", ").."\n") end
+  if #q==0 then status="No unmuted tracks to analyze.";return end
   q[#q+1]={kind="master",name="Master",rows={master}}
   q[#q+1]={kind="verify",name="Master verification",rows={master}}
   for _,p in ipairs(q) do for _,t in ipairs(p.rows) do selected[t]=true end end
   for t in pairs(selected) do local ok,e=safe_row(t);if not ok then status=e;return end end
   local a,b=r.GetSet_LoopTimeRange2(proj,false,false,0,0,false)
   r.Undo_BeginBlock2(proj)
-  job={queue=q,index=1,kind="Auto Mix",cmd=cmd,a=a,b=b,cursor=r.GetCursorPositionEx(proj),repeat_state=r.GetSetRepeatEx(proj,-1),ready_at=r.time_precise()+1.4}
+  job={queue=q,index=1,kind="Auto Mix",cmd=cmd,a=a,b=b,cursor=r.GetCursorPositionEx(proj),repeat_state=r.GetSetRepeatEx(proj,-1),ready_at=r.time_precise()+1.4,perf={}}
   last_verified="";last_stats=""
   alert_text="Processing please wait.";alert_until=job.ready_at
   local ok,e=pcall(function()
