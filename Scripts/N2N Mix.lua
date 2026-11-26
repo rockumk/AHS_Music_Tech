@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.1.4
+-- @version 0.1.5
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -10,11 +10,14 @@ local MAX=256
 local FXNAME="N2N Mix Meter"
 local roles={"Lead Vocal","Lead Instrument","Drums","Bass","Primary Accomp.","BG Vocals","Secondary Accomp.","Traditional Arp","Pad / Texture","Effects","Unclassified","Buss"}
 local defaults={-22,-24,-25,-25,-27,-28,-30,-32,-35,-40,-30,-27}
-local intensity={-3,0,2,4}
-local intens_names={"Soft","Normal","Strong","Very Strong"}
-local levels={-60,-10,-5,0,5,10,15,20}
-local simple={"Mute","Down twice","Down","Normal","Up","Up twice","Up three times","Featured"}
-local trad={"0","p","mp","•","mf","f","ff","★"}
+-- Preserve stored IDs: 5 is section transition, 6 is Silent; 7 is retired track level.
+local intensity={-3,0,2,4,[6]=-60}
+local intens_names={"Soft","Normal","Strong","Very Strong",[5]="Transition",[6]="Silent"}
+local intensity_ids={6,1,2,3,4,5}
+local levels={-60,-10,-5,0,5,10,15,15}
+local simple={"Mute","Very Low","Low","Mid","High","Very High","Very High","Star"}
+local trad={"0","p","mp","•","mf","f","f","★"}
+local tool_ids={1,2,3,4,5,6,8,9}
 local presets={{"YouTube",-14},{"Spotify",-14},{"Apple Music",-16},{"General streaming",-14},{"Dynamic master",-18},{"Premaster",-20},{"EBU R128",-23},{"Custom",-16}}
 local sections,rows,master,groups={}, {},nil,{}
 local job,pass=nil,nil
@@ -22,6 +25,8 @@ local status="Ready."
 local log={}
 local traditional=false
 local tool=4
+local intensity_tool=2
+local mono_push
 local expanded={}
 local dirty={}
 local transition_start=nil
@@ -78,7 +83,7 @@ local function read_sections()
     if s.a<0 or (j>1 and s.a<a[j-1].b-0.00001) then return nil,"Overlapping or negative-time regions are not supported." end
     s.key=string.format("%d:%s:%.6f:%.6f",s.id,s.name,s.a,s.b)
     s.countin=s.name:lower():gsub("[^a-z]","")=="countin"
-    s.int=clamp(num("int:"..s.key,2),1,5)
+    s.int=clamp(num("int:"..s.key,2),1,6)
     s.bars={}
     local q=r.TimeMap2_timeToQN(proj,s.a)
     local qend=r.TimeMap2_timeToQN(proj,s.b)
@@ -89,7 +94,7 @@ local function read_sections()
       local e=math.min(s.b,r.TimeMap2_QNToTime(proj,q))
       if e<=start+0.000001 then e=s.b end
       local b=#s.bars+1
-      s.bars[b]={a=start,b=e,int=clamp(num("int:"..s.key..":"..b,s.int),1,5)}
+      s.bars[b]={a=start,b=e,int=clamp(num("int:"..s.key..":"..b,s.int),1,6)}
       start=e
       if #s.bars>4096 then return nil,"Section too long for grid." end
     end
@@ -160,7 +165,10 @@ local function refresh()
       for j,s in ipairs(sections) do
         local prefix=row.key..":"..s.key
         row.cells[j]={}
-        for b=1,#s.bars do row.cells[j][b]=clamp(num("cell:"..prefix..":"..b,4),1,9) end
+        for b=1,#s.bars do
+          local v=clamp(num("cell:"..prefix..":"..b,4),1,9)
+          row.cells[j][b]=v==7 and 6 or v
+        end
         local cached=tonumber(get("base:"..prefix,""))
         if cached and fx_index(row) then row.base[j]=cached end
       end
@@ -675,7 +683,7 @@ local function symbol(dl,x,y,w,h,v)
     line(dl,cx+10,cy-6,cx+10,cy)
   elseif traditional then centered(dl,x,y,w,h,trad[v],0x101010FF,0xFFFFFFFF)
   else
-    local n=v==2 and 2 or v==3 and 1 or v-4
+    local n=v==2 and 2 or v==3 and 1 or math.min(v-4,2)
     local up=v>4
     for i=1,n do
       local xx=cx+(i-(n+1)/2)*9
@@ -687,7 +695,7 @@ local function symbol(dl,x,y,w,h,v)
     end
   end
 end
-local function fill_for(v) return v==0 and 3/7 or (v-1)/7 end
+local function fill_for(v) return v==0 and 0.5 or v==8 and 1 or (math.min(v,6)-1)/6 end
 -- Display musical prominence using the same time interpolation as the audio transition.
 local function transition_fills(t)
   local all,map={},{}
@@ -721,11 +729,14 @@ local function transition_fills(t)
   return map
 end
 local function popup_level(t,j,b,v,id)
+  local n=mono_push(true)
   if r.ImGui_BeginPopupContextItem(ctx,"##options"..id) then
-    for k=1,8 do
-      local label=(traditional and trad[k] or simple[k])
+    for _,k in ipairs(tool_ids) do
+      if k~=9 then
+      local label=traditional and (trad[k].."  "..simple[k]) or simple[k]
       if r.ImGui_Selectable(ctx,label,k==v) then
         transition_start=nil;edit_cell(t,j,b,k)
+      end
       end
     end
     if r.ImGui_Selectable(ctx,"Transition",v==9) then
@@ -734,6 +745,7 @@ local function popup_level(t,j,b,v,id)
     end
     r.ImGui_EndPopup(ctx)
   end
+  r.ImGui_PopStyleColor(ctx,n)
 end
 local function cell(t,j,b,w,fills,ri,ci)
   local s=sections[j]
@@ -813,7 +825,7 @@ local function intensity_cell(c,contour,ci)
   local s=sections[c.j]
   local v=c.b and s.bars[c.b].int or s.bars[1].int
   if not c.b then for _,bar in ipairs(s.bars) do if bar.int~=v then v=0;break end end end
-  local label=s.countin and "—" or v==0 and "Mixed" or v==5 and "" or (c.b and ({"Soft","Normal","Strong","V.Strong"})[v] or intens_names[v])
+  local label=s.countin and "—" or v==0 and "Mixed" or v==5 and "" or (c.b and v==4 and "V.Strong" or intens_names[v])
   local id="##int"..c.j..":"..(c.b or 0)
   local dl=r.ImGui_GetWindowDrawList(ctx)
   local x,y=r.ImGui_GetCursorScreenPos(ctx)
@@ -821,7 +833,7 @@ local function intensity_cell(c,contour,ci)
   local hover=r.ImGui_IsItemHovered(ctx,r.ImGui_HoveredFlags_AllowWhenBlockedByActiveItem())
   local light,dark=0xDADADAFF,0x858585FF
   r.ImGui_DrawList_AddRectFilled(dl,x,y,x+c.w,y+CELL_H,light,0)
-  local function f(d) return clamp(0.25+0.75*(d+3)/7,0,1) end
+  local function f(d) return d<=-60 and 0 or d< -3 and 0.25*(d+60)/57 or clamp(0.25+0.75*(d+3)/7,0,1) end
   local f0,f1
   if v==5 then
     local a=contour[c.j][c.b or 1]
@@ -837,7 +849,7 @@ local function intensity_cell(c,contour,ci)
   if label~="" then centered(dl,x,y,c.w,CELL_H,label,0x101010FF,0xFFFFFFFF) end
   if not job and not s.countin then
     if hover and r.ImGui_IsMouseClicked(ctx,0) then
-      local chosen=tool==9 and 5 or (v>=1 and v<=4 and v%4+1 or 2)
+      local chosen=intensity_tool
       stroke={kind="intensity",ci=ci,value=chosen};set_intensity(c.j,c.b,chosen)
     elseif hover and stroke and stroke.kind=="intensity" and r.ImGui_IsMouseDown(ctx,0) and stroke.ci~=ci then
       for k=math.min(ci,stroke.ci),math.max(ci,stroke.ci) do
@@ -846,12 +858,13 @@ local function intensity_cell(c,contour,ci)
       stroke.ci=ci
     end
   end
+  local n=mono_push(true)
   if not job and not s.countin and r.ImGui_BeginPopupContextItem(ctx,"##opts"..id) then
-    for k,name in ipairs(intens_names) do if r.ImGui_Selectable(ctx,name,v==k) then set_intensity(c.j,c.b,k) end end
-    if r.ImGui_Selectable(ctx,"Transition",v==5) then set_intensity(c.j,c.b,5) end
+    for _,k in ipairs(intensity_ids) do if r.ImGui_Selectable(ctx,intens_names[k],v==k) then intensity_tool=k;set_intensity(c.j,c.b,k) end end
     r.ImGui_EndPopup(ctx)
   end
-  if hover then r.ImGui_SetTooltip(ctx,"Click to cycle intensity; right-click for choices. Select Transition to paint a ramp.") end
+  r.ImGui_PopStyleColor(ctx,n)
+  if hover then r.ImGui_SetTooltip(ctx,"Paint "..intens_names[intensity_tool].." by clicking or dragging. Right-click for choices.") end
 end
 local function color_header(c)
   local s=sections[c.j]
@@ -887,8 +900,8 @@ local function tool_button(i)
   local w=i==9 and 82 or 32
   local clicked=r.ImGui_InvisibleButton(ctx,"##tool"..i,w,CELL_H)
   local hover=r.ImGui_IsItemHovered(ctx)
-  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+CELL_H,tool==i and 0xBDBDBDFF or hover and 0xE5E5E5FF or 0xFFFFFFFF,4)
-  r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+CELL_H,0x111111FF,3,0,tool==i and 2.5 or 1)
+  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+CELL_H,tool==i and 0xD3B86DFF or hover and 0xB5BEC8FF or 0x8F9BA7FF,4)
+  r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+CELL_H,tool==i and 0xFFFFFFFF or 0x11111180,3,0,tool==i and 2.5 or 1)
   if i==9 then centered(dl,x,y,w,CELL_H,"Transition",0x101010FF,0xFFFFFFFF)
   else symbol(dl,x,y,w,CELL_H,i) end
   if hover then r.ImGui_SetTooltip(ctx,i==9 and "Transition" or simple[i]) end
@@ -914,8 +927,8 @@ local function same() r.ImGui_SameLine(ctx) end
 local function button(s,fn)
   if r.ImGui_Button(ctx,s) then fn() end
 end
-local function mono_push(gray)
-  local base=gray and 0xC4C4C4FF or 0xFFFFFFFF
+mono_push=function(gray)
+  local base=gray and 0xC4C4C4FF or 0xEAEAEAFF
   local colors={
     {r.ImGui_Col_Text(),0x111111FF},
     {r.ImGui_Col_Button(),base},
@@ -940,7 +953,7 @@ local function radio(label,value)
   local tw,th=r.ImGui_CalcTextSize(ctx,label)
   local clicked=r.ImGui_InvisibleButton(ctx,"##notation"..label,tw+22,CELL_H)
   local cy=y+CELL_H/2
-  r.ImGui_DrawList_AddCircleFilled(dl,x+8,cy,7,0xFFFFFFFF)
+  r.ImGui_DrawList_AddCircleFilled(dl,x+8,cy,7,0xEAEAEAFF)
   r.ImGui_DrawList_AddCircle(dl,x+8,cy,7,0x111111FF,0,1.5)
   if traditional==value then r.ImGui_DrawList_AddCircleFilled(dl,x+8,cy,3.8,0x111111FF) end
   local text_color=r.ImGui_GetStyleColor(ctx,r.ImGui_Col_Text())
@@ -965,6 +978,9 @@ local function draw()
   local bg=r.ImGui_GetStyleColor(ctx,r.ImGui_Col_WindowBg()) | 0xff
   r.ImGui_PushStyleColor(ctx,r.ImGui_Col_WindowBg(),bg)
   r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ChildBg(),bg)
+  r.ImGui_PushStyleColor(ctx,r.ImGui_Col_TitleBg(),0x080808FF)
+  r.ImGui_PushStyleColor(ctx,r.ImGui_Col_TitleBgActive(),0x666666FF)
+  r.ImGui_PushStyleColor(ctx,r.ImGui_Col_TitleBgCollapsed(),0x080808FF)
   if ui_font then
     -- Probe PushFont itself: CreateFont can accept a numeric flags argument
     -- in 0.10, so successful font creation does not identify the API version.
@@ -1006,7 +1022,17 @@ local function draw()
       r.ImGui_PopStyleColor(ctx,nmono)
       same();r.ImGui_Text(ctx,string.format("%.1f LUFS | sample peak %.1f dBFS",master_target(),peak_ceiling))
       radio("Simple",false);same();radio("Traditional",true)
-      for i=1,9 do same();tool_button(i) end
+      for _,i in ipairs(tool_ids) do same();tool_button(i) end
+      r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Section levels");same()
+      local gr=mono_push(true)
+      for i,k in ipairs(intensity_ids) do
+        if i>1 then same() end
+        local selected=k==intensity_tool
+        if selected then r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),0x8E8E8EFF) end
+        if r.ImGui_Button(ctx,intens_names[k].."##paintint"..k) then intensity_tool=k end
+        if selected then r.ImGui_PopStyleColor(ctx) end
+      end
+      r.ImGui_PopStyleColor(ctx,gr)
     end
     alert_banner()
     r.ImGui_Separator(ctx)
@@ -1063,7 +1089,9 @@ local function draw()
           end
           r.ImGui_PopStyleColor(ctx,role_colors)
           r.ImGui_SameLine(ctx,0,GAP);r.ImGui_SetNextItemWidth(ctx,57)
+          local tc=mono_push(false)
           local ch,v=r.ImGui_InputDouble(ctx,"##target"..t.key,t.target,0,0,"%.1f")
+          r.ImGui_PopStyleColor(ctx,tc)
           if ch and not job then
             local old=t.target;t.target=clamp(v,-60,-8);put("target:"..t.key,t.target)
             for j,base in pairs(t.base) do t.base[j]=clamp(base+t.target-old,-30,24);put("base:"..t.key..":"..sections[j].key,t.base[j]) end
@@ -1079,7 +1107,7 @@ local function draw()
     r.ImGui_End(ctx)
   end
   if ui_font then r.ImGui_PopFont(ctx) end
-  r.ImGui_PopStyleColor(ctx,2);r.ImGui_PopStyleVar(ctx,4)
+  r.ImGui_PopStyleColor(ctx,5);r.ImGui_PopStyleVar(ctx,4)
   if not r.ImGui_IsMouseDown(ctx,0) then
     if stroke and stroke.kind=="level" and stroke.tool==9 and not job then
       local s=stroke
