@@ -19,6 +19,7 @@ rate_seen=0;
 sec=0;
 active=0;
 bins=0;
+ring=0;
 energies=16;
 max_windows=120000;
 ln10=log(10);
@@ -58,7 +59,7 @@ function reset_filters() (
 function reset_section() (
   n=0; peak=0; total=0; hop_n=0; hop_e=0;
   bins=0; win_count=0; overflow=0;
-  0[0]=0; 0[1]=0; 0[2]=0; 0[3]=0;
+  ring[0]=0; ring[1]=0; ring[2]=0; ring[3]=0;
 );
 function begin_section(i) (
   sec=i; reset_section();
@@ -137,11 +138,11 @@ active ? (
     peak=max(peak,max(abs(spl0),abs(spl1)));
     hop_e+=e; hop_n+=1;
     hop_n>=hop ? (
-      0[bins%4]=hop_e;
+      ring[bins%4]=hop_e;
       bins+=1;
       bins>=4 ? (
         win_count<max_windows ? (
-          energies[win_count]=(0[0]+0[1]+0[2]+0[3])/(4*hop);
+          energies[win_count]=(ring[0]+ring[1]+ring[2]+ring[3])/(4*hop);
           win_count+=1;
         ) : overflow=1;
       );
