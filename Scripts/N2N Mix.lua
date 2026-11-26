@@ -94,7 +94,7 @@ local function role_guess(t,name,bus)
   if n:find("chord",1,true) then return 5 end -- chord-bass is accompaniment
   if n:find("bass",1,true) then return 4 end
   if n:find("pad",1,true) or n:find("texture",1,true) then return 9 end
-  if n:find("arp",1,true) then return 8 end
+  if n:find("arp",1,true) and not n:find("n2n",1,true) then return 8 end
   for i=0,r.TrackFX_GetCount(t)-1 do
     local _,fx=r.TrackFX_GetFXName(t,i,"")
     fx=fx:lower()
@@ -117,7 +117,10 @@ local function refresh()
     if r.GetMediaTrackInfo_Value(t,"B_SHOWINMIXER")>0 then
       local _,name=r.GetTrackName(t)
       local row={track=t,key=track_key(t),name=name,fxguid=get_owned(t),cells={},base={},reports={},deps={},depth=0}
-      row.bus=r.GetMediaTrackInfo_Value(t,"I_FOLDERDEPTH")>0 or r.GetTrackNumSends(t,-1)>0
+      row.bus=r.GetMediaTrackInfo_Value(t,"I_FOLDERDEPTH")>0
+      for k=0,r.GetTrackNumSends(t,-1)-1 do
+        if r.GetTrackSendInfo_Value(t,-1,k,"I_SRCCHAN")>=0 and r.GetTrackSendInfo_Value(t,-1,k,"B_MUTE")==0 then row.bus=true;break end
+      end
       row.role=clamp(num("role:"..row.key,role_guess(t,name,row.bus)),1,#roles)
       row.target=num("target:"..row.key,defaults[row.role])
       row.bus=row.bus or row.role==10 or row.role==12
@@ -213,9 +216,9 @@ local function envelope(t)
   local lo,hi=c:match("<PARMENV%s+%S+%s+([%+%-%.%deE]+)%s+([%+%-%.%deE]+)")
   lo,hi=tonumber(lo),tonumber(hi)
   if not lo or not hi or hi<=lo then error("Unrecognized PARMENV range: "..t.name) end
-  c=c:gsub("([\r\n]ACT%s+)%d+", "%11",1)
-  c=c:gsub("([\r\n]VIS%s+)%d+", "%10",1)
-  c=c:gsub("([\r\n]ARM%s+)%d+", "%10",1)
+  c=c:gsub("([\r\n]ACT%s+)%d+", function(p) return p.."1" end,1)
+  c=c:gsub("([\r\n]VIS%s+)%d+", function(p) return p.."0" end,1)
+  c=c:gsub("([\r\n]ARM%s+)%d+", function(p) return p.."0" end,1)
   if not r.SetEnvelopeStateChunk(env,c,false) then error("Cannot configure gain envelope: "..t.name) end
   env=r.GetFXEnvelope(t.track,f,0,false)
   if r.CountAutomationItems(env)>0 then error("Unexpected automation items: "..t.name) end
@@ -372,7 +375,7 @@ local function complete_pass(stats)
     flat(master,gain)
     put("mastergain",gain)
     last_stats=string.format("Master before %.2f LUFS / %.2f dBFS; gain %+.2f dB; estimated %.2f LUFS.",lufs,peak,gain,lufs+gain)
-    if gain<requested-0.1 then last_stats=last_stats.." Peak limited (no limiter)." end
+    if gain<requested-0.1 then last_stats=last_stats.." Peak constrained (gain only; no limiter)." end
     note(last_stats)
   elseif p.kind=="verify" then
     local lufs,peak=stats_value(stats,"LUFSI"),stats_value(stats,"PEAK")
@@ -430,6 +433,7 @@ local function step()
   end
 end
 local function start(kind)
+  if next(dirty) then status="Finish current grid edit first.";return end
   if not stopped() then status="Stop transport first.";return end
   if not refresh() then return end
   if math.abs(r.Master_GetPlayRate(proj)-1)>0.0001 then status="Set project play rate to 1.0.";return end
@@ -513,8 +517,8 @@ local function cell(t,j,b,w)
   if f>0 then r.ImGui_DrawList_AddRectFilled(dl,x,y+h*(1-f),x+w,y+h,dark,2) end
   if v==9 then r.ImGui_DrawList_AddLine(dl,x+2,y+h-3,x+w-2,y+3,0xFFFFFFFF,2) end
   local report=t.reports[j]
-  if job then label=report and (report.state==1 and string.format("%.1f",report.lufs) or "OK") or "·" end
-  if s.countin then label="—" end
+  if job then label=report and (report.state==1 and ("✓ "..string.format("%.1f",report.lufs)) or "✓") or "·" end
+  if s.countin and not job then label="—" end
   local tw,th=r.ImGui_CalcTextSize(ctx,label)
   r.ImGui_DrawList_AddText(dl,x+(w-tw)/2,y+(h-th)/2,0xFFFFFFFF,label)
   if hovered and not job then
@@ -528,6 +532,7 @@ local function cell(t,j,b,w)
 end
 local function apply_dirty()
   if not next(dirty) or job or not stopped() then return end
+  if r.GetGlobalAutomationOverride()>1 then status="Disable global automation write/bypass before editing.";return end
   r.Undo_BeginBlock2(proj)
   local ok,e=pcall(function()
     for t in pairs(dirty) do
@@ -620,8 +625,8 @@ local function draw()
         if r.ImGui_BeginCombo(ctx,"##role"..t.key,roles[t.role]) then
           for i,name in ipairs(roles) do
             if r.ImGui_Selectable(ctx,name,i==t.role) and not job then
-              t.role=i;t.target=defaults[i];put("role:"..t.key,i);put("target:"..t.key,t.target)
-              for j,v in pairs(t.reports) do t.base[j]=calc_base(t,j,v);put("base:"..t.key..":"..sections[j].key,t.base[j] or "") end
+              local old=t.target;t.role=i;t.target=defaults[i];put("role:"..t.key,i);put("target:"..t.key,t.target)
+              for j,base in pairs(t.base) do t.base[j]=clamp(base+t.target-old,-30,24);put("base:"..t.key..":"..sections[j].key,t.base[j]) end
               dirty[t]=true
             end
           end
