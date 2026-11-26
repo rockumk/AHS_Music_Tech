@@ -4255,17 +4255,26 @@ function Build_Single_Track(tr)
     local track_color = reaper.ColorToNative(tr[8][1], tr[8][2], tr[8][3]) | 0x10000000
     reaper.SetTrackColor(track_to_use, track_color)
 
-    -- Initialize only newly created tracks. Never reset a user's existing mix on rebuild.
-    if is_new then
-        local initial_linear = tonumber(tr[9]) or 1.0
-        if tr[3] ~= false then
-            -- Performance Dynamics precedes the end-of-chain LUFS meter.
-            local model = config.performance_dynamics_types and config.performance_dynamics_types[tr_type]
-            if model ~= nil then
-                local perf_at = -1000 - reaper.TrackFX_GetCount(track_to_use)
-                local perf_fx = reaper.TrackFX_AddByName(track_to_use, "JS: Performance Dynamics.jsfx", false, perf_at)
+    -- Add the separate performance processor to new AND previously built N2N
+    -- instrument tracks, without resetting an existing timbre choice or mix.
+    local model = config.performance_dynamics_types and config.performance_dynamics_types[tr_type]
+    if tr[3] ~= false and model ~= nil then
+        local _, saved_model = reaper.GetSetMediaTrackInfo_String(track_to_use, "P_EXT:N2N_PERF_MODEL", "", false)
+        local _, saved_guid = reaper.GetSetMediaTrackInfo_String(track_to_use, "P_EXT:N2N_PERF_FX", "", false)
+        if saved_model == "" and saved_guid == "" then
+            local _, meter_guid = reaper.GetSetMediaTrackInfo_String(track_to_use, "P_EXT:N2N_MIX_FX", "", false)
+            local count = reaper.TrackFX_GetCount(track_to_use)
+            local at = count
+            local existing = false
+            for i = 0, count - 1 do
+                local _, name = reaper.TrackFX_GetFXName(track_to_use, i, "")
+                if name:find("Performance Dynamics", 1, true) then existing = true end
+                if meter_guid ~= "" and reaper.TrackFX_GetFXGUID(track_to_use, i) == meter_guid then at = i end
+            end
+            if not existing then
+                local perf_fx = reaper.TrackFX_AddByName(track_to_use, "JS: Performance Dynamics.jsfx", false, -1000 - at)
                 if perf_fx < 0 then
-                    perf_fx = reaper.TrackFX_AddByName(track_to_use, "JS: Performance Dynamics (14-Instrument Clean Headroom Prototype)", false, perf_at)
+                    perf_fx = reaper.TrackFX_AddByName(track_to_use, "JS: Performance Dynamics (14-Instrument Clean Headroom Prototype)", false, -1000 - at)
                 end
                 if perf_fx >= 0 then
                     reaper.TrackFX_SetParam(track_to_use, perf_fx, 0, 0)
@@ -4277,6 +4286,13 @@ function Build_Single_Track(tr)
                     table.insert(G_MISSING_PLUGINS, {name = "Performance Dynamics.jsfx", source = 3})
                 end
             end
+        end
+    end
+
+    -- Initialize only newly created tracks. Never reset a user's existing mix on rebuild.
+    if is_new then
+        local initial_linear = tonumber(tr[9]) or 1.0
+        if tr[3] ~= false then
             -- All recipe/common FX have been added; append the tested stereo gain meter.
             local at = -1000 - reaper.TrackFX_GetCount(track_to_use)
             local mix_fx = reaper.TrackFX_AddByName(track_to_use, "JS: N2N Mix Meter.jsfx", false, at)
