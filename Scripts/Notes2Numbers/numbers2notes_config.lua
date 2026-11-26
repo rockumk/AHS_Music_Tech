@@ -1,5 +1,5 @@
 -- @description numbers2notes_config
--- @version 1.7.7
+-- @version 1.7.8
 -- @noindex
 -- @author Rock Kennedy
 -- @about
@@ -9,6 +9,11 @@
 --   + Added N2N Topline Output Option
 
 local config = {}
+
+-- Performance Dynamics: zero-based JSFX instrument source, -1 = installed/bypassed.
+-- Unknown synth patches must be classified by the musician in N2N Mix.
+config.performance_dynamics_types = {[41]=-1,[21]=-1,[22]=-1,[16]=-1,[17]=-1,[20]=6,[31]=1}
+
 
 -- 1. PLUGIN SOURCES (Instructions/Links)
 config.pluginsources = {
