@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.12
+version: 7.8.0-dev.13
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.12 -
+  # N2N Drum Arranger v7.8.0-dev.13 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -134,7 +134,7 @@ slider11:14<10,30,1>-Grid Row Height
 slider12:1<0,1,1>-Song Form Protocol
 
 @init
-version_display = "v7.8.0-dev.12";
+version_display = "v7.8.0-dev.13";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -1423,6 +1423,12 @@ function resolve_pattern(t) local(out) (
 ); // Ensure this has its own space
 needs_tab_update = 1;
 effective_play_tab = 26; // Default starting tab
+// Publish the requested section separately from the sounding pattern.
+vis_seq=0; vis_audio_requested=-1; vis_audio_source=0; vis_audio_step=-1;
+vis_audio_phase=0; vis_audio_total=0; vis_audio_running=0;
+gfx_follow_target=-1; gfx_vis_requested=-1; gfx_vis_source=0;
+gfx_vis_step=-1; gfx_vis_phase=0; gfx_vis_total=0; gfx_vis_running=0;
+hub_browse=0;
 active_row_count = 0;
 
 // Initialize all to 0 (unmuted)
@@ -2127,6 +2133,24 @@ playing ? while(span_scan<=span_last && (!form_audio || mem[form_cache+span_scan
     span_scan+=1;
   );
 form_audio ? (form_at>=0 ? playback_shift=-mem[form_cache+form_at*3] : playback_shift=0;);
+// Snapshot the current span after the lookahead scan restores its clock.
+// Graphics must not use the last lookahead span or the requested grid's timing.
+vis_seq+=1;
+vis_audio_requested=raw_target;
+vis_audio_source=effective_play_tab;
+vis_audio_running=(play_state&1) && !mem[ui_power_off] && effective_play_tab>0;
+vis_audio_step=-1; vis_audio_phase=0; vis_audio_total=0;
+vis_audio_source>0 ? (
+    vis_a_sub=eff_sub(vis_audio_source);
+    vis_a_bars=eff_bars(vis_audio_source);
+    vis_a_rate=eff_half(vis_audio_source)?0.5:1;
+    vis_audio_total=vis_a_sub*vis_a_bars;
+    vis_a_pos=(beat_position+playback_shift)*vis_a_rate*vis_a_sub/4;
+    vis_audio_phase=fmod_pos(vis_a_pos,vis_audio_total);
+    vis_audio_running ? vis_audio_step=min(vis_audio_total-1,max(0,floor(vis_audio_phase)));
+);
+mem[ui_last_step]=vis_audio_step;
+vis_seq+=1;
 i_k=0; 
 loop(128,
     mem[kill_note+i_k]>0 ? (
@@ -2154,17 +2178,6 @@ loop(128,
 
 
 @gfx 1420 780
-// Hub pattern navigation: keyed by registration token; never writes a cue or lock.
-hub_edit_addr=8300000+(my_slot-1)*2;
-hub_edit_cmd=gmem[hub_edit_addr+1];
-hub_edit_cmd>0 && gmem[hub_edit_addr]==my_key && gmem[reg_base+my_slot]==my_key ? (
-    hub_edit_tab=floor(hub_edit_cmd)-1;
-    hub_edit_tab>=1 && hub_edit_tab<TOTAL_TABS ? (
-        mem[ui_edit_tab]=hub_edit_tab;
-        
-    );
-    gmem[hub_edit_addr+1]=0;
-);
 gfx_setfont(1, "Trebuchet MS", fontsize , 'b');
 gfx_measurestr("This is a test to determine if the text is being rendered on PC or Mac.", str_w, str_h);
 gfx_set(1,1,1,1); 
@@ -2504,6 +2517,42 @@ item_w = 30; btn(draw_x, draw_y, item_w, "   >") ? ( gfx_set(1,0,0,1); export_n2
 // =========================================================
 // ROWS 2, 3, 4: CONSOLIDATED TABS AND LEFT INFO COLUMN
 // =========================================================
+// Stable audio snapshot for this graphics frame.
+gfx_seq_before=vis_seq;
+gfx_seq_before%2==0 ? (
+    gfx_tmp_requested=vis_audio_requested; gfx_tmp_source=vis_audio_source;
+    gfx_tmp_step=vis_audio_step; gfx_tmp_phase=vis_audio_phase;
+    gfx_tmp_total=vis_audio_total; gfx_tmp_running=vis_audio_running;
+    gfx_seq_before==vis_seq ? (
+        gfx_vis_requested=gfx_tmp_requested; gfx_vis_source=gfx_tmp_source;
+        gfx_vis_step=gfx_tmp_step; gfx_vis_phase=gfx_tmp_phase;
+        gfx_vis_total=gfx_tmp_total; gfx_vis_running=gfx_tmp_running;
+    );
+);
+// Hub navigation is an editing operation, never a playback cue.
+hub_edit_addr=8300000+(my_slot-1)*2;
+hub_edit_cmd=gmem[hub_edit_addr+1];
+hub_edit_cmd>0 && gmem[hub_edit_addr]==my_key && gmem[reg_base+my_slot]==my_key ? (
+    hub_edit_tab=floor(hub_edit_cmd)-1;
+    hub_edit_tab>=1 && hub_edit_tab<TOTAL_TABS ? (
+        mem[ui_edit_tab]=hub_edit_tab;
+        hub_browse=1; hub_browse_source=gfx_vis_source; hub_browse_request=gfx_vis_requested;
+    );
+    gmem[hub_edit_addr+1]=0;
+);
+// Keep the requested section visible, including its inherited ghost notes.
+// Do not change the edit tab in the middle of a mouse gesture.
+mem[ui_locked_tab]==-1 && !mem[ui_power_off] ? (
+    gfx_next_tab=gfx_vis_requested;
+    hub_browse && (gfx_vis_source!=hub_browse_source || gfx_vis_requested!=hub_browse_request) ? hub_browse=0;
+    !hub_browse && gfx_next_tab>=1 && gfx_next_tab<TOTAL_TABS ? (
+        ((play_state&1) || gfx_next_tab!=gfx_follow_target) && !mb && !rmb && !color_popup_active && !help_active ? (
+            mem[ui_edit_tab]=gfx_next_tab;
+            gfx_follow_target=gfx_next_tab;
+        );
+    );
+) : gfx_follow_target=-1;
+
 draw_y = ROW2_Y; // Advance Y to Tab Area
 
 // VISUAL ONLY: show the current requested pattern's inheritance, even with transport parked.
@@ -2556,7 +2605,7 @@ loop(3,
         );
         gfx_setfont(1,os_font,fontsize,'b');
         (mb && !p_mb && mx>=follow_group_x && mx<follow_group_x+follow_group_w && my>=follow_group_y && my<follow_group_y+follow_group_h) ? (
-            mem[ui_locked_tab]=-1; gmem[GM_BASE+1]=-1; cue_release_requested=1; needs_tab_update=1;
+            mem[ui_locked_tab]=-1; gmem[GM_BASE+1]=-1; gfx_follow_target=-1; hub_browse=0; cue_release_requested=1; needs_tab_update=1;
         );
     );
     !eligible_song_tab(mem[ui_edit_tab]) && mem[ui_edit_tab]!=26 && mem[ui_edit_tab]!=77 ? mem[ui_edit_tab]=26;
@@ -2778,6 +2827,8 @@ t_e = mem[ui_edit_tab];
     
     fb_tab = get_active_fallback(t_e);
     is_ghosting = (t_e != fb_tab);
+    gfx_highlight_actual=gfx_vis_running && !mem[ui_power_off] && t_e==gfx_vis_source;
+    gfx_highlight_ghost=gfx_vis_running && !mem[ui_power_off] && t_e==gfx_vis_requested && fb_tab==gfx_vis_source && is_ghosting;
     
     fb_pat_v_ptr = vel_base + fb_tab*vel_stride_tab; 
     fb_pat_g_ptr = grid_base + fb_tab*vel_stride_tab; 
@@ -3127,11 +3178,8 @@ ty = draw_y;
     ty+=12; 
     s_v=eff_sub(t_e); 
     st_v=eff_bars(t_e)*s_v;
-    playing_tab = (mem[ui_locked_tab] <= 0) ? mem[ui_play_prog_tab] : mem[ui_locked_tab];
-    (play_state & 1 && playing_tab == t_e) ? ( 
-        vis_beat = calc_vis_beat(t_e); 
-        play_step_idx = floor(vis_beat * (s_v/4)); 
-    ) : play_step_idx = -1;
+    // Actual note highlights and ghost note highlights use the same audio clock.
+    play_step_idx=gfx_highlight_actual?gfx_vis_step:-1;
 
     btn(10, ty+2, 77, " COPY ROW") ? ( 
         memcpy(copy_row_v_buf, curr_pat_v_ptr + sel_r*vel_stride_row, MAX_STEPS); 
@@ -3684,14 +3732,16 @@ circle_hit = (
         );
         
         
-        is_ghosting ? (
-            s_g = 0; 
-            loop(st_v,
+        is_ghosting && fb_tab>0 ? (
+            s_g = 0;
+            ghost_steps=max(1,eff_bars(fb_tab)*eff_sub(fb_tab));
+            ghost_cw=gx_w/ghost_steps;
+            loop(ghost_steps,
                 idx_ghost = r_g*vel_stride_row + s_g; 
                 
                 // If the fallback tab has a note here...
                 mem[fb_pat_g_ptr + idx_ghost] ? (
-                    cx_g = gx_s + s_g*cw_v; 
+                    cx_g = gx_s + s_g*ghost_cw; 
                     
                     // 1. Calculate Standard Row Color
                     c_idx = mem[row_color_base+r_g];
@@ -3704,7 +3754,7 @@ circle_hit = (
                     v_scale = min_b + (rng_b * (v_disp / 127)); 
                     
                     // Flash playhead white, otherwise use row color
-                    ((play_state & 1) && play_step_idx == s_g) ? (
+                    (gfx_highlight_ghost && gfx_vis_step == s_g) ? (
                         gfx_set(1, 1, 1, 0.95); 
                     ) : (
                         gfx_set(cr*v_scale, cg*v_scale, cb*v_scale, 1); 
@@ -3714,9 +3764,9 @@ circle_hit = (
                     fb_l = mem[fb_pat_l_ptr + idx_ghost];
                     fb_l < 1 ? fb_l = 1;
                     
-                    ghost_w = (cw_v * fb_l) - (cw_v * (2/3));
+                    ghost_w = (ghost_cw * min(fb_l,ghost_steps-s_g)) - (ghost_cw * (2/3));
                     ghost_h = row_h / 3;
-                    g_x = cx_g + (cw_v / 3);
+                    g_x = cx_g + (ghost_cw / 3);
                     g_y = ry + (row_h / 3);
                     
                     gfx_rect(g_x, g_y, ghost_w, ghost_h);
@@ -3736,14 +3786,10 @@ circle_hit = (
     draw_y + draw_h > sb_y + sb_h ? draw_y = sb_y + sb_h - draw_h;
     gfx_rect(sb_x + 2, draw_y, sb_w - 4, draw_h);
     
-    playing ? (
-        t_n = mem[ui_locked_tab] == 0 ? mem[ui_play_prog_tab] : (mem[ui_locked_tab] > 0 ? mem[ui_locked_tab] : mem[ui_play_prog_tab]);
-        t_n == t_e ? (
-            vis_beat = calc_vis_beat(t_n);
-            p_l = eff_bars(t_n) * 4;
-            phx = gx_s + (vis_beat/p_l)*gx_w;
-            rect(phx-1, grid_y, 3, slider7*row_h, 0, 1, 0, 0.4);
-        );
+    // Draw the sounding pattern's phase on its actual or inherited view.
+    (gfx_highlight_actual || gfx_highlight_ghost) && gfx_vis_total>0 ? (
+        phx=gx_s+(gfx_vis_phase/gfx_vis_total)*gx_w;
+        rect(phx-1,grid_y,3,visible_rows*row_h,0,1,0,0.4);
     );
 
 // ---------------------------------------------------------
