@@ -1,0 +1,160 @@
+desc:N2N Mix Meter (diagnostic)
+ // Original implementation of stereo K-weighted gated energy measurement.
+ // Reference: ITU-R BS.1770, Annex 1. Sample peak only, not true peak.
+ // Diagnostic protocol v1: section times in seconds; results per occurrence.
+options:gmem=N2N_Mix_Analysis_v1
+slider1:0<-60,30,0.01>Gain (dB)
+slider2:0<0,256,1>-Instance slot
+slider3:0<0,2147483647,1>-Run token
+in_pin:Left
+in_pin:Right
+out_pin:Left
+out_pin:Right
+
+@init
+ext_noinit=1;
+ext_nodenorm=1;
+run_seen=0;
+rate_seen=0;
+sec=0;
+active=0;
+bins=0;
+ring=0;
+energies=16;
+max_windows=120000;
+ln10=log(10);
+function coeffs(sr) local(k,q,vh,vb,a) (
+  // Bilinear transform of the BS.1770 shelf and RLB stages.
+  k=tan($pi*1681.974450955533/sr);
+  q=0.7071752369554196;
+  vh=10^(3.999843853973347/20);
+  vb=vh^0.4996667741545416;
+  a=1+k/q+k*k;
+  sb0=(vh+vb*k/q+k*k)/a;
+  sb1=2*(k*k-vh)/a;
+  sb2=(vh-vb*k/q+k*k)/a;
+  sa1=2*(k*k-1)/a;
+  sa2=(1-k/q+k*k)/a;
+  k=tan($pi*38.13547087602444/sr);
+  q=0.5003270373238773;
+  a=1+k/q+k*k;
+  ha1=2*(k*k-1)/a;
+  ha2=(1-k/q+k*k)/a;
+  hop=max(1,floor(sr*0.1+0.5));
+  rate_seen=sr;
+);
+function kweight(x) instance(z1,z2,w1,w2) local(y,v) (
+  y=sb0*x+z1;
+  z1=sb1*x-sa1*y+z2;
+  z2=sb2*x-sa2*y;
+  v=y+w1;
+  w1=-2*y-ha1*v+w2;
+  w2=y-ha2*v;
+  v;
+);
+function reset_filters() (
+  L.z1=L.z2=L.w1=L.w2=0;
+  R.z1=R.z2=R.w1=R.w2=0;
+);
+function reset_section() (
+  n=0; peak=0; total=0; hop_n=0; hop_e=0;
+  bins=0; win_count=0; overflow=0;
+  ring[0]=0; ring[1]=0; ring[2]=0; ring[3]=0;
+);
+function begin_section(i) (
+  sec=i; reset_section();
+  start_t=gmem[16+2*(i-1)];
+  end_t=gmem[17+2*(i-1)];
+);
+function report_section() local(i,e,abs_gate,rel_gate,sum,count,lufs,p,status,addr) (
+  // Publish the token last. Missing and partial runs remain distinguishable.
+  abs_gate=10^((-70+0.691)/10);
+  sum=0; count=0; i=0;
+  loop(win_count,
+    e=energies[i];
+    e>=abs_gate ? (sum+=e; count+=1;);
+    i+=1;
+  );
+  status=1; lufs=-1000;
+  count>0 ? (
+    rel_gate=max(abs_gate,sum/count*0.1);
+    sum=0; count=0; i=0;
+    loop(win_count,
+      e=energies[i];
+      e>=rel_gate ? (sum+=e;count+=1;);
+      i+=1;
+    );
+    count>0 ? lufs=-0.691+10*log(sum/count)/ln10;
+  ) : status=2;
+  win_count==0 && peak>0.0000001 ? status=3;
+  overflow ? status=4;
+  p=peak>0 ? 20*log(peak)/ln10 : -1000;
+  addr=4096+((slot-1)*256+sec-1)*8;
+  gmem[addr+1]=status;
+  gmem[addr+2]=lufs;
+  gmem[addr+3]=p;
+  gmem[addr+4]=n;
+  gmem[addr+5]=rate_seen;
+  gmem[addr+6]=win_count;
+  gmem[addr+7]=total;
+  gmem[addr]=run_seen;
+);
+gain=1;
+
+@slider
+gain_target=10^(slider1/20);
+
+@block
+slot=floor(slider2+0.5);
+token=floor(slider3+0.5);
+armed=gmem[0]==1 && token>0 && gmem[1]==token && slot>=1 && slot<=256;
+count_secs=min(256,max(0,floor(gmem[2])));
+rate_seen!=srate ? (coeffs(srate); reset_filters(););
+gain_target=10^(slider1/20);
+smooth=1-exp(-1/(max(1,srate)*0.005));
+armed && (play_state&1) && count_secs>0 ? (
+  run_seen!=token ? (
+    run_seen=token;
+    reset_filters();
+    begin_section(1);
+  );
+  active=1;
+  t=play_position;
+  dt=1/srate;
+) : active=0;
+
+@sample
+active ? (
+  // Filter continuously, including gaps, to preserve filter state.
+  yl=L.kweight(spl0);
+  yr=R.kweight(spl1);
+  e=yl*yl+yr*yr;
+  while(sec<=count_secs && t>=end_t-0.00000001) (
+    n>0 ? report_section();
+    begin_section(sec+1);
+  );
+  sec<=count_secs && t>=start_t-0.00000001 && t<end_t ? (
+    n+=1; total+=e;
+    peak=max(peak,max(abs(spl0),abs(spl1)));
+    hop_e+=e; hop_n+=1;
+    hop_n>=hop ? (
+      ring[bins%4]=hop_e;
+      bins+=1;
+      bins>=4 ? (
+        win_count<max_windows ? (
+          energies[win_count]=(ring[0]+ring[1]+ring[2]+ring[3])/(4*hop);
+          win_count+=1;
+        ) : overflow=1;
+      );
+      hop_n=0; hop_e=0;
+    );
+    // Finalize at the final sample even if no further block is processed.
+    t+dt>=end_t-0.00000001 ? (
+      report_section(); begin_section(sec+1);
+    );
+  );
+  t+=dt;
+);
+gain+=(gain_target-gain)*smooth;
+spl0*=gain;
+spl1*=gain;
