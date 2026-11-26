@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.1.1
+-- @version 0.1.2
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -13,7 +13,7 @@ local defaults={-22,-24,-25,-25,-27,-28,-30,-32,-35,-40,-30,-27}
 local intensity={-3,0,2,4}
 local intens_names={"Soft","Normal","Strong","Very Strong"}
 local levels={-60,-10,-5,0,5,10,15,20}
-local simple={"0","vv","v","•","^","^^","^^^","★"}
+local simple={"Mute","Down twice","Down","Normal","Up","Up twice","Up three times","Featured"}
 local trad={"0","p","mp","•","mf","f","ff","★"}
 local presets={{"YouTube",-14},{"Spotify",-14},{"Apple Music",-16},{"General streaming",-14},{"Dynamic master",-18},{"Premaster",-20},{"EBU R128",-23},{"Custom",-16}}
 local sections,rows,master,groups={}, {},nil,{}
@@ -26,6 +26,12 @@ local expanded={}
 local dirty={}
 local transition_start=nil
 local last_paint=nil
+local stroke=nil
+local ui_font=nil
+local UI_SIZE=18
+local CELL_H=36
+local LEFT_W=465
+local GAP=4
 local preset=1
 local custom=-16
 local peak_ceiling=-2 -- sample-peak guard; not a true-peak guarantee
@@ -78,7 +84,8 @@ local function read_sections()
       q=math.min(q+4,qend)
       local e=math.min(s.b,r.TimeMap2_QNToTime(proj,q))
       if e<=start+0.000001 then e=s.b end
-      s.bars[#s.bars+1]={a=start,b=e}
+      local b=#s.bars+1
+      s.bars[b]={a=start,b=e,int=clamp(num("int:"..s.key..":"..b,s.int),1,4)}
       start=e
       if #s.bars>4096 then return nil,"Section too long for grid." end
     end
@@ -88,7 +95,7 @@ end
 local function role_guess(t,name,bus)
   local n=name:lower()
   if n:find("lexikan",1,true) or n:find("reverb",1,true) or n:find("delay return",1,true) or n:find("fx return",1,true) or n:find("effects",1,true) then return 10 end
-  if n:find("topline",1,true) then return 2 end
+  if n:find("topline",1,true) or n:find("black key live",1,true) or n:find("white key live",1,true) or n:match("^audio%s*%d*$") then return 2 end
   if n:find("background vocal",1,true) or n:find("backing vocal",1,true) or n:find("bg vocal",1,true) then return 6 end
   if n:find("vocal",1,true) then return 1 end
   if n:find("drum",1,true) then return 3 end
@@ -240,9 +247,16 @@ local function write_points(t,pts)
   r.Envelope_SortPointsEx(env,-1)
 end
 local function flat(t,db) write_points(t,{{0,db,0}}) end
+local function section_intensity(s)
+  local energy,duration=0,0
+  for _,b in ipairs(s.bars) do
+    local d=b.b-b.a;energy=energy+d*10^(intensity[b.int]/10);duration=duration+d
+  end
+  return duration>0 and 10*math.log(energy/duration,10) or 0
+end
 local function calc_base(t,j,v)
   if sections[j].countin or not v or v.state~=1 or math.abs(v.coverage-1)>0.02 then return nil end
-  return clamp(t.target+(t.depth>0 and intensity[sections[j].int] or 0)-v.lufs,-30,24)
+  return clamp(t.target+(t.depth>0 and section_intensity(sections[j]) or 0)-v.lufs,-30,24)
 end
 local function offset(v) return levels[v] or 0 end
 local function apply_row(t)
@@ -250,7 +264,7 @@ local function apply_row(t)
   for j,s in ipairs(sections) do
     for b,span in ipairs(s.bars) do
       local v=t.cells[j][b]
-      bars[#bars+1]={a=span.a,b=span.b,j=j,v=v,ignore=s.countin}
+      bars[#bars+1]={a=span.a,b=span.b,j=j,v=v,int=span.int,ignore=s.countin}
     end
   end
   local function db_at(x,off)
@@ -258,7 +272,7 @@ local function apply_row(t)
     if x.ignore then return t.initial or 0 end
     if off<=-59.9 then return -60 end
     -- Section intensity is applied at source only, not again to downstream busses.
-    return clamp((t.base[x.j] or t.initial or 0)+off+(t.depth==0 and intensity[s.int] or 0),-60,30)
+    return clamp((t.base[x.j] or t.initial or 0)+off+(t.depth==0 and intensity[x.int] or 0),-60,30)
   end
   local i=1
   while i<=#bars do
@@ -486,9 +500,10 @@ local function start(kind)
   end)
   if not ok then fail(e) end
 end
-local function edit_cell(t,j,b)
+local function edit_cell(t,j,b,chosen)
   if sections[j].countin then return end
-  if tool==9 then
+  local chosen=chosen or tool
+  if chosen==9 then
     if not transition_start or transition_start.t~=t then transition_start={t=t,j=j,b=b};status="Select transition end on the same track.";return end
     local s0=transition_start;transition_start=nil
     local start_j,end_j=math.min(s0.j,j),math.max(s0.j,j)
@@ -504,45 +519,240 @@ local function edit_cell(t,j,b)
       end
     end
   else
-    if b then t.cells[j][b]=tool else for k=1,#t.cells[j] do t.cells[j][k]=tool end end
+    if b then t.cells[j][b]=chosen else for k=1,#t.cells[j] do t.cells[j][k]=chosen end end
     save_cells(t,j)
   end
   dirty[t]=true
 end
 local function rgba(rr,gg,bb,aa) return (rr<<24)|(gg<<16)|(bb<<8)|aa end
-local function cell(t,j,b,w)
+local function rgb(native)
+  if native==0 then return 100,112,125 end
+  return r.ColorFromNative(native & 0xffffff)
+end
+local function contrast(rr,gg,bb)
+  return (rr*0.299+gg*0.587+bb*0.114)>145 and 0x101010FF or 0xFFFFFFFF
+end
+local function centered(dl,x,y,w,h,label,col,outline)
+  local tw,th=r.ImGui_CalcTextSize(ctx,label)
+  local tx,ty=x+(w-tw)/2,y+(h-th)/2
+  if outline then
+    for dx=-1,1 do for dy=-1,1 do
+      if dx~=0 or dy~=0 then r.ImGui_DrawList_AddText(dl,tx+dx,ty+dy,outline,label) end
+    end end
+  end
+  r.ImGui_DrawList_AddText(dl,tx,ty,col,label)
+end
+local function line(dl,x1,y1,x2,y2)
+  r.ImGui_DrawList_AddLine(dl,x1,y1,x2,y2,0xFFFFFFD0,5.5)
+  r.ImGui_DrawList_AddLine(dl,x1,y1,x2,y2,0x151515FF,3)
+end
+local function symbol(dl,x,y,w,h,v)
+  local cx,cy=x+w/2,y+h/2
+  if v==0 then centered(dl,x,y,w,h,"...",0x101010FF,0xFFFFFFFF)
+  elseif v==1 then
+    r.ImGui_DrawList_AddCircle(dl,cx,cy,8,0xFFFFFFFF,0,5)
+    r.ImGui_DrawList_AddCircle(dl,cx,cy,8,0x151515FF,0,2.5)
+    line(dl,cx-5,cy+5,cx+5,cy-5)
+  elseif v==4 then
+    r.ImGui_DrawList_AddCircleFilled(dl,cx,cy,5,0xFFFFFFFF)
+    r.ImGui_DrawList_AddCircleFilled(dl,cx,cy,3.5,0x151515FF)
+  elseif v==8 then
+    local pts={}
+    for i=0,9 do
+      local ang=-math.pi/2+i*math.pi/5
+      local rad=i%2==0 and 12 or 5
+      pts[i+1]={cx+math.cos(ang)*rad,cy+math.sin(ang)*rad}
+    end
+    for i=1,10 do
+      local p,q=pts[i],pts[i%10+1]
+      r.ImGui_DrawList_AddLine(dl,p[1],p[2],q[1],q[2],0xFFFFFFFF,3.4)
+    end
+    for i=1,10 do
+      local p,q=pts[i],pts[i%10+1]
+      r.ImGui_DrawList_AddTriangleFilled(dl,cx,cy,p[1],p[2],q[1],q[2],0x151515FF)
+    end
+  elseif v==9 then
+    line(dl,cx-10,cy+6,cx+10,cy-6)
+    line(dl,cx+4,cy-6,cx+10,cy-6)
+    line(dl,cx+10,cy-6,cx+10,cy)
+  elseif traditional then centered(dl,x,y,w,h,trad[v],0x101010FF,0xFFFFFFFF)
+  else
+    local n=v==2 and 2 or v==3 and 1 or v-4
+    local up=v>4
+    for i=1,n do
+      local xx=cx+(i-(n+1)/2)*12
+      local tip=cy+(up and -9 or 9)
+      local tail=cy+(up and 8 or -8)
+      local wing=tip+(up and 6 or -6)
+      line(dl,xx,tail,xx,tip)
+      line(dl,xx-5,wing,xx,tip);line(dl,xx+5,wing,xx,tip)
+    end
+  end
+end
+local function fill_for(v) return v==0 and 3/7 or (v-1)/7 end
+-- Display musical prominence using the same time interpolation as the audio transition.
+local function transition_fills(t)
+  local all,map={},{}
+  for j,s in ipairs(sections) do
+    map[j]={}
+    for b,bar in ipairs(s.bars) do
+      local v=t.cells[j][b]
+      local x={a=bar.a,b=bar.b,v=v,ignore=s.countin}
+      all[#all+1]=x;map[j][b]=x
+    end
+  end
+  local i=1
+  while i<=#all do
+    local x=all[i]
+    if x.v~=9 or x.ignore then
+      x.f0=fill_for(x.ignore and 1 or x.v);x.f1=x.f0;i=i+1
+    else
+      local first=i
+      while i<=#all and all[i].v==9 and not all[i].ignore and
+        (i==first or math.abs(all[i].a-all[i-1].b)<0.001) do i=i+1 end
+      local last=i-1
+      local p,n=all[first-1],all[i]
+      local a=p and not p.ignore and math.abs(p.b-all[first].a)<0.001 and fill_for(p.v) or 0
+      local z=n and not n.ignore and math.abs(n.a-all[last].b)<0.001 and fill_for(n.v) or 0
+      local t0,t1=all[first].a,all[last].b
+      for k=first,last do
+        local b=all[k];b.f0=a+(z-a)*(b.a-t0)/(t1-t0);b.f1=a+(z-a)*(b.b-t0)/(t1-t0)
+      end
+    end
+  end
+  return map
+end
+local function popup_level(t,j,b,v,id)
+  if r.ImGui_BeginPopupContextItem(ctx,"##options"..id) then
+    for k=1,8 do
+      local label=(traditional and trad[k] or simple[k])
+      if r.ImGui_Selectable(ctx,label,k==v) then
+        transition_start=nil;edit_cell(t,j,b,k)
+      end
+    end
+    if r.ImGui_Selectable(ctx,"Transition",v==9) then
+      if b then t.cells[j][b]=9 else for k=1,#t.cells[j] do t.cells[j][k]=9 end end
+      save_cells(t,j);dirty[t]=true;transition_start=nil
+    end
+    r.ImGui_EndPopup(ctx)
+  end
+end
+local function cell(t,j,b,w,fills)
   local s=sections[j]
   local v=b and t.cells[j][b] or t.cells[j][1]
   if not b then for _,x in ipairs(t.cells[j]) do if x~=v then v=0;break end end end
-  local label=v==9 and "~" or v==0 and "..." or (traditional and trad or simple)[v]
   local dl=r.ImGui_GetWindowDrawList(ctx)
   local x,y=r.ImGui_GetCursorScreenPos(ctx)
-  local h=24
+  local h=CELL_H
   local id="##"..t.key..":"..j..":"..(b or 0)
-  local clicked=r.ImGui_InvisibleButton(ctx,id,w,h)
-  local hovered=r.ImGui_IsItemHovered(ctx)
-  local raw=r.GetTrackColor(t.track)
-  local rr,gg,bb=90,120,145
-  if raw~=0 then rr,gg,bb=r.ColorFromNative(raw) end
-  local light=rgba(math.floor(rr*.45+140),math.floor(gg*.45+140),math.floor(bb*.45+140),255)
-  local dark=rgba(math.floor(rr*.65),math.floor(gg*.65),math.floor(bb*.65),255)
-  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+h,light,2)
-  local f=v==9 and 0.5 or v==0 and 0.43 or (v-1)/7
-  if f>0 then r.ImGui_DrawList_AddRectFilled(dl,x,y+h*(1-f),x+w,y+h,dark,2) end
-  if v==9 then r.ImGui_DrawList_AddLine(dl,x+2,y+h-3,x+w-2,y+3,0xFFFFFFFF,2) end
+  r.ImGui_InvisibleButton(ctx,id,w,h)
+  local hovered=r.ImGui_IsItemHovered(ctx,r.ImGui_HoveredFlags_AllowWhenBlockedByActiveItem())
+  local rr,gg,bb=rgb(r.GetTrackColor(t.track))
+  local light=rgba(math.floor(rr*.55+110),math.floor(gg*.55+110),math.floor(bb*.55+110),255)
+  local dark=rgba(math.floor(rr*.70),math.floor(gg*.70),math.floor(bb*.70),255)
+  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+h,light,0)
+  if not s.countin then
+    if v==9 then
+      local f0=b and fills[j][b].f0 or fills[j][1].f0
+      local f1=b and fills[j][b].f1 or fills[j][#s.bars].f1
+      if f0>0 or f1>0 then
+        if f0==0 then
+          r.ImGui_DrawList_AddTriangleFilled(dl,x,y+h,x+w,y+h*(1-f1),x+w,y+h,dark)
+        elseif f1==0 then
+          r.ImGui_DrawList_AddTriangleFilled(dl,x,y+h*(1-f0),x+w,y+h,x,y+h,dark)
+        else
+          r.ImGui_DrawList_AddQuadFilled(dl,x,y+h*(1-f0),x+w,y+h*(1-f1),x+w,y+h,x,y+h,dark)
+        end
+      end
+    else
+      local f=fill_for(v)
+      if f>0 then r.ImGui_DrawList_AddRectFilled(dl,x,y+h*(1-f),x+w,y+h,dark,0) end
+    end
+  end
+  r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+h,hovered and 0xFFFFFFFF or 0x00000050,0,0,hovered and 2 or 1)
   local report=t.reports[j]
-  if job then label=report and (report.state==1 and ("✓ "..string.format("%.1f",report.lufs)) or "✓") or "·" end
-  if s.countin and not job then label="—" end
-  local tw,th=r.ImGui_CalcTextSize(ctx,label)
-  r.ImGui_DrawList_AddText(dl,x+(w-tw)/2,y+(h-th)/2,0xFFFFFFFF,label)
-  if hovered and not job then
-    local k=id
-    if clicked or (tool~=9 and r.ImGui_IsMouseDown(ctx,0) and last_paint~=k) then edit_cell(t,j,b);last_paint=k end
+  if job then
+    centered(dl,x,y,w,h,report and (report.state==1 and string.format("%.1f",report.lufs) or "OK") or "·",0x101010FF,0xFFFFFFFF)
+  elseif s.countin then centered(dl,x,y,w,h,"—",0x101010FF,0xFFFFFFFF)
+  elseif v~=9 then symbol(dl,x,y,w,h,v) end
+  if not job and not s.countin then
+    if hovered and r.ImGui_IsMouseClicked(ctx,0) then
+      stroke={kind="level",t=t,j=j,b=b,tool=tool}
+      if tool~=9 then edit_cell(t,j,b,tool);last_paint=id end
+    elseif hovered and stroke and stroke.kind=="level" and r.ImGui_IsMouseDown(ctx,0) then
+      if stroke.tool~=9 and last_paint~=id then edit_cell(t,j,b,stroke.tool);last_paint=id
+      elseif stroke.tool==9 and stroke.t==t then stroke.endj=j;stroke.endb=b end
+    end
+    popup_level(t,j,b,v,id)
   end
-  if hovered then
+  if hovered and not stroke then
     local b0=t.base[j]
-    r.ImGui_SetTooltip(ctx,string.format("%s | %s\nTarget %.1f LUFS | calibration %s%s",t.name,s.name,t.target,b0 and string.format("%+.2f dB",b0) or "unmeasured",report and string.format("\nReport %.2f LUFS / %.0f%% coverage",report.lufs,report.coverage*100) or ""))
+    r.ImGui_SetTooltip(ctx,string.format("%s | %s%s\nTarget %.1f LUFS | calibration %s%s",t.name,s.name,b and (" | Bar "..b) or "",t.target,b0 and string.format("%+.2f dB",b0) or "unmeasured",report and string.format("\nReport %.2f LUFS / %.0f%% coverage",report.lufs,report.coverage*100) or ""))
   end
+end
+local function set_intensity(j,b,v)
+  local s=sections[j]
+  if s.countin then return end
+  if b then
+    s.bars[b].int=v;put("int:"..s.key..":"..b,v)
+  else
+    s.int=v;put("int:"..s.key,v)
+    for k,bar in ipairs(s.bars) do bar.int=v;put("int:"..s.key..":"..k,v) end
+  end
+  for _,t in ipairs(rows) do if t.depth==0 then dirty[t]=true end end
+end
+local function intensity_cell(c)
+  local s=sections[c.j]
+  local v=c.b and s.bars[c.b].int or s.bars[1].int
+  if not c.b then for _,bar in ipairs(s.bars) do if bar.int~=v then v=0;break end end end
+  local label=s.countin and "—" or v==0 and "Mixed" or (c.b and ({"Soft","Normal","Strong","V.Strong"})[v] or intens_names[v])
+  local id="##int"..c.j..":"..(c.b or 0)
+  if r.ImGui_Button(ctx,label..id,c.w,CELL_H) and not job and not s.countin then set_intensity(c.j,c.b,v%4+1) end
+  if not job and not s.countin and r.ImGui_BeginPopupContextItem(ctx,"##opts"..id) then
+    for k,name in ipairs(intens_names) do if r.ImGui_Selectable(ctx,name,v==k) then set_intensity(c.j,c.b,k) end end
+    r.ImGui_EndPopup(ctx)
+  end
+end
+local function color_header(c)
+  local s=sections[c.j]
+  local id="##sec"..c.j..":"..(c.b or 0)
+  local dl=r.ImGui_GetWindowDrawList(ctx)
+  local x,y=r.ImGui_GetCursorScreenPos(ctx)
+  local rr,gg,bb=rgb(s.color)
+  local clicked=r.ImGui_InvisibleButton(ctx,id,c.w,CELL_H)
+  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+c.w,y+CELL_H,rgba(rr,gg,bb,255),3)
+  local label=c.b and (c.b==1 and s.name.." −" or tostring(c.b)) or s.name.." +"
+  r.ImGui_DrawList_PushClipRect(dl,x+2,y,x+c.w-2,y+CELL_H,true)
+  centered(dl,x,y,c.w,CELL_H,label,contrast(rr,gg,bb))
+  r.ImGui_DrawList_PopClipRect(dl)
+  if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,s.name..(c.b and " | Bar "..c.b or "").." — click to fold / unfold") end
+  if clicked and not job then expanded[s.key]=not expanded[s.key] end
+end
+local function track_header(t)
+  local dl=r.ImGui_GetWindowDrawList(ctx)
+  local x,y=r.ImGui_GetCursorScreenPos(ctx)
+  local w=230
+  r.ImGui_InvisibleButton(ctx,"##track"..t.key,w,CELL_H)
+  local rr,gg,bb=rgb(r.GetTrackColor(t.track))
+  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+CELL_H,rgba(rr,gg,bb,255),3)
+  local _,th=r.ImGui_CalcTextSize(ctx,t.name)
+  r.ImGui_DrawList_PushClipRect(dl,x+5,y,x+w-5,y+CELL_H,true)
+  r.ImGui_DrawList_AddText(dl,x+6,y+(CELL_H-th)/2,contrast(rr,gg,bb),t.name)
+  r.ImGui_DrawList_PopClipRect(dl)
+  if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,t.name) end
+end
+local function tool_button(i)
+  local dl=r.ImGui_GetWindowDrawList(ctx)
+  local x,y=r.ImGui_GetCursorScreenPos(ctx)
+  local w=i==9 and 108 or 44
+  local clicked=r.ImGui_InvisibleButton(ctx,"##tool"..i,w,CELL_H)
+  local hover=r.ImGui_IsItemHovered(ctx)
+  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+CELL_H,tool==i and 0xD3B86DFF or hover and 0xB5BEC8FF or 0x8F9BA7FF,4)
+  r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+CELL_H,tool==i and 0xFFFFFFFF or 0x11111180,4,0,tool==i and 2.5 or 1)
+  if i==9 then centered(dl,x,y,w,CELL_H,"Transition",0x101010FF,0xFFFFFFFF)
+  else symbol(dl,x,y,w,CELL_H,i) end
+  if hover then r.ImGui_SetTooltip(ctx,i==9 and "Transition" or simple[i]) end
+  if clicked then tool=i;transition_start=nil end
 end
 local function apply_dirty()
   if not next(dirty) or job or not stopped() then return end
@@ -573,7 +783,13 @@ local function button(s,fn)
   if r.ImGui_Button(ctx,s) then fn() end
 end
 local function draw()
-  r.ImGui_SetNextWindowSize(ctx,1200,600,r.ImGui_Cond_FirstUseEver())
+  r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_Alpha(),1)
+  local bg=r.ImGui_GetStyleColor(ctx,r.ImGui_Col_WindowBg()) | 0xff
+  r.ImGui_PushStyleColor(ctx,r.ImGui_Col_WindowBg(),bg)
+  r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ChildBg(),bg)
+  if ui_font then r.ImGui_PushFont(ctx,ui_font) end
+  r.ImGui_SetNextWindowSize(ctx,1350,650,r.ImGui_Cond_FirstUseEver())
+  r.ImGui_SetNextWindowBgAlpha(ctx,1)
   local visible,open=r.ImGui_Begin(ctx,"N2N Mix",true)
   if visible then
     if not job then
@@ -609,70 +825,90 @@ local function draw()
       r.ImGui_Text(ctx,string.format("Target %.1f LUFS | sample peak guard %.1f dBFS",master_target(),peak_ceiling))
       local ch,v=r.ImGui_Checkbox(ctx,"Traditional",traditional)
       if ch then traditional=v;put("traditional",v and 1 or 0) end
-      for i=1,9 do
-        same()
-        local lbl=i==9 and "Transition" or (traditional and trad or simple)[i]
-        if r.ImGui_Button(ctx,(tool==i and "["..lbl.."]" or lbl).."##tool"..i) then tool=i;transition_start=nil end
-      end
+      for i=1,9 do same();tool_button(i) end
       r.ImGui_TextWrapped(ctx,"Paint levels by dragging. Transition: click start and end on one track. Click a section heading to expand bars.")
     end
-    if #sections>0 and r.ImGui_BeginChild(ctx,"##grid",0,0,0,r.ImGui_WindowFlags_HorizontalScrollbar()) then
-      local cols={}
+    if #sections>0 then
+      local cols,total={},0
       for j,s in ipairs(sections) do
-        if expanded[s.key] then for b=1,#s.bars do cols[#cols+1]={j=j,b=b,w=55} end
-        else cols[#cols+1]={j=j,w=98} end
-      end
-      local colx=355
-      r.ImGui_Text(ctx,"Track / Role / Target")
-      for _,c in ipairs(cols) do
-        r.ImGui_SameLine(ctx,colx);colx=colx+c.w+4
-        local s=sections[c.j]
-        local lbl=c.b and (c.b==1 and s.name.." [-]" or tostring(c.b)) or s.name.." [+]"
-        if r.ImGui_Button(ctx,lbl.."##sec"..c.j..":"..(c.b or 0),c.w,24) and not job then expanded[s.key]=not expanded[s.key] end
-      end
-      r.ImGui_Text(ctx,"Section intensity")
-      colx=355
-      for _,c in ipairs(cols) do
-        r.ImGui_SameLine(ctx,colx);colx=colx+c.w+4
-        local s=sections[c.j]
-        if r.ImGui_Button(ctx,(s.countin and "—" or intens_names[s.int]).."##int"..c.j..":"..(c.b or 0),c.w,24) and not job and not s.countin then
-          s.int=s.int%4+1;put("int:"..s.key,s.int)
-          for _,t in ipairs(rows) do if t.depth==0 then dirty[t]=true end end
-        end
-      end
-      for _,t in ipairs(rows) do
-        r.ImGui_Text(ctx,t.name)
-        r.ImGui_SameLine(ctx,165)
-        r.ImGui_SetNextItemWidth(ctx,118)
-        if r.ImGui_BeginCombo(ctx,"##role"..t.key,roles[t.role]) then
-          for i,name in ipairs(roles) do
-            if r.ImGui_Selectable(ctx,name,i==t.role) and not job then
-              local old=t.target;t.role=i;t.target=defaults[i];put("role:"..t.key,i);put("target:"..t.key,t.target)
-              for j,base in pairs(t.base) do t.base[j]=clamp(base+t.target-old,-30,24);put("base:"..t.key..":"..sections[j].key,t.base[j]) end
-              dirty[t]=true
-            end
+        if expanded[s.key] then
+          for b=1,#s.bars do
+            local w=b==1 and 130 or 92
+            cols[#cols+1]={j=j,b=b,w=w};total=total+w+GAP
           end
-          r.ImGui_EndCombo(ctx)
+        else
+          local w=math.max(132,r.ImGui_CalcTextSize(ctx,s.name.." +")+20)
+          cols[#cols+1]={j=j,w=w};total=total+w+GAP
         end
-        r.ImGui_SameLine(ctx,287);r.ImGui_SetNextItemWidth(ctx,64)
-        local ch,v=r.ImGui_InputDouble(ctx,"##target"..t.key,t.target,0,0,"%.1f")
-        if ch and not job then
-          local old=t.target;t.target=clamp(v,-60,-8);put("target:"..t.key,t.target)
-          for j,base in pairs(t.base) do t.base[j]=clamp(base+t.target-old,-30,24);put("base:"..t.key..":"..sections[j].key,t.base[j]) end
-          dirty[t]=true
-        end
-        colx=355
-        for _,c in ipairs(cols) do r.ImGui_SameLine(ctx,colx);colx=colx+c.w+4;cell(t,c.j,c.b,c.w) end
       end
-      r.ImGui_EndChild(ctx)
+      local flags=r.ImGui_TableFlags_ScrollX() | r.ImGui_TableFlags_ScrollY() | r.ImGui_TableFlags_SizingFixedFit()
+      -- Only two actual table columns: the entire song strip can exceed the native
+      -- ImGui column limit without losing the frozen track header.
+      if r.ImGui_BeginTable(ctx,"##mixgrid",2,flags,0,0,LEFT_W+total+32) then
+        r.ImGui_TableSetupColumn(ctx,"Track",r.ImGui_TableColumnFlags_WidthFixed(),LEFT_W)
+        r.ImGui_TableSetupColumn(ctx,"Song",r.ImGui_TableColumnFlags_WidthFixed(),total+8)
+        r.ImGui_TableSetupScrollFreeze(ctx,1,2)
+        local function across(fn)
+          for i,c in ipairs(cols) do
+            if i>1 then r.ImGui_SameLine(ctx,0,GAP) end
+            fn(c)
+          end
+        end
+        r.ImGui_TableNextRow(ctx,0,CELL_H)
+        r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Track / Role / Target")
+        r.ImGui_TableSetColumnIndex(ctx,1);across(color_header)
+        r.ImGui_TableNextRow(ctx,0,CELL_H)
+        r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Section intensity")
+        r.ImGui_TableSetColumnIndex(ctx,1);across(intensity_cell)
+        for _,t in ipairs(rows) do
+          r.ImGui_TableNextRow(ctx,0,CELL_H)
+          r.ImGui_TableSetColumnIndex(ctx,0)
+          track_header(t)
+          r.ImGui_SameLine(ctx,0,GAP)
+          r.ImGui_SetNextItemWidth(ctx,152)
+          if r.ImGui_BeginCombo(ctx,"##role"..t.key,roles[t.role]) then
+            for i,name in ipairs(roles) do
+              if r.ImGui_Selectable(ctx,name,i==t.role) and not job then
+                local old=t.target;t.role=i;t.target=defaults[i];put("role:"..t.key,i);put("target:"..t.key,t.target)
+                for j,base in pairs(t.base) do t.base[j]=clamp(base+t.target-old,-30,24);put("base:"..t.key..":"..sections[j].key,t.base[j]) end
+                dirty[t]=true
+              end
+            end
+            r.ImGui_EndCombo(ctx)
+          end
+          r.ImGui_SameLine(ctx,0,GAP);r.ImGui_SetNextItemWidth(ctx,70)
+          local ch,v=r.ImGui_InputDouble(ctx,"##target"..t.key,t.target,0,0,"%.1f")
+          if ch and not job then
+            local old=t.target;t.target=clamp(v,-60,-8);put("target:"..t.key,t.target)
+            for j,base in pairs(t.base) do t.base[j]=clamp(base+t.target-old,-30,24);put("base:"..t.key..":"..sections[j].key,t.base[j]) end
+            dirty[t]=true
+          end
+          r.ImGui_TableSetColumnIndex(ctx,1)
+          local fills=transition_fills(t)
+          across(function(c) cell(t,c.j,c.b,c.w,fills) end)
+        end
+        r.ImGui_EndTable(ctx)
+      end
     end
     r.ImGui_End(ctx)
   end
-  if not r.ImGui_IsMouseDown(ctx,0) then last_paint=nil;apply_dirty() end
+  if ui_font then r.ImGui_PopFont(ctx) end
+  r.ImGui_PopStyleColor(ctx,2);r.ImGui_PopStyleVar(ctx)
+  if not r.ImGui_IsMouseDown(ctx,0) then
+    if stroke and stroke.tool==9 and not job then
+      local s=stroke
+      if s.endj and (s.j~=s.endj or s.b~=s.endb) then
+        transition_start={t=s.t,j=s.j,b=s.b};edit_cell(s.t,s.endj,s.endb,9)
+      else edit_cell(s.t,s.j,s.b,9) end
+    end
+    stroke=nil;last_paint=nil;apply_dirty()
+  end
   return open
 end
 if not r.ImGui_CreateContext then r.MB("ReaImGui is required.","N2N Mix",0);return end
 ctx=r.ImGui_CreateContext("N2N Mix")
+ui_font=r.ImGui_CreateFont("sans-serif",UI_SIZE)
+r.ImGui_Attach(ctx,ui_font)
 preset=clamp(num("preset",1),1,#presets)
 custom=num("custom",-16)
 traditional=num("traditional",0)==1
