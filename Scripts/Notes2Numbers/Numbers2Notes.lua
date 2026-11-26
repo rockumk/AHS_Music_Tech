@@ -4255,9 +4255,34 @@ function Build_Single_Track(tr)
     local track_color = reaper.ColorToNative(tr[8][1], tr[8][2], tr[8][3]) | 0x10000000
     reaper.SetTrackColor(track_to_use, track_color)
 
-    -- ONLY reset volume if the track is brand new!
+    -- Initialize only newly created tracks. Never reset a user's existing mix on rebuild.
     if is_new then
-        reaper.SetTrackUIVolume(track_to_use, tr[9], false, true, 0)
+        local initial_linear = tonumber(tr[9]) or 1.0
+        if tr[3] ~= false then
+            -- All recipe/common FX have been added; append the tested stereo gain meter.
+            local at = -1000 - reaper.TrackFX_GetCount(track_to_use)
+            local mix_fx = reaper.TrackFX_AddByName(track_to_use, "JS: N2N Mix Meter.jsfx", false, at)
+            if mix_fx < 0 then
+                mix_fx = reaper.TrackFX_AddByName(track_to_use, "JS: N2N Mix Meter (diagnostic)", false, at)
+            end
+            if mix_fx >= 0 then
+                local db = math.max(-60, math.min(30, 20 * math.log(math.max(initial_linear, 0.001), 10)))
+                reaper.TrackFX_SetParam(track_to_use, mix_fx, 0, db)
+                reaper.TrackFX_SetParam(track_to_use, mix_fx, 1, 0)
+                reaper.TrackFX_SetParam(track_to_use, mix_fx, 2, 0)
+                -- Same ownership tag used by the N2N Mix script; reuse this FX during fine tuning.
+                reaper.GetSetMediaTrackInfo_String(track_to_use, "P_EXT:N2N_MIX_FX", reaper.TrackFX_GetFXGUID(track_to_use, mix_fx), true)
+                reaper.GetSetMediaTrackInfo_String(track_to_use, "P_EXT:N2N_MIX_INITIAL_DB", tostring(db), true)
+                reaper.SetTrackUIVolume(track_to_use, 1.0, false, true, 0)
+            else
+                -- Missing dependency: preserve the intended audio level rather than jump to unity.
+                table.insert(G_MISSING_PLUGINS, {name = "N2N Mix Meter.jsfx", source = 3})
+                reaper.SetTrackUIVolume(track_to_use, initial_linear, false, true, 0)
+            end
+        else
+            -- Hidden chart/MIDI source tracks must never receive the N2N Mix JSFX.
+            reaper.SetTrackUIVolume(track_to_use, initial_linear, false, true, 0)
+        end
     end
 
     -- TCP / MCP Visibility Control
