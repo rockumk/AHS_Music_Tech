@@ -1,0 +1,1093 @@
+desc:Performance Dynamics (14-Instrument Clean Headroom Prototype)
+version: 0.1.0
+author: Rock Kennedy
+about:
+  Instrument-specific performance intensity, timbre and gain processing.
+provides:
+  [main] .
+//tags: dynamics saturation transient expression prototype
+
+slider1:0<-100,100,0.5>Performance Intensity (%)
+slider2:0<0,13,1{Brass (also Sax),Drums,Acoustic Guitar,Voice (Lead),Piano,Bowed Strings,Electric Bass,Upright Bass,Electric Guitar (Clean/Crunch),Small Plucked (Mando/Banjo),Clarinet,Flute,Double Reeds (Oboe/Bassoon),Low Brass / Bari Sax}>Instrument Source
+slider3:75<0,200,1>Loud (+) Timbre Scale (%)
+slider4:120<0,200,1>Soft (-) Timbre Scale (%)
+slider5:7<0,18,0.5>Loud (+) Volume Range (dB)
+slider6:4<0,48,0.5>Soft (-) Volume Range (dB)
+slider7:0<0,2,1{Use Boost/Cut Sliders,Full Fade to -inf,Timbre Only (Auto-Gain)}>Volume Mode
+slider8:1<0,2,1{Continuous (20ms),Future Notes Only (Onset Latch),Hybrid (Latch + Slow Drift)}>Timing Mode
+slider9:50<0,60,1>Room / Environment (%)
+slider10:65<0,100,1>Note-Level Awareness (%)
+
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+
+@init
+LN10_20 = 0.11512925465; // ln(10)/20
+LN10_40 = 0.05756462732; // ln(10)/40
+
+function db2lin(db) ( exp(db * LN10_20); );
+
+function true_tanh(x) local(e2x) (
+  x > 8.0 ? 1.0 : x < -8.0 ? -1.0 : (
+    e2x = exp(2.0 * x);
+    (e2x - 1.0) / (e2x + 1.0);
+  );
+);
+
+// Transparent output safety ceiling only above -0.54 dBFS (0.94 -> max 0.998)
+function safety_ceil(x) local(ax) (
+  ax = abs(x);
+  ax <= 0.94 ? x : (
+    (x >= 0 ? 1.0 : -1.0) * (0.94 + 0.058 * true_tanh((ax - 0.94) / 0.058));
+  );
+);
+
+function sat_2x_reset() instance(prev_x, ic1_s, ic2_s, ic1_l, ic2_l) (
+  prev_x = 0; ic1_s = 0; ic2_s = 0; ic1_l = 0; ic2_l = 0;
+);
+
+// 2x Oversampled, strictly monotonic, phase-matched saturator
+function sat_2x(x, drv, asym, mix)
+  instance(prev_x, ic1_s, ic2_s, ic1_l, ic2_l)
+  local(xm, u0, u1, s0, s1, g, k, a1, a2, a3, v3, v1, v2, ys, yl)
+(
+  xm = 0.5 * (prev_x + x);
+  prev_x = x;
+
+  u0 = xm + asym * xm * xm / (1.0 + abs(xm));
+  u1 = x  + asym * x  * x  / (1.0 + abs(x));
+  s0 = true_tanh(drv * u0) / drv;
+  s1 = true_tanh(drv * u1) / drv;
+
+  // 2-pole Butterworth LPF at 0.42 * srate_1x (at 2x rate: tan(pi*0.21) = 0.775676)
+  g = 0.775676;
+  k = 1.41421356;
+  a1 = 1.0 / (1.0 + g * (g + k));
+  a2 = g * a1; a3 = g * a2;
+
+  v3 = s0 - ic2_s; v1 = a1 * ic1_s + a2 * v3; v2 = ic2_s + a2 * ic1_s + a3 * v3;
+  ic1_s = 2.0 * v1 - ic1_s; ic2_s = 2.0 * v2 - ic2_s;
+  v3 = s1 - ic2_s; v1 = a1 * ic1_s + a2 * v3; v2 = ic2_s + a2 * ic1_s + a3 * v3;
+  ic1_s = 2.0 * v1 - ic1_s; ic2_s = 2.0 * v2 - ic2_s;
+  ys = v2;
+
+  v3 = xm - ic2_l; v1 = a1 * ic1_l + a2 * v3; v2 = ic2_l + a2 * ic1_l + a3 * v3;
+  ic1_l = 2.0 * v1 - ic1_l; ic2_l = 2.0 * v2 - ic2_l;
+  v3 = x  - ic2_l; v1 = a1 * ic1_l + a2 * v3; v2 = ic2_l + a2 * ic1_l + a3 * v3;
+  ic1_l = 2.0 * v1 - ic1_l; ic2_l = 2.0 * v2 - ic2_l;
+  yl = v2;
+
+  yl + mix * (ys - yl);
+);
+
+function svf_reset() instance(ic1eq, ic2eq) ( ic1eq = 0; ic2eq = 0; );
+
+function svf_lp(x, fc, q) instance(ic1eq, ic2eq, g, k, a1, a2, a3, v1, v2, v3) (
+  g = tan($pi * min(fc, srate * 0.45) / srate);
+  k = 1.0 / max(0.1, q);
+  a1 = 1.0 / (1.0 + g * (g + k));
+  a2 = g * a1; a3 = g * a2;
+  v3 = x - ic2eq;
+  v1 = a1 * ic1eq + a2 * v3;
+  v2 = ic2eq + a2 * ic1eq + a3 * v3;
+  ic1eq = 2.0 * v1 - ic1eq; ic2eq = 2.0 * v2 - ic2eq;
+  v2;
+);
+
+function svf_hp(x, fc, q) instance(ic1eq, ic2eq, g, k, a1, a2, a3, v1, v2, v3) (
+  g = tan($pi * min(fc, srate * 0.45) / srate);
+  k = 1.0 / max(0.1, q);
+  a1 = 1.0 / (1.0 + g * (g + k));
+  a2 = g * a1; a3 = g * a2;
+  v3 = x - ic2eq;
+  v1 = a1 * ic1eq + a2 * v3;
+  v2 = ic2eq + a2 * ic1eq + a3 * v3;
+  ic1eq = 2.0 * v1 - ic1eq; ic2eq = 2.0 * v2 - ic2eq;
+  x - k * v1 - v2;
+);
+
+function svf_bell(x, fc, q, db) instance(ic1eq, ic2eq, g, k, a1, a2, a3, v1, v2, v3, gain_lin) (
+  abs(db) < 0.02 ? x : (
+    gain_lin = exp(db * LN10_20);
+    g = tan($pi * min(fc, srate * 0.45) / srate);
+    k = 1.0 / max(0.1, q);
+    a1 = 1.0 / (1.0 + g * (g + k));
+    a2 = g * a1; a3 = g * a2;
+    v3 = x - ic2eq;
+    v1 = a1 * ic1eq + a2 * v3;
+    v2 = ic2eq + a2 * ic1eq + a3 * v3;
+    ic1eq = 2.0 * v1 - ic1eq; ic2eq = 2.0 * v2 - ic2eq;
+    x + (gain_lin - 1.0) * k * v1;
+  );
+);
+
+function svf_hshelf(x, fc, q, db) instance(ic1eq, ic2eq, g, k, a1, a2, a3, v1, v2, v3, A, m0, m1, m2) (
+  abs(db) < 0.02 ? x : (
+    A = exp(db * LN10_40);
+    g = tan($pi * min(fc, srate * 0.45) / srate) / sqrt(A);
+    k = 1.0 / max(0.1, q);
+    a1 = 1.0 / (1.0 + g * (g + k));
+    a2 = g * a1; a3 = g * a2;
+    v3 = x - ic2eq;
+    v1 = a1 * ic1eq + a2 * v3;
+    v2 = ic2eq + a2 * ic1eq + a3 * v3;
+    ic1eq = 2.0 * v1 - ic1eq; ic2eq = 2.0 * v2 - ic2eq;
+    m0 = A * A; m1 = k * (1.0 - A) * A; m2 = 1.0 - m0;
+    m0 * x + m1 * v1 + m2 * v2;
+  );
+);
+
+function dc_block(x) instance(x1, y1, r) (
+  r = 1.0 - (2.0 * $pi * 15.0 / srate);
+  y1 = x - x1 + r * y1;
+  x1 = x;
+  y1;
+);
+
+// --- Memory Partitioning ---
+BUF_SIZE = 8192; BUF_MASK = BUF_SIZE - 1;
+BUF_L = 0; BUF_R = 8192;
+
+FDN_SIZE = 16384; FDN_MASK = FDN_SIZE - 1;
+FDN_0 = 16384; FDN_1 = 32768; FDN_2 = 49152; FDN_3 = 65536;
+
+ER_SIZE = 8192; ER_MASK = ER_SIZE - 1;
+ER_L = 81920; ER_R = 90112;
+
+memset(0, 0, 98304);
+
+la_samps = floor(0.008 * srate);
+pdc_delay = la_samps;
+pdc_bot_ch = 0;
+pdc_top_ch = 2;
+
+write_pos = 0; fdn_pos = 0; er_pos = 0;
+
+rt60 = 0.85;
+d0_len = floor(0.0297 * srate); fb0 = exp(-6.907755 * 0.0297 / rt60);
+d1_len = floor(0.0371 * srate); fb1 = exp(-6.907755 * 0.0371 / rt60);
+d2_len = floor(0.0433 * srate); fb2 = exp(-6.907755 * 0.0433 / rt60);
+d3_len = floor(0.0529 * srate); fb3 = exp(-6.907755 * 0.0529 / rt60);
+
+er_l1 = floor(0.0073 * srate); er_l2 = floor(0.0131 * srate); er_l3 = floor(0.0217 * srate);
+er_r1 = floor(0.0091 * srate); er_r2 = floor(0.0163 * srate); er_r3 = floor(0.0249 * srate);
+
+lp0 = lp1 = lp2 = lp3 = 0.0;
+
+function read_cubic(buf_base, delay_samps) local(rp, idx, f, i0, i1, i2, i3, y0, y1, y2, y3, c0, c1, c2, c3) (
+  rp = write_pos - delay_samps;
+  idx = floor(rp);
+  f = rp - idx;
+  i0 = (idx - 1 + BUF_SIZE) & BUF_MASK;
+  i1 = (idx     + BUF_SIZE) & BUF_MASK;
+  i2 = (idx + 1 + BUF_SIZE) & BUF_MASK;
+  i3 = (idx + 2 + BUF_SIZE) & BUF_MASK;
+  y0 = buf_base[i0]; y1 = buf_base[i1]; y2 = buf_base[i2]; y3 = buf_base[i3];
+  c0 = y1;
+  c1 = 0.5 * (y2 - y0);
+  c2 = y0 - 2.5 * y1 + 2.0 * y2 - 0.5 * y3;
+  c3 = 0.5 * (y3 - y0) + 1.5 * (y1 - y2);
+  ((c3 * f + c2) * f + c1) * f + c0;
+);
+
+// --- State Init ---
+env_ref = 0.25;
+norm_gain_smooth = 1.0;
+I_active = 0.0;
+I_latched = 0.0;
+loud_timbre_smooth = 0.75;
+soft_timbre_smooth = 0.92;
+max_boost_smooth = 7.0;
+max_cut_smooth = 4.0;
+room_mix_smooth = 0.50;
+aware_smooth = 0.65;
+last_preset = -1;
+
+rms_sq = 0.0;
+fast_env = 0.0; slow_env = 0.0; note_env = 0.25;
+note_rel = 1.0; w_dn = 1.0; w_up = 1.0;
+trans_norm = 0.0; prev_trans = 0.0;
+atk_env = 0.0;
+out_gain = 1.0;
+out_peak_disp = 0.0001;
+
+latch_cooldown = 0; latch_flash = 0; silence_cnt = 0;
+pitch_env = 0.0; pitch_offset_samps = 0.0; pitch_trig_hold = 0;
+
+sat_l.sat_2x_reset(); sat_r.sat_2x_reset();
+f1_l.svf_reset(); f1_r.svf_reset();
+f2_l.svf_reset(); f2_r.svf_reset();
+f3_l.svf_reset(); f3_r.svf_reset();
+f4_l.svf_reset(); f4_r.svf_reset();
+dc_l.x1 = dc_l.y1 = 0;
+dc_r.x1 = dc_r.y1 = 0;
+
+@slider
+I_target            = slider1 / 100.0;
+preset              = slider2;
+loud_timbre_target  = slider3 / 100.0;
+soft_timbre_target  = slider4 / 100.0;
+max_boost_target    = slider5;
+max_cut_target      = slider6;
+vol_mode            = slider7;
+timing_mode         = slider8;
+room_mix_target     = slider9 / 100.0;
+aware_target        = slider10 / 100.0;
+
+(preset != last_preset) ? (
+  sat_l.sat_2x_reset(); sat_r.sat_2x_reset();
+  f1_l.svf_reset(); f1_r.svf_reset();
+  f2_l.svf_reset(); f2_r.svf_reset();
+  f3_l.svf_reset(); f3_r.svf_reset();
+  f4_l.svf_reset(); f4_r.svf_reset();
+  dc_l.x1 = dc_l.y1 = 0; dc_r.x1 = dc_r.y1 = 0;
+  last_preset = preset;
+);
+
+c_smooth       = 1.0 - exp(-1.0 / (0.020 * srate));
+c_latch_glide  = 1.0 - exp(-1.0 / (0.0015 * srate));
+c_hybrid_drift = 1.0 - exp(-1.0 / (1.200 * srate));
+c_norm_smooth  = 1.0 - exp(-1.0 / (0.100 * srate));
+
+c_rms_win      = 1.0 - exp(-1.0 / (0.015 * srate));
+c_rms_att      = 1.0 - exp(-1.0 / (0.080 * srate));
+c_rms_rel      = 1.0 - exp(-1.0 / (1.200 * srate));
+c_peak_att     = 1.0 - exp(-1.0 / (0.001 * srate));
+c_peak_rel     = 1.0 - exp(-1.0 / (1.500 * srate));
+
+c_fast_att     = 1.0 - exp(-1.0 / (0.0005 * srate));
+c_fast_rel     = 1.0 - exp(-1.0 / (0.015  * srate));
+c_slow_att     = 1.0 - exp(-1.0 / (0.030  * srate));
+c_slow_rel     = 1.0 - exp(-1.0 / (0.090  * srate));
+
+c_note_att     = 1.0 - exp(-1.0 / (0.060  * srate));
+c_note_rel     = 1.0 - exp(-1.0 / (0.350  * srate));
+c_atk_rel      = exp(-1.0 / (0.022 * srate));
+
+c_pitch_rel    = exp(-1.0 / (0.025 * srate));
+c_pitch_ret    = exp(-1.0 / (0.250 * srate));
+c_peak_disp    = exp(-1.0 / (0.600 * srate));
+
+c_fdn_damp     = 1.0 - exp(-2.0 * $pi * 4200.0 / srate);
+
+@block
+pdc_delay = la_samps;
+pdc_bot_ch = 0;
+pdc_top_ch = 2;
+
+@sample
+loud_timbre_smooth += c_smooth * (loud_timbre_target - loud_timbre_smooth);
+soft_timbre_smooth += c_smooth * (soft_timbre_target - soft_timbre_smooth);
+max_boost_smooth   += c_smooth * (max_boost_target - max_boost_smooth);
+max_cut_smooth     += c_smooth * (max_cut_target - max_cut_smooth);
+room_mix_smooth    += c_smooth * (room_mix_target - room_mix_smooth);
+aware_smooth       += c_smooth * (aware_target - aware_smooth);
+
+// 1. Write undelayed input to 8ms lookahead ring buffer
+inL = spl0; inR = spl1;
+BUF_L[write_pos] = inL;
+BUF_R[write_pos] = inR;
+
+// 2. Gated Auto-Calibration Tracker
+sc_peak = max(abs(inL), abs(inR));
+inst_sq = 0.5 * (inL * inL + inR * inR);
+rms_sq += c_rms_win * (inst_sq - rms_sq);
+sc_rms  = sqrt(max(0.0, rms_sq));
+
+is_sustained = (preset == 0 || preset == 3 || preset == 5 || preset >= 10);
+(sc_peak > 0.00178) ? (
+  is_sustained ? (
+    (sc_rms > env_ref) ? (
+      env_ref += c_rms_att * (sc_rms - env_ref);
+    ) : (
+      env_ref += c_rms_rel * (sc_rms - env_ref);
+    );
+  ) : (
+    (sc_peak > env_ref) ? (
+      env_ref += c_peak_att * (sc_peak - env_ref);
+    ) : (
+      env_ref += c_peak_rel * (sc_peak - env_ref);
+    );
+  );
+);
+
+env_ref_clamped = max(0.008, min(1.0, env_ref));
+norm_gain_target = 0.25 / env_ref_clamped;
+norm_gain_smooth += c_norm_smooth * (norm_gain_target - norm_gain_smooth);
+
+// 3. Lookahead Transient, Note-Body Level & Onset Detection
+sc_cal = sc_peak * norm_gain_smooth;
+fast_env += (sc_cal > fast_env ? c_fast_att : c_fast_rel) * (sc_cal - fast_env);
+slow_env += (sc_cal > slow_env ? c_slow_att : c_slow_rel) * (sc_cal - slow_env);
+
+sc_lvl = (is_sustained ? sc_rms : sc_peak) * norm_gain_smooth;
+note_env += (sc_lvl > note_env ? c_note_att : c_note_rel) * (sc_lvl - note_env);
+note_rel = note_env / 0.25;
+
+trans_raw = max(0.0, fast_env - slow_env);
+trans_norm = min(1.5, trans_raw / 0.25);
+
+onset_trig = (fast_env > slow_env * 1.18 + 0.012) && (latch_cooldown <= 0);
+(onset_trig) ? (
+  latch_cooldown = floor(0.110 * srate);
+  latch_flash = floor(0.160 * srate);
+  atk_env = max(atk_env, min(1.0, 0.30 + 0.70 * trans_norm));
+);
+latch_cooldown = max(0, latch_cooldown - 1);
+latch_flash = max(0, latch_flash - 1);
+atk_env *= c_atk_rel;
+
+is_silent = (sc_cal < 0.005);
+silence_cnt = is_silent ? (silence_cnt + 1) : 0;
+silence_ready = (silence_cnt > floor(0.120 * srate));
+
+// 4. Timing Mode (0: Continuous, 1: Future Notes Only, 2: Hybrid)
+(timing_mode == 0) ? (
+  I_active += c_smooth * (I_target - I_active);
+  I_latched = I_active;
+) : (timing_mode == 1) ? (
+  (onset_trig || silence_ready) ? ( I_latched = I_target; );
+  glide_c = silence_ready ? c_smooth : c_latch_glide;
+  I_active += glide_c * (I_latched - I_active);
+) : (
+  (onset_trig || silence_ready) ? (
+    I_latched = I_target;
+    I_active += c_latch_glide * (I_latched - I_active);
+  ) : (
+    I_latched += c_hybrid_drift * (I_target - I_latched);
+    I_active += c_latch_glide * (I_latched - I_active);
+  );
+);
+
+I_timbre = (I_active >= 0) ? (I_active * loud_timbre_smooth)
+                          : (I_active * soft_timbre_smooth);
+
+raw_w_dn = max(0.55, min(1.25, 0.55 + 0.45 * note_rel));
+raw_w_up = (note_rel > 1.0) ? max(0.80, 1.0 - 0.18 * (note_rel - 1.0))
+                            : min(1.12, 0.88 + 0.12 * note_rel);
+w_dn = 1.0 + aware_smooth * (raw_w_dn - 1.0);
+w_up = 1.0 + aware_smooth * (raw_w_up - 1.0);
+
+// 5. Drums Pitch-Drop Envelope (preset == 1)
+(preset == 1 && I_timbre > 0.001) ? (
+  (trans_norm > 0.22 && trans_norm > prev_trans && pitch_trig_hold <= 0) ? (
+    pitch_env = min(1.0, trans_norm * 0.9);
+    pitch_trig_hold = floor(0.035 * srate);
+  );
+  pitch_trig_hold = max(0, pitch_trig_hold - 1);
+  prev_trans = trans_norm;
+
+  pitch_env *= c_pitch_rel;
+  max_off = 0.004 * srate;
+  step = pitch_env * 0.0235 * (I_timbre * w_up) * (1.0 - pitch_offset_samps / max_off);
+  pitch_offset_samps += step;
+  (pitch_env < 0.02) ? ( pitch_offset_samps *= c_pitch_ret; );
+) : (
+  pitch_env = 0.0;
+  pitch_offset_samps *= 0.998;
+  prev_trans = trans_norm;
+);
+
+// 6. Read from Lookahead Buffer
+read_delay = la_samps - pitch_offset_samps;
+(abs(pitch_offset_samps) > 0.001) ? (
+  xL = read_cubic(BUF_L, read_delay);
+  xR = read_cubic(BUF_R, read_delay);
+) : (
+  r_idx = (write_pos - la_samps + BUF_SIZE) & BUF_MASK;
+  xL = BUF_L[r_idx];
+  xR = BUF_R[r_idx];
+);
+
+write_pos = (write_pos + 1) & BUF_MASK;
+
+// 7. Timbral Processing & Direct Output Gain
+yL = xL; yR = xR;
+
+(abs(I_active) < 0.001) ? (
+  out_gain = 1.0;
+  dry_outL = yL;
+  dry_outR = yR;
+) : (
+  (abs(I_timbre) >= 0.001) ? (
+    yL *= norm_gain_smooth;
+    yR *= norm_gain_smooth;
+
+    It = (I_timbre >= 0) ? (I_timbre * w_up) : (I_timbre * w_dn);
+    St = -It;
+
+    // -----------------------------------------------------------------------
+    // 0: BRASS (also Sax) - Clean chord-safe bite + headroom compensation
+    // -----------------------------------------------------------------------
+    (preset == 0) ? (
+      (It > 0) ? (
+        yL = f1_l.svf_bell(yL, 1600, 0.8, 2.8 * It);
+        yR = f1_r.svf_bell(yR, 1600, 0.8, 2.8 * It);
+
+        // Mild chord-safe 2x asymmetric warmth (zero IMD crunch on fanfare chords)
+        drv = 1.0 + 0.65 * min(2.0, It);
+        asym = min(0.45, 0.24 * It);
+        yL = dc_l.dc_block(sat_l.sat_2x(yL, drv, asym, min(0.85, 0.75 * It)));
+        yR = dc_r.dc_block(sat_r.sat_2x(yR, drv, asym, min(0.85, 0.75 * It)));
+
+        // Linear dynamic brass bloom & onset bite
+        bloom_db = 5.0 * It * min(1.3, 0.4 + 0.6 * note_rel);
+        yL = f2_l.svf_hshelf(yL, 1900, 0.707, bloom_db);
+        yR = f2_r.svf_hshelf(yR, 1900, 0.707, bloom_db);
+
+        bite_db = 3.2 * It * atk_env;
+        yL = f3_l.svf_bell(yL, 2900, 0.95, bite_db);
+        yR = f3_r.svf_bell(yR, 2900, 0.95, bite_db);
+
+        // Compensate internal EQ gain so +Volume slider stays predictable
+        eq_trim = db2lin(-2.2 * min(1.5, It));
+        yL *= eq_trim; yR *= eq_trim;
+      ) : (
+        fc_brass = max(550.0, 18000.0 * pow(1100.0 / 18000.0, min(1.25, St)));
+        fc_brass *= (1.0 - 0.25 * min(1.2, St) * atk_env);
+        yL = f1_l.svf_lp(yL, max(450.0, fc_brass), 0.62);
+        yR = f1_r.svf_lp(yR, max(450.0, fc_brass), 0.62);
+
+        yL = f2_l.svf_bell(yL, 260, 0.7, 2.0 * St);
+        yR = f2_r.svf_bell(yR, 260, 0.7, 2.0 * St);
+      );
+    ) :
+
+    // -----------------------------------------------------------------------
+    // 1: DRUMS
+    // -----------------------------------------------------------------------
+    (preset == 1) ? (
+      (It > 0) ? (
+        t_boost = 1.0 + 0.55 * It * min(1.5, trans_norm);
+        yL *= t_boost; yR *= t_boost;
+
+        crack_db = 4.5 * It * min(1.2, trans_norm);
+        yL = f1_l.svf_hshelf(yL, 3500, 0.707, crack_db);
+        yR = f1_r.svf_hshelf(yR, 3500, 0.707, crack_db);
+
+        s_drv = 1.0 + 1.4 * min(2.0, It);
+        yL = sat_l.sat_2x(yL, s_drv, 0.0, min(0.85, 0.5 * It));
+        yR = sat_r.sat_2x(yR, s_drv, 0.0, min(0.85, 0.5 * It));
+
+        eq_trim = db2lin(-1.5 * min(1.5, It));
+        yL *= eq_trim; yR *= eq_trim;
+      ) : (
+        t_amt = min(1.30, St * min(1.0, trans_norm * 1.3));
+        dwell_gain = max(0.35, 1.0 - 0.38 * t_amt);
+        yL *= dwell_gain; yR *= dwell_gain;
+
+        fc_drum = max(750.0, 17000.0 * pow(1300.0 / 17000.0, t_amt));
+        yL = f1_l.svf_lp(yL, fc_drum, 0.707);
+        yR = f1_r.svf_lp(yR, fc_drum, 0.707);
+
+        (fast_env < 0.08 && trans_norm < 0.1) ? (
+          tail_atten = max(0.30, 1.0 - 0.30 * St * (1.0 - min(1.0, fast_env / 0.08)));
+          yL *= tail_atten; yR *= tail_atten;
+        );
+      );
+    ) :
+
+    // -----------------------------------------------------------------------
+    // 2: ACOUSTIC GUITAR
+    // -----------------------------------------------------------------------
+    (preset == 2) ? (
+      (It > 0) ? (
+        hpL = f1_l.svf_hp(yL, 1800, 0.707);
+        hpR = f1_r.svf_hp(yR, 1800, 0.707);
+        g_drv = 1.6 + 2.0 * min(2.0, It);
+        buzzL = true_tanh(hpL * g_drv) / (1.4 + 1.2 * It);
+        buzzR = true_tanh(hpR * g_drv) / (1.4 + 1.2 * It);
+        buzz_mix = 0.35 * It * (0.3 + 0.7 * min(1.2, trans_norm));
+        yL += buzzL * buzz_mix; yR += buzzR * buzz_mix;
+
+        pick_db = 4.2 * It * min(1.2, trans_norm);
+        yL = f2_l.svf_bell(yL, 3200, 0.9, pick_db);
+        yR = f2_r.svf_bell(yR, 3200, 0.9, pick_db);
+
+        yL = sat_l.sat_2x(yL, 1.0 + 0.7 * min(2.0, It), 0.0, min(0.80, 0.4 * It));
+        yR = sat_r.sat_2x(yR, 1.0 + 0.7 * min(2.0, It), 0.0, min(0.80, 0.4 * It));
+
+        eq_trim = db2lin(-1.5 * min(1.5, It));
+        yL *= eq_trim; yR *= eq_trim;
+      ) : (
+        flesh_db = max(-12.0, -7.0 * St * min(1.0, trans_norm * 1.2));
+        yL = f1_l.svf_bell(yL, 3200, 0.85, flesh_db);
+        yR = f1_r.svf_bell(yR, 3200, 0.85, flesh_db);
+
+        yL *= max(0.55, 1.0 - 0.22 * St * min(1.0, trans_norm));
+        yR *= max(0.55, 1.0 - 0.22 * St * min(1.0, trans_norm));
+
+        fc_gtr = max(1800.0, 18000.0 * pow(5500.0 / 18000.0, St));
+        yL = f2_l.svf_lp(yL, fc_gtr, 0.65);
+        yR = f2_r.svf_lp(yR, fc_gtr, 0.65);
+        yL = f3_l.svf_bell(yL, 220, 0.7, 1.8 * St);
+        yR = f3_r.svf_bell(yR, 220, 0.7, 1.8 * St);
+      );
+    ) :
+
+    // -----------------------------------------------------------------------
+    // 3: VOICE (Lead)
+    // -----------------------------------------------------------------------
+    (preset == 3) ? (
+      (It > 0) ? (
+        proj_db = 4.2 * It * min(1.3, 0.4 + 0.6 * note_rel);
+        yL = f1_l.svf_bell(yL, 2400, 0.85, proj_db);
+        yR = f1_r.svf_bell(yR, 2400, 0.85, proj_db);
+
+        v_drv = 1.0 + 0.70 * min(2.0, It);
+        v_asym = min(0.45, 0.22 * It);
+        yL = dc_l.dc_block(sat_l.sat_2x(yL, v_drv, v_asym, min(0.80, 0.65 * It)));
+        yR = dc_r.dc_block(sat_r.sat_2x(yR, v_drv, v_asym, min(0.80, 0.65 * It)));
+
+        cons_db = 2.5 * It * atk_env;
+        yL = f2_l.svf_hshelf(yL, 5500, 0.707, cons_db);
+        yR = f2_r.svf_hshelf(yR, 5500, 0.707, cons_db);
+
+        eq_trim = db2lin(-1.6 * min(1.5, It));
+        yL *= eq_trim; yR *= eq_trim;
+      ) : (
+        rel_db = max(-10.0, -5.5 * St * min(1.2, 0.4 + 0.6 * note_rel));
+        yL = f1_l.svf_bell(yL, 2600, 0.75, rel_db);
+        yR = f1_r.svf_bell(yR, 2600, 0.75, rel_db);
+
+        yL = f2_l.svf_bell(yL, 220, 0.7, 2.2 * St);
+        yR = f2_r.svf_bell(yR, 220, 0.7, 2.2 * St);
+
+        yL = f3_l.svf_hshelf(yL, 3800, 0.707, -4.5 * min(1.2, St) * atk_env);
+        yR = f3_r.svf_hshelf(yR, 3800, 0.707, -4.5 * min(1.2, St) * atk_env);
+
+        air_db = 1.8 * St * (1.0 - atk_env);
+        yL = f4_l.svf_hshelf(yL, 9000, 0.707, air_db);
+        yR = f4_r.svf_hshelf(yR, 9000, 0.707, air_db);
+      );
+    ) :
+
+    // -----------------------------------------------------------------------
+    // 4: PIANO
+    // -----------------------------------------------------------------------
+    (preset == 4) ? (
+      (It > 0) ? (
+        h_boost = 1.0 + 0.40 * It * min(1.4, trans_norm);
+        yL *= h_boost; yR *= h_boost;
+
+        click_db = 4.2 * It * min(1.2, trans_norm);
+        yL = f1_l.svf_hshelf(yL, 3200, 0.707, click_db);
+        yR = f1_r.svf_hshelf(yR, 3200, 0.707, click_db);
+
+        yL = sat_l.sat_2x(yL, 1.0 + 0.75 * min(2.0, It), 0.0, min(0.80, 0.50 * It));
+        yR = sat_r.sat_2x(yR, 1.0 + 0.75 * min(2.0, It), 0.0, min(0.80, 0.50 * It));
+
+        p_bloom = 2.5 * It * min(1.2, note_rel);
+        yL = f2_l.svf_hshelf(yL, 2000, 0.707, p_bloom);
+        yR = f2_r.svf_hshelf(yR, 2000, 0.707, p_bloom);
+
+        eq_trim = db2lin(-1.8 * min(1.5, It));
+        yL *= eq_trim; yR *= eq_trim;
+      ) : (
+        felt_amt = min(1.25, St * (0.60 + 0.40 * min(1.2, note_rel)));
+        fc_piano = max(950.0, 18000.0 * pow(1800.0 / 18000.0, felt_amt));
+        yL = f1_l.svf_lp(yL, fc_piano, 0.65);
+        yR = f1_r.svf_lp(yR, fc_piano, 0.65);
+
+        h_soft = max(0.55, 1.0 - 0.25 * St * min(1.0, trans_norm * 1.2));
+        yL *= h_soft; yR *= h_soft;
+
+        yL = f2_l.svf_bell(yL, 240, 0.7, 1.8 * St);
+        yR = f2_r.svf_bell(yR, 240, 0.7, 1.8 * St);
+      );
+    ) :
+
+    // -----------------------------------------------------------------------
+    // 5: BOWED STRINGS
+    // -----------------------------------------------------------------------
+    (preset == 5) ? (
+      (It > 0) ? (
+        hpL = f1_l.svf_hp(yL, 1600, 0.707);
+        hpR = f1_r.svf_hp(yR, 1600, 0.707);
+        r_drv = 1.4 + 1.5 * min(2.0, It);
+        rosL = true_tanh(hpL * r_drv) / (1.3 + 1.0 * It);
+        rosR = true_tanh(hpR * r_drv) / (1.3 + 1.0 * It);
+        ros_mix = min(0.50, 0.24 * It * min(1.2, 0.4 + 0.8 * atk_env));
+        yL += rosL * ros_mix; yR += rosR * ros_mix;
+
+        edge_db = 4.2 * It * min(1.2, 0.35 + 0.65 * note_rel);
+        yL = f2_l.svf_bell(yL, 2600, 0.8, edge_db);
+        yR = f2_r.svf_bell(yR, 2600, 0.8, edge_db);
+
+        b_boost = 1.0 + 0.30 * It * atk_env;
+        yL *= b_boost; yR *= b_boost;
+
+        eq_trim = db2lin(-1.6 * min(1.5, It));
+        yL *= eq_trim; yR *= eq_trim;
+      ) : (
+        fc_str = max(1400.0, 18000.0 * pow(2800.0 / 18000.0, min(1.25, St)));
+        fc_str *= (1.0 - 0.22 * min(1.2, St) * atk_env);
+        yL = f1_l.svf_lp(yL, max(1000.0, fc_str), 0.55);
+        yR = f1_r.svf_lp(yR, max(1000.0, fc_str), 0.55);
+
+        yL = f2_l.svf_bell(yL, 260, 0.65, 2.0 * St);
+        yR = f2_r.svf_bell(yR, 260, 0.65, 2.0 * St);
+      );
+    ) :
+
+    // -----------------------------------------------------------------------
+    // 6: ELECTRIC BASS
+    // -----------------------------------------------------------------------
+    (preset == 6) ? (
+      (It > 0) ? (
+        eb_drv = 1.0 + 1.4 * min(2.0, It);
+        eb_asym = min(0.45, 0.22 * It);
+        yL = dc_l.dc_block(sat_l.sat_2x(yL, eb_drv, eb_asym, min(0.85, 0.65 * It)));
+        yR = dc_r.dc_block(sat_r.sat_2x(yR, eb_drv, eb_asym, min(0.85, 0.65 * It)));
+
+        growl_db = 3.0 * It * min(1.2, 0.4 + 0.8 * note_rel);
+        yL = f1_l.svf_bell(yL, 850, 0.8, growl_db);
+        yR = f1_r.svf_bell(yR, 850, 0.8, growl_db);
+
+        pop_db = 4.5 * It * min(1.2, trans_norm);
+        yL = f2_l.svf_bell(yL, 2400, 0.9, pop_db);
+        yR = f2_r.svf_bell(yR, 2400, 0.9, pop_db);
+
+        yL *= (1.0 + 0.35 * It * min(1.3, trans_norm));
+        yR *= (1.0 + 0.35 * It * min(1.3, trans_norm));
+
+        eq_trim = db2lin(-1.5 * min(1.5, It));
+        yL *= eq_trim; yR *= eq_trim;
+      ) : (
+        fc_eb = max(480.0, 16000.0 * pow(900.0 / 16000.0, min(1.25, St)));
+        yL = f1_l.svf_lp(yL, fc_eb, 0.65);
+        yR = f1_r.svf_lp(yR, fc_eb, 0.65);
+
+        thumb_soft = max(0.55, 1.0 - 0.25 * St * min(1.0, trans_norm * 1.2));
+        yL *= thumb_soft; yR *= thumb_soft;
+      );
+    ) :
+
+    // -----------------------------------------------------------------------
+    // 7: UPRIGHT BASS
+    // -----------------------------------------------------------------------
+    (preset == 7) ? (
+      (It > 0) ? (
+        ub_drv = 1.0 + 1.2 * min(2.0, It);
+        ub_asym = min(0.45, 0.25 * It);
+        yL = dc_l.dc_block(sat_l.sat_2x(yL, ub_drv, ub_asym, min(0.85, 0.60 * It)));
+        yR = dc_r.dc_block(sat_r.sat_2x(yR, ub_drv, ub_asym, min(0.85, 0.60 * It)));
+
+        thump_db = 4.2 * It * min(1.2, trans_norm);
+        yL = f1_l.svf_bell(yL, 900, 0.85, thump_db);
+        yR = f1_r.svf_bell(yR, 900, 0.85, thump_db);
+
+        wood_db = 2.5 * It * min(1.2, note_rel);
+        yL = f2_l.svf_bell(yL, 260, 0.7, wood_db);
+        yR = f2_r.svf_bell(yR, 260, 0.7, wood_db);
+
+        yL *= (1.0 + 0.35 * It * min(1.3, trans_norm));
+        yR *= (1.0 + 0.35 * It * min(1.3, trans_norm));
+
+        eq_trim = db2lin(-1.5 * min(1.5, It));
+        yL *= eq_trim; yR *= eq_trim;
+      ) : (
+        fc_ub = max(420.0, 16000.0 * pow(700.0 / 16000.0, min(1.25, St)));
+        yL = f1_l.svf_lp(yL, fc_ub, 0.65);
+        yR = f1_r.svf_lp(yR, fc_ub, 0.65);
+
+        ub_soft = max(0.55, 1.0 - 0.25 * St * min(1.0, trans_norm * 1.2));
+        yL *= ub_soft; yR *= ub_soft;
+
+        yL = f2_l.svf_bell(yL, 180, 0.7, 1.8 * St);
+        yR = f2_r.svf_bell(yR, 180, 0.7, 1.8 * St);
+      );
+    ) :
+
+    // -----------------------------------------------------------------------
+    // 8: ELECTRIC GUITAR (Clean / Edge-of-Breakup)
+    // -----------------------------------------------------------------------
+    (preset == 8) ? (
+      (It > 0) ? (
+        yL = f1_l.svf_bell(yL, 1200, 0.7, 2.5 * It);
+        yR = f1_r.svf_bell(yR, 1200, 0.7, 2.5 * It);
+
+        eg_drv = 1.0 + 1.4 * min(2.0, It);
+        eg_asym = min(0.45, 0.25 * It);
+        yL = dc_l.dc_block(sat_l.sat_2x(yL, eg_drv, eg_asym, min(0.90, 0.70 * It)));
+        yR = dc_r.dc_block(sat_r.sat_2x(yR, eg_drv, eg_asym, min(0.90, 0.70 * It)));
+
+        chirp_db = 3.8 * It * min(1.2, trans_norm);
+        yL = f2_l.svf_bell(yL, 3000, 0.9, chirp_db);
+        yR = f2_r.svf_bell(yR, 3000, 0.9, chirp_db);
+
+        yL = f3_l.svf_hshelf(yL, 5500, 0.707, -3.0 * min(1.5, It));
+        yR = f3_r.svf_hshelf(yR, 5500, 0.707, -3.0 * min(1.5, It));
+
+        eq_trim = db2lin(-1.5 * min(1.5, It));
+        yL *= eq_trim; yR *= eq_trim;
+      ) : (
+        grit_cut = max(-11.0, -5.5 * St * min(1.2, 0.3 + 0.7 * note_rel));
+        yL = f1_l.svf_bell(yL, 2400, 0.75, grit_cut);
+        yR = f1_r.svf_bell(yR, 2400, 0.75, grit_cut);
+
+        eg_soft = max(0.55, 1.0 - 0.22 * St * min(1.0, trans_norm * 1.2));
+        yL *= eg_soft; yR *= eg_soft;
+
+        yL = f2_l.svf_bell(yL, 420, 0.7, 1.8 * St);
+        yR = f2_r.svf_bell(yR, 420, 0.7, 1.8 * St);
+      );
+    ) :
+
+    // -----------------------------------------------------------------------
+    // 9: SMALL PLUCKED (Mandolin / Banjo / Ukulele)
+    // -----------------------------------------------------------------------
+    (preset == 9) ? (
+      (It > 0) ? (
+        hpL = f1_l.svf_hp(yL, 2600, 0.707);
+        hpR = f1_r.svf_hp(yR, 2600, 0.707);
+        m_drv = 1.6 + 1.8 * min(2.0, It);
+        snapL = true_tanh(hpL * m_drv) / (1.4 + 1.2 * It);
+        snapR = true_tanh(hpR * m_drv) / (1.4 + 1.2 * It);
+        snap_mix = 0.35 * It * (0.3 + 0.7 * min(1.2, trans_norm));
+        yL += snapL * snap_mix; yR += snapR * snap_mix;
+
+        yL = f2_l.svf_bell(yL, 4200, 0.85, 4.2 * It * min(1.2, trans_norm));
+        yR = f2_r.svf_bell(yR, 4200, 0.85, 4.2 * It * min(1.2, trans_norm));
+        yL = f3_l.svf_bell(yL, 1400, 0.80, 2.2 * It * min(1.2, trans_norm));
+        yR = f3_r.svf_bell(yR, 1400, 0.80, 2.2 * It * min(1.2, trans_norm));
+
+        yL = sat_l.sat_2x(yL, 1.0 + 0.65 * min(2.0, It), 0.0, min(0.80, 0.35 * It));
+        yR = sat_r.sat_2x(yR, 1.0 + 0.65 * min(2.0, It), 0.0, min(0.80, 0.35 * It));
+
+        eq_trim = db2lin(-1.5 * min(1.5, It));
+        yL *= eq_trim; yR *= eq_trim;
+      ) : (
+        m_cut = max(-12.0, -7.0 * St * min(1.0, trans_norm * 1.2));
+        yL = f1_l.svf_bell(yL, 4200, 0.8, m_cut);
+        yR = f1_r.svf_bell(yR, 4200, 0.8, m_cut);
+
+        yL *= max(0.55, 1.0 - 0.22 * St * min(1.0, trans_norm));
+        yR *= max(0.55, 1.0 - 0.22 * St * min(1.0, trans_norm));
+
+        fc_sm = max(2400.0, 18000.0 * pow(6000.0 / 18000.0, St));
+        yL = f2_l.svf_lp(yL, fc_sm, 0.65);
+        yR = f2_r.svf_lp(yR, fc_sm, 0.65);
+
+        yL = f3_l.svf_bell(yL, 500, 0.7, 2.0 * St);
+        yR = f3_r.svf_bell(yR, 500, 0.7, 2.0 * St);
+      );
+    ) :
+
+    // -----------------------------------------------------------------------
+    // 10: CLARINET
+    // -----------------------------------------------------------------------
+    (preset == 10) ? (
+      (It > 0) ? (
+        cl_drv = 1.0 + 0.85 * min(2.0, It);
+        yL = sat_l.sat_2x(yL, cl_drv, 0.0, min(0.85, 0.75 * It));
+        yR = sat_r.sat_2x(yR, cl_drv, 0.0, min(0.85, 0.75 * It));
+
+        reed_db = 4.2 * It * min(1.3, 0.35 + 0.65 * note_rel);
+        yL = f1_l.svf_bell(yL, 2400, 0.85, reed_db);
+        yR = f1_r.svf_bell(yR, 2400, 0.85, reed_db);
+
+        yL = f2_l.svf_hshelf(yL, 3200, 0.707, 3.0 * It * atk_env);
+        yR = f2_r.svf_hshelf(yR, 3200, 0.707, 3.0 * It * atk_env);
+
+        eq_trim = db2lin(-1.8 * min(1.5, It));
+        yL *= eq_trim; yR *= eq_trim;
+      ) : (
+        fc_cl = max(650.0, 18000.0 * pow(1350.0 / 18000.0, min(1.25, St)));
+        fc_cl *= (1.0 - 0.25 * min(1.2, St) * atk_env);
+        yL = f1_l.svf_lp(yL, max(500.0, fc_cl), 0.60);
+        yR = f1_r.svf_lp(yR, max(500.0, fc_cl), 0.60);
+
+        yL = f2_l.svf_bell(yL, 300, 0.7, 2.0 * St);
+        yR = f2_r.svf_bell(yR, 300, 0.7, 2.0 * St);
+      );
+    ) :
+
+    // -----------------------------------------------------------------------
+    // 11: FLUTE
+    // -----------------------------------------------------------------------
+    (preset == 11) ? (
+      (It > 0) ? (
+        fl_drv = 1.0 + 0.70 * min(2.0, It);
+        fl_asym = min(0.45, 0.24 * It);
+        yL = dc_l.dc_block(sat_l.sat_2x(yL, fl_drv, fl_asym, min(0.85, 0.70 * It)));
+        yR = dc_r.dc_block(sat_r.sat_2x(yR, fl_drv, fl_asym, min(0.85, 0.70 * It)));
+
+        fl_db = 4.2 * It * min(1.3, 0.35 + 0.65 * note_rel);
+        yL = f1_l.svf_bell(yL, 2400, 0.75, fl_db);
+        yR = f1_r.svf_bell(yR, 2400, 0.75, fl_db);
+
+        yL = f2_l.svf_hshelf(yL, 3800, 0.707, 3.2 * It * atk_env);
+        yR = f2_r.svf_hshelf(yR, 3800, 0.707, 3.2 * It * atk_env);
+
+        eq_trim = db2lin(-1.8 * min(1.5, It));
+        yL *= eq_trim; yR *= eq_trim;
+      ) : (
+        harm_cut = max(-11.0, -7.0 * St * min(1.2, 0.4 + 0.6 * note_rel));
+        yL = f1_l.svf_bell(yL, 2200, 0.60, harm_cut);
+        yR = f1_r.svf_bell(yR, 2200, 0.60, harm_cut);
+
+        yL = f2_l.svf_bell(yL, 4200, 0.70, max(-8.0, -4.0 * St - 3.0 * St * atk_env));
+        yR = f2_r.svf_bell(yR, 4200, 0.70, max(-8.0, -4.0 * St - 3.0 * St * atk_env));
+
+        yL = f3_l.svf_hshelf(yL, 7500, 0.707, 2.0 * St);
+        yR = f3_r.svf_hshelf(yR, 7500, 0.707, 2.0 * St);
+
+        yL = f4_l.svf_bell(yL, 480, 0.7, 2.0 * St);
+        yR = f4_r.svf_bell(yR, 480, 0.7, 2.0 * St);
+      );
+    ) :
+
+    // -----------------------------------------------------------------------
+    // 12: DOUBLE REEDS (Oboe / Bassoon)
+    // -----------------------------------------------------------------------
+    (preset == 12) ? (
+      (It > 0) ? (
+        dr_drv = 1.0 + 0.75 * min(2.0, It);
+        dr_asym = min(0.45, 0.25 * It);
+        yL = dc_l.dc_block(sat_l.sat_2x(yL, dr_drv, dr_asym, min(0.85, 0.70 * It)));
+        yR = dc_r.dc_block(sat_r.sat_2x(yR, dr_drv, dr_asym, min(0.85, 0.70 * It)));
+
+        nasal_db = 4.5 * It * min(1.3, 0.35 + 0.65 * note_rel);
+        yL = f1_l.svf_bell(yL, 1900, 0.75, nasal_db);
+        yR = f1_r.svf_bell(yR, 1900, 0.75, nasal_db);
+
+        yL = f2_l.svf_bell(yL, 3000, 0.90, 2.8 * It * atk_env);
+        yR = f2_r.svf_bell(yR, 3000, 0.90, 2.8 * It * atk_env);
+
+        eq_trim = db2lin(-1.8 * min(1.5, It));
+        yL *= eq_trim; yR *= eq_trim;
+      ) : (
+        nasal_cut = max(-11.0, -6.0 * St * min(1.2, 0.4 + 0.6 * note_rel));
+        yL = f1_l.svf_bell(yL, 2000, 0.70, nasal_cut);
+        yR = f1_r.svf_bell(yR, 2000, 0.70, nasal_cut);
+
+        fc_dr = max(950.0, 18000.0 * pow(2200.0 / 18000.0, min(1.25, St)));
+        fc_dr *= (1.0 - 0.25 * min(1.2, St) * atk_env);
+        yL = f2_l.svf_lp(yL, max(750.0, fc_dr), 0.60);
+        yR = f2_r.svf_lp(yR, max(750.0, fc_dr), 0.60);
+      );
+    ) :
+
+    // -----------------------------------------------------------------------
+    // 13: LOW BRASS / BARI SAX
+    // -----------------------------------------------------------------------
+    (preset == 13) ? (
+      (It > 0) ? (
+        yL = f1_l.svf_bell(yL, 750, 0.75, 2.8 * It);
+        yR = f1_r.svf_bell(yR, 750, 0.75, 2.8 * It);
+
+        lb_drv = 1.0 + 0.70 * min(2.0, It);
+        lb_asym = min(0.45, 0.26 * It);
+        yL = dc_l.dc_block(sat_l.sat_2x(yL, lb_drv, lb_asym, min(0.85, 0.75 * It)));
+        yR = dc_r.dc_block(sat_r.sat_2x(yR, lb_drv, lb_asym, min(0.85, 0.75 * It)));
+
+        lb_bloom = 4.8 * It * min(1.3, 0.4 + 0.6 * note_rel);
+        yL = f2_l.svf_hshelf(yL, 900, 0.707, lb_bloom);
+        yR = f2_r.svf_hshelf(yR, 900, 0.707, lb_bloom);
+
+        lb_bite = 3.2 * It * atk_env;
+        yL = f3_l.svf_bell(yL, 1600, 0.9, lb_bite);
+        yR = f3_r.svf_bell(yR, 1600, 0.9, lb_bite);
+
+        eq_trim = db2lin(-2.2 * min(1.5, It));
+        yL *= eq_trim; yR *= eq_trim;
+      ) : (
+        fc_lb = max(320.0, 16000.0 * pow(520.0 / 16000.0, min(1.25, St)));
+        fc_lb *= (1.0 - 0.25 * min(1.2, St) * atk_env);
+        yL = f1_l.svf_lp(yL, max(260.0, fc_lb), 0.62);
+        yR = f1_r.svf_lp(yR, max(260.0, fc_lb), 0.62);
+
+        yL = f2_l.svf_bell(yL, 115, 0.65, 2.2 * St);
+        yR = f2_r.svf_bell(yR, 115, 0.65, 2.2 * St);
+      );
+    );
+
+    yL /= norm_gain_smooth;
+    yR /= norm_gain_smooth;
+  );
+
+  // Volume Scaling
+  Iv = I_active;
+  Sv = -Iv;
+
+  (vol_mode == 0) ? (
+    out_db = (Iv >= 0) ? (max_boost_smooth * Iv) : (-max_cut_smooth * Sv);
+    out_gain = db2lin(out_db);
+  ) : (vol_mode == 1) ? (
+    (Iv >= 0) ? (
+      out_gain = db2lin(max_boost_smooth * Iv);
+    ) : (
+      out_db = -max_cut_smooth * pow(Sv, 1.35);
+      tail = (Sv > 0.85) ? (1.0 - (Sv - 0.85) / 0.15) : 1.0;
+      out_gain = db2lin(out_db) * (tail * tail);
+    );
+  ) : (
+    (preset == 0 || preset == 13) ? comp_up = -0.5 :
+    (preset == 1) ? comp_up = -0.3 : comp_up = -0.4;
+
+    (preset == 3 || preset == 5 || preset == 8 || preset == 11) ? comp_dn = 1.2 :
+    (preset == 6 || preset == 7) ? comp_dn = 1.0 : comp_dn = 1.5;
+
+    out_db = (I_timbre >= 0) ? (comp_up * I_timbre) : (comp_dn * (-I_timbre));
+    out_db = max(-6.0, min(4.0, out_db));
+    out_gain = db2lin(out_db);
+  );
+
+  dry_outL = yL * out_gain;
+  dry_outR = yR * out_gain;
+);
+
+// 8. Persistent Room / Environment + Output Safety Ceiling
+(room_mix_smooth > 0.001) ? (
+  room_send_gain = (out_gain < 1.0) ? (out_gain * (1.0 + 0.35 * (1.0 - out_gain))) : out_gain;
+  r_inL = yL * room_send_gain;
+  r_inR = yR * room_send_gain;
+
+  ER_L[er_pos] = r_inL;
+  ER_R[er_pos] = r_inR;
+  er_outL = 0.38 * ER_L[(er_pos - er_l1 + ER_SIZE) & ER_MASK]
+          + 0.28 * ER_L[(er_pos - er_l2 + ER_SIZE) & ER_MASK]
+          + 0.18 * ER_L[(er_pos - er_l3 + ER_SIZE) & ER_MASK];
+  er_outR = 0.38 * ER_R[(er_pos - er_r1 + ER_SIZE) & ER_MASK]
+          + 0.28 * ER_R[(er_pos - er_r2 + ER_SIZE) & ER_MASK]
+          + 0.18 * ER_R[(er_pos - er_r3 + ER_SIZE) & ER_MASK];
+  er_pos = (er_pos + 1) & ER_MASK;
+
+  d0 = FDN_0[(fdn_pos - d0_len + FDN_SIZE) & FDN_MASK];
+  d1 = FDN_1[(fdn_pos - d1_len + FDN_SIZE) & FDN_MASK];
+  d2 = FDN_2[(fdn_pos - d2_len + FDN_SIZE) & FDN_MASK];
+  d3 = FDN_3[(fdn_pos - d3_len + FDN_SIZE) & FDN_MASK];
+
+  lp0 += c_fdn_damp * (d0 - lp0);
+  lp1 += c_fdn_damp * (d1 - lp1);
+  lp2 += c_fdn_damp * (d2 - lp2);
+  lp3 += c_fdn_damp * (d3 - lp3);
+
+  h0 = 0.5 * (lp0 + lp1 + lp2 + lp3);
+  h1 = 0.5 * (lp0 - lp1 + lp2 - lp3);
+  h2 = 0.5 * (lp0 + lp1 - lp2 - lp3);
+  h3 = 0.5 * (lp0 - lp1 - lp2 + lp3);
+
+  mid_in  = 0.7071 * (r_inL + r_inR);
+  side_in = 0.7071 * (r_inL - r_inR);
+  FDN_0[fdn_pos] = 0.28 * r_inL   + fb0 * h0;
+  FDN_1[fdn_pos] = 0.28 * r_inR   + fb1 * h1;
+  FDN_2[fdn_pos] = 0.28 * mid_in  + fb2 * h2;
+  FDN_3[fdn_pos] = 0.28 * side_in + fb3 * h3;
+  fdn_pos = (fdn_pos + 1) & FDN_MASK;
+
+  roomL = 0.45 * er_outL + 0.55 * (d0 + d2);
+  roomR = 0.45 * er_outR + 0.55 * (d1 + d3);
+
+  raw_sumL = dry_outL + room_mix_smooth * roomL;
+  raw_sumR = dry_outR + room_mix_smooth * roomR;
+) : (
+  raw_sumL = dry_outL;
+  raw_sumR = dry_outR;
+);
+
+cur_out_pk = max(abs(raw_sumL), abs(raw_sumR));
+out_peak_disp = max(cur_out_pk, out_peak_disp * c_peak_disp);
+
+spl0 = safety_ceil(raw_sumL);
+spl1 = safety_ceil(raw_sumR);
+
+@gfx 580 192
+gfx_clear = 0x16181D;
+gfx_setfont(1, "Arial", 14);
+
+// Row 1: Preset, Target, Active, Gain
+gfx_set(0.85, 0.88, 0.92, 1);
+gfx_x = 14; gfx_y = 12;
+(preset == 0)  ? gfx_drawstr("BRASS | ") :
+(preset == 1)  ? gfx_drawstr("DRUMS | ") :
+(preset == 2)  ? gfx_drawstr("ACOUSTIC GTR | ") :
+(preset == 3)  ? gfx_drawstr("VOICE | ") :
+(preset == 4)  ? gfx_drawstr("PIANO | ") :
+(preset == 5)  ? gfx_drawstr("STRINGS | ") :
+(preset == 6)  ? gfx_drawstr("ELEC BASS | ") :
+(preset == 7)  ? gfx_drawstr("UPRIGHT BASS | ") :
+(preset == 8)  ? gfx_drawstr("ELEC GTR | ") :
+(preset == 9)  ? gfx_drawstr("MANDO/BANJO | ") :
+(preset == 10) ? gfx_drawstr("CLARINET | ") :
+(preset == 11) ? gfx_drawstr("FLUTE | ") :
+(preset == 12) ? gfx_drawstr("DOUBLE REEDS | ") :
+                 gfx_drawstr("LOW BRASS | ");
+gfx_drawstr("Slider: ");
+gfx_drawnumber(slider1, 1);
+gfx_drawstr("%  |  Active: ");
+gfx_drawnumber(I_active * 100.0, 1);
+gfx_drawstr("%  |  Gain: ");
+(out_gain <= 0.0001) ? (
+  gfx_drawstr("-inf dB");
+) : (
+  out_db_disp = 20 * log10(out_gain);
+  (out_db_disp > 0.05) ? gfx_drawstr("+");
+  gfx_drawnumber(out_db_disp, 1);
+  gfx_drawstr(" dB");
+);
+
+// Row 2: Latch Status
+gfx_x = 14; gfx_y = 38;
+(timing_mode == 0) ? (
+  gfx_set(0.55, 0.70, 0.85, 1);
+  gfx_drawstr("Timing: Continuous Smooth");
+) : (latch_flash > 0) ? (
+  gfx_set(0.30, 0.95, 0.55, 1);
+  gfx_drawstr("Timing: NEW NOTE TRIGGERED -> Updated to Slider!");
+) : (abs(I_target - I_active) > 0.01) ? (
+  gfx_set(0.95, 0.75, 0.25, 1);
+  gfx_drawstr("Timing: HOLDING CURRENT NOTE (Waiting for next note...)");
+) : (
+  gfx_set(0.65, 0.72, 0.80, 1);
+  gfx_drawstr("Timing: Synced / Waiting for note onset");
+);
+
+// Row 3: Auto-Calibration, Note Rel & Output Peak Headroom
+gfx_x = 14; gfx_y = 66;
+cal_db = 20 * log10(max(0.0001, env_ref_clamped));
+pk_db  = 20 * log10(max(0.0001, out_peak_disp));
+gfx_set(0.65, 0.72, 0.80, 1);
+gfx_drawstr("Ref: ");
+gfx_drawnumber(cal_db, 1);
+gfx_drawstr(" dBFS  |  Note Rel: ");
+gfx_drawnumber(note_rel, 2);
+gfx_drawstr("x  |  Out Peak: ");
+(out_peak_disp > 0.94) ? gfx_set(0.95, 0.35, 0.30, 1) :
+(out_peak_disp > 0.80) ? gfx_set(0.95, 0.75, 0.25, 1) :
+                         gfx_set(0.45, 0.85, 0.55, 1);
+(pk_db > 0.05) ? gfx_drawstr("+");
+gfx_drawnumber(pk_db, 1);
+gfx_drawstr(" dBFS");
+
+// Row 4: Attack / Transient Detector Bar
+gfx_set(0.65, 0.72, 0.80, 1);
+gfx_x = 14; gfx_y = 100;
+gfx_drawstr(is_sustained ? "Onset HF Soften:" : "Transient Detector:");
+gfx_set(0.25, 0.28, 0.35, 1);
+gfx_rect(155, 101, 380, 14);
+gfx_set(0.25, 0.75, 0.95, 1);
+gfx_rect(155, 101, min(380, (is_sustained ? atk_env : trans_norm / 1.5) * 380), 14);
+
+// Row 5: Drum Pitch Flare Bar
+gfx_set(0.65, 0.72, 0.80, 1);
+gfx_x = 14; gfx_y = 128;
+gfx_drawstr("Drum Pitch Flare:");
+gfx_set(0.25, 0.28, 0.35, 1);
+gfx_rect(155, 129, 380, 14);
+gfx_set(0.95, 0.55, 0.25, 1);
+gfx_rect(155, 129, min(380, pitch_env * min(2.0, max(0.0, I_timbre)) * 190), 14);
+
+// Row 6: Note Level Bar (1.0x = center line)
+gfx_set(0.65, 0.72, 0.80, 1);
+gfx_x = 14; gfx_y = 156;
+gfx_drawstr("Note Rel (1.0x = mf):");
+gfx_set(0.25, 0.28, 0.35, 1);
+gfx_rect(155, 157, 380, 14);
+gfx_set(0.55, 0.85, 0.45, 1);
+gfx_rect(155, 157, min(380, note_rel * 190), 14);
+gfx_set(1, 1, 1, 0.6);
+gfx_line(155 + 190, 155, 155 + 190, 173);
