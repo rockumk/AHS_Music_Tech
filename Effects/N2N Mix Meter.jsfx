@@ -1,5 +1,5 @@
 desc:N2N Mix Meter (diagnostic)
-version: 0.1.1
+version: 0.1.2
 author: Rock Kennedy
 about:
   Stereo K-weighted gated energy measurement and gain control.
@@ -109,7 +109,7 @@ function report_section() local(i,e,abs_gate,rel_gate,sum,count,lufs,p,status,ad
 gain=1;
 
 @slider
-gain_target=10^(slider1/20);
+gain_target=slider1<=-60 ? 0 : 10^(slider1/20);
 
 @block
 slot=floor(slider2+0.5);
@@ -117,7 +117,7 @@ token=floor(slider3+0.5);
 armed=gmem[0]==1 && token>0 && gmem[1]==token && slot>=1 && slot<=256;
 count_secs=min(256,max(0,floor(gmem[2])));
 rate_seen!=srate ? (coeffs(srate); reset_filters(););
-gain_target=10^(slider1/20);
+gain_target=slider1<=-60 ? 0 : 10^(slider1/20);
 smooth=1-exp(-1/(max(1,srate)*0.005));
 armed && (play_state&1) && count_secs>0 ? (
   run_seen!=token ? (
@@ -163,6 +163,8 @@ active ? (
   t+=dt;
 );
 gain+=(gain_target-gain)*smooth;
+// The bottom of the gain range is a true mute, after de-click smoothing.
+gain_target==0 && gain<0.0000001 ? gain=0;
 spl0*=gain;
 spl1*=gain;
 
