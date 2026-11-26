@@ -512,7 +512,7 @@ local function action_id()
   end
 end
 local function poll()
-  if not pass then return 0,0 end
+  if not pass or pass.kind~="track" then return 0,0 end
   attach()
   local done,total=0,#pass.rows*#sections
   for i,t in ipairs(pass.rows) do
@@ -555,15 +555,32 @@ local function complete_pass(stats)
   attach();r.gmem_write(0,0)
   local p=pass
   pass=nil
-  local invalid=0
-  for _,t in ipairs(p.rows) do
-    for j=1,#sections do
-      local v=t.reports[j]
-      if not v or v.state>=3 or math.abs(v.coverage-1)>0.02 then invalid=invalid+1 end
+  -- Track calibration requires per-section reports. Master/verification use
+  -- REAPER's native rendered-output statistics, not the meter's pre-gain reports.
+  if p.kind=="track" then
+    local failures={}
+    for _,t in ipairs(p.rows) do
+      for j,s in ipairs(sections) do
+        local v=t.reports[j]
+        local reason
+        if not v then reason="missing report"
+        elseif v.state~=1 and v.state~=2 then reason="meter status "..tostring(v.state)
+        elseif math.abs(v.coverage-1)>0.02 then reason=string.format("%.1f%% coverage",v.coverage*100) end
+        if reason then failures[#failures+1]=t.name.." / "..s.name..": "..reason end
+      end
     end
+    if #failures>0 then
+      local detail=p.name..": "..done.."/"..total.." reports; "..#failures.." incomplete.\n"..table.concat(failures,"\n")
+      r.ShowConsoleMsg("N2N Mix analysis:\n"..detail.."\nNative render stats: "..tostring(stats).."\n")
+      if not p.retried then
+        p.retried=true
+        note(p.name..": incomplete reports; retrying offline once.")
+        return
+      end
+      error(p.name..": "..#failures.." incomplete; "..failures[1]..". Full details in REAPER console",0)
+    end
+    note(string.format("%s: %d/%d reports complete.",p.name,done,total))
   end
-  note(string.format("%s: %d/%d reports, %d invalid or incomplete.",p.name,done,total,invalid))
-  if invalid>0 then error("Incomplete analysis; no gain applied for this pass") end
   if p.kind=="track" then
     for _,t in ipairs(p.rows) do
       for j,v in pairs(t.reports) do
@@ -574,7 +591,10 @@ local function complete_pass(stats)
     end
   elseif p.kind=="master" then
     local lufs,peak=stats_value(stats,"LUFSI"),stats_value(stats,"PEAK")
-    if not lufs or not peak or lufs<=-70 then error("No valid native master loudness/peak result") end
+    if not lufs or not peak or lufs<=-70 then
+      r.ShowConsoleMsg("N2N Mix master render: "..tostring(stats).."\n")
+      error("No valid native master loudness/peak result; see REAPER console",0)
+    end
     local requested=master_target()-lufs
     local gain=clamp(math.min(requested,peak_ceiling-peak),-60,30)
     apply_master(gain)
@@ -584,7 +604,10 @@ local function complete_pass(stats)
     note(last_stats)
   elseif p.kind=="verify" then
     local lufs,peak=stats_value(stats,"LUFSI"),stats_value(stats,"PEAK")
-    if not lufs or not peak then error("No native verification result") end
+    if not lufs or not peak then
+      r.ShowConsoleMsg("N2N Mix verification render: "..tostring(stats).."\n")
+      error("No native verification result; see REAPER console",0)
+    end
     last_verified=string.format("Verified master: %.2f LUFS-I, %.2f dBFS sample peak (target %.1f LUFS).",lufs,peak,master_target())
     if peak>peak_ceiling+0.1 then
       local g=num("mastergain",0)-(peak-peak_ceiling)
@@ -603,11 +626,10 @@ local function complete_pass(stats)
 end
 local function arm(p)
   attach()
-  local tok=(math.floor(r.time_precise()*1000)%800000)+1
-  if tok==r.gmem_read(1) then tok=tok+1 end
+  local tok=(math.floor(r.gmem_read(1))%2000000000)+1
   r.gmem_write(0,0);r.gmem_write(1,tok);r.gmem_write(2,#sections)
   for j,s in ipairs(sections) do r.gmem_write(16+2*(j-1),s.a);r.gmem_write(17+2*(j-1),s.b) end
-  for i,t in ipairs(p.rows) do
+  for i,t in ipairs(p.kind=="track" and p.rows or {}) do
     t.reports={}
     local f=ensure_fx(t)
     r.TrackFX_SetParam(t.track,f,1,i);r.TrackFX_SetParam(t.track,f,2,tok)
@@ -615,7 +637,7 @@ local function arm(p)
   end
   if p.kind=="master" then apply_master(0) end
   p.token=tok; p.phase="armed";pass=p
-  r.gmem_write(0,1)
+  r.gmem_write(0,p.kind=="track" and 1 or 0)
   r.GetSet_LoopTimeRange2(proj,true,false,sections[1].a,sections[#sections].b+0.1,false)
   note(p.name.." — offline analysis")
 end
@@ -1074,7 +1096,7 @@ local function draw()
     same();r.ImGui_TextWrapped(ctx,status)
     if job then
       local d,n=poll()
-      r.ImGui_ProgressBar(ctx,n>0 and d/n or 0,-1,0,string.format("Stage %d/%d | %d/%d reports",job.index,#job.queue,d,n))
+      r.ImGui_ProgressBar(ctx,n>0 and d/n or 0,-1,0,n>0 and string.format("Stage %d/%d | %d/%d reports",job.index,#job.queue,d,n) or string.format("Stage %d/%d | Native render statistics",job.index,#job.queue))
     else
       r.ImGui_Text(ctx,"Master Target");same()
       nmono=mono_push(false)
@@ -1090,17 +1112,19 @@ local function draw()
       end
       r.ImGui_PopStyleColor(ctx,nmono)
       same();r.ImGui_Text(ctx,string.format("%.1f LUFS | sample peak %.1f dBFS",master_target(),peak_ceiling))
-      radio("Simple",false);same();radio("Traditional",true)
-      for _,i in ipairs(tool_ids) do same();tool_button(i) end
       r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Section levels");same()
       local gr=mono_push(true)
+      r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),5)
+      local section_w=0
+      for _,k in ipairs(intensity_ids) do section_w=math.max(section_w,r.ImGui_CalcTextSize(ctx,intens_names[k])+18) end
       for i,k in ipairs(intensity_ids) do
         if i>1 then same() end
         local selected=k==intensity_tool
         if selected then r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),0x8E8E8EFF) end
-        if r.ImGui_Button(ctx,intens_names[k].."##paintint"..k) then intensity_tool=k end
+        if r.ImGui_Button(ctx,intens_names[k].."##paintint"..k,section_w,CELL_H) then intensity_tool=k end
         if selected then r.ImGui_PopStyleColor(ctx) end
       end
+      r.ImGui_PopStyleVar(ctx)
       r.ImGui_PopStyleColor(ctx,gr)
     end
     alert_banner()
@@ -1122,7 +1146,7 @@ local function draw()
       local flags=r.ImGui_TableFlags_ScrollX() | r.ImGui_TableFlags_ScrollY() | r.ImGui_TableFlags_SizingFixedFit()
       -- Only two actual table columns: the entire song strip can exceed the native
       -- ImGui column limit without losing the frozen track header.
-      if r.ImGui_BeginTable(ctx,"##mixgrid",2,flags,0,0,LEFT_W+total+32) then
+      if r.ImGui_BeginTable(ctx,"##mixgrid",2,flags,0,job and 0 or -(CELL_H+12),LEFT_W+total+32) then
         r.ImGui_TableSetupColumn(ctx,"Track",r.ImGui_TableColumnFlags_WidthFixed(),LEFT_W)
         r.ImGui_TableSetupColumn(ctx,"Song",r.ImGui_TableColumnFlags_WidthFixed(),total+8)
         r.ImGui_TableSetupScrollFreeze(ctx,1,2)
@@ -1172,6 +1196,11 @@ local function draw()
         end
         r.ImGui_EndTable(ctx)
       end
+    end
+    if not job then
+      r.ImGui_Separator(ctx)
+      radio("Simple",false);same();radio("Traditional",true)
+      for _,i in ipairs(tool_ids) do same();tool_button(i) end
     end
     r.ImGui_End(ctx)
   end
