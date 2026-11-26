@@ -184,6 +184,8 @@ local function safe_row(t)
   local i=fx_index(t)
   if i and i~=r.TrackFX_GetCount(t.track)-1 then return false,"Move owned N2N meter to end of FX chain: "..t.name end
   if i then
+    local _,owned_name=r.TrackFX_GetFXName(t.track,i,"")
+    if not owned_name:find(FXNAME,1,true) then return false,"Owned FX GUID no longer identifies N2N meter: "..t.name end
     if not r.TrackFX_GetEnabled(t.track,i) or r.TrackFX_GetOffline(t.track,i) then return false,"Enable N2N meter: "..t.name end
     local env=r.GetFXEnvelope(t.track,i,0,false)
     if env and r.CountAutomationItems(env)>0 then return false,"N2N gain envelope has automation items: "..t.name end
@@ -237,7 +239,7 @@ end
 local function flat(t,db) write_points(t,{{0,db,0}}) end
 local function calc_base(t,j,v)
   if sections[j].countin or not v or v.state~=1 or math.abs(v.coverage-1)>0.02 then return nil end
-  return clamp(t.target-v.lufs,-30,24)
+  return clamp(t.target+(t.depth>0 and intensity[sections[j].int] or 0)-v.lufs,-30,24)
 end
 local function offset(v) return levels[v] or 0 end
 local function apply_row(t)
@@ -287,9 +289,11 @@ local function apply_row(t)
     if nextb and math.abs(nextb.a-e)<0.00001 then
       -- 5 ms ramp at hard boundaries; continuous transition endpoints already match.
       if math.abs(b.g1-nextb.g0)>0.0001 then add(math.max(b.a,e-0.005),b.g1,0) end
-    else
+    elseif nextb then
       add(math.max(b.a,e-0.005),b.g1,0)
       add(e,0,1)
+    else
+      add(e,b.g1,1) -- preserve final gain through instrument / reverb tails
     end
   end
   write_points(t,pts)
@@ -546,6 +550,14 @@ local function apply_dirty()
   dirty={}
   if not ok then note("Grid update stopped: "..tostring(e)) end
 end
+local function report_log()
+  local a={table.concat(log,"\n"),"Track\tSection\tLUFS-I\tPeak dBFS\tCalibration dB\tCoverage"}
+  for _,t in ipairs(rows) do for j,s in ipairs(sections) do
+    local v=t.reports[j]
+    a[#a+1]=table.concat({t.name,s.name,v and v.state==1 and string.format("%.2f",v.lufs) or "",v and v.peak>-120 and string.format("%.2f",v.peak) or "",t.base[j] and string.format("%+.2f",t.base[j]) or "",v and string.format("%.2f%%",v.coverage*100) or ""},"\t")
+  end end
+  r.ShowConsoleMsg(table.concat(a,"\n").."\n")
+end
 local function same() r.ImGui_SameLine(ctx) end
 local function button(s,fn)
   if r.ImGui_Button(ctx,s) then fn() end
@@ -564,7 +576,7 @@ local function draw()
     else
       button("Cancel",function() finish("Cancelled. Undo to revert partial changes.") end)
     end
-    same();button("Report",function() r.ShowConsoleMsg(table.concat(log,"\n").."\n") end)
+    same();button("Report",report_log)
     r.ImGui_TextWrapped(ctx,status)
     if last_stats~="" then r.ImGui_TextWrapped(ctx,last_stats) end
     if last_verified~="" then r.ImGui_TextWrapped(ctx,last_verified) end
