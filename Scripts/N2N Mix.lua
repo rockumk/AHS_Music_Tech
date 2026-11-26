@@ -46,6 +46,7 @@ local peak_ceiling=-2 -- sample-peak guard; not a true-peak guarantee
 local boundary_ramp=0.250 -- seconds; ordinary level changes, not explicit transitions
 local alert_text,alert_until="",0
 local pending_start=nil
+local alert_x,alert_y
 local refresh_at=0
 local layout_sig=""
 local last_stats=""
@@ -1007,6 +1008,30 @@ local function set_intensity(j,b,v)
   for _,t in ipairs(rows) do if t.depth==0 then dirty[t]=true end end
   master_dirty=true
 end
+local function draw_section_tile(dl,x,y,w,h,f0,f1,label,selected,hover)
+  local light=selected and 0xE5D6A3FF or 0xDADADAFF
+  local dark=selected and 0xB89B4EFF or 0x858585FF
+  local rim=selected and 0xD3B86DFF or hover and 0xEEEEEEFF or 0x303030FF
+  local rad=4
+  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+h,light,rad)
+  -- Keep the sloped interior inside the rounded silhouette. Fill the central
+  -- polygon, then cover the lower corners using a rounded base where needed.
+  if f0>0 or f1>0 then
+    if f0==f1 then
+      local top=y+h*(1-f0)
+      r.ImGui_DrawList_AddRectFilled(dl,x,top,x+w,y+h,dark,math.min(rad,(y+h-top)*0.5),f0==1 and 0 or r.ImGui_DrawFlags_RoundCornersBottom())
+    else
+      local inset=2
+      local a,b=x+inset,x+w-inset
+      local bot=y+h-inset
+      local top0=y+inset+(h-2*inset)*(1-f0)
+      local top1=y+inset+(h-2*inset)*(1-f1)
+      r.ImGui_DrawList_AddQuadFilled(dl,a,top0,b,top1,b,bot,a,bot,dark)
+    end
+  end
+  r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+h,rim,rad,0,selected and 2 or 1)
+  if label~="" then centered(dl,x,y,w,h,label,0x101010FF) end
+end
 local function intensity_cell(c,contour,ci)
   local s=sections[c.j]
   local v=c.b and s.bars[c.b].int or s.bars[1].int
@@ -1017,8 +1042,6 @@ local function intensity_cell(c,contour,ci)
   local x,y=r.ImGui_GetCursorScreenPos(ctx)
   local clicked=r.ImGui_InvisibleButton(ctx,id,c.w,CELL_H)
   local hover=r.ImGui_IsItemHovered(ctx,r.ImGui_HoveredFlags_AllowWhenBlockedByActiveItem())
-  local light,dark=0xDADADAFF,0x858585FF
-  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+c.w,y+CELL_H,light,0)
   local f0,f1
   if v==5 then
     local a=contour[c.j][c.b or 1]
@@ -1027,11 +1050,7 @@ local function intensity_cell(c,contour,ci)
   elseif v==0 then f0,f1=0.5,0.5
   elseif not s.countin then f0,f1=section_fill[v],section_fill[v]
   else f0,f1=0,0 end
-  if f0>0 or f1>0 then
-    r.ImGui_DrawList_AddQuadFilled(dl,x,y+CELL_H*(1-f0),x+c.w,y+CELL_H*(1-f1),x+c.w,y+CELL_H,x,y+CELL_H,dark)
-  end
-  r.ImGui_DrawList_AddRect(dl,x,y,x+c.w,y+CELL_H,hover and 0xFFFFFFFF or 0x303030FF,0,0,1)
-  if label~="" then centered(dl,x,y,c.w,CELL_H,label,0x101010FF,0xFFFFFFFF) end
+  draw_section_tile(dl,x,y,c.w,CELL_H,f0,f1,label,false,hover)
   if not job and not s.countin then
     if hover and r.ImGui_IsMouseClicked(ctx,0) then
       local chosen=intensity_tool
@@ -1085,8 +1104,8 @@ local function tool_button(i)
   local w=i==9 and 82 or 32
   local clicked=r.ImGui_InvisibleButton(ctx,"##tool"..i,w,CELL_H)
   local hover=r.ImGui_IsItemHovered(ctx)
-  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+CELL_H,tool==i and 0xD3B86DFF or hover and 0xB5BEC8FF or 0x8F9BA7FF,4)
-  r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+CELL_H,tool==i and 0xFFFFFFFF or 0x11111180,3,0,tool==i and 2.5 or 1)
+  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+CELL_H,tool==i and 0xD3B86DFF or hover and 0xB5BEC8FF or 0x8F9BA7FF,0)
+  r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+CELL_H,tool==i and 0xFFFFFFFF or 0x11111180,0,0,tool==i and 2.5 or 1)
   if i==9 then centered(dl,x,y,w,CELL_H,"Transition",0x101010FF,0xFFFFFFFF)
   else symbol(dl,x,y,w,CELL_H,i) end
   if hover then r.ImGui_SetTooltip(ctx,i==9 and "Transition" or simple[i]) end
@@ -1153,15 +1172,23 @@ local function radio(label,value)
   r.ImGui_DrawList_AddText(dl,x+19,y+(CELL_H-th)/2,text_color,label)
   if clicked then traditional=value;put("traditional",value and 1 or 0) end
 end
-local function alert_banner()
+local function alert_window()
   if alert_text=="" or r.time_precise()>=alert_until then return end
-  local dl=r.ImGui_GetWindowDrawList(ctx)
-  local x,y=r.ImGui_GetCursorScreenPos(ctx)
-  local w=r.ImGui_GetContentRegionAvail(ctx)
-  r.ImGui_Dummy(ctx,w,30)
-  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+30,0xF5F5F5FF,3)
-  r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+30,0x111111FF,3,0,1.5)
-  centered(dl,x,y,w,30,alert_text,0x111111FF)
+  local flags=r.ImGui_WindowFlags_NoTitleBar() | r.ImGui_WindowFlags_NoResize() |
+    r.ImGui_WindowFlags_NoCollapse() | r.ImGui_WindowFlags_NoSavedSettings() |
+    r.ImGui_WindowFlags_NoDocking()
+  r.ImGui_SetNextWindowPos(ctx,alert_x or 300,alert_y or 200,r.ImGui_Cond_Always(),0.5,0.5)
+  r.ImGui_SetNextWindowSize(ctx,280,68,r.ImGui_Cond_Always())
+  r.ImGui_SetNextWindowBgAlpha(ctx,1)
+  r.ImGui_SetNextWindowFocus(ctx)
+  local visible=r.ImGui_Begin(ctx,"N2N Mix Processing##notice",nil,flags)
+  if visible then
+    local dl=r.ImGui_GetWindowDrawList(ctx)
+    local x,y=r.ImGui_GetCursorScreenPos(ctx)
+    local w,h=r.ImGui_GetContentRegionAvail(ctx)
+    centered(dl,x,y,w,h,alert_text,r.ImGui_GetStyleColor(ctx,r.ImGui_Col_Text()))
+    r.ImGui_End(ctx)
+  end
 end
 local function draw()
   r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_Alpha(),1)
@@ -1191,9 +1218,14 @@ local function draw()
   r.ImGui_SetNextWindowBgAlpha(ctx,1)
   local visible,open=r.ImGui_Begin(ctx,"N2N Mix",true)
   if visible then
-    local nmono=mono_push(false)
+    local wx,wy=r.ImGui_GetWindowPos(ctx)
+    local ww,wh=r.ImGui_GetWindowSize(ctx)
+    alert_x,alert_y=wx+ww/2,wy+wh/2
+    local nmono=mono_push(true)
+    r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),5)
     if not job then button("Auto Mix",request_start)
     else button("Cancel",function() finish("Cancelled. Undo to revert partial changes.") end) end
+    r.ImGui_PopStyleVar(ctx)
     r.ImGui_PopStyleColor(ctx,nmono)
     same();r.ImGui_TextWrapped(ctx,status)
     if job then
@@ -1214,22 +1246,25 @@ local function draw()
       end
       r.ImGui_PopStyleColor(ctx,nmono)
       same();r.ImGui_Text(ctx,string.format("%.1f LUFS | sample peak %.1f dBFS",master_target(),peak_ceiling))
-      r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Section levels");same()
-      local gr=mono_push(true)
-      r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),5)
       local section_w=0
       for _,k in ipairs(intensity_ids) do section_w=math.max(section_w,r.ImGui_CalcTextSize(ctx,intens_names[k])+18) end
+      local palette_w=section_w*#intensity_ids+4*(#intensity_ids-1)
+      local start_x=r.ImGui_GetCursorPosX(ctx)
+      local avail=r.ImGui_GetContentRegionAvail(ctx)
+      r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Section levels")
+      r.ImGui_SameLine(ctx,math.max(start_x+r.ImGui_CalcTextSize(ctx,"Section levels")+8,start_x+(avail-palette_w)/2))
       for i,k in ipairs(intensity_ids) do
         if i>1 then same() end
-        local selected=k==intensity_tool
-        if selected then r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),0x8E8E8EFF) end
-        if r.ImGui_Button(ctx,intens_names[k].."##paintint"..k,section_w,CELL_H) then intensity_tool=k end
-        if selected then r.ImGui_PopStyleColor(ctx) end
+        local dl=r.ImGui_GetWindowDrawList(ctx)
+        local x,y=r.ImGui_GetCursorScreenPos(ctx)
+        local clicked=r.ImGui_InvisibleButton(ctx,"##paintint"..k,section_w,CELL_H)
+        local hover=r.ImGui_IsItemHovered(ctx)
+        local f0=k==5 and 0 or section_fill[k]
+        local f1=k==5 and 1 or f0
+        draw_section_tile(dl,x,y,section_w,CELL_H,f0,f1,intens_names[k],k==intensity_tool,hover)
+        if clicked then intensity_tool=k end
       end
-      r.ImGui_PopStyleVar(ctx)
-      r.ImGui_PopStyleColor(ctx,gr)
     end
-    alert_banner()
     r.ImGui_Separator(ctx)
     if #sections>0 then
       local cols,total={},0
@@ -1301,11 +1336,19 @@ local function draw()
     end
     if not job then
       r.ImGui_Separator(ctx)
+      local w=0
+      for _,i in ipairs(tool_ids) do w=w+(i==9 and 82 or 32) end
+      w=w+4*(#tool_ids-1)
+      local x=r.ImGui_GetCursorPosX(ctx);local avail=r.ImGui_GetContentRegionAvail(ctx)
       radio("Simple",false);same();radio("Traditional",true)
-      for _,i in ipairs(tool_ids) do same();tool_button(i) end
+      local end_x=r.ImGui_GetCursorPosX(ctx)
+      local radio_w=r.ImGui_CalcTextSize(ctx,"Traditional")+26
+      r.ImGui_SameLine(ctx,math.max(end_x+radio_w,x+(avail-w)/2))
+      for k,i in ipairs(tool_ids) do if k>1 then same() end;tool_button(i) end
     end
     r.ImGui_End(ctx)
   end
+  alert_window()
   if ui_font then r.ImGui_PopFont(ctx) end
   r.ImGui_PopStyleColor(ctx,5);r.ImGui_PopStyleVar(ctx,4)
   if not r.ImGui_IsMouseDown(ctx,0) then
