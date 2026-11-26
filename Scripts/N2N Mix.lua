@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.1.7
+-- @version 0.1.8
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -45,6 +45,7 @@ local custom=-16
 local peak_ceiling=-2 -- sample-peak guard; not a true-peak guarantee
 local boundary_ramp=0.250 -- seconds; ordinary level changes, not explicit transitions
 local alert_text,alert_until="",0
+local pending_start=nil
 local refresh_at=0
 local layout_sig=""
 local last_stats=""
@@ -532,6 +533,17 @@ local function cleanup()
   attach();r.gmem_write(0,0)
   if job then
     for t,flags in pairs(job.perf or {}) do if valid(t) then r.SetMediaTrackInfo_Value(t,"I_PERFFLAGS",flags) end end
+    for t,state in pairs(job.states or {}) do if valid(t) then
+      r.SetMediaTrackInfo_Value(t,"B_MUTE",state.mute)
+      r.SetMediaTrackInfo_Value(t,"I_SOLO",state.solo)
+    end end
+    for t,guid in pairs(job.temporary or {}) do
+      if valid(t) then
+        for i=r.TrackFX_GetCount(t)-1,0,-1 do if r.TrackFX_GetFXGUID(t,i)==guid then r.TrackFX_Delete(t,i);break end end
+        r.GetSetMediaTrackInfo_String(t,"P_EXT:N2N_MIX_FX","",true)
+      end
+    end
+    r.TrackList_AdjustWindows(false)
     r.GetSet_LoopTimeRange2(proj,true,false,job.a,job.b,false)
     r.GetSetRepeatEx(proj,job.repeat_state)
     r.SetEditCurPos2(proj,job.cursor,false,false)
@@ -540,7 +552,7 @@ end
 local function finish(msg)
   if not job then return end
   cleanup()
-  note(msg)
+  note(msg..string.format(" (%d dry runs)",job.renders or 0))
   r.Undo_EndBlock2(proj,"N2N Mix: "..job.kind,-1)
   job=nil;pass=nil
   if msg:match("^Auto Mix complete") then alert_text="Processing done.";alert_until=r.time_precise()+1.8 else alert_text="";alert_until=0 end
@@ -573,6 +585,14 @@ local function complete_pass(stats)
     local failures,diagnostics,missing_rows={},{},{}
     for i,t in ipairs(p.rows) do
       local failed=false
+      local absent=next(t.reports)==nil
+      -- In current-audition mode REAPER may suspend nonsoloed tracks. Do
+      -- not alter a track that the host did not process, or treat partial reports as silence.
+      if job.keep_solo and absent and r.GetMediaTrackInfo_Value(t.track,"I_SOLO")==0 and r.GetMediaTrackInfo_Value(t.track,"B_SOLO_DEFEAT")==0 then
+        t.skip_analysis=true
+        note("Excluded from current audition: "..t.name)
+      else
+      t.skip_analysis=false
       for j,s in ipairs(sections) do
         local v=t.reports[j]
         local reason
@@ -582,6 +602,7 @@ local function complete_pass(stats)
         if reason then failures[#failures+1]=t.name.." / "..s.name..": "..reason;failed=true end
       end
       if failed then missing_rows[#missing_rows+1]=t;diagnostics[#diagnostics+1]=track_diagnostic(t,i,p) end
+      end
     end
     if #failures>0 then
       local detail=p.name..": "..done.."/"..total.." reports; "..#failures.." incomplete.\n"..table.concat(failures,"\n")
@@ -602,11 +623,15 @@ local function complete_pass(stats)
   end
   if p.kind=="track" then
     for _,t in ipairs(p.rows) do
+      if not t.skip_analysis then
+      r.SetMediaTrackInfo_Value(t.track,"D_VOL",1)
       for j,v in pairs(t.reports) do
         t.base[j]=calc_base(t,j,v)
         put("base:"..t.key..":"..sections[j].key,t.base[j] or "")
       end
       apply_row(t)
+      job.temporary[t.track]=nil
+      end
     end
   elseif p.kind=="master" then
     local lufs,peak=stats_value(stats,"LUFSI"),stats_value(stats,"PEAK")
@@ -615,7 +640,7 @@ local function complete_pass(stats)
       error("No valid native master loudness/peak result; see REAPER console",0)
     end
     local requested=master_target()-lufs
-    local gain=clamp(math.min(requested,peak_ceiling-peak),-60,30)
+    local gain=clamp(math.min(requested,peak_ceiling-peak-0.25),-60,30)
     apply_master(gain)
     put("mastergain",gain)
     last_stats=string.format("Master before %.2f LUFS / %.2f dBFS; gain %+.2f dB; estimated %.2f LUFS.",lufs,peak,gain,lufs+gain)
@@ -629,10 +654,10 @@ local function complete_pass(stats)
     end
     last_verified=string.format("Verified master: %.2f LUFS-I, %.2f dBFS sample peak (target %.1f LUFS).",lufs,peak,master_target())
     if peak>peak_ceiling+0.1 then
-      local g=num("mastergain",0)-(peak-peak_ceiling)
+      local g=clamp(num("mastergain",0)-(peak-peak_ceiling)-0.35,-60,30)
       apply_master(g);put("mastergain",g)
       job.verify_retries=(job.verify_retries or 0)+1
-      if job.verify_retries<=2 then
+      if job.verify_retries<=1 then
         job.queue[#job.queue+1]={kind="verify",name="Master peak recheck",rows={master}}
         last_verified=last_verified.." Additional peak correction; verifying again."
       else
@@ -650,7 +675,9 @@ local function arm(p)
   for j,s in ipairs(sections) do r.gmem_write(16+2*(j-1),s.a);r.gmem_write(17+2*(j-1),s.b) end
   for i,t in ipairs(p.kind=="track" and p.rows or {}) do
     t.reports={}
+    local existing=fx_index(t)
     local f=ensure_fx(t)
+    if not existing then job.temporary[t.track]=t.fxguid end
     r.TrackFX_SetNamedConfigParm(t.track,f,"force_auto_bypass","0")
     if not r.TrackFX_SetParam(t.track,f,1,i) or not r.TrackFX_SetParam(t.track,f,2,tok) then error("Cannot arm meter: "..t.name,0) end
     local slot_now=r.TrackFX_GetParam(t.track,f,1)
@@ -661,7 +688,9 @@ local function arm(p)
     for k=0,7 do r.gmem_write(1024+(i-1)*8+k,0) end
     for j=1,#sections do r.gmem_write(4096+((i-1)*256+j-1)*8,0) end
   end
-  if p.kind=="master" then apply_master(0) end
+  if p.kind=="master" then
+    ensure_fx(master);r.SetMediaTrackInfo_Value(master.track,"D_VOL",1);apply_master(0)
+  end
   p.token=tok; p.phase="armed";pass=p
   r.gmem_write(0,p.kind=="track" and 1 or 0)
   r.GetSet_LoopTimeRange2(proj,true,false,sections[1].a,sections[#sections].b+0.1,false)
@@ -674,13 +703,14 @@ local function step()
     if not p then finish("Auto Mix complete. "..last_verified);return end
     arm(p);return
   end
+  job.renders=job.renders+1
+  r.ShowConsoleMsg(string.format("N2N Mix dry run %d: %s\n",job.renders,pass.name))
   local _,stats=r.GetSetProjectInfo_String(proj,"RENDER_STATS",tostring(job.cmd),false)
   complete_pass(stats)
 end
-local function start()
+local function start(policy)
   if next(dirty) or master_dirty then status="Finish current grid edit first.";return end
   if not stopped() then status="Stop transport before Auto Mix.";return end
-  if r.AnyTrackSolo(proj) then status="Clear track solos before Auto Mix.";return end
   if not refresh() then return end
   if math.abs(r.Master_GetPlayRate(proj)-1)>0.0001 then status="Set project play rate to 1.0.";return end
   if r.GetGlobalAutomationOverride()>1 then status="Disable global automation write/bypass override.";return end
@@ -703,7 +733,7 @@ local function start()
   for d=0,#rows do
     local eligible={}
     for _,t in ipairs(groups[d] or {}) do
-      if skip_muted(t) then skipped[#skipped+1]=t.name else eligible[#eligible+1]=t end
+      if policy~="all" and skip_muted(t) then skipped[#skipped+1]=t.name else eligible[#eligible+1]=t end
     end
     if #eligible>0 then
       local label=d==0 and "Source tracks" or ("Downstream audio layer "..d)
@@ -718,20 +748,48 @@ local function start()
   for t in pairs(selected) do local ok,e=safe_row(t);if not ok then status=e;return end end
   local a,b=r.GetSet_LoopTimeRange2(proj,false,false,0,0,false)
   r.Undo_BeginBlock2(proj)
-  job={queue=q,index=1,kind="Auto Mix",cmd=cmd,a=a,b=b,cursor=r.GetCursorPositionEx(proj),repeat_state=r.GetSetRepeatEx(proj,-1),ready_at=r.time_precise()+1.4,perf={}}
+  job={queue=q,index=1,kind="Auto Mix",cmd=cmd,a=a,b=b,cursor=r.GetCursorPositionEx(proj),repeat_state=r.GetSetRepeatEx(proj,-1),ready_at=r.time_precise(),perf={},states={},temporary={},renders=0,keep_solo=policy=="current" and r.AnyTrackSolo(proj)}
   last_verified="";last_stats=""
-  alert_text="Processing please wait.";alert_until=job.ready_at
   local ok,e=pcall(function()
-    for t in pairs(selected) do
-      ensure_fx(t)
-      r.SetMediaTrackInfo_Value(t.track,"D_VOL",1)
-      flat(t,0)
+    if policy=="all" then
+      for i=-1,r.CountTracks(proj)-1 do
+        local t=i<0 and r.GetMasterTrack(proj) or r.GetTrack(proj,i)
+        local mute=r.GetMediaTrackInfo_Value(t,"B_MUTE")
+        local solo=r.GetMediaTrackInfo_Value(t,"I_SOLO")
+        local change_mute=mute~=0 and (i<0 or r.GetMediaTrackInfo_Value(t,"B_SHOWINMIXER")>0)
+        if change_mute or solo~=0 then
+          job.states[t]={mute=mute,solo=solo}
+          if change_mute then r.SetMediaTrackInfo_Value(t,"B_MUTE",0) end
+          if solo~=0 then r.SetMediaTrackInfo_Value(t,"I_SOLO",0) end
+        end
+      end
     end
     note(string.format("Audio routing: %d track layers, master and verification.",#q-2))
-    -- Give the notice its full display interval after preparation finishes.
-    job.ready_at=r.time_precise()+1.4;alert_until=job.ready_at
+    local plan={}
+    for _,p in ipairs(q) do
+      local names={};for _,t in ipairs(p.rows) do names[#names+1]=t.name end
+      plan[#plan+1]=p.name..": "..table.concat(names,", ")
+    end
+    r.ShowConsoleMsg("N2N Mix planned stages:\n"..table.concat(plan,"\n").."\n")
   end)
   if not ok then fail(e) end
+end
+local function request_start()
+  if pending_start or job then return end
+  if not stopped() then status="Stop transport before Auto Mix.";return end
+  local restricted=r.AnyTrackSolo(proj) or r.GetMediaTrackInfo_Value(r.GetMasterTrack(proj),"B_MUTE")~=0
+  for i=0,r.CountTracks(proj)-1 do
+    local t=r.GetTrack(proj,i)
+    if r.GetMediaTrackInfo_Value(t,"B_SHOWINMIXER")>0 and r.GetMediaTrackInfo_Value(t,"B_MUTE")~=0 then restricted=true end
+  end
+  local policy="current"
+  if restricted then
+    local answer=r.MB("Some tracks are muted or soloed.\n\nYes: Temporarily unmute visible tracks and clear solos for a full mix.\nNo: Mix the current audible arrangement.\nCancel: Do not process.\n\nOriginal mute and solo settings are restored afterward.","N2N Mix",3)
+    if answer==2 then return end
+    if answer==6 then policy="all" end
+  end
+  if policy=="current" and r.GetMediaTrackInfo_Value(r.GetMasterTrack(proj),"B_MUTE")~=0 then status="Master is muted. Choose the full-mix option.";return end
+  pending_start=policy;alert_text="Processing please wait.";alert_until=r.time_precise()+1.2
 end
 local function edit_cell(t,j,b,chosen)
   if sections[j].countin then return end
@@ -1134,7 +1192,7 @@ local function draw()
   local visible,open=r.ImGui_Begin(ctx,"N2N Mix",true)
   if visible then
     local nmono=mono_push(false)
-    if not job then button("Auto Mix",start)
+    if not job then button("Auto Mix",request_start)
     else button("Cancel",function() finish("Cancelled. Undo to revert partial changes.") end) end
     r.ImGui_PopStyleColor(ctx,nmono)
     same();r.ImGui_TextWrapped(ctx,status)
@@ -1281,6 +1339,11 @@ local function loop()
   if not job and not stroke and not transition_start and not next(dirty) and not master_dirty and r.time_precise()>=refresh_at and stopped() then
     refresh_at=r.time_precise()+0.75
     if project_layout_signature()~=layout_sig then refresh() end
+  end
+  if pending_start and r.time_precise()>=alert_until then
+    local policy=pending_start;pending_start=nil;alert_text=""
+    local ok,e=pcall(start,policy)
+    if not ok then if job then fail(e) else status=tostring(e) end end
   end
   if job then
     local ok,e=pcall(step)
