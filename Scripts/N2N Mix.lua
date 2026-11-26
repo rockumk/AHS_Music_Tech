@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.1.0
+-- @version 0.1.1
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -29,6 +29,7 @@ local last_paint=nil
 local preset=1
 local custom=-16
 local peak_ceiling=-2 -- sample-peak guard; not a true-peak guarantee
+local boundary_ramp=0.250 -- seconds; ordinary level changes, not explicit transitions
 local selected_mode="Offline"
 local last_stats=""
 local last_verified=""
@@ -117,6 +118,8 @@ local function refresh()
     if r.GetMediaTrackInfo_Value(t,"B_SHOWINMIXER")>0 then
       local _,name=r.GetTrackName(t)
       local row={track=t,key=track_key(t),name=name,fxguid=get_owned(t),cells={},base={},reports={},deps={},depth=0}
+      local _,initial=r.GetSetMediaTrackInfo_String(t,"P_EXT:N2N_MIX_INITIAL_DB","",false)
+      row.initial=clamp(tonumber(initial) or 0,-60,30)
       row.bus=r.GetMediaTrackInfo_Value(t,"I_FOLDERDEPTH")>0
       for k=0,r.GetTrackNumSends(t,-1)-1 do
         if r.GetTrackSendInfo_Value(t,-1,k,"I_SRCCHAN")>=0 and r.GetTrackSendInfo_Value(t,-1,k,"B_MUTE")==0 then row.bus=true;break end
@@ -252,10 +255,10 @@ local function apply_row(t)
   end
   local function db_at(x,off)
     local s=sections[x.j]
-    if x.ignore then return 0 end
+    if x.ignore then return t.initial or 0 end
     if off<=-59.9 then return -60 end
     -- Section intensity is applied at source only, not again to downstream busses.
-    return clamp((t.base[x.j] or 0)+off+(t.depth==0 and intensity[s.int] or 0),-60,30)
+    return clamp((t.base[x.j] or t.initial or 0)+off+(t.depth==0 and intensity[s.int] or 0),-60,30)
   end
   local i=1
   while i<=#bars do
@@ -277,21 +280,28 @@ local function apply_row(t)
   local function add(t,v,shape) 
     if #pts>0 and math.abs(pts[#pts][1]-t)<0.0000001 then pts[#pts]={t,v,shape} else pts[#pts+1]={t,v,shape} end
   end
-  add(0,0,1)
+  local initial=t.initial or 0
+  add(0,initial,1)
   for k,b in ipairs(bars) do
     local prev=bars[k-1]
     if not prev or b.a>prev.b+0.00001 then
-      if b.a>0 then add(math.max(0,b.a-0.005),0,0) end
+      if b.a>0 then
+        local gap=prev and b.a-prev.b or b.a
+        add(b.a-math.min(boundary_ramp,gap*0.5),initial,0)
+      end
       add(b.a,b.g0,0)
     else add(b.a,b.g0,0) end
     local nextb=bars[k+1]
     local e=b.b
     if nextb and math.abs(nextb.a-e)<0.00001 then
-      -- 5 ms ramp at hard boundaries; continuous transition endpoints already match.
-      if math.abs(b.g1-nextb.g0)>0.0001 then add(math.max(b.a,e-0.005),b.g1,0) end
+      -- Ease ordinary steps over the last 250 ms, capped at a quarter of the bar.
+      -- Explicit transition spans already meet their neighbors and remain untouched.
+      if math.abs(b.g1-nextb.g0)>0.0001 then
+        add(e-math.min(boundary_ramp,(e-b.a)*0.25),b.g1,0)
+      end
     elseif nextb then
-      add(math.max(b.a,e-0.005),b.g1,0)
-      add(e,0,1)
+      add(e-math.min(boundary_ramp,(e-b.a)*0.25),b.g1,0)
+      add(e,initial,1)
     else
       add(e,b.g1,1) -- preserve final gain through instrument / reverb tails
     end
