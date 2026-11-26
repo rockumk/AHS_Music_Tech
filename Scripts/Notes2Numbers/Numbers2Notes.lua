@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.18
+-- @version 2.0.4-dev.19
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -4259,6 +4259,24 @@ function Build_Single_Track(tr)
     if is_new then
         local initial_linear = tonumber(tr[9]) or 1.0
         if tr[3] ~= false then
+            -- Performance Dynamics precedes the end-of-chain LUFS meter.
+            local model = config.performance_dynamics_types and config.performance_dynamics_types[tr_type]
+            if model ~= nil then
+                local perf_at = -1000 - reaper.TrackFX_GetCount(track_to_use)
+                local perf_fx = reaper.TrackFX_AddByName(track_to_use, "JS: Performance Dynamics.jsfx", false, perf_at)
+                if perf_fx < 0 then
+                    perf_fx = reaper.TrackFX_AddByName(track_to_use, "JS: Performance Dynamics (14-Instrument Clean Headroom Prototype)", false, perf_at)
+                end
+                if perf_fx >= 0 then
+                    reaper.TrackFX_SetParam(track_to_use, perf_fx, 0, 0)
+                    if model >= 0 then reaper.TrackFX_SetParam(track_to_use, perf_fx, 1, model) end
+                    reaper.TrackFX_SetEnabled(track_to_use, perf_fx, model >= 0)
+                    reaper.GetSetMediaTrackInfo_String(track_to_use, "P_EXT:N2N_PERF_FX", reaper.TrackFX_GetFXGUID(track_to_use, perf_fx), true)
+                    reaper.GetSetMediaTrackInfo_String(track_to_use, "P_EXT:N2N_PERF_MODEL", tostring(model), true)
+                else
+                    table.insert(G_MISSING_PLUGINS, {name = "Performance Dynamics.jsfx", source = 3})
+                end
+            end
             -- All recipe/common FX have been added; append the tested stereo gain meter.
             local at = -1000 - reaper.TrackFX_GetCount(track_to_use)
             local mix_fx = reaper.TrackFX_AddByName(track_to_use, "JS: N2N Mix Meter.jsfx", false, at)
