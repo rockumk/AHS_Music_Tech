@@ -32,6 +32,8 @@ local UI_SIZE=18
 local CELL_H=36
 local LEFT_W=465
 local GAP=4
+local display_cols={}
+local font_new_api=false
 local preset=1
 local custom=-16
 local peak_ceiling=-2 -- sample-peak guard; not a true-peak guarantee
@@ -637,7 +639,7 @@ local function popup_level(t,j,b,v,id)
     r.ImGui_EndPopup(ctx)
   end
 end
-local function cell(t,j,b,w,fills)
+local function cell(t,j,b,w,fills,ri,ci)
   local s=sections[j]
   local v=b and t.cells[j][b] or t.cells[j][1]
   if not b then for _,x in ipairs(t.cells[j]) do if x~=v then v=0;break end end end
@@ -677,10 +679,20 @@ local function cell(t,j,b,w,fills)
   elseif v~=9 then symbol(dl,x,y,w,h,v) end
   if not job and not s.countin then
     if hovered and r.ImGui_IsMouseClicked(ctx,0) then
-      stroke={kind="level",t=t,j=j,b=b,tool=tool}
+      stroke={kind="level",t=t,j=j,b=b,tool=tool,ri=ri,ci=ci}
       if tool~=9 then edit_cell(t,j,b,tool);last_paint=id end
     elseif hovered and stroke and stroke.kind=="level" and r.ImGui_IsMouseDown(ctx,0) then
-      if stroke.tool~=9 and last_paint~=id then edit_cell(t,j,b,stroke.tool);last_paint=id
+      if stroke.tool~=9 and last_paint~=id then
+        -- Interpolate between sampled mouse positions so fast dragging does not skip cells.
+        local dr,dc=ri-stroke.ri,ci-stroke.ci
+        local steps=math.max(math.abs(dr),math.abs(dc),1)
+        for k=1,steps do
+          local rr=math.floor(stroke.ri+dr*k/steps+0.5)
+          local cc=math.floor(stroke.ci+dc*k/steps+0.5)
+          local col=display_cols[cc]
+          if rows[rr] and col then edit_cell(rows[rr],col.j,col.b,stroke.tool) end
+        end
+        stroke.ri,stroke.ci=ri,ci;last_paint=id
       elseif stroke.tool==9 and stroke.t==t then stroke.endj=j;stroke.endb=b end
     end
     popup_level(t,j,b,v,id)
@@ -787,7 +799,9 @@ local function draw()
   local bg=r.ImGui_GetStyleColor(ctx,r.ImGui_Col_WindowBg()) | 0xff
   r.ImGui_PushStyleColor(ctx,r.ImGui_Col_WindowBg(),bg)
   r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ChildBg(),bg)
-  if ui_font then r.ImGui_PushFont(ctx,ui_font) end
+  if ui_font then
+    if font_new_api then r.ImGui_PushFont(ctx,ui_font,UI_SIZE) else r.ImGui_PushFont(ctx,ui_font) end
+  end
   r.ImGui_SetNextWindowSize(ctx,1350,650,r.ImGui_Cond_FirstUseEver())
   r.ImGui_SetNextWindowBgAlpha(ctx,1)
   local visible,open=r.ImGui_Begin(ctx,"N2N Mix",true)
@@ -833,7 +847,7 @@ local function draw()
       for j,s in ipairs(sections) do
         if expanded[s.key] then
           for b=1,#s.bars do
-            local w=b==1 and 130 or 92
+            local w=b==1 and math.max(130,r.ImGui_CalcTextSize(ctx,s.name.." −")+20) or 100
             cols[#cols+1]={j=j,b=b,w=w};total=total+w+GAP
           end
         else
@@ -841,6 +855,7 @@ local function draw()
           cols[#cols+1]={j=j,w=w};total=total+w+GAP
         end
       end
+      display_cols=cols
       local flags=r.ImGui_TableFlags_ScrollX() | r.ImGui_TableFlags_ScrollY() | r.ImGui_TableFlags_SizingFixedFit()
       -- Only two actual table columns: the entire song strip can exceed the native
       -- ImGui column limit without losing the frozen track header.
@@ -851,7 +866,7 @@ local function draw()
         local function across(fn)
           for i,c in ipairs(cols) do
             if i>1 then r.ImGui_SameLine(ctx,0,GAP) end
-            fn(c)
+            fn(c,i)
           end
         end
         r.ImGui_TableNextRow(ctx,0,CELL_H)
@@ -860,7 +875,7 @@ local function draw()
         r.ImGui_TableNextRow(ctx,0,CELL_H)
         r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Section intensity")
         r.ImGui_TableSetColumnIndex(ctx,1);across(intensity_cell)
-        for _,t in ipairs(rows) do
+        for ri,t in ipairs(rows) do
           r.ImGui_TableNextRow(ctx,0,CELL_H)
           r.ImGui_TableSetColumnIndex(ctx,0)
           track_header(t)
@@ -885,7 +900,7 @@ local function draw()
           end
           r.ImGui_TableSetColumnIndex(ctx,1)
           local fills=transition_fills(t)
-          across(function(c) cell(t,c.j,c.b,c.w,fills) end)
+          across(function(c,ci) cell(t,c.j,c.b,c.w,fills,ri,ci) end)
         end
         r.ImGui_EndTable(ctx)
       end
@@ -907,7 +922,11 @@ local function draw()
 end
 if not r.ImGui_CreateContext then r.MB("ReaImGui is required.","N2N Mix",0);return end
 ctx=r.ImGui_CreateContext("N2N Mix")
-ui_font=r.ImGui_CreateFont("sans-serif",UI_SIZE)
+-- ReaImGui 0.9 uses a font size at creation; 0.10 uses a size at PushFont.
+local ok_font,font=pcall(r.ImGui_CreateFont,"sans-serif",UI_SIZE)
+if ok_font and font then ui_font=font else
+  ui_font=r.ImGui_CreateFont("sans-serif");font_new_api=true
+end
 r.ImGui_Attach(ctx,ui_font)
 preset=clamp(num("preset",1),1,#presets)
 custom=num("custom",-16)
