@@ -272,24 +272,59 @@ local function write_points(t,pts)
   r.Envelope_SortPointsEx(env,-1)
 end
 local function flat(t,db) write_points(t,{{0,db,0}}) end
-local function section_intensity(s)
+local function intensity_contour()
+  local all,map={},{}
+  for j,s in ipairs(sections) do
+    map[j]={}
+    for b,bar in ipairs(s.bars) do
+      local x={a=bar.a,b=bar.b,v=bar.int,ignore=s.countin}
+      all[#all+1]=x;map[j][b]=x
+    end
+  end
+  local i=1
+  while i<=#all do
+    local x=all[i]
+    if x.v~=5 or x.ignore then
+      x.d0=x.ignore and 0 or (intensity[x.v] or 0);x.d1=x.d0;i=i+1
+    else
+      local first=i
+      while i<=#all and all[i].v==5 and not all[i].ignore and (i==first or math.abs(all[i].a-all[i-1].b)<0.001) do i=i+1 end
+      local last=i-1
+      local p,n=all[first-1],all[i]
+      local a=p and not p.ignore and math.abs(p.b-all[first].a)<0.001 and (intensity[p.v] or 0) or intensity[1]
+      local z=n and not n.ignore and math.abs(n.a-all[last].b)<0.001 and (intensity[n.v] or 0) or intensity[1]
+      local t0,t1=all[first].a,all[last].b
+      for k=first,last do
+        local b=all[k];b.d0=a+(z-a)*(b.a-t0)/(t1-t0);b.d1=a+(z-a)*(b.b-t0)/(t1-t0)
+      end
+    end
+  end
+  return map
+end
+local function section_intensity(s,j)
+  local contour=intensity_contour()[j]
   local energy,duration=0,0
-  for _,b in ipairs(s.bars) do
-    local d=b.b-b.a;energy=energy+d*10^(intensity[b.int]/10);duration=duration+d
+  for _,b in ipairs(contour) do
+    local d=b.b-b.a
+    local x,y=10^(b.d0/10),10^(b.d1/10)
+    local mean=math.abs(b.d1-b.d0)<1e-8 and x or (y-x)/(math.log(y)-math.log(x))
+    energy=energy+d*mean;duration=duration+d
   end
   return duration>0 and 10*math.log(energy/duration,10) or 0
 end
 local function calc_base(t,j,v)
   if sections[j].countin or not v or v.state~=1 or math.abs(v.coverage-1)>0.02 then return nil end
-  return clamp(t.target+(t.depth>0 and section_intensity(sections[j]) or 0)-v.lufs,-30,24)
+  return clamp(t.target+(t.depth>0 and section_intensity(sections[j],j) or 0)-v.lufs,-30,24)
 end
 local function offset(v) return levels[v] or 0 end
 local function apply_row(t)
   local bars={}
+  local contour=intensity_contour()
   for j,s in ipairs(sections) do
     for b,span in ipairs(s.bars) do
       local v=t.cells[j][b]
-      bars[#bars+1]={a=span.a,b=span.b,j=j,v=v,int=span.int,ignore=s.countin}
+      local d=contour[j][b]
+      bars[#bars+1]={a=span.a,b=span.b,j=j,v=v,d0=d.d0,d1=d.d1,ignore=s.countin}
     end
   end
   local function db_at(x,off)
@@ -297,7 +332,7 @@ local function apply_row(t)
     if x.ignore then return t.initial or 0 end
     if off<=-59.9 then return -60 end
     -- Section intensity is applied at source only, not again to downstream busses.
-    return clamp((t.base[x.j] or t.initial or 0)+off+(t.depth==0 and intensity[x.int] or 0),-60,30)
+    return (t.base[x.j] or t.initial or 0)+off
   end
   local i=1
   while i<=#bars do
@@ -314,6 +349,15 @@ local function apply_row(t)
       local t0,t1=bars[first].a,bars[last].b
       for k=first,last do local b=bars[k];b.g0=a+(z-a)*(b.a-t0)/(t1-t0);b.g1=a+(z-a)*(b.b-t0)/(t1-t0) end
     end
+  end
+  -- Add the independent intensity contour after calculating the track transition.
+  -- Downstream tracks already receive the source intensity through the routing.
+  for _,b in ipairs(bars) do
+    if t.depth==0 and not b.ignore and b.v~=1 then
+      if b.g0>-60 then b.g0=b.g0+b.d0 end
+      if b.g1>-60 then b.g1=b.g1+b.d1 end
+    end
+    b.g0=clamp(b.g0,-60,30);b.g1=clamp(b.g1,-60,30)
   end
   local pts={}
   local function add(t,v,shape) 
@@ -336,7 +380,9 @@ local function apply_row(t)
       -- Ease ordinary steps over the last 250 ms, capped at a quarter of the bar.
       -- Explicit transition spans already meet their neighbors and remain untouched.
       if math.abs(b.g1-nextb.g0)>0.0001 then
-        add(e-math.min(boundary_ramp,(e-b.a)*0.25),b.g1,0)
+        local ramp=math.min(boundary_ramp,(e-b.a)*0.25)
+        local before=b.g0+(b.g1-b.g0)*(1-ramp/(e-b.a))
+        add(e-ramp,before,0)
       end
     elseif nextb then
       add(e-math.min(boundary_ramp,(e-b.a)*0.25),b.g1,0)
@@ -717,17 +763,42 @@ local function set_intensity(j,b,v)
   end
   for _,t in ipairs(rows) do if t.depth==0 then dirty[t]=true end end
 end
-local function intensity_cell(c)
+local function intensity_cell(c,contour)
   local s=sections[c.j]
   local v=c.b and s.bars[c.b].int or s.bars[1].int
   if not c.b then for _,bar in ipairs(s.bars) do if bar.int~=v then v=0;break end end end
-  local label=s.countin and "—" or v==0 and "Mixed" or (c.b and ({"Soft","Normal","Strong","V.Strong"})[v] or intens_names[v])
+  local label=s.countin and "—" or v==0 and "Mixed" or v==5 and "" or (c.b and ({"Soft","Normal","Strong","V.Strong"})[v] or intens_names[v])
   local id="##int"..c.j..":"..(c.b or 0)
-  if r.ImGui_Button(ctx,label..id,c.w,CELL_H) and not job and not s.countin then set_intensity(c.j,c.b,v%4+1) end
+  local dl=r.ImGui_GetWindowDrawList(ctx)
+  local x,y=r.ImGui_GetCursorScreenPos(ctx)
+  local clicked=r.ImGui_InvisibleButton(ctx,id,c.w,CELL_H)
+  local hover=r.ImGui_IsItemHovered(ctx)
+  local light,dark=0xDADADAFF,0x858585FF
+  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+c.w,y+CELL_H,light,0)
+  local function f(d) return clamp(0.25+0.75*(d+3)/7,0,1) end
+  local f0,f1
+  if v==5 then
+    local a=contour[c.j][c.b or 1]
+    local b=contour[c.j][c.b or #s.bars]
+    f0,f1=f(a.d0),f(b.d1)
+  elseif v==0 then f0,f1=0.5,0.5
+  elseif not s.countin then f0,f1=f(intensity[v]),f(intensity[v])
+  else f0,f1=0,0 end
+  if f0>0 or f1>0 then
+    r.ImGui_DrawList_AddQuadFilled(dl,x,y+CELL_H*(1-f0),x+c.w,y+CELL_H*(1-f1),x+c.w,y+CELL_H,x,y+CELL_H,dark)
+  end
+  r.ImGui_DrawList_AddRect(dl,x,y,x+c.w,y+CELL_H,hover and 0xFFFFFFFF or 0x303030FF,0,0,1)
+  if label~="" then centered(dl,x,y,c.w,CELL_H,label,0x101010FF,0xFFFFFFFF) end
+  if clicked and not job and not s.countin then
+    if tool==9 then set_intensity(c.j,c.b,5)
+    else set_intensity(c.j,c.b,v>=1 and v<=4 and v%4+1 or 2) end
+  end
   if not job and not s.countin and r.ImGui_BeginPopupContextItem(ctx,"##opts"..id) then
     for k,name in ipairs(intens_names) do if r.ImGui_Selectable(ctx,name,v==k) then set_intensity(c.j,c.b,k) end end
+    if r.ImGui_Selectable(ctx,"Transition",v==5) then set_intensity(c.j,c.b,5) end
     r.ImGui_EndPopup(ctx)
   end
+  if hover then r.ImGui_SetTooltip(ctx,"Click to cycle intensity; right-click for choices. Select Transition to paint a ramp.") end
 end
 local function color_header(c)
   local s=sections[c.j]
@@ -888,7 +959,8 @@ local function draw()
         r.ImGui_TableSetColumnIndex(ctx,1);across(color_header)
         r.ImGui_TableNextRow(ctx,0,CELL_H)
         r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Section intensity")
-        r.ImGui_TableSetColumnIndex(ctx,1);across(intensity_cell)
+        local contour=intensity_contour()
+        r.ImGui_TableSetColumnIndex(ctx,1);across(function(c) intensity_cell(c,contour) end)
         for ri,t in ipairs(rows) do
           r.ImGui_TableNextRow(ctx,0,CELL_H)
           r.ImGui_TableSetColumnIndex(ctx,0)
