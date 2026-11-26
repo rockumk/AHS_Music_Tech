@@ -179,7 +179,10 @@ local function refresh()
       local _,pg=r.GetSetMediaTrackInfo_String(t,"P_EXT:N2N_PERF_FX","",false)
       local _,pm=r.GetSetMediaTrackInfo_String(t,"P_EXT:N2N_PERF_MODEL","",false)
       row.perfguid=pg~="" and pg or nil
-      row.model=clamp(tonumber(pm) or -1,-1,13)
+      local _,id=r.GetSetMediaTrackInfo_String(t,"P_EXT:N2N:ID","",false)
+      local recipe=tonumber(id:match("^(%d+)_"))
+      local known=recipe==31 and 1 or recipe==20 and 6 or -1
+      row.model=clamp(tonumber(pm) or known,-1,13)
       row.timbre_allowed=not row.bus and row.role~=10 and row.role~=12
       for j,s in ipairs(sections) do
         local prefix=row.key..":"..s.key
@@ -568,8 +571,9 @@ local function configure_perf(t)
   for j,s in ipairs(sections) do
     for b,span in ipairs(s.bars) do
       local p=t.perfplan[j][b]
-      for k=1,8 do
-        local u,v=(k-1)/8,k/8
+      local n=(math.abs(p.p1-p.p0)>1e-9 or math.abs(p.sec.f1-p.sec.f0)>1e-9) and 8 or 1
+      for k=1,n do
+        local u,v=(k-1)/n,k/n
         bars[#bars+1]={a=span.a+(span.b-span.a)*u,b=span.a+(span.b-span.a)*v,g0=p.value(u),g1=p.value(v)}
       end
     end
@@ -620,7 +624,7 @@ local function apply_row(t)
   for _,b in ipairs(bars) do
     local cuts={0,1}
     local pp=t.perfplan and t.perfplan[b.j][b.bar]
-    if pp and not pp.mute then for k=1,7 do cuts[#cuts+1]=k/8 end end
+    if pp and not pp.mute and (math.abs(pp.p1-pp.p0)>1e-9 or math.abs(pp.sec.f1-pp.sec.f0)>1e-9) then for k=1,7 do cuts[#cuts+1]=k/8 end end
     local add_int=t.depth==0 and not b.ignore and b.v~=1
     if add_int and math.abs(b.f1-b.f0)>1e-9 then
       for _,f in ipairs({0.25,0.5,0.75}) do
@@ -637,7 +641,7 @@ local function apply_row(t)
     end
     for k=2,#cuts do
       local a,z=cuts[k-1],cuts[k]
-      result[#result+1]={a=b.a+(b.b-b.a)*a,b=b.a+(b.b-b.a)*z,g0=value(a),g1=value(z)}
+      if z-a>1e-9 then result[#result+1]={a=b.a+(b.b-b.a)*a,b=b.a+(b.b-b.a)*z,g0=value(a),g1=value(z)} end
     end
   end
   write_points(t,contour_points(result,t.initial or 0))
@@ -1512,6 +1516,7 @@ local function draw()
             for i,name in ipairs(roles) do
               if r.ImGui_Selectable(ctx,name,i==t.role) and not job then
                 local old=t.target;t.role=i;t.target=defaults[i];put("role:"..t.key,i);put("target:"..t.key,t.target)
+                t.timbre_allowed=not t.bus and i~=10 and i~=12
                 for j,base in pairs(t.base) do t.base[j]=clamp(base+t.target-old,-30,24);put("base:"..t.key..":"..sections[j].key,t.base[j]) end
                 dirty[t]=true
               end
