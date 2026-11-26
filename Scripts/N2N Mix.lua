@@ -29,6 +29,7 @@ local intensity_tool=2
 local mono_push
 local expanded={}
 local dirty={}
+local master_dirty=false
 local transition_start=nil
 local last_paint=nil
 local stroke=nil
@@ -147,7 +148,7 @@ end
 local function refresh()
   layout_sig=project_layout_signature()  local a,err=read_sections()
   if not a then sections={};rows={};groups={};status=err;return false end
-  sections=a; rows={}; groups={}; dirty={}; transition_start=nil
+  sections=a; rows={}; groups={}; dirty={}; master_dirty=false; transition_start=nil
   local byptr={}
   for i=0,r.CountTracks(proj)-1 do
     local t=r.GetTrack(proj,i)
@@ -352,8 +353,8 @@ local function section_intensity(s,j)
   local energy,duration=0,0
   for _,b in ipairs(contour) do
     local d=b.b-b.a
-    local x,y=10^(b.d0/10),10^(b.d1/10)
-    local mean=math.abs(b.d1-b.d0)<1e-8 and x or (y-x)/(math.log(y)-math.log(x))
+    local x,y=10^(math.max(-3,b.d0)/10),10^(math.max(-3,b.d1)/10)
+    local mean=math.abs(x-y)<1e-8 and x or (y-x)/(math.log(y)-math.log(x))
     energy=energy+d*mean;duration=duration+d
   end
   return duration>0 and 10*math.log(energy/duration,10) or 0
@@ -363,6 +364,40 @@ local function calc_base(t,j,v)
   return clamp(t.target+(t.depth>0 and section_intensity(sections[j],j) or 0)-v.lufs,-30,24)
 end
 local function offset(v) return levels[v] or 0 end
+local function contour_points(bars,initial)
+  local pts={}
+  local function add(t,v,shape) 
+    if #pts>0 and math.abs(pts[#pts][1]-t)<0.0000001 then pts[#pts]={t,v,shape} else pts[#pts+1]={t,v,shape} end
+  end
+  add(0,initial,1)
+  for k,b in ipairs(bars) do
+    local prev=bars[k-1]
+    if not prev or b.a>prev.b+0.00001 then
+      if b.a>0 then
+        local gap=prev and b.a-prev.b or b.a
+        add(b.a-math.min(boundary_ramp,gap*0.5),initial,0)
+      end
+      add(b.a,b.g0,0)
+    else add(b.a,b.g0,0) end
+    local nextb=bars[k+1]
+    local e=b.b
+    if nextb and math.abs(nextb.a-e)<0.00001 then
+      -- Ease ordinary steps over the last 250 ms, capped at a quarter of the bar.
+      -- Explicit transition spans already meet their neighbors and remain untouched.
+      if math.abs(b.g1-nextb.g0)>0.0001 then
+        local ramp=math.min(boundary_ramp,(e-b.a)*0.25)
+        local before=b.g0+(b.g1-b.g0)*(1-ramp/(e-b.a))
+        add(e-ramp,before,0)
+      end
+    elseif nextb then
+      add(e-math.min(boundary_ramp,(e-b.a)*0.25),b.g1,0)
+      add(e,initial,1)
+    else
+      add(e,b.g1,1) -- preserve final gain through instrument / reverb tails
+    end
+  end
+  return pts
+end
 local function apply_row(t)
   local bars={}
   local contour=intensity_contour()
@@ -400,44 +435,37 @@ local function apply_row(t)
   -- Downstream tracks already receive the source intensity through the routing.
   for _,b in ipairs(bars) do
     if t.depth==0 and not b.ignore and b.v~=1 then
-      if b.g0>-60 then b.g0=b.g0+b.d0 end
-      if b.g1>-60 then b.g1=b.g1+b.d1 end
+      if b.g0>-60 then b.g0=b.g0+math.max(-3,b.d0) end
+      if b.g1>-60 then b.g1=b.g1+math.max(-3,b.d1) end
     end
     b.g0=clamp(b.g0,-60,30);b.g1=clamp(b.g1,-60,30)
   end
-  local pts={}
-  local function add(t,v,shape) 
-    if #pts>0 and math.abs(pts[#pts][1]-t)<0.0000001 then pts[#pts]={t,v,shape} else pts[#pts+1]={t,v,shape} end
+  write_points(t,contour_points(bars,t.initial or 0))
+end
+-- Global silence is applied at the master, after effects and busses.
+-- Normal section intensity stays at the sources; only the portion below Soft
+-- is assigned to the master, avoiding duplicate gain changes in routing.
+local function apply_master(gain)
+  local contour=intensity_contour()
+  local bars={}
+  local function value(d)
+    if d<=-60+1e-8 then return -60 end
+    return clamp(gain+math.min(0,d+3),-60,30)
   end
-  local initial=t.initial or 0
-  add(0,initial,1)
-  for k,b in ipairs(bars) do
-    local prev=bars[k-1]
-    if not prev or b.a>prev.b+0.00001 then
-      if b.a>0 then
-        local gap=prev and b.a-prev.b or b.a
-        add(b.a-math.min(boundary_ramp,gap*0.5),initial,0)
+  for j,s in ipairs(sections) do
+    for b,span in ipairs(s.bars) do
+      local d=contour[j][b]
+      -- Split where the global fade meets Soft to avoid smearing the breakpoint.
+      if (d.d0+3)*(d.d1+3)<0 then
+        local at=span.a+(span.b-span.a)*(-3-d.d0)/(d.d1-d.d0)
+        bars[#bars+1]={a=span.a,b=at,g0=value(d.d0),g1=value(-3)}
+        bars[#bars+1]={a=at,b=span.b,g0=value(-3),g1=value(d.d1)}
+      else
+        bars[#bars+1]={a=span.a,b=span.b,g0=value(d.d0),g1=value(d.d1)}
       end
-      add(b.a,b.g0,0)
-    else add(b.a,b.g0,0) end
-    local nextb=bars[k+1]
-    local e=b.b
-    if nextb and math.abs(nextb.a-e)<0.00001 then
-      -- Ease ordinary steps over the last 250 ms, capped at a quarter of the bar.
-      -- Explicit transition spans already meet their neighbors and remain untouched.
-      if math.abs(b.g1-nextb.g0)>0.0001 then
-        local ramp=math.min(boundary_ramp,(e-b.a)*0.25)
-        local before=b.g0+(b.g1-b.g0)*(1-ramp/(e-b.a))
-        add(e-ramp,before,0)
-      end
-    elseif nextb then
-      add(e-math.min(boundary_ramp,(e-b.a)*0.25),b.g1,0)
-      add(e,initial,1)
-    else
-      add(e,b.g1,1) -- preserve final gain through instrument / reverb tails
     end
   end
-  write_points(t,pts)
+  write_points(master,contour_points(bars,gain))
 end
 local function save_cells(t,j)
   local s=sections[j]
@@ -517,7 +545,7 @@ local function complete_pass(stats)
     if not lufs or not peak or lufs<=-70 then error("No valid native master loudness/peak result") end
     local requested=master_target()-lufs
     local gain=clamp(math.min(requested,peak_ceiling-peak),-60,30)
-    flat(master,gain)
+    apply_master(gain)
     put("mastergain",gain)
     last_stats=string.format("Master before %.2f LUFS / %.2f dBFS; gain %+.2f dB; estimated %.2f LUFS.",lufs,peak,gain,lufs+gain)
     if gain<requested-0.1 then last_stats=last_stats.." Peak constrained (gain only; no limiter)." end
@@ -528,7 +556,7 @@ local function complete_pass(stats)
     last_verified=string.format("Verified master: %.2f LUFS-I, %.2f dBFS sample peak (target %.1f LUFS).",lufs,peak,master_target())
     if peak>peak_ceiling+0.1 then
       local g=num("mastergain",0)-(peak-peak_ceiling)
-      flat(master,g);put("mastergain",g)
+      apply_master(g);put("mastergain",g)
       job.verify_retries=(job.verify_retries or 0)+1
       if job.verify_retries<=2 then
         job.queue[#job.queue+1]={kind="verify",name="Master peak recheck",rows={master}}
@@ -553,6 +581,7 @@ local function arm(p)
     r.TrackFX_SetParam(t.track,f,1,i);r.TrackFX_SetParam(t.track,f,2,tok)
     for j=1,#sections do r.gmem_write(4096+((i-1)*256+j-1)*8,0) end
   end
+  if p.kind=="master" then apply_master(0) end
   p.token=tok; p.phase="armed";pass=p
   r.gmem_write(0,1)
   r.GetSet_LoopTimeRange2(proj,true,false,sections[1].a,sections[#sections].b+0.1,false)
@@ -569,7 +598,7 @@ local function step()
   complete_pass(stats)
 end
 local function start()
-  if next(dirty) then status="Finish current grid edit first.";return end
+  if next(dirty) or master_dirty then status="Finish current grid edit first.";return end
   if not stopped() then status="Stop transport before Auto Mix.";return end
   if not refresh() then return end
   if math.abs(r.Master_GetPlayRate(proj)-1)>0.0001 then status="Set project play rate to 1.0.";return end
@@ -820,6 +849,7 @@ local function set_intensity(j,b,v)
     for k,bar in ipairs(s.bars) do bar.int=v;put("int:"..s.key..":"..k,v) end
   end
   for _,t in ipairs(rows) do if t.depth==0 then dirty[t]=true end end
+  master_dirty=true
 end
 local function intensity_cell(c,contour,ci)
   local s=sections[c.j]
@@ -908,10 +938,18 @@ local function tool_button(i)
   if clicked then tool=i;transition_start=nil end
 end
 local function apply_dirty()
-  if not next(dirty) or job or r.EnumProjects(-1,"")~=proj or (r.GetPlayStateEx(proj)&4)~=0 then return end
+  if (not next(dirty) and not master_dirty) or job or r.EnumProjects(-1,"")~=proj or (r.GetPlayStateEx(proj)&4)~=0 then return end
   if r.GetGlobalAutomationOverride()>1 then status="Disable global automation write/bypass before editing.";return end
   r.Undo_BeginBlock2(proj)
   local ok,e=pcall(function()
+    if master_dirty and master then
+      local needed=fx_index(master)~=nil
+      for _,s in ipairs(sections) do for _,b in ipairs(s.bars) do if b.int==6 then needed=true end end end
+      if needed then
+        local safe,msg=safe_row(master);if not safe then error(msg) end
+        ensure_fx(master);apply_master(num("mastergain",0))
+      end
+    end
     for t in pairs(dirty) do
       if valid(t.track) and r.GetMediaTrackInfo_Value(t.track,"B_SHOWINMIXER")>0 and fx_index(t) then
         local safe,msg=safe_row(t);if not safe then error(msg) end
@@ -920,7 +958,7 @@ local function apply_dirty()
     end
   end)
   r.Undo_EndBlock2(proj,"N2N Mix grid edit",-1)
-  dirty={}
+  dirty={};master_dirty=false
   if not ok then note("Grid update stopped: "..tostring(e)) end
 end
 local function same() r.ImGui_SameLine(ctx) end
@@ -1136,7 +1174,7 @@ traditional=num("traditional",0)==1
 refresh()
 local function loop()
   if r.EnumProjects(-1,"")~=proj then if job then fail("Project changed") end;return end
-  if not job and not stroke and not transition_start and not next(dirty) and r.time_precise()>=refresh_at and stopped() then
+  if not job and not stroke and not transition_start and not next(dirty) and not master_dirty and r.time_precise()>=refresh_at and stopped() then
     refresh_at=r.time_precise()+0.75
     if project_layout_signature()~=layout_sig then refresh() end
   end
