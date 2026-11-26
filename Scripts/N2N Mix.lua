@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.0
+-- @version 0.2.1
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -183,7 +183,9 @@ local function refresh()
       local recipe=tonumber(id:match("^(%d+)_"))
       local known=recipe==31 and 1 or recipe==20 and 6 or -1
       row.model=clamp(tonumber(pm) or known,-1,13)
-      row.timbre_allowed=not row.bus and row.role~=10 and row.role~=12
+      -- A MIDI receive may still have audio channels configured. Role, not
+      -- the mere presence of receives, determines timbre eligibility.
+      row.timbre_allowed=row.role~=10 and row.role~=12
       for j,s in ipairs(sections) do
         local prefix=row.key..":"..s.key
         row.cells[j]={};row.ramps[j]={}
@@ -1328,7 +1330,7 @@ local function apply_dirty()
       end
     end
     for t in pairs(dirty) do
-      if valid(t.track) and r.GetMediaTrackInfo_Value(t.track,"B_SHOWINMIXER")>0 and (fx_index(t) or t.model>=0) then
+      if valid(t.track) and r.GetMediaTrackInfo_Value(t.track,"B_SHOWINMIXER")>0 and (fx_index(t) or perf_index(t) or t.model>=0) then
         local safe,msg=safe_row(t);if not safe then error(msg) end
         configure_perf(t)
         apply_row(t)
@@ -1516,7 +1518,7 @@ local function draw()
             for i,name in ipairs(roles) do
               if r.ImGui_Selectable(ctx,name,i==t.role) and not job then
                 local old=t.target;t.role=i;t.target=defaults[i];put("role:"..t.key,i);put("target:"..t.key,t.target)
-                t.timbre_allowed=not t.bus and i~=10 and i~=12
+                t.timbre_allowed=i~=10 and i~=12
                 for j,base in pairs(t.base) do t.base[j]=clamp(base+t.target-old,-30,24);put("base:"..t.key..":"..sections[j].key,t.base[j]) end
                 dirty[t]=true
               end
@@ -1534,8 +1536,12 @@ local function draw()
                 elseif k>1 and not t.timbre_allowed then status="Timbre processing is for source tracks, not busses or effects."
                 else
                   t.model=k-2
-                  r.GetSetMediaTrackInfo_String(t.track,"P_EXT:N2N_PERF_MODEL",tostring(t.model),true)
-                  dirty[t]=true;status="Timbre changed. Run Auto Mix to recalibrate loudness."
+                  local saved=r.GetSetMediaTrackInfo_String(t.track,"P_EXT:N2N_PERF_MODEL",tostring(t.model),true)
+                  if saved then
+                    dirty[t]=true;status=t.name..": "..name..". Run Auto Mix to recalibrate loudness."
+                  else
+                    status="Could not save timbre for "..t.name
+                  end
                 end
               end
             end
