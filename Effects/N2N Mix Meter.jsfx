@@ -1,7 +1,13 @@
 desc:N2N Mix Meter (diagnostic)
- // Original implementation of stereo K-weighted gated energy measurement.
- // Reference: ITU-R BS.1770, Annex 1. Sample peak only, not true peak.
- // Diagnostic protocol v1: section times in seconds; results per occurrence.
+version: 0.1.0
+author: Rock Kennedy
+about:
+  Stereo K-weighted gated energy measurement and gain control.
+  Reference: ITU-R BS.1770, Annex 1. Sample peak only, not true peak.
+  Diagnostic protocol v1: section times in seconds; results per occurrence.
+provides:
+  [main] .
+
 options:gmem=N2N_Mix_Analysis_v1
 slider1:0<-60,30,0.01>Gain (dB)
 slider2:0<0,256,1>-Instance slot
