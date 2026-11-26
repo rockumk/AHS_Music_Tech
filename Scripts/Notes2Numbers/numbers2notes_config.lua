@@ -1,5 +1,5 @@
 -- @description numbers2notes_config
--- @version 1.7.5
+-- @version 1.7.6
 -- @noindex
 -- @author Rock Kennedy
 -- @about
@@ -300,7 +300,9 @@ config.track_recipe = {
 -- [6] = Sends (Table). Keep as {} -- The Compiler routes these automatically!
 --[7] = Is MIDI? (Legacy integer, safe to ignore).
 -- [8] = Track Color (Table). { R, G, B }
--- [9] = Default Volume (Number). Linear scale (e.g., 1.0 is +0dB, 0.5 is -6dB).
+-- [9] = Initial gain (linear multiplier: 1.0 = 0 dB, 0.5 = -6 dB).
+--       MCP-visible new tracks apply this in the final N2N Mix JSFX, not the fader.
+--       Hidden MIDI/chart tracks keep their original fader values; rebuilds preserve existing mixes.
 -- =========================================================================================
 
 -- Example of the new condensed format:
@@ -333,7 +335,7 @@ config.track_table = {
 		[1] = {"N2N Topline", true, true, 0, {
             {nil , true, nil, 0},
             {"REPLACEFX", true, "N2N Vital Default", 0}
-        }, {}, 0, {207, 179, 160}, 0.4}
+        }, {}, 0, {207, 179, 160}, 0.75}
     },	
 	
 	[21] = {
@@ -353,7 +355,7 @@ config.track_table = {
             {"JS: N2N Arp.jsfx", true, nil, 3},
 			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACEPRESET", 0}
-        }, {}, 0, {160, 198, 207}, 0.2},
+        }, {}, 0, {160, 198, 207}, 0.85},
         [2] = {"N2N Sust. Chord ##", true, true, 0, {
             {"Chords_Assign_N2N.jsfx", true, nil, 3},
             {"ReaCenterMIDIpitch", false, nil, 3},
@@ -362,7 +364,7 @@ config.track_table = {
             {"ThisTriggersThat", false, nil, 3},
 			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACEPRESET", 0}
-        }, {}, 0, {160, 198, 207}, 1.0},
+        }, {}, 0, {160, 198, 207}, 0.75},
         [3] = {"N2N DrumA. Chord ##", true, true, 0, {
             {"JS: N2N Drum Arranger", true, nil, 3},
             {"REPLACEFX", true, "REPLACE PRESET", 0}
@@ -388,7 +390,7 @@ config.track_table = {
             {"JS: N2N Arp.jsfx", true, nil, 3},  
 			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACEPRESET", 0}
-        }, {}, 0, {198, 160, 207}, 0.4},
+        }, {}, 0, {198, 160, 207}, 0.50},
         [2] = {"N2N Sust. Chord-Bass ##", true, true, 0, {
             {"HeadStart", true, nil, 3},
             {"ReaCenterMIDIpitch", false, nil, 3},
@@ -424,7 +426,7 @@ config.track_table = {
             {"JS: N2N Arp.jsfx", true, nil, 3},
 			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACEPRESET", 0}
-        }, {}, 0, {160, 179, 207}, 1.0},
+        }, {}, 0, {160, 179, 207}, 0.65},
         [2] = {"N2N Sust. Bass ##", true, true, 0, {
             {"Bass_Assign_N2N.jsfx", true, nil, 3},
             {"ReaCenterMIDIpitch", false, nil, 3},
@@ -433,7 +435,7 @@ config.track_table = {
             {"ThisTriggersThat", false, nil, 3},
 			{"JS: Back2Key_N2N.jsfx", true, nil, 3},
             {"REPLACEFX", true, "REPLACEPRESET", 0}
-        }, {}, 0, {160, 179, 207}, 1.0},
+        }, {}, 0, {160, 179, 207}, 1.55},
         [3] = {"N2N DrumA. Bass ##", true, true, 0, {
             {"JS: N2N Drum Arranger", true, nil, 3},
             {"REPLACEFX", true, "REPLACEPRESET", 0}
@@ -460,17 +462,17 @@ config.track_table = {
 			{"JS: 32_to_2_Downmix_N2N", true, nil, 0},
 			{"JS: Cue_Pattern_Filter_N2N", true, nil, 0},
             {"JS:Violet Envelope Shaper S2", false, nil, 7}
-        }, {}, 0, {144, 144, 144}, 1.3}
+        }, {}, 0, {144, 144, 144}, 2.30}
     },
 	[30] = {
 		[1] = {"N2N REPLACEFX", false, true, 0, {
 			{"REPLACEFX", true, "REPLACEPRESET", 0},
 			{"JS:ReEQ", true, nil, 2}
-		}, {}, 1, {250, 250, 250}, 0.17}
+		}, {}, 1, {250, 250, 250}, 0.32}
     },
 	
     [99] = {
-        [1] = {"Audio ##", true, true, 0, {{"", false, nil, 3}}, {}, 1, {207, 207, 160}, 0},
+        [1] = {"Audio ##", true, true, 0, {{"", false, nil, 3}}, {}, 1, {207, 207, 160}, 1.0},
         [2] = {"Ac. Guitar Audio ##", true, true, 0, {{"", true, nil, 0}}, {}, 0, {207, 207, 160}, 1.0},
         [3] = {"Elec. Guitar Audio ##", true, true, 0, {{"", true, nil, 0}}, {}, 0, {207, 207, 160}, 1.0},
         [4] = {"Bass Audio", true, true, 0, {{"Bass Station S2", true, nil, 0}}, {}, 0, {207, 207, 160}, 1.0},
