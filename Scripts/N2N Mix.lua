@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.1.3
+-- @version 0.1.4
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -8,7 +8,7 @@ local NS="N2N_Mix_Analysis_v1"
 local STORE="N2N Mix v1"
 local MAX=256
 local FXNAME="N2N Mix Meter"
-local roles={"Lead Vocal","Lead Instrument / Topline","Drums","Bass","Primary Accompaniment","Background Vocals","Secondary Accompaniment","Traditional Arpeggiator","Pad / Texture","Effects","Unclassified","Buss"}
+local roles={"Lead Vocal","Lead Instrument","Drums","Bass","Primary Accomp.","BG Vocals","Secondary Accomp.","Traditional Arp","Pad / Texture","Effects","Unclassified","Buss"}
 local defaults={-22,-24,-25,-25,-27,-28,-30,-32,-35,-40,-30,-27}
 local intensity={-3,0,2,4}
 local intens_names={"Soft","Normal","Strong","Very Strong"}
@@ -28,17 +28,19 @@ local transition_start=nil
 local last_paint=nil
 local stroke=nil
 local ui_font=nil
-local UI_SIZE=18
-local CELL_H=36
-local LEFT_W=465
-local GAP=4
+local UI_SIZE=13
+local CELL_H=26
+local LEFT_W=348
+local GAP=3
 local display_cols={}
 local font_new_api=nil
 local preset=1
 local custom=-16
 local peak_ceiling=-2 -- sample-peak guard; not a true-peak guarantee
 local boundary_ramp=0.250 -- seconds; ordinary level changes, not explicit transitions
-local selected_mode="Offline"
+local alert_text,alert_until="",0
+local refresh_at=0
+local layout_sig=""
 local last_stats=""
 local last_verified=""
 local ctx
@@ -76,7 +78,7 @@ local function read_sections()
     if s.a<0 or (j>1 and s.a<a[j-1].b-0.00001) then return nil,"Overlapping or negative-time regions are not supported." end
     s.key=string.format("%d:%s:%.6f:%.6f",s.id,s.name,s.a,s.b)
     s.countin=s.name:lower():gsub("[^a-z]","")=="countin"
-    s.int=clamp(num("int:"..s.key,2),1,4)
+    s.int=clamp(num("int:"..s.key,2),1,5)
     s.bars={}
     local q=r.TimeMap2_timeToQN(proj,s.a)
     local qend=r.TimeMap2_timeToQN(proj,s.b)
@@ -87,7 +89,7 @@ local function read_sections()
       local e=math.min(s.b,r.TimeMap2_QNToTime(proj,q))
       if e<=start+0.000001 then e=s.b end
       local b=#s.bars+1
-      s.bars[b]={a=start,b=e,int=clamp(num("int:"..s.key..":"..b,s.int),1,4)}
+      s.bars[b]={a=start,b=e,int=clamp(num("int:"..s.key..":"..b,s.int),1,5)}
       start=e
       if #s.bars>4096 then return nil,"Section too long for grid." end
     end
@@ -129,13 +131,12 @@ local function refresh()
       local row={track=t,key=track_key(t),name=name,fxguid=get_owned(t),cells={},base={},reports={},deps={},depth=0}
       local _,initial=r.GetSetMediaTrackInfo_String(t,"P_EXT:N2N_MIX_INITIAL_DB","",false)
       row.initial=clamp(tonumber(initial) or 0,-60,30)
-      row.bus=r.GetMediaTrackInfo_Value(t,"I_FOLDERDEPTH")>0
+      row.bus=false
       for k=0,r.GetTrackNumSends(t,-1)-1 do
         if r.GetTrackSendInfo_Value(t,-1,k,"I_SRCCHAN")>=0 and r.GetTrackSendInfo_Value(t,-1,k,"B_MUTE")==0 then row.bus=true;break end
       end
       row.role=clamp(num("role:"..row.key,role_guess(t,name,row.bus)),1,#roles)
       row.target=num("target:"..row.key,defaults[row.role])
-      row.bus=row.bus or row.role==10 or row.role==12
       for j,s in ipairs(sections) do
         local prefix=row.key..":"..s.key
         row.cells[j]={}
@@ -146,31 +147,53 @@ local function refresh()
       rows[#rows+1]=row; byptr[t]=row
     end
   end
-  -- Dependency graph: audio receives and folder routing. Hidden tracks are never instrumented.
-  for _,row in ipairs(rows) do
-    local t=row.track
-    for i=0,r.GetTrackNumSends(t,0)-1 do
-      local dest=r.GetTrackSendInfo_Value(t,0,i,"P_DESTTRACK")
-      if r.GetTrackSendInfo_Value(t,0,i,"I_SRCCHAN")>=0 and r.GetTrackSendInfo_Value(t,0,i,"B_MUTE")==0 and byptr[dest] then
-        byptr[dest].deps[row]=true
+  -- Plan from audio edges, not track labels or folder status. Hidden tracks
+  -- may carry audio, but are traversed read-only and never receive a meter.
+  local nodes={}
+  for i=0,r.CountTracks(proj)-1 do
+    local t=r.GetTrack(proj,i)
+    nodes[t]={track=t,row=byptr[t],incoming={}}
+  end
+  local function is_n2n_midi_only(t)
+    local _,id=r.GetSetMediaTrackInfo_String(t,"P_EXT:N2N:ID","",false)
+    local _,cue=r.GetSetMediaTrackInfo_String(t,"P_EXT:N2N:IS_CUECHILD","",false)
+    if cue=="1" then return true end
+    return not byptr[t] and (id:match("^%d+_0$")~=nil or id:match("^[1567]_1$")~=nil or id=="15_1" or id=="4_1")
+  end
+  local function edge(src,dst)
+    if nodes[src] and nodes[dst] then nodes[dst].incoming[src]=true end
+  end
+  for t in pairs(nodes) do
+    if not is_n2n_midi_only(t) then
+      for i=0,r.GetTrackNumSends(t,0)-1 do
+        local dest=r.GetTrackSendInfo_Value(t,0,i,"P_DESTTRACK")
+        local chan=r.GetTrackSendInfo_Value(t,0,i,"I_SRCCHAN")
+        local muted=r.GetTrackSendInfo_Value(t,0,i,"B_MUTE")
+        local mode=r.GetTrackSendInfo_Value(t,0,i,"I_SENDMODE")
+        -- Pre-FX sends are independent of our end-of-chain gain.
+        if chan>=0 and muted==0 and mode~=1 then edge(t,dest) end
       end
+      local parent=r.GetParentTrack(t)
+      if parent and r.GetMediaTrackInfo_Value(t,"B_MAINSEND")>0 then edge(t,parent) end
     end
-    local parent=r.GetParentTrack(t)
-    if parent and byptr[parent] and r.GetMediaTrackInfo_Value(t,"B_MAINSEND")>0 then byptr[parent].deps[row]=true end
   end
   local visiting={}
-  local function depth(row)
-    if row.depth_done then return row.depth end
-    if visiting[row] then error("Audio routing cycle among visible tracks.") end
-    visiting[row]=true
-    local d=row.bus and 1 or 0
-    for dep in pairs(row.deps) do d=math.max(d,depth(dep)+1) end
-    row.depth=d;row.depth_done=true;visiting[row]=nil
+  local function depth(node)
+    if node.done then return node.depth end
+    if visiting[node] then error("Audio routing feedback detected. Auto Mix cannot safely order a feedback loop.") end
+    visiting[node]=true
+    local d=0
+    for src in pairs(node.incoming) do
+      local upstream=nodes[src]
+      d=math.max(d,depth(upstream)+(upstream.row and 1 or 0))
+    end
+    node.depth=d;node.done=true;visiting[node]=nil
     return d
   end
   local ok,e=pcall(function()
     for _,row in ipairs(rows) do
-      local d=depth(row)
+      local d=depth(nodes[row.track])
+      row.depth=d
       groups[d]=groups[d] or {};groups[d][#groups[d]+1]=row
     end
   end)
@@ -355,7 +378,6 @@ end
 local function cleanup()
   attach();r.gmem_write(0,0)
   if job then
-    if job.mode=="Real time" then r.OnStopButtonEx(proj) end
     r.GetSet_LoopTimeRange2(proj,true,false,job.a,job.b,false)
     r.GetSetRepeatEx(proj,job.repeat_state)
     r.SetEditCurPos2(proj,job.cursor,false,false)
@@ -367,6 +389,7 @@ local function finish(msg)
   note(msg)
   r.Undo_EndBlock2(proj,"N2N Mix: "..job.kind,-1)
   job=nil;pass=nil
+  if msg:match("^Auto Mix complete") then alert_text="Processing done.";alert_until=r.time_precise()+1.8 else alert_text="";alert_until=0 end
   r.UpdateArrange()
 end
 local function fail(e) finish("Stopped: "..tostring(e)..". Undo N2N Mix to revert partial changes.") end
@@ -414,7 +437,7 @@ local function complete_pass(stats)
     if peak>peak_ceiling+0.1 then
       local g=num("mastergain",0)-(peak-peak_ceiling)
       flat(master,g);put("mastergain",g)
-      last_verified=last_verified.." Additional peak correction applied; rerun Master to verify."
+      last_verified=last_verified.." Additional peak correction applied; run Auto Mix again to verify."
     end
     note(last_verified)
   end
@@ -435,70 +458,51 @@ local function arm(p)
   p.token=tok; p.phase="armed";pass=p
   r.gmem_write(0,1)
   r.GetSet_LoopTimeRange2(proj,true,false,sections[1].a,sections[#sections].b+0.1,false)
-  note(p.name.." — listening ("..job.mode..")")
+  note(p.name.." — offline analysis")
 end
 local function step()
-  if not job then return end
+  if not job or r.time_precise()<job.ready_at then return end
   if not pass then
     local p=job.queue[job.index]
-    if not p then finish("Fine tune complete. "..last_verified);return end
-    arm(p);return -- draw armed state before render
+    if not p then finish("Auto Mix complete. "..last_verified);return end
+    arm(p);return
   end
-  if pass.phase=="armed" then
-    if job.mode=="Real time" and pass.kind=="track" then
-      r.GetSetRepeatEx(proj,0);r.SetEditCurPos2(proj,sections[1].a,false,false);r.OnPlayButtonEx(proj)
-      pass.phase="playing";pass.started=r.time_precise()
-    else
-      -- Native render stats are required for integrated whole-master loudness.
-      local _,stats=r.GetSetProjectInfo_String(proj,"RENDER_STATS",tostring(job.cmd),false)
-      complete_pass(stats)
-    end
-  elseif pass.phase=="playing" then
-    poll()
-    if r.GetPlayPositionEx(proj)>=sections[#sections].b+0.05 then
-      r.OnStopButtonEx(proj);complete_pass("")
-    elseif r.GetPlayStateEx(proj)&1==0 and r.time_precise()-pass.started>0.5 then
-      error("Playback stopped before end")
-    end
-  end
+  local _,stats=r.GetSetProjectInfo_String(proj,"RENDER_STATS",tostring(job.cmd),false)
+  complete_pass(stats)
 end
-local function start(kind)
+local function start()
   if next(dirty) then status="Finish current grid edit first.";return end
-  if not stopped() then status="Stop transport first.";return end
+  if not stopped() then status="Stop transport before Auto Mix.";return end
   if not refresh() then return end
   if math.abs(r.Master_GetPlayRate(proj)-1)>0.0001 then status="Set project play rate to 1.0.";return end
-  local override=r.GetGlobalAutomationOverride()
-  if override>1 then status="Disable global automation write/bypass override.";return end
+  if r.GetGlobalAutomationOverride()>1 then status="Disable global automation write/bypass override.";return end
   attach()
   if r.gmem_read(0)==1 then status="Another analysis is armed.";return end
   local cmd=action_id()
   if not cmd then status="Native dry-run action not found.";return end
   local q,selected={},{}
-  if kind=="All" or kind=="Instruments" then
-    if groups[0] then q[#q+1]={kind="track",name="1. Instruments",rows=groups[0]} end
+  for d=0,#rows do
+    if groups[d] and #groups[d]>0 then
+      local label=d==0 and "Source tracks" or ("Downstream audio layer "..d)
+      q[#q+1]={kind="track",name=label.." ("..#groups[d].." tracks)",rows=groups[d]}
+    end
   end
-  if kind=="All" or kind=="Busses & FX" then
-    for d=1,#rows do if groups[d] then q[#q+1]={kind="track",name="2. Busses / FX layer "..d,rows=groups[d]} end end
-  end
-  if kind=="All" or kind=="Master" then
-    q[#q+1]={kind="master",name="3. Master",rows={master}}
-    q[#q+1]={kind="verify",name="Verify master",rows={master}}
-  end
-  if #q==0 then status="No eligible tracks for this stage.";return end
+  q[#q+1]={kind="master",name="Master",rows={master}}
+  q[#q+1]={kind="verify",name="Master verification",rows={master}}
   for _,p in ipairs(q) do for _,t in ipairs(p.rows) do selected[t]=true end end
   for t in pairs(selected) do local ok,e=safe_row(t);if not ok then status=e;return end end
   local a,b=r.GetSet_LoopTimeRange2(proj,false,false,0,0,false)
   r.Undo_BeginBlock2(proj)
-  job={queue=q,index=1,kind=kind,mode=selected_mode,cmd=cmd,a=a,b=b,cursor=r.GetCursorPositionEx(proj),repeat_state=r.GetSetRepeatEx(proj,-1)}
+  job={queue=q,index=1,kind="Auto Mix",cmd=cmd,a=a,b=b,cursor=r.GetCursorPositionEx(proj),repeat_state=r.GetSetRepeatEx(proj,-1),ready_at=r.time_precise()+1.4}
   last_verified="";last_stats=""
+  alert_text="Processing please wait.";alert_until=job.ready_at
   local ok,e=pcall(function()
     for t in pairs(selected) do
       ensure_fx(t)
       r.SetMediaTrackInfo_Value(t.track,"D_VOL",1)
       flat(t,0)
     end
-    -- A previous master gain must not influence a new master pass; it was reset above.
-    note("Fine tune "..kind.." prepared. Faders at unity for participating stages.")
+    note(string.format("Audio routing: %d track layers, master and verification.",#q-2))
   end)
   if not ok then fail(e) end
 end
@@ -767,12 +771,12 @@ local function tool_button(i)
   if clicked then tool=i;transition_start=nil end
 end
 local function apply_dirty()
-  if not next(dirty) or job or not stopped() then return end
+  if not next(dirty) or job or r.EnumProjects(-1,"")~=proj or (r.GetPlayStateEx(proj)&4)~=0 then return end
   if r.GetGlobalAutomationOverride()>1 then status="Disable global automation write/bypass before editing.";return end
   r.Undo_BeginBlock2(proj)
   local ok,e=pcall(function()
     for t in pairs(dirty) do
-      if fx_index(t) then
+      if valid(t.track) and r.GetMediaTrackInfo_Value(t.track,"B_SHOWINMIXER")>0 and fx_index(t) then
         local safe,msg=safe_row(t);if not safe then error(msg) end
         apply_row(t)
       end
