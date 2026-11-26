@@ -1,5 +1,5 @@
 -- @description numbers2notes_config
--- @version 1.7.6
+-- @version 1.7.7
 -- @noindex
 -- @author Rock Kennedy
 -- @about
@@ -342,13 +342,13 @@ config.track_table = {
 		[1] = {"Black Key Live", true, true, 0, {
             {"JS: Mood2Mode", true, nil, 0},
             {"REPLACEFX", true, "N2N Vital Default", 0}
-        }, {}, 0, {207, 179, 160}, 0.4}
+        }, {}, 0, {207, 179, 160}, 0.75}
     },	
     [22] = {
 		[1] = {"White Key Live", true, true, 0, {
             {"JS: Mood2Mode", true, nil, 0},
             {"REPLACEFX", true, "N2N Vital Default", 0}
-        }, {}, 0, {207, 179, 160}, 0.4}
+        }, {}, 0, {207, 179, 160}, 0.75}
     },
     [16] = {[0] = {"N2N Chord MIDI Source", true, false, 1, {}, {}, 1, {107, 138, 145}, 0},
         [1] = {"N2N Arp Chord ##", true, true, 0, {
@@ -472,7 +472,7 @@ config.track_table = {
     },
 	
     [99] = {
-        [1] = {"Audio ##", true, true, 0, {{"", false, nil, 3}}, {}, 1, {207, 207, 160}, 1.0},
+        [1] = {"Audio ##", true, true, 0, {{"", false, nil, 3}}, {}, 1, {207, 207, 160}, 0.75},
         [2] = {"Ac. Guitar Audio ##", true, true, 0, {{"", true, nil, 0}}, {}, 0, {207, 207, 160}, 1.0},
         [3] = {"Elec. Guitar Audio ##", true, true, 0, {{"", true, nil, 0}}, {}, 0, {207, 207, 160}, 1.0},
         [4] = {"Bass Audio", true, true, 0, {{"Bass Station S2", true, nil, 0}}, {}, 0, {207, 207, 160}, 1.0},
