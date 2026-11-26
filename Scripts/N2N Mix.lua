@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.1.5
+-- @version 0.1.6
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -319,6 +319,15 @@ local function write_points(t,pts)
   r.Envelope_SortPointsEx(env,-1)
 end
 local function flat(t,db) write_points(t,{{0,db,0}}) end
+local section_fill={[6]=0,[1]=0.25,[2]=0.5,[3]=0.75,[4]=1}
+-- Fade progress is a linear musical contour, not a linear interpolation of -60 dB.
+local function section_db(f)
+  f=clamp(f,0,1)
+  if f<=0 then return -60 end
+  if f<0.25 then return math.max(-60,-3+20*math.log(f/0.25,10)) end
+  if f<0.5 then return -3+12*(f-0.25) end
+  return 8*(f-0.5)
+end
 local function intensity_contour()
   local all,map={},{}
   for j,s in ipairs(sections) do
@@ -332,17 +341,19 @@ local function intensity_contour()
   while i<=#all do
     local x=all[i]
     if x.v~=5 or x.ignore then
-      x.d0=x.ignore and 0 or (intensity[x.v] or 0);x.d1=x.d0;i=i+1
+      x.f0=x.ignore and 0.5 or (section_fill[x.v] or 0.5);x.f1=x.f0
+      x.d0=section_db(x.f0);x.d1=x.d0;i=i+1
     else
       local first=i
       while i<=#all and all[i].v==5 and not all[i].ignore and (i==first or math.abs(all[i].a-all[i-1].b)<0.001) do i=i+1 end
       local last=i-1
       local p,n=all[first-1],all[i]
-      local a=p and not p.ignore and math.abs(p.b-all[first].a)<0.001 and (intensity[p.v] or 0) or intensity[1]
-      local z=n and not n.ignore and math.abs(n.a-all[last].b)<0.001 and (intensity[n.v] or 0) or intensity[1]
+      local a=p and not p.ignore and math.abs(p.b-all[first].a)<0.001 and (section_fill[p.v] or 0.5) or 0
+      local z=n and not n.ignore and math.abs(n.a-all[last].b)<0.001 and (section_fill[n.v] or 0.5) or 0
       local t0,t1=all[first].a,all[last].b
       for k=first,last do
-        local b=all[k];b.d0=a+(z-a)*(b.a-t0)/(t1-t0);b.d1=a+(z-a)*(b.b-t0)/(t1-t0)
+        local b=all[k];b.f0=a+(z-a)*(b.a-t0)/(t1-t0);b.f1=a+(z-a)*(b.b-t0)/(t1-t0)
+        b.d0=section_db(b.f0);b.d1=section_db(b.f1)
       end
     end
   end
@@ -405,7 +416,7 @@ local function apply_row(t)
     for b,span in ipairs(s.bars) do
       local v=t.cells[j][b]
       local d=contour[j][b]
-      bars[#bars+1]={a=span.a,b=span.b,j=j,v=v,d0=d.d0,d1=d.d1,ignore=s.countin}
+      bars[#bars+1]={a=span.a,b=span.b,j=j,v=v,f0=d.f0,f1=d.f1,ignore=s.countin}
     end
   end
   local function db_at(x,off)
@@ -431,16 +442,29 @@ local function apply_row(t)
       for k=first,last do local b=bars[k];b.g0=a+(z-a)*(b.a-t0)/(t1-t0);b.g1=a+(z-a)*(b.b-t0)/(t1-t0) end
     end
   end
-  -- Add the independent intensity contour after calculating the track transition.
-  -- Downstream tracks already receive the source intensity through the routing.
+  -- Split only at the musical intensity breakpoints; master handles below Soft.
+  local result={}
   for _,b in ipairs(bars) do
-    if t.depth==0 and not b.ignore and b.v~=1 then
-      if b.g0>-60 then b.g0=b.g0+math.max(-3,b.d0) end
-      if b.g1>-60 then b.g1=b.g1+math.max(-3,b.d1) end
+    local cuts={0,1}
+    local add_int=t.depth==0 and not b.ignore and b.v~=1
+    if add_int and math.abs(b.f1-b.f0)>1e-9 then
+      for _,f in ipairs({0.25,0.5,0.75}) do
+        local cross=(f-b.f0)/(b.f1-b.f0)
+        if cross>0 and cross<1 then cuts[#cuts+1]=cross end
+      end
+      table.sort(cuts)
     end
-    b.g0=clamp(b.g0,-60,30);b.g1=clamp(b.g1,-60,30)
+    local function value(u)
+      local g=b.g0+(b.g1-b.g0)*u
+      if add_int and g>-60 then g=g+math.max(-3,section_db(b.f0+(b.f1-b.f0)*u)) end
+      return clamp(g,-60,30)
+    end
+    for k=2,#cuts do
+      local a,z=cuts[k-1],cuts[k]
+      result[#result+1]={a=b.a+(b.b-b.a)*a,b=b.a+(b.b-b.a)*z,g0=value(a),g1=value(z)}
+    end
   end
-  write_points(t,contour_points(bars,t.initial or 0))
+  write_points(t,contour_points(result,t.initial or 0))
 end
 -- Global silence is applied at the master, after effects and busses.
 -- Normal section intensity stays at the sources; only the portion below Soft
@@ -455,13 +479,21 @@ local function apply_master(gain)
   for j,s in ipairs(sections) do
     for b,span in ipairs(s.bars) do
       local d=contour[j][b]
-      -- Split where the global fade meets Soft to avoid smearing the breakpoint.
-      if (d.d0+3)*(d.d1+3)<0 then
-        local at=span.a+(span.b-span.a)*(-3-d.d0)/(d.d1-d.d0)
-        bars[#bars+1]={a=span.a,b=at,g0=value(d.d0),g1=value(-3)}
-        bars[#bars+1]={a=at,b=span.b,g0=value(-3),g1=value(d.d1)}
-      else
-        bars[#bars+1]={a=span.a,b=span.b,g0=value(d.d0),g1=value(d.d1)}
+      -- Approximate the amplitude-linear fade in dB with closely spaced
+      -- points, retaining exact endpoints and the Soft crossing.
+      local cuts={0,1}
+      if math.abs(d.f1-d.f0)>1e-9 then
+        for k=1,31 do cuts[#cuts+1]=k/32 end
+        local cross=(0.25-d.f0)/(d.f1-d.f0)
+        if cross>0 and cross<1 then cuts[#cuts+1]=cross end
+        table.sort(cuts)
+      end
+      for k=2,#cuts do
+        local a,b=cuts[k-1],cuts[k]
+        if b-a>1e-9 then
+          bars[#bars+1]={a=span.a+(span.b-span.a)*a,b=span.a+(span.b-span.a)*b,
+            g0=value(section_db(d.f0+(d.f1-d.f0)*a)),g1=value(section_db(d.f0+(d.f1-d.f0)*b))}
+        end
       end
     end
   end
@@ -863,14 +895,13 @@ local function intensity_cell(c,contour,ci)
   local hover=r.ImGui_IsItemHovered(ctx,r.ImGui_HoveredFlags_AllowWhenBlockedByActiveItem())
   local light,dark=0xDADADAFF,0x858585FF
   r.ImGui_DrawList_AddRectFilled(dl,x,y,x+c.w,y+CELL_H,light,0)
-  local function f(d) return d<=-60 and 0 or d< -3 and 0.25*(d+60)/57 or clamp(0.25+0.75*(d+3)/7,0,1) end
   local f0,f1
   if v==5 then
     local a=contour[c.j][c.b or 1]
     local b=contour[c.j][c.b or #s.bars]
-    f0,f1=f(a.d0),f(b.d1)
+    f0,f1=a.f0,b.f1
   elseif v==0 then f0,f1=0.5,0.5
-  elseif not s.countin then f0,f1=f(intensity[v]),f(intensity[v])
+  elseif not s.countin then f0,f1=section_fill[v],section_fill[v]
   else f0,f1=0,0 end
   if f0>0 or f1>0 then
     r.ImGui_DrawList_AddQuadFilled(dl,x,y+CELL_H*(1-f0),x+c.w,y+CELL_H*(1-f1),x+c.w,y+CELL_H,x,y+CELL_H,dark)
