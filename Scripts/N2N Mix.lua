@@ -61,6 +61,9 @@ local function get(k,d)
 end
 local function put(k,v) r.SetProjExtState(proj,STORE,k,tostring(v)) end
 local function num(k,d) return tonumber(get(k,"")) or d end
+local function new_ramp()
+  local id=num("ramp_serial",0)+1;put("ramp_serial",id);return id
+end
 local function attach() r.gmem_attach(NS) end
 local function valid(t) return r.ValidatePtr2(proj,t,"MediaTrack*") end
 local function stopped() return r.EnumProjects(-1,"")==proj and r.GetPlayStateEx(proj)==0 end
@@ -97,7 +100,7 @@ local function read_sections()
       local e=math.min(s.b,r.TimeMap2_QNToTime(proj,q))
       if e<=start+0.000001 then e=s.b end
       local b=#s.bars+1
-      s.bars[b]={a=start,b=e,int=clamp(num("int:"..s.key..":"..b,s.int),1,6)}
+      s.bars[b]={a=start,b=e,int=clamp(num("int:"..s.key..":"..b,s.int),1,6),ramp=num("iramp:"..s.key..":"..b,0)}
       start=e
       if #s.bars>4096 then return nil,"Section too long for grid." end
     end
@@ -156,7 +159,7 @@ local function refresh()
     local t=r.GetTrack(proj,i)
     if r.GetMediaTrackInfo_Value(t,"B_SHOWINMIXER")>0 then
       local _,name=r.GetTrackName(t)
-      local row={track=t,key=track_key(t),name=name,fxguid=get_owned(t),cells={},base={},reports={},deps={},depth=0}
+      local row={track=t,key=track_key(t),name=name,fxguid=get_owned(t),cells={},ramps={},base={},reports={},deps={},depth=0}
       local _,initial=r.GetSetMediaTrackInfo_String(t,"P_EXT:N2N_MIX_INITIAL_DB","",false)
       row.initial=clamp(tonumber(initial) or 0,-60,30)
       row.bus=false
@@ -167,10 +170,11 @@ local function refresh()
       row.target=num("target:"..row.key,defaults[row.role])
       for j,s in ipairs(sections) do
         local prefix=row.key..":"..s.key
-        row.cells[j]={}
+        row.cells[j]={};row.ramps[j]={}
         for b=1,#s.bars do
           local v=clamp(num("cell:"..prefix..":"..b,4),1,9)
           row.cells[j][b]=v==7 and 6 or v
+          row.ramps[j][b]=num("ramp:"..prefix..":"..b,0)
         end
         local cached=tonumber(get("base:"..prefix,""))
         if cached and fx_index(row) then row.base[j]=cached end
@@ -331,12 +335,33 @@ local function section_db(f)
   if f<0.5 then return -3+12*(f-0.25) end
   return 8*(f-0.5)
 end
+local function ramp_chain(all,first,transition,fill,low,high)
+  -- Contiguous transition bars are divided into individual painted spans.
+  -- Legacy spans have id 0. Adjacent independently painted spans alternate
+  -- peak/valley at their shared boundaries instead of collapsing into one.
+  local i=first;local spans={}
+  while i<=#all and all[i].v==transition and not all[i].ignore and (i==first or math.abs(all[i].a-all[i-1].b)<0.001) do
+    local x=all[i];local span=spans[#spans]
+    if not span or span.id~=x.ramp then span={first=i,last=i,id=x.ramp};spans[#spans+1]=span else span.last=i end
+    i=i+1
+  end
+  local p,n=all[first-1],all[i]
+  local left=p and not p.ignore and math.abs(p.b-all[first].a)<0.001 and p or nil
+  local right=n and not n.ignore and math.abs(n.a-all[i-1].b)<0.001 and n or nil
+  local rising=not left or fill(left.v)<=0.5
+  for k,span in ipairs(spans) do
+    span.left=k==1 and left or nil;span.right=k==#spans and right or nil
+    span.lv=k==1 and (left and left.v or low) or ((k%2==0)==rising and high or low)
+    span.rv=k==#spans and (right and right.v or low) or ((k%2==1)==rising and high or low)
+  end
+  return spans,i
+end
 local function intensity_contour()
   local all,map={},{}
   for j,s in ipairs(sections) do
     map[j]={}
     for b,bar in ipairs(s.bars) do
-      local x={a=bar.a,b=bar.b,v=bar.int,ignore=s.countin}
+      local x={a=bar.a,b=bar.b,v=bar.int,ramp=bar.ramp or 0,ignore=s.countin}
       all[#all+1]=x;map[j][b]=x
     end
   end
@@ -347,16 +372,16 @@ local function intensity_contour()
       x.f0=x.ignore and 0.5 or (section_fill[x.v] or 0.5);x.f1=x.f0
       x.d0=section_db(x.f0);x.d1=x.d0;i=i+1
     else
-      local first=i
-      while i<=#all and all[i].v==5 and not all[i].ignore and (i==first or math.abs(all[i].a-all[i-1].b)<0.001) do i=i+1 end
-      local last=i-1
-      local p,n=all[first-1],all[i]
-      local a=p and not p.ignore and math.abs(p.b-all[first].a)<0.001 and (section_fill[p.v] or 0.5) or 0
-      local z=n and not n.ignore and math.abs(n.a-all[last].b)<0.001 and (section_fill[n.v] or 0.5) or 0
-      local t0,t1=all[first].a,all[last].b
-      for k=first,last do
-        local b=all[k];b.f0=a+(z-a)*(b.a-t0)/(t1-t0);b.f1=a+(z-a)*(b.b-t0)/(t1-t0)
-        b.d0=section_db(b.f0);b.d1=section_db(b.f1)
+      local spans,next_i=ramp_chain(all,i,5,function(v) return section_fill[v] or 0.5 end,6,4)
+      i=next_i
+      for _,span in ipairs(spans) do
+        local a,z=section_fill[span.lv],section_fill[span.rv]
+        local t0,t1=all[span.first].a,all[span.last].b
+        for k=span.first,span.last do
+          local b=all[k]
+          b.f0=a+(z-a)*(b.a-t0)/(t1-t0);b.f1=a+(z-a)*(b.b-t0)/(t1-t0)
+          b.d0=section_db(b.f0);b.d1=section_db(b.f1)
+        end
       end
     end
   end
@@ -412,6 +437,7 @@ local function contour_points(bars,initial)
   end
   return pts
 end
+local function track_fill(v) return v==0 and 0.5 or v==8 and 1 or (math.min(v,6)-1)/6 end
 local function apply_row(t)
   local bars={}
   local contour=intensity_contour()
@@ -419,7 +445,7 @@ local function apply_row(t)
     for b,span in ipairs(s.bars) do
       local v=t.cells[j][b]
       local d=contour[j][b]
-      bars[#bars+1]={a=span.a,b=span.b,j=j,v=v,f0=d.f0,f1=d.f1,ignore=s.countin}
+      bars[#bars+1]={a=span.a,b=span.b,j=j,v=v,ramp=t.ramps[j][b] or 0,f0=d.f0,f1=d.f1,ignore=s.countin}
     end
   end
   local function db_at(x,off)
@@ -435,14 +461,19 @@ local function apply_row(t)
     if x.v~=9 or x.ignore then
       x.g0=db_at(x,offset(x.v));x.g1=x.g0;i=i+1
     else
-      local first=i
-      while i<=#bars and bars[i].v==9 and not bars[i].ignore and (i==first or math.abs(bars[i].a-bars[i-1].b)<0.001) do i=i+1 end
-      local last=i-1
-      local p,n=bars[first-1],bars[i]
-      local a=p and not p.ignore and math.abs(p.b-bars[first].a)<0.001 and db_at(p,offset(p.v)) or -60
-      local z=n and not n.ignore and math.abs(n.a-bars[last].b)<0.001 and db_at(n,offset(n.v)) or -60
-      local t0,t1=bars[first].a,bars[last].b
-      for k=first,last do local b=bars[k];b.g0=a+(z-a)*(b.a-t0)/(t1-t0);b.g1=a+(z-a)*(b.b-t0)/(t1-t0) end
+      local spans,next_i=ramp_chain(bars,i,9,track_fill,1,8)
+      i=next_i
+      local previous_end
+      for _,span in ipairs(spans) do
+        local a=previous_end or (span.left and db_at(span.left,offset(span.lv)) or -60)
+        local z=span.right and db_at(span.right,offset(span.rv)) or
+          (span.rv==1 and -60 or db_at(bars[span.last],offset(span.rv)))
+        local t0,t1=bars[span.first].a,bars[span.last].b
+        for k=span.first,span.last do
+          local b=bars[k];b.g0=a+(z-a)*(b.a-t0)/(t1-t0);b.g1=a+(z-a)*(b.b-t0)/(t1-t0)
+        end
+        previous_end=z
+      end
     end
   end
   -- Split only at the musical intensity breakpoints; master handles below Soft.
@@ -504,7 +535,10 @@ local function apply_master(gain)
 end
 local function save_cells(t,j)
   local s=sections[j]
-  for b,v in ipairs(t.cells[j]) do put("cell:"..t.key..":"..s.key..":"..b,v) end
+  for b,v in ipairs(t.cells[j]) do
+    put("cell:"..t.key..":"..s.key..":"..b,v)
+    put("ramp:"..t.key..":"..s.key..":"..b,t.ramps[j][b] or 0)
+  end
 end
 local function action_id()
   local sec=r.SectionFromUniqueID(0)
@@ -802,16 +836,17 @@ local function edit_cell(t,j,b,chosen)
     local start_b,end_b=s0.b,b
     if s0.j>j then start_b,end_b=b,s0.b end
     if start_j==end_j and start_b and end_b then start_b,end_b=math.min(start_b,end_b),math.max(start_b,end_b) end
+    local ramp=new_ramp()
     for k=start_j,end_j do
       if not sections[k].countin then
         local x=k==start_j and start_b or 1
         local y=k==end_j and end_b or #sections[k].bars
-        for n=x or 1,y or #sections[k].bars do t.cells[k][n]=9 end
+        for n=x or 1,y or #sections[k].bars do t.cells[k][n]=9;t.ramps[k][n]=ramp end
         save_cells(t,k)
       end
     end
   else
-    if b then t.cells[j][b]=chosen else for k=1,#t.cells[j] do t.cells[j][k]=chosen end end
+    if b then t.cells[j][b]=chosen;t.ramps[j][b]=0 else for k=1,#t.cells[j] do t.cells[j][k]=chosen;t.ramps[j][k]=0 end end
     save_cells(t,j)
   end
   dirty[t]=true
@@ -881,7 +916,7 @@ local function symbol(dl,x,y,w,h,v)
     end
   end
 end
-local function fill_for(v) return v==0 and 0.5 or v==8 and 1 or (math.min(v,6)-1)/6 end
+local fill_for=track_fill
 -- Display musical prominence using the same time interpolation as the audio transition.
 local function transition_fills(t)
   local all,map={},{}
@@ -889,7 +924,7 @@ local function transition_fills(t)
     map[j]={}
     for b,bar in ipairs(s.bars) do
       local v=t.cells[j][b]
-      local x={a=bar.a,b=bar.b,v=v,ignore=s.countin}
+      local x={a=bar.a,b=bar.b,v=v,ramp=t.ramps[j][b] or 0,ignore=s.countin}
       all[#all+1]=x;map[j][b]=x
     end
   end
@@ -899,16 +934,14 @@ local function transition_fills(t)
     if x.v~=9 or x.ignore then
       x.f0=fill_for(x.ignore and 1 or x.v);x.f1=x.f0;i=i+1
     else
-      local first=i
-      while i<=#all and all[i].v==9 and not all[i].ignore and
-        (i==first or math.abs(all[i].a-all[i-1].b)<0.001) do i=i+1 end
-      local last=i-1
-      local p,n=all[first-1],all[i]
-      local a=p and not p.ignore and math.abs(p.b-all[first].a)<0.001 and fill_for(p.v) or 0
-      local z=n and not n.ignore and math.abs(n.a-all[last].b)<0.001 and fill_for(n.v) or 0
-      local t0,t1=all[first].a,all[last].b
-      for k=first,last do
-        local b=all[k];b.f0=a+(z-a)*(b.a-t0)/(t1-t0);b.f1=a+(z-a)*(b.b-t0)/(t1-t0)
+      local spans,next_i=ramp_chain(all,i,9,fill_for,1,8)
+      i=next_i
+      for _,span in ipairs(spans) do
+        local a,z=fill_for(span.lv),fill_for(span.rv)
+        local t0,t1=all[span.first].a,all[span.last].b
+        for k=span.first,span.last do
+          local b=all[k];b.f0=a+(z-a)*(b.a-t0)/(t1-t0);b.f1=a+(z-a)*(b.b-t0)/(t1-t0)
+        end
       end
     end
   end
@@ -926,7 +959,8 @@ local function popup_level(t,j,b,v,id)
       end
     end
     if r.ImGui_Selectable(ctx,"Transition",v==9) then
-      if b then t.cells[j][b]=9 else for k=1,#t.cells[j] do t.cells[j][k]=9 end end
+      local ramp=new_ramp()
+      if b then t.cells[j][b]=9;t.ramps[j][b]=ramp else for k=1,#t.cells[j] do t.cells[j][k]=9;t.ramps[j][k]=ramp end end
       save_cells(t,j);dirty[t]=true;transition_start=nil
     end
     r.ImGui_EndPopup(ctx)
@@ -996,14 +1030,15 @@ local function cell(t,j,b,w,fills,ri,ci)
     r.ImGui_SetTooltip(ctx,string.format("%s | %s%s\nTarget %.1f LUFS | calibration %s%s",t.name,s.name,b and (" | Bar "..b) or "",t.target,b0 and string.format("%+.2f dB",b0) or "unmeasured",report and string.format("\nReport %.2f LUFS / %.0f%% coverage",report.lufs,report.coverage*100) or ""))
   end
 end
-local function set_intensity(j,b,v)
+local function set_intensity(j,b,v,ramp)
+  ramp=v==5 and (ramp or new_ramp()) or 0
   local s=sections[j]
   if s.countin then return end
   if b then
-    s.bars[b].int=v;put("int:"..s.key..":"..b,v)
+    s.bars[b].int=v;s.bars[b].ramp=ramp;put("int:"..s.key..":"..b,v);put("iramp:"..s.key..":"..b,ramp)
   else
     s.int=v;put("int:"..s.key,v)
-    for k,bar in ipairs(s.bars) do bar.int=v;put("int:"..s.key..":"..k,v) end
+    for k,bar in ipairs(s.bars) do bar.int=v;bar.ramp=ramp;put("int:"..s.key..":"..k,v);put("iramp:"..s.key..":"..k,ramp) end
   end
   for _,t in ipairs(rows) do if t.depth==0 then dirty[t]=true end end
   master_dirty=true
@@ -1054,10 +1089,10 @@ local function intensity_cell(c,contour,ci)
   if not job and not s.countin then
     if hover and r.ImGui_IsMouseClicked(ctx,0) then
       local chosen=intensity_tool
-      stroke={kind="intensity",ci=ci,value=chosen};set_intensity(c.j,c.b,chosen)
+      stroke={kind="intensity",ci=ci,value=chosen,ramp=chosen==5 and new_ramp() or 0};set_intensity(c.j,c.b,chosen,stroke.ramp)
     elseif hover and stroke and stroke.kind=="intensity" and r.ImGui_IsMouseDown(ctx,0) and stroke.ci~=ci then
       for k=math.min(ci,stroke.ci),math.max(ci,stroke.ci) do
-        local col=display_cols[k];if col then set_intensity(col.j,col.b,stroke.value) end
+        local col=display_cols[k];if col then set_intensity(col.j,col.b,stroke.value,stroke.ramp) end
       end
       stroke.ci=ci
     end
