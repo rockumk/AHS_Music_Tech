@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.1.8
+-- @version 0.2.0
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -8,6 +8,8 @@ local NS="N2N_Mix_Analysis_v1"
 local STORE="N2N Mix v1"
 local MAX=256
 local FXNAME="N2N Mix Meter"
+local PERFNAME="Performance Dynamics"
+local timbres={"None","Brass / Sax","Drums","Acoustic Guitar","Voice","Piano","Bowed Strings","Electric Bass","Upright Bass","Electric Guitar","Small Plucked","Clarinet","Flute","Double Reeds","Low Brass / Bari Sax"}
 local roles={"Lead Vocal","Lead Instrument","Drums","Bass","Primary Accomp.","BG Vocals","Secondary Accomp.","Traditional Arp","Pad / Texture","Effects","Unclassified","Buss"}
 local defaults={-22,-24,-25,-25,-27,-28,-30,-32,-35,-40,-30,-27}
 -- Preserve stored IDs: 5 is section transition, 6 is Silent; 7 is retired track level.
@@ -36,7 +38,7 @@ local stroke=nil
 local ui_font=nil
 local UI_SIZE=13
 local CELL_H=26
-local LEFT_W=380
+local LEFT_W=535
 local GAP=3
 local display_cols={}
 local font_new_api=nil
@@ -72,6 +74,12 @@ local function fx_index(t)
   if not valid(t.track) or not t.fxguid then return nil end
   for i=0,r.TrackFX_GetCount(t.track)-1 do
     if r.TrackFX_GetFXGUID(t.track,i)==t.fxguid then return i end
+  end
+end
+local function perf_index(t)
+  if not valid(t.track) or not t.perfguid then return nil end
+  for i=0,r.TrackFX_GetCount(t.track)-1 do
+    if r.TrackFX_GetFXGUID(t.track,i)==t.perfguid then return i end
   end
 end
 local function read_sections()
@@ -168,6 +176,11 @@ local function refresh()
       end
       row.role=clamp(num("role:"..row.key,role_guess(t,name,row.bus)),1,#roles)
       row.target=num("target:"..row.key,defaults[row.role])
+      local _,pg=r.GetSetMediaTrackInfo_String(t,"P_EXT:N2N_PERF_FX","",false)
+      local _,pm=r.GetSetMediaTrackInfo_String(t,"P_EXT:N2N_PERF_MODEL","",false)
+      row.perfguid=pg~="" and pg or nil
+      row.model=clamp(tonumber(pm) or -1,-1,13)
+      row.timbre_allowed=not row.bus and row.role~=10 and row.role~=12
       for j,s in ipairs(sections) do
         local prefix=row.key..":"..s.key
         row.cells[j]={};row.ramps[j]={}
@@ -266,6 +279,14 @@ local function safe_row(t)
       if n:find(FXNAME,1,true) then return false,"Unowned N2N meter already on "..t.name.."; remove it before mixing." end
     end
   end
+  local pf=perf_index(t)
+  if pf then
+    local _,n=r.TrackFX_GetFXName(t.track,pf,"")
+    if not n:find(PERFNAME,1,true) then return false,"Owned Performance Dynamics GUID mismatch: "..t.name end
+    if i and pf~=i-1 then return false,"Move Performance Dynamics immediately before N2N Mix Meter: "..t.name end
+    local pe=r.GetFXEnvelope(t.track,pf,0,false)
+    if pe and r.CountAutomationItems(pe)>0 then return false,"Performance intensity envelope has automation items: "..t.name end
+  end
   return true
 end
 local function ensure_fx(t)
@@ -279,8 +300,8 @@ local function ensure_fx(t)
   r.GetSetMediaTrackInfo_String(t.track,"P_EXT:N2N_MIX_FX",t.fxguid,true)
   return f
 end
-local function envelope(t,live)
-  local f=ensure_fx(t)
+local function envelope(t,live,fx)
+  local f=fx or ensure_fx(t)
   local env=r.GetFXEnvelope(t.track,f,0,true)
   if not env then error("Cannot create gain envelope: "..t.name) end
   local ok,c=r.GetEnvelopeStateChunk(env,"",false)
@@ -299,9 +320,10 @@ local function envelope(t,live)
   r.DeleteEnvelopePointRangeEx(env,-1,-1e9,1e9)
   return env,lo,hi
 end
-local function write_points(t,pts)
+local function write_points(t,pts,fx,minval,maxval)
+  minval,maxval=minval or -60,maxval or 30
   local live=(r.GetPlayStateEx(proj)&1)~=0
-  local env,lo,hi,chunk=envelope(t,live)
+  local env,lo,hi,chunk=envelope(t,live,fx)
   if live then
     -- Replace the point list in one host update during playback, rather than
     -- leaving a temporarily empty gain envelope between individual calls.
@@ -311,7 +333,7 @@ local function write_points(t,pts)
     if not close then error("Invalid envelope chunk: "..t.name) end
     local lines={}
     for _,p in ipairs(pts) do
-      local raw=lo+(clamp(p[2],-60,30)+60)/90*(hi-lo)
+      local raw=lo+(clamp(p[2],minval,maxval)-minval)/(maxval-minval)*(hi-lo)
       lines[#lines+1]=string.format("PT %.12f %.12f %d 0 0",p[1],raw,p[3] or 0)
     end
     local replacement=chunk:sub(1,close-1):gsub("%s*$","").."\n"..table.concat(lines,"\n").."\n"..chunk:sub(close)
@@ -319,8 +341,8 @@ local function write_points(t,pts)
     return
   end
   for _,p in ipairs(pts) do
-    local db=clamp(p[2],-60,30)
-    local raw=lo+(db+60)/90*(hi-lo)
+    local db=clamp(p[2],minval,maxval)
+    local raw=lo+(db-minval)/(maxval-minval)*(hi-lo)
     if not r.InsertEnvelopePointEx(env,-1,p[1],raw,p[3] or 0,0,false,true) then error("Cannot insert gain point: "..t.name) end
   end
   r.Envelope_SortPointsEx(env,-1)
@@ -398,9 +420,31 @@ local function section_intensity(s,j)
   end
   return duration>0 and 10*math.log(energy/duration,10) or 0
 end
+local function perf_volume(t,p)
+  return p>=0 and p*(t.perfboost or 7)/100 or p*(t.perfcut or 4)/100
+end
 local function calc_base(t,j,v)
   if sections[j].countin or not v or v.state~=1 or math.abs(v.coverage-1)>0.02 then return nil end
-  return clamp(t.target+(t.depth>0 and section_intensity(sections[j],j) or 0)-v.lufs,-30,24)
+  local adjustment=t.depth>0 and section_intensity(sections[j],j) or 0
+  -- Measure the changed timbre and room directly; estimate the nominal volume
+  -- component across the section to retain rather than erase the grid contour.
+  if t.perfplan and t.perfplan[j] then
+    local desired,residual,duration=0,0,0
+    for b,span in ipairs(sections[j].bars) do
+      local p=t.perfplan[j][b]
+      if p and not p.mute then
+        for k=1,16 do
+          local u=(k-0.5)/16;local d=(span.b-span.a)/16
+          local want=p.want(u);local nominal=perf_volume(t,p.value(u))
+          desired=desired+d*10^(want/10)
+          residual=residual+d*10^((want-nominal)/10)
+          duration=duration+d
+        end
+      end
+    end
+    if duration>0 and residual>0 then adjustment=10*math.log(desired/residual,10) end
+  end
+  return clamp(t.target+adjustment-v.lufs,-30,24)
 end
 local function offset(v) return levels[v] or 0 end
 local function contour_points(bars,initial)
@@ -438,6 +482,101 @@ local function contour_points(bars,initial)
   return pts
 end
 local function track_fill(v) return v==0 and 0.5 or v==8 and 1 or (math.min(v,6)-1)/6 end
+local perf_levels={[1]=0,[2]=-100,[3]=-50,[4]=0,[5]=33,[6]=67,[8]=100}
+local function section_perf(f)
+  if f<=0.25 then return -20 end
+  if f<0.5 then return -20+80*(f-0.25) end
+  return 60*(f-0.5)
+end
+local function make_perf_plan(t)
+  local all,map={},{}
+  local section=intensity_contour()
+  for j,s in ipairs(sections) do
+    map[j]={}
+    for b,bar in ipairs(s.bars) do
+      local v=t.cells[j][b]
+      local x={a=bar.a,b=bar.b,v=v,ramp=t.ramps[j][b] or 0,ignore=s.countin,sec=section[j][b]}
+      all[#all+1]=x;map[j][b]=x
+    end
+  end
+  local i=1
+  while i<=#all do
+    local x=all[i]
+    if x.v~=9 or x.ignore then
+      x.p0=x.ignore and 0 or (perf_levels[x.v] or 0);x.p1=x.p0
+      x.w0=x.ignore and 0 or (levels[x.v] or 0);x.w1=x.w0;i=i+1
+    else
+      local spans,next_i=ramp_chain(all,i,9,track_fill,1,8)
+      i=next_i
+      for _,s in ipairs(spans) do
+        local p0=s.lv==1 and -100 or perf_levels[s.lv] or 0
+        local p1=s.rv==1 and -100 or perf_levels[s.rv] or 0
+        local w0,w1=levels[s.lv] or 0,levels[s.rv] or 0
+        local a,z=all[s.first].a,all[s.last].b
+        for k=s.first,s.last do
+          local b=all[k];local u,v=(b.a-a)/(z-a),(b.b-a)/(z-a)
+          b.p0=p0+(p1-p0)*u;b.p1=p0+(p1-p0)*v
+          b.w0=w0+(w1-w0)*u;b.w1=w0+(w1-w0)*v
+        end
+      end
+    end
+  end
+  for _,p in ipairs(all) do
+    p.mute=p.v==1 or p.ignore
+    p.value=function(u)
+      if p.mute then return 0 end
+      local f=p.sec.f0+(p.sec.f1-p.sec.f0)*u
+      return clamp(p.p0+(p.p1-p.p0)*u+(t.depth==0 and section_perf(f) or 0),-100,100)
+    end
+    p.want=function(u)
+      local f=p.sec.f0+(p.sec.f1-p.sec.f0)*u
+      return p.w0+(p.w1-p.w0)*u+(t.depth==0 and math.max(-3,section_db(f)) or 0)
+    end
+  end
+  return map
+end
+local function configure_perf(t)
+  local f=perf_index(t)
+  if not t.timbre_allowed or t.model<0 then
+    if f then r.TrackFX_SetEnabled(t.track,f,false) end
+    t.perfplan=nil;return
+  end
+  local meter=ensure_fx(t)
+  if not f then
+    for i=0,r.TrackFX_GetCount(t.track)-1 do
+      local _,n=r.TrackFX_GetFXName(t.track,i,"")
+      if n:find(PERFNAME,1,true) then error("Unowned Performance Dynamics on "..t.name.."; remove it or use None.",0) end
+    end
+    if not stopped() then error("Stop playback to install Performance Dynamics: "..t.name,0) end
+    f=r.TrackFX_AddByName(t.track,"JS: Performance Dynamics.jsfx",false,-1000-meter)
+    if f<0 then f=r.TrackFX_AddByName(t.track,"JS: Performance Dynamics (14-Instrument Clean Headroom Prototype)",false,-1000-meter) end
+    if f<0 then error("Install Performance Dynamics.jsfx first.",0) end
+    t.perfguid=r.TrackFX_GetFXGUID(t.track,f)
+    r.GetSetMediaTrackInfo_String(t.track,"P_EXT:N2N_PERF_FX",t.perfguid,true)
+  end
+  if f~=fx_index(t)-1 then error("Performance Dynamics must immediately precede the meter: "..t.name,0) end
+  if r.TrackFX_GetOffline(t.track,f) then error("Bring Performance Dynamics online: "..t.name,0) end
+  r.TrackFX_SetEnabled(t.track,f,true)
+  r.TrackFX_SetParam(t.track,f,1,t.model)
+  -- Preserve user-adjustable timbre, room and timing settings. This initial
+  -- integration requires the supplied boost/cut volume mode.
+  r.TrackFX_SetParam(t.track,f,6,0)
+  t.perfboost=r.TrackFX_GetParam(t.track,f,4)
+  t.perfcut=r.TrackFX_GetParam(t.track,f,5)
+  t.perfplan=make_perf_plan(t)
+  local bars={}
+  for j,s in ipairs(sections) do
+    for b,span in ipairs(s.bars) do
+      local p=t.perfplan[j][b]
+      for k=1,8 do
+        local u,v=(k-1)/8,k/8
+        bars[#bars+1]={a=span.a+(span.b-span.a)*u,b=span.a+(span.b-span.a)*v,g0=p.value(u),g1=p.value(v)}
+      end
+    end
+  end
+  write_points(t,contour_points(bars,0),f,-100,100)
+end
+
 local function apply_row(t)
   local bars={}
   local contour=intensity_contour()
@@ -445,7 +584,7 @@ local function apply_row(t)
     for b,span in ipairs(s.bars) do
       local v=t.cells[j][b]
       local d=contour[j][b]
-      bars[#bars+1]={a=span.a,b=span.b,j=j,v=v,ramp=t.ramps[j][b] or 0,f0=d.f0,f1=d.f1,ignore=s.countin}
+      bars[#bars+1]={a=span.a,b=span.b,j=j,bar=b,v=v,ramp=t.ramps[j][b] or 0,f0=d.f0,f1=d.f1,ignore=s.countin}
     end
   end
   local function db_at(x,off)
@@ -480,17 +619,20 @@ local function apply_row(t)
   local result={}
   for _,b in ipairs(bars) do
     local cuts={0,1}
+    local pp=t.perfplan and t.perfplan[b.j][b.bar]
+    if pp and not pp.mute then for k=1,7 do cuts[#cuts+1]=k/8 end end
     local add_int=t.depth==0 and not b.ignore and b.v~=1
     if add_int and math.abs(b.f1-b.f0)>1e-9 then
       for _,f in ipairs({0.25,0.5,0.75}) do
         local cross=(f-b.f0)/(b.f1-b.f0)
         if cross>0 and cross<1 then cuts[#cuts+1]=cross end
       end
-      table.sort(cuts)
     end
+    table.sort(cuts)
     local function value(u)
       local g=b.g0+(b.g1-b.g0)*u
       if add_int and g>-60 then g=g+math.max(-3,section_db(b.f0+(b.f1-b.f0)*u)) end
+      if pp and not pp.mute and g>-60 then g=g-perf_volume(t,pp.value(u)) end
       return clamp(g,-60,30)
     end
     for k=2,#cuts do
@@ -713,6 +855,10 @@ local function arm(p)
     local existing=fx_index(t)
     local f=ensure_fx(t)
     if not existing then job.temporary[t.track]=t.fxguid end
+    -- The current-audition option can suspend non-soloed tracks. Do not
+    -- change their performance FX in advance of a report.
+    if not job.keep_solo or r.GetMediaTrackInfo_Value(t.track,"I_SOLO")~=0 or r.GetMediaTrackInfo_Value(t.track,"B_SOLO_DEFEAT")~=0 then configure_perf(t) end
+    f=fx_index(t)
     r.TrackFX_SetNamedConfigParm(t.track,f,"force_auto_bypass","0")
     if not r.TrackFX_SetParam(t.track,f,1,i) or not r.TrackFX_SetParam(t.track,f,2,tok) then error("Cannot arm meter: "..t.name,0) end
     local slot_now=r.TrackFX_GetParam(t.track,f,1)
@@ -1178,8 +1324,9 @@ local function apply_dirty()
       end
     end
     for t in pairs(dirty) do
-      if valid(t.track) and r.GetMediaTrackInfo_Value(t.track,"B_SHOWINMIXER")>0 and fx_index(t) then
+      if valid(t.track) and r.GetMediaTrackInfo_Value(t.track,"B_SHOWINMIXER")>0 and (fx_index(t) or t.model>=0) then
         local safe,msg=safe_row(t);if not safe then error(msg) end
+        configure_perf(t)
         apply_row(t)
       end
     end
@@ -1348,7 +1495,7 @@ local function draw()
           end
         end
         r.ImGui_TableNextRow(ctx,0,CELL_H)
-        r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Track / Role / Target")
+        r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Track / Role / Timbre / Target")
         r.ImGui_TableSetColumnIndex(ctx,1);across(color_header)
         r.ImGui_TableNextRow(ctx,0,CELL_H)
         r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Section intensity")
@@ -1372,6 +1519,24 @@ local function draw()
             r.ImGui_EndCombo(ctx)
           end
           r.ImGui_PopStyleColor(ctx,role_colors)
+          r.ImGui_SameLine(ctx,0,GAP)
+          local tint=mono_push(true)
+          r.ImGui_SetNextItemWidth(ctx,150)
+          if r.ImGui_BeginCombo(ctx,"##timbre"..t.key,timbres[t.model+2] or "None") then
+            for k,name in ipairs(timbres) do
+              if r.ImGui_Selectable(ctx,name,t.model==k-2) and not job then
+                if not stopped() then status="Stop playback before changing timbre."
+                elseif k>1 and not t.timbre_allowed then status="Timbre processing is for source tracks, not busses or effects."
+                else
+                  t.model=k-2
+                  r.GetSetMediaTrackInfo_String(t.track,"P_EXT:N2N_PERF_MODEL",tostring(t.model),true)
+                  dirty[t]=true;status="Timbre changed. Run Auto Mix to recalibrate loudness."
+                end
+              end
+            end
+            r.ImGui_EndCombo(ctx)
+          end
+          r.ImGui_PopStyleColor(ctx,tint)
           r.ImGui_SameLine(ctx,0,GAP);r.ImGui_SetNextItemWidth(ctx,57)
           local tc=mono_push(false)
           local ch,v=r.ImGui_InputDouble(ctx,"##target"..t.key,t.target,0,0,"%.1f")
