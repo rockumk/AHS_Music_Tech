@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.39
+-- @version 2.0.4-dev.40
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -16,6 +16,7 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
+--   + Added Drums tab with a shortcut to REAPER's MIDI note names folder.
 --   # Added small chord audition buttons to left panel.
 --   + Improved warnings for missing sections.
 --   + Improved audition voicing quality.
@@ -2441,6 +2442,10 @@ Form: I V C V C B C O]]
                 feedback_tab_mode = 11
                 r.ImGui_EndTabItem(ctx)
             end
+            if r.ImGui_BeginTabItem(ctx, "Drums") then
+                feedback_tab_mode = 13
+                r.ImGui_EndTabItem(ctx)
+            end
             if r.ImGui_BeginTabItem(ctx, "Mix") then
                 feedback_tab_mode = 12
                 r.ImGui_EndTabItem(ctx)
@@ -2550,6 +2555,20 @@ Form: I V C V C B C O]]
         end
         if feedback_tab_mode == 11 then
             gmem_export.DrawTracks(ctx, fontsmall, Open_N2N_Topline_Editor)
+        end
+        if feedback_tab_mode == 13 then
+            r.ImGui_Dummy(ctx,0,8)
+            r.ImGui_Text(ctx,"Drum Maps")
+            r.ImGui_Separator(ctx)
+            local midi_note_names_path = r.GetResourcePath() .. "/MIDINoteNames"
+            if r.ImGui_Button(ctx,"Open MIDI Note Names Directory",0,30) then
+                if r.CF_ShellExecute then
+                    r.CF_ShellExecute(midi_note_names_path)
+                else
+                    r.ShowMessageBox("SWS Extension is required to open the folder automatically.\n\n" .. midi_note_names_path,"MIDI Note Names",0)
+                end
+            end
+            r.ImGui_TextWrapped(ctx,midi_note_names_path)
         end
         if feedback_tab_mode == 12 then
             r.ImGui_Dummy(ctx,0,8)
