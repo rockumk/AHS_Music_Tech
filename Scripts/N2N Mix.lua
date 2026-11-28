@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.8
+-- @version 0.2.9
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -41,7 +41,7 @@ local CELL_H=26
 local LEFT_W=535
 local ui={role=true,timbre=true,pan_transition=false,pan_start=nil,pan_stroke=nil}
 function ui.header_width()
-  return 161+3*(22+3)+6+(ui.role and 153 or 0)+(ui.timbre and 153 or 0)
+  return 161+3*(22+3)+6+(ui.role and 153 or 35)+(ui.timbre and 153 or 35)
 end
 local ALL_W=68
 local TARGET_H=48
@@ -1664,19 +1664,26 @@ local function color_header(c)
   local dl=r.ImGui_GetWindowDrawList(ctx)
   local x,y=r.ImGui_GetCursorScreenPos(ctx)
   local rr,gg,bb=rgb(s.color)
-  local clicked=r.ImGui_InvisibleButton(ctx,id,c.w,CELL_H)
+  local col=contrast(rr,gg,bb)
+  local foldable=not c.b or c.b==1
+  local fold_w=foldable and 18 or 0
+  local main_w=c.w-fold_w
+  local clicked=r.ImGui_InvisibleButton(ctx,id,main_w,CELL_H)
+  local hover=r.ImGui_IsItemHovered(ctx)
   r.ImGui_DrawList_AddRectFilled(dl,x,y,x+c.w,y+CELL_H,rgba(rr,gg,bb,255),3)
-  local label=c.b and (c.b==1 and s.name.." −" or tostring(c.b)) or s.name.." +"
-  r.ImGui_DrawList_PushClipRect(dl,x+2,y,x+c.w-2,y+CELL_H,true)
-  centered(dl,x,y,c.w,CELL_H,label,contrast(rr,gg,bb))
+  local label=c.b and (c.b==1 and s.name or tostring(c.b)) or s.name
+  r.ImGui_DrawList_PushClipRect(dl,x+2,y,x+main_w-2,y+CELL_H,true)
+  centered(dl,x,y,main_w,CELL_H,label,col)
   r.ImGui_DrawList_PopClipRect(dl)
   if not job and not pending_start then
-    if clicked then
-      if r.ImGui_IsKeyDown(ctx,r.ImGui_Mod_Shift()) then play_section(s,1)
-      else expanded[s.key]=not expanded[s.key] end
+    if clicked and r.ImGui_IsKeyDown(ctx,r.ImGui_Mod_Shift()) then
+      ui.section_hover=nil;play_section(s,1)
+    elseif hover and not r.ImGui_IsMouseDown(ctx,0) then
+      ui.section_hover={s=s,x=x,y=y,until_time=r.time_precise()+0.45}
     end
     local n=mono_push(true)
     if r.ImGui_BeginPopupContextItem(ctx,"##secplay"..c.j..":"..(c.b or 0)) then
+      ui.section_hover=nil
       if r.ImGui_Selectable(ctx,"Play") then play_section(s,0) end
       if r.ImGui_Selectable(ctx,"Play -1 Bar") then play_section(s,1) end
       if r.ImGui_Selectable(ctx,"Play -2 Bars") then play_section(s,2) end
@@ -1684,12 +1691,54 @@ local function color_header(c)
     end
     r.ImGui_PopStyleColor(ctx,n)
   end
+  if foldable then
+    -- Dedicated right-hand hit region; title clicks never expand the grid.
+    r.ImGui_SameLine(ctx,0,0)
+    local fold_clicked=r.ImGui_InvisibleButton(ctx,id.."fold",fold_w,CELL_H)
+    local fold_hover=r.ImGui_IsItemHovered(ctx)
+    if fold_hover then ui.section_hover=nil end
+    if fold_hover then r.ImGui_DrawList_AddRectFilled(dl,x+main_w,y,x+c.w,y+CELL_H,0xFFFFFF20,3) end
+    local tx,ty=x+c.w-5,y+CELL_H-5
+    if expanded[s.key] then
+      r.ImGui_DrawList_AddTriangleFilled(dl,tx-10,ty-1,tx,ty-1,tx-5,ty-8,col)
+    else
+      r.ImGui_DrawList_AddTriangleFilled(dl,tx-9,ty-9,tx-9,ty,tx,ty,col)
+    end
+    if fold_clicked and not job and not pending_start then expanded[s.key]=not expanded[s.key] end
+  end
+end
+-- A small input-capable floating strip, rather than a non-clickable tooltip.
+-- The brief grace interval lets the pointer cross from title to controls.
+function ui.section_play_strip()
+  local h=ui.section_hover
+  if not h or job or pending_start or r.time_precise()>h.until_time then ui.section_hover=nil;return end
+  local flags=r.ImGui_WindowFlags_NoTitleBar() | r.ImGui_WindowFlags_AlwaysAutoResize() |
+    r.ImGui_WindowFlags_NoSavedSettings() | r.ImGui_WindowFlags_NoFocusOnAppearing() |
+    r.ImGui_WindowFlags_NoMove() | r.ImGui_WindowFlags_NoResize() | r.ImGui_WindowFlags_NoDocking()
+  r.ImGui_SetNextWindowPos(ctx,h.x,h.y-2,r.ImGui_Cond_Always(),0,1)
+  r.ImGui_SetNextWindowBgAlpha(ctx,1)
+  local visible=r.ImGui_Begin(ctx,"##sectionPlaybackStrip",nil,flags)
+  if visible then
+    if r.ImGui_IsWindowHovered(ctx) then h.until_time=r.time_precise()+0.45 end
+    local n=mono_push(true)
+    r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),3)
+    local choice
+    if r.ImGui_Button(ctx,"-2",29,22) then choice=2 end
+    r.ImGui_SameLine(ctx,0,3)
+    if r.ImGui_Button(ctx,"-1",29,22) then choice=1 end
+    r.ImGui_SameLine(ctx,0,3)
+    if r.ImGui_Button(ctx,"►",29,22) then choice=0 end
+    r.ImGui_PopStyleVar(ctx)
+    r.ImGui_PopStyleColor(ctx,n)
+    if choice~=nil then ui.section_hover=nil;play_section(h.s,choice) end
+    r.ImGui_End(ctx)
+  end
 end
 local function track_header(t)
   local dl=r.ImGui_GetWindowDrawList(ctx)
   local x,y=r.ImGui_GetCursorScreenPos(ctx)
   local w=161
-  r.ImGui_InvisibleButton(ctx,"##track"..t.key,w,CELL_H)
+  local clicked=r.ImGui_InvisibleButton(ctx,"##track"..t.key,w,CELL_H)
   local rr,gg,bb=rgb(r.GetTrackColor(t.track))
   r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+CELL_H,rgba(rr,gg,bb,255),3)
   local _,th=r.ImGui_CalcTextSize(ctx,t.name)
@@ -1698,6 +1747,7 @@ local function track_header(t)
   r.ImGui_DrawList_PopClipRect(dl)
   if not job then
     local n=mono_push(true)
+    if clicked then r.ImGui_OpenPopup(ctx,"##trackmenu"..t.key) end
     if r.ImGui_BeginPopupContextItem(ctx,"##trackmenu"..t.key) then
       plugin_menu(t,nil,nil,true)
       r.ImGui_EndPopup(ctx)
@@ -2027,6 +2077,7 @@ end
 local function show_target_popup()
   if job or pending_start then return end
   if not stopped() then status="Stop transport before Auto Mix.";return end
+  ui.section_hover=nil
   target_popup=true
 end
 local function master_options()
@@ -2193,7 +2244,9 @@ local function draw()
     if not job then
       same()
       local n=mono_push(true)
+      r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),5)
       if r.ImGui_Button(ctx,show_parameters and "Hide Envelope Lanes" or "Show Envelope Lanes",155,0) then set_parameters_visible() end
+      r.ImGui_PopStyleVar(ctx)
       r.ImGui_PopStyleColor(ctx,n)
     end
     same();r.ImGui_TextWrapped(ctx,status)
@@ -2249,11 +2302,11 @@ local function draw()
       for j,s in ipairs(sections) do
         if expanded[s.key] then
           for b=1,#s.bars do
-            local w=b==1 and math.max(92,r.ImGui_CalcTextSize(ctx,s.name.." −")+14) or 70
+            local w=b==1 and math.max(92,r.ImGui_CalcTextSize(ctx,s.name)+24) or 70
             cols[#cols+1]={j=j,b=b,w=w};total=total+w+GAP
           end
         else
-          local w=math.max(94,r.ImGui_CalcTextSize(ctx,s.name.." +")+14)
+          local w=math.max(94,r.ImGui_CalcTextSize(ctx,s.name)+24)
           cols[#cols+1]={j=j,w=w};total=total+w+GAP
         end
       end
@@ -2261,6 +2314,7 @@ local function draw()
       local flags=r.ImGui_TableFlags_ScrollX() | r.ImGui_TableFlags_ScrollY() | r.ImGui_TableFlags_SizingFixedFit()
       -- Freeze both the track information and whole-row control. The song
       -- strip remains one scrollable column to avoid ImGui's column limit.
+      local role_open,timbre_open=ui.role,ui.timbre
       if r.ImGui_BeginTable(ctx,"##mixgrid_v2",3,flags,0,job and 0 or -(CELL_H+29),LEFT_W+ALL_W+total+38) then
         r.ImGui_TableSetupColumn(ctx,"Track",r.ImGui_TableColumnFlags_WidthFixed(),LEFT_W)
         r.ImGui_TableSetupColumn(ctx,"All",r.ImGui_TableColumnFlags_WidthFixed(),ALL_W)
@@ -2274,13 +2328,19 @@ local function draw()
         end
         r.ImGui_TableNextRow(ctx,0,CELL_H)
         r.ImGui_TableSetColumnIndex(ctx,0)
-        r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Track")
-        local n=mono_push(true)
-        r.ImGui_SameLine(ctx)
-        if r.ImGui_Button(ctx,ui.role and "Role -" or "Role +",64,CELL_H) then ui.role=not ui.role;put("show_role",ui.role and 1 or 0) end
-        r.ImGui_SameLine(ctx)
-        if r.ImGui_Button(ctx,ui.timbre and "Timbre -" or "Timbre +",76,CELL_H) then ui.timbre=not ui.timbre;put("show_timbre",ui.timbre and 1 or 0) end
-        r.ImGui_PopStyleColor(ctx,n)
+        local dl=r.ImGui_GetWindowDrawList(ctx)
+        local hx,hy=r.ImGui_GetCursorScreenPos(ctx)
+        r.ImGui_Dummy(ctx,236,CELL_H)
+        r.ImGui_DrawList_AddText(dl,hx+5,hy+(CELL_H-UI_SIZE)/2,r.ImGui_GetStyleColor(ctx,r.ImGui_Col_Text()),"Track")
+        r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),0x303030FF)
+        r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ButtonHovered(),0x505050FF)
+        r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ButtonActive(),0x707070FF)
+        r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Text(),0xD0D0D0FF)
+        r.ImGui_SameLine(ctx,0,GAP)
+        if r.ImGui_Button(ctx,role_open and "Role −" or "R+##role",role_open and 150 or 32,CELL_H) then ui.role=not role_open;put("show_role",ui.role and 1 or 0) end
+        r.ImGui_SameLine(ctx,0,GAP)
+        if r.ImGui_Button(ctx,timbre_open and "Timbre −" or "T+##timbre",timbre_open and 150 or 32,CELL_H) then ui.timbre=not timbre_open;put("show_timbre",ui.timbre and 1 or 0) end
+        r.ImGui_PopStyleColor(ctx,4)
         r.ImGui_TableSetColumnIndex(ctx,1)
         do
           local dl=r.ImGui_GetWindowDrawList(ctx)
@@ -2307,8 +2367,8 @@ local function draw()
           r.ImGui_TableSetColumnIndex(ctx,0)
           track_header(t)
           ui.track_switch(t,"S","I_SOLO");ui.track_switch(t,"A","I_RECARM");ui.track_switch(t,"M","B_MUTE")
-          if ui.role then
           r.ImGui_SameLine(ctx,0,GAP)
+          if role_open then
           local role_colors=mono_push(true)
           r.ImGui_SetNextItemWidth(ctx,150)
           if r.ImGui_BeginCombo(ctx,"##role"..t.key,roles[t.role]) then
@@ -2323,9 +2383,9 @@ local function draw()
             r.ImGui_EndCombo(ctx)
           end
           r.ImGui_PopStyleColor(ctx,role_colors)
-          end
-          if ui.timbre then
+          else r.ImGui_Dummy(ctx,32,CELL_H) end
           r.ImGui_SameLine(ctx,0,GAP)
+          if timbre_open then
           local tint=mono_push(true)
           r.ImGui_SetNextItemWidth(ctx,150)
           if r.ImGui_BeginCombo(ctx,"##timbre"..t.key,timbres[t.model+2] or "None") then
@@ -2347,7 +2407,7 @@ local function draw()
             r.ImGui_EndCombo(ctx)
           end
           r.ImGui_PopStyleColor(ctx,tint)
-          end
+          else r.ImGui_Dummy(ctx,32,CELL_H) end
           r.ImGui_TableSetColumnIndex(ctx,1)
           if targets then
             r.ImGui_SetNextItemWidth(ctx,ALL_W)
@@ -2402,6 +2462,7 @@ local function draw()
     end
     r.ImGui_End(ctx)
   end
+  ui.section_play_strip()
   alert_window()
   if ui_font then r.ImGui_PopFont(ctx) end
   r.ImGui_PopStyleColor(ctx,5);r.ImGui_PopStyleVar(ctx,4)
