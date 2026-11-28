@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.9
+-- @version 0.2.10
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -1647,16 +1647,16 @@ local function intensity_cell(c,contour,ci)
   end
   r.ImGui_PopStyleColor(ctx,n)
 end
-local function play_section(s,bars_early)
+local function play_section(s,bars_early,go_only)
   if job or pending_start or r.EnumProjects(-1,"")~=proj then return end
   local state=r.GetPlayStateEx(proj)
   if (state&4)~=0 then status="Stop recording before jumping to a section.";return end
-  -- Same 4/4 convention as the existing N2N grid; QN conversion
-  -- respects tempo changes and avoids a fixed seconds-per-bar assumption.
+  -- Stop first so REAPER cannot restore its previous edit cursor over our cue.
+  if state~=0 then r.Main_OnCommand(1016,0) end
   local q=r.TimeMap2_timeToQN(proj,s.a)
   local pos=math.max(0,r.TimeMap2_QNToTime(proj,q-4*bars_early))
-  r.SetEditCurPos2(proj,pos,true,true)
-  if (state&1)==0 or (state&2)~=0 then r.Main_OnCommand(1007,0) end
+  r.SetEditCurPos2(proj,pos,true,false)
+  if not go_only then r.Main_OnCommand(1007,0) end
 end
 local function color_header(c)
   local s=sections[c.j]
@@ -1684,9 +1684,7 @@ local function color_header(c)
     local n=mono_push(true)
     if r.ImGui_BeginPopupContextItem(ctx,"##secplay"..c.j..":"..(c.b or 0)) then
       ui.section_hover=nil
-      if r.ImGui_Selectable(ctx,"Play") then play_section(s,0) end
-      if r.ImGui_Selectable(ctx,"Play -1 Bar") then play_section(s,1) end
-      if r.ImGui_Selectable(ctx,"Play -2 Bars") then play_section(s,2) end
+      if r.ImGui_Selectable(ctx,"Go to Section") then play_section(s,0,true) end
       r.ImGui_EndPopup(ctx)
     end
     r.ImGui_PopStyleColor(ctx,n)
@@ -1715,7 +1713,7 @@ function ui.section_play_strip()
   local flags=r.ImGui_WindowFlags_NoTitleBar() | r.ImGui_WindowFlags_AlwaysAutoResize() |
     r.ImGui_WindowFlags_NoSavedSettings() | r.ImGui_WindowFlags_NoFocusOnAppearing() |
     r.ImGui_WindowFlags_NoMove() | r.ImGui_WindowFlags_NoResize() | r.ImGui_WindowFlags_NoDocking()
-  r.ImGui_SetNextWindowPos(ctx,h.x,h.y-2,r.ImGui_Cond_Always(),0,1)
+  r.ImGui_SetNextWindowPos(ctx,h.x-6,h.y-2,r.ImGui_Cond_Always(),0,1)
   r.ImGui_SetNextWindowBgAlpha(ctx,1)
   local visible=r.ImGui_Begin(ctx,"##sectionPlaybackStrip",nil,flags)
   if visible then
@@ -2030,50 +2028,99 @@ end
 local function notation_width()
   return r.ImGui_CalcTextSize(ctx,"Simple")+r.ImGui_CalcTextSize(ctx,"Traditional")+48
 end
+-- Transport symbols are drawn with geometry rather than font glyphs so the
+-- appearance is consistent on macOS and Windows, even at small font sizes.
+function ui.transport_icon(dl,i,x,y,color)
+  local function ln(a,b,c,d,w)
+    r.ImGui_DrawList_AddLine(dl,x+a,y+b,x+c,y+d,color,w or 1.6)
+  end
+  local function rect(a,b,c,d)
+    r.ImGui_DrawList_AddRectFilled(dl,x+a,y+b,x+c,y+d,color,0.7)
+  end
+  local function tri(a,b,c,d,e,f)
+    r.ImGui_DrawList_AddTriangleFilled(dl,x+a,y+b,x+c,y+d,x+e,y+f,color)
+  end
+  if i==1 then
+    -- Panic / all notes off.
+    ln(0,-6,0,1,2);r.ImGui_DrawList_AddCircleFilled(dl,x,y+5,1.3,color)
+  elseif i==2 then
+    r.ImGui_DrawList_AddCircleFilled(dl,x,y,5.5,color)
+  elseif i==3 then
+    tri(-4,-6,-4,6,6,0)
+  elseif i==4 then
+    rect(-5,-5,5,5)
+  elseif i==5 then
+    rect(-5,-6,-1,6);rect(1,-6,5,6)
+  elseif i==6 then
+    -- Two arrows in a compact repeat loop.
+    ln(-6,0,-6,-4);ln(-6,-4,4,-4)
+    ln(1,-7,4,-4);ln(1,-1,4,-4)
+    ln(6,0,6,4);ln(6,4,-4,4)
+    ln(-1,1,-4,4);ln(-1,7,-4,4)
+  elseif i==7 then
+    rect(-7,-6,-5,6);tri(4,-6,4,6,-4,0)
+  elseif i==8 then
+    ln(5,0,-5,0);ln(-5,0,0,-5);ln(-5,0,0,5)
+  elseif i==9 then
+    ln(-5,0,5,0);ln(5,0,0,-5);ln(5,0,0,5)
+  elseif i==10 then
+    rect(5,-6,7,6);tri(-4,-6,-4,6,4,0)
+  end
+end
 local function transport()
   local repeat_on=r.GetSetRepeat(-1)==1
+  local state=r.GetPlayStateEx(proj)
+  local recording=(state&4)~=0
+  local paused=(state&2)~=0
+  local playing=(state&1)~=0 and not paused
   local items={
-    {"!","!",0xE6D200FF,0x000000FF,40349},
-    {"●","F9",0x960A0AFF,0xFFFFFFFF,1013,r.ImGui_Key_F9()},
-    {"►","F10",0x0A960AFF,0xFFFFFFFF,1007,r.ImGui_Key_F10()},
-    {"■","F11",0xB44600FF,0xFFFFFFFF,1016,r.ImGui_Key_F11()},
-    {"||","F12",0x9600C8FF,0xFFFFFFFF,1008,r.ImGui_Key_F12()},
-    {"↻","",repeat_on and 0xB8B8B8FF or 0x4D4D4DFF,repeat_on and 0x000000FF or 0xFFFFFFFF},
-    {"▐◄","Home",0x1A1A1AFF,0xFFFFFFFF,40042,r.ImGui_Key_Home()},
-    {"←","Pg ↓",0x1A1A1AFF,0xFFFFFFFF,40172,r.ImGui_Key_PageDown()},
-    {"→","Pg ↑",0x1A1A1AFF,0xFFFFFFFF,40173,r.ImGui_Key_PageUp()},
-    {"►▌","End",0x1A1A1AFF,0xFFFFFFFF,40043,r.ImGui_Key_End()},
+    {"!",40349},
+    {"F9",1013,r.ImGui_Key_F9()},
+    {"F10",1007,r.ImGui_Key_F10()},
+    {"F11",1016,r.ImGui_Key_F11()},
+    {"F12",1008,r.ImGui_Key_F12()},
+    {"",nil},
+    {"Home",40042,r.ImGui_Key_Home()},
+    {"Pg ↓",40172,r.ImGui_Key_PageDown()},
+    {"Pg ↑",40173,r.ImGui_Key_PageUp()},
+    {"End",40043,r.ImGui_Key_End()},
   }
   local keys_allowed=r.ImGui_IsWindowFocused(ctx) and not r.ImGui_IsAnyItemActive(ctx)
   local dl=r.ImGui_GetWindowDrawList(ctx)
-  local label_color=r.ImGui_GetStyleColor(ctx,r.ImGui_Col_Text())
   local w,h=26,22
   r.ImGui_BeginGroup(ctx)
   for i,v in ipairs(items) do
-    if i>1 then same() end
+    if i>1 then r.ImGui_SameLine(ctx,0,(i==2 or i==7) and 6 or 3) end
     local x,y=r.ImGui_GetCursorScreenPos(ctx)
-    if v[2]~="" then
-      local tw,th=r.ImGui_CalcTextSize(ctx,v[2])
-      r.ImGui_DrawList_AddText(dl,x+(w-tw)/2,y-th-1,label_color,v[2])
+    local active=(i==2 and recording) or (i==3 and playing) or (i==5 and paused) or (i==6 and repeat_on)
+    local accent=i==2 and 0xCF7777FF or i==3 and 0x9DC6A7FF or 0xD3B86DFF
+    local icon=active and accent or (i==2 and 0xBA8585FF or 0xCCCCCCFF)
+    if v[1]~="" then
+      local tw,th=r.ImGui_CalcTextSize(ctx,v[1])
+      r.ImGui_DrawList_AddText(dl,x+(w-tw)/2,y-th-1,0x929292FF,v[1])
     end
-    r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Text(),v[4])
-    r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),v[3])
-    local click=r.ImGui_Button(ctx,v[1].."##mixtransport"..i,w,h)
-    r.ImGui_PopStyleColor(ctx,2)
-    local key=keys_allowed and v[6] and r.ImGui_IsKeyPressed(ctx,v[6],false)
+    local click=r.ImGui_InvisibleButton(ctx,"##mixtransport"..i,w,h)
+    local hover=r.ImGui_IsItemHovered(ctx)
+    local pressed=r.ImGui_IsItemActive(ctx)
+    local bg=pressed and 0x4A4A4AFF or hover and 0x393939FF or active and 0x333333FF or 0x252525FF
+    r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+h,bg,4)
+    r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+h,active and accent or 0x515151FF,4,0,1)
+    ui.transport_icon(dl,i,x+w/2,y+h/2,icon)
+    local key=keys_allowed and v[3] and r.ImGui_IsKeyPressed(ctx,v[3],false)
     if i==1 and keys_allowed then
       key=r.ImGui_IsKeyDown(ctx,r.ImGui_Mod_Shift()) and r.ImGui_IsKeyPressed(ctx,r.ImGui_Key_1(),false)
     end
     if (click or key) and not pending_start then
       if i==6 then r.GetSetRepeat(repeat_on and 0 or 1)
       else
-        r.Main_OnCommand(v[5],0)
+        r.Main_OnCommand(v[2],0)
         if i==4 then r.Main_OnCommand(40349,0) end
       end
     end
   end
   r.ImGui_EndGroup(ctx)
 end
+
 local function show_target_popup()
   if job or pending_start then return end
   if not stopped() then status="Stop transport before Auto Mix.";return end
