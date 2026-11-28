@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.15
+-- @version 1.9.16
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -543,6 +543,64 @@ local function locate(t)
     for fx=0,reaper.TrackFX_GetCount(t.track)-1 do
         if reaper.TrackFX_GetFXGUID(t.track,fx)==t.guid then return fx end
     end
+end
+-- UI requests from the arranger: per-instance key, command, timestamp.
+local HUB_UI_BASE=8320000
+function export.ServiceArrangerUIRequests()
+    local r=reaper
+    local project=r.EnumProjects(-1,"")
+    local now=r.time_precise()
+    r.gmem_attach("N2N_Ecosystem_RSKennedy")
+    r.gmem_write(HUB_UI_BASE,now)
+    local raise=false
+    for id=1,512 do
+        local base=HUB_UI_BASE+4+(id-1)*4
+        local cmd=r.gmem_read(base+1)
+        if cmd~=0 then
+            local key,stamp=r.gmem_read(base),r.gmem_read(base+2)
+            r.gmem_write(base+1,0)
+            if (cmd==1 or cmd==2) and key>0 and key==r.gmem_read(REG_BASE+id) and math.abs(now-stamp)<2 then
+                local inventory,counts=scan(project)
+                if counts[id]==1 then
+                    for _,t in ipairs(inventory) do
+                        if t.id==id and locate(t) then
+                            if cmd==2 then raise=true
+                            else
+                                local tr=t.track
+                                local fx=r.TrackFX_GetInstrument(tr)
+                                if fx<0 then
+                                    -- Some N2N recipes put the arranger on a MIDI-only track.
+                                    -- Follow only an unambiguous direct MIDI send.
+                                    local dest,ambiguous
+                                    for i=0,r.GetTrackNumSends(tr,0)-1 do
+                                        if r.GetTrackSendInfo_Value(tr,0,i,"B_MUTE")==0 and (math.floor(r.GetTrackSendInfo_Value(tr,0,i,"I_MIDIFLAGS"))&31)~=31 then
+                                            local d=r.GetTrackSendInfo_Value(tr,0,i,"P_DESTTRACK")
+                                            if d and r.ValidatePtr2(project,d,"MediaTrack*") and r.TrackFX_GetInstrument(d)>=0 then
+                                                if dest and dest~=d then ambiguous=true end
+                                                dest=d
+                                            end
+                                        end
+                                    end
+                                    if dest and not ambiguous then tr=dest;fx=r.TrackFX_GetInstrument(tr) end
+                                end
+                                if fx>=0 then
+                                    r.TrackFX_Show(tr,fx,3)
+                                    local hwnd=r.TrackFX_GetFloatingWindow(tr,fx)
+                                    if hwnd then
+                                        if r.JS_Window_SetZOrder then r.JS_Window_SetZOrder(hwnd,"TOP") end
+                                        if r.JS_Window_SetForeground then r.JS_Window_SetForeground(hwnd) end
+                                        if r.JS_Window_SetFocus then r.JS_Window_SetFocus(hwnd) end
+                                    end
+                                else r.MB("No unique instrument found for "..t.name..".","Numbers2Notes",0) end
+                            end
+                            break
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return raise
 end
 function export.PublishTrackIdentity(force)
     local r=reaper
