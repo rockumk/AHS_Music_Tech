@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.12
+-- @version 1.9.13
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -642,7 +642,17 @@ function export.OpenEditor(wanted,title)
         local hwnd=r.JS_Window_Find(title,true)
         if hwnd then r.JS_Window_SetFocus(hwnd);return end
     end
-    local path=find_script(wanted)
+    local path
+    if wanted=="n2ntopline" or wanted=="n2nmix" then
+        local source=debug.getinfo(1,"S").source:gsub("^@",""):gsub("\\","/")
+        local parent=source:match("^(.*)/Notes2Numbers/[^/]+$")
+        if parent then
+            local candidate=parent.."/"..title..".lua"
+            local file=io.open(candidate,"rb")
+            if file then file:close();path=candidate end
+        end
+    end
+    path=path or find_script(wanted)
     if not path then r.MB("Install "..title..".lua first.","Numbers2Notes",0);return end
     local cmd=r.AddRemoveReaScript(true,0,path,true)
     if cmd and cmd>0 then r.Main_OnCommand(cmd,0)
@@ -981,8 +991,8 @@ function export.DrawTracks(ctx,font)
     r.ImGui_PopStyleVar(ctx,3)
     if normal_font then r.ImGui_PopFont(ctx) end
     -- Launch advanced cueing in place of the temporary width fields.
-    -- Size controls remain at the right end of the non-scrolling footer.
-    local zoom_button,readout_width,launcher_width,topline_width=24,52,196,158
+    -- Cueing on the left, zoom in the middle, and Topline at the right edge.
+    local zoom_button,readout_width,launcher_width,topline_width=24,52,196,190
     local readout=("%d%%"):format(percent)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),3,1)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),2,2)
@@ -990,9 +1000,7 @@ function export.DrawTracks(ctx,font)
     r.ImGui_SetCursorPosX(ctx,box_x)
     if r.ImGui_Button(ctx,"N2N Advanced Cueing",launcher_width,footer_height) then launch_cue() end
     if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,"Open N2NCue for manual cue placement and live cueing") end
-    r.ImGui_SameLine(ctx,box_x+panel_width-(2*zoom_button+readout_width+6)-topline_width-12)
-    if r.ImGui_Button(ctx,"Open N2N Topline",topline_width,footer_height) then export.OpenEditor("n2ntopline","N2N Topline") end
-    r.ImGui_SameLine(ctx,box_x+panel_width-(2*zoom_button+readout_width+6))
+    r.ImGui_SameLine(ctx,box_x+(panel_width-(2*zoom_button+readout_width+6))/2)
     if percent<=TRACK_SCALE_MIN then r.ImGui_BeginDisabled(ctx) end
     if r.ImGui_Button(ctx,"-##track_zoom",zoom_button,footer_height) then adjust_track_scale(-TRACK_SCALE_STEP) end
     if percent<=TRACK_SCALE_MIN then r.ImGui_EndDisabled(ctx) end
@@ -1005,6 +1013,8 @@ function export.DrawTracks(ctx,font)
     if percent>=TRACK_SCALE_MAX then r.ImGui_BeginDisabled(ctx) end
     if r.ImGui_Button(ctx,"+##track_zoom",zoom_button,footer_height) then adjust_track_scale(TRACK_SCALE_STEP) end
     if percent>=TRACK_SCALE_MAX then r.ImGui_EndDisabled(ctx) end
+    r.ImGui_SameLine(ctx,box_x+panel_width-topline_width)
+    if r.ImGui_Button(ctx,"Open N2N Topline Editor",topline_width,footer_height) then export.OpenEditor("n2ntopline","N2N Topline") end
     r.ImGui_PopStyleVar(ctx,2)
     if id_popup then
         if id_popup_open then r.ImGui_OpenPopup(ctx,"N2N Instance ID"); id_popup_open=false end
