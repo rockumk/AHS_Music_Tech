@@ -1,5 +1,5 @@
 -- @description N2N Topline
--- @version 5.4-dev.9
+-- @version 5.4-dev.10
 -- @author Rock Kennedy and Gemini 4 Hydrogen (which did an absolutely fabulous job of transforming the vision into solid Lua code)
 -- @about
 --   Numbers2Notes Topline Melody Editor (1200x640 minimum):
@@ -1955,11 +1955,43 @@ function state.draw_section_popup(canvas_w)
     state.transport_button("section_play_"..i,x+3+(i-1)*30,y+3,28,24,i==1 and "-2" or i==2 and "-1" or "",false,nil,function() state.cue_section(h.sec,3-i,true) end,i==3 and function(cx,cy) state.transport_icon(3,cx,cy) end or nil)
   end
 end
+-- Same native MIDI panic as the tested N2N Mix; also cancel local previews.
+function state.panic(after_stop)
+  if reaper.EnumProjects(-1,"")~=owner_project then return end
+  state.stop_preview_notes()
+    local action=40345
+    if reaper.SectionFromUniqueID and reaper.kbd_getTextFromCmd then
+        local section=reaper.SectionFromUniqueID(0)
+        if section then
+            local function all_off(name)
+                name=(name or ""):lower():gsub("%-"," ")
+                return name:find("all notes off",1,true) and name:find("all sounds off",1,true)
+            end
+            if not all_off(reaper.kbd_getTextFromCmd(40345,section))
+                and all_off(reaper.kbd_getTextFromCmd(40349,section)) then action=40349 end
+        end
+    end
+  reaper.Main_OnCommandEx(action,0,owner_project)
+  state.panic_due=nil
+  if after_stop or reaper.GetPlayStateEx(owner_project)==0 then
+    state.panic_action=action
+    state.panic_due=reaper.time_precise()+0.075
+  end
+  if not after_stop then state.status_msg="MIDI panic sent." end
+end
+function state.service_panic()
+  if not state.panic_due or reaper.time_precise()<state.panic_due then return end
+  state.panic_due=nil
+  if reaper.EnumProjects(-1,"")==owner_project and reaper.GetPlayStateEx(owner_project)==0 then
+    reaper.Main_OnCommandEx(state.panic_action or 40345,0,owner_project)
+  end
+end
 function state.transport_action(i)
-  local cmds={40349,1013,1007,1016,1008,0,40042,40172,40173,40043}
+  local cmds={40345,1013,1007,1016,1008,0,40042,40172,40173,40043}
   if i==2 then state.stop_preview_notes() end
   if i==6 then reaper.GetSetRepeat(reaper.GetSetRepeat(-1)==1 and 0 or 1)
-  else reaper.Main_OnCommand(cmds[i],0);if i==4 then reaper.Main_OnCommand(40349,0) end end
+  elseif i==1 then state.panic(false)
+  else reaper.Main_OnCommand(cmds[i],0);if i==4 then state.panic(true) end end
 end
 local function draw_transport_bar(canvas_w)
   local trans_y=gfx.h-state.transport_h
@@ -2568,6 +2600,7 @@ end
 local function main()
   if reaper.EnumProjects(-1,"")~=owner_project then state.capture_window();on_script_exit();gfx.quit();return end
   reaper.SetExtState(HUB_EXT_SEC,"heartbeat",tostring(reaper.time_precise()),false)
+  state.service_panic()
   if reaper.GetExtState(HUB_EXT_SEC,"focus")~="" then
     reaper.DeleteExtState(HUB_EXT_SEC,"focus",false)
     if reaper.JS_Window_Find and reaper.JS_Window_SetFocus then

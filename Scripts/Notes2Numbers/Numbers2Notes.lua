@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.36
+-- @version 2.0.4-dev.37
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -1781,7 +1781,42 @@ function Get_Transport_Sections(header_text, chord_text)
     return sections
 end 
 
+-- Match the tested N2N Mix MIDI panic: native reset and a stopped-only retry.
+do
+    local pending
+    function N2N_MIDI_Panic(after_stop)
+        local project=reaper.EnumProjects(-1,"")
+        local action=40345
+        if reaper.SectionFromUniqueID and reaper.kbd_getTextFromCmd then
+            local section=reaper.SectionFromUniqueID(0)
+            if section then
+                local function all_off(name)
+                    name=(name or ""):lower():gsub("%-"," ")
+                    return name:find("all notes off",1,true) and name:find("all sounds off",1,true)
+                end
+                if not all_off(reaper.kbd_getTextFromCmd(40345,section))
+                    and all_off(reaper.kbd_getTextFromCmd(40349,section)) then action=40349 end
+            end
+        end
+        reaper.Main_OnCommandEx(action,0,project)
+        pending=nil
+        if after_stop or reaper.GetPlayStateEx(project)==0 then
+            pending={project=project,action=action,due=reaper.time_precise()+0.075}
+        end
+    end
+    function N2N_Service_MIDI_Panic()
+        if not pending then return end
+        if reaper.EnumProjects(-1,"")~=pending.project then pending=nil;return end
+        if reaper.time_precise()<pending.due then return end
+        local p=pending;pending=nil
+        if reaper.GetPlayStateEx(p.project)==0 then
+            reaper.Main_OnCommandEx(p.action,0,p.project)
+        end
+    end
+end
+
 function IM_GUI_Loop()
+    N2N_Service_MIDI_Panic()
     local window_sec = "N2N_EDITOR_WINDOWS"
     reaper.SetExtState(window_sec,"numbers2notes:heartbeat",tostring(reaper.time_precise()),false)
     local focus_request = reaper.GetExtState(window_sec,"numbers2notes:focus")
@@ -1848,7 +1883,7 @@ function IM_GUI_Loop()
 
         -- Transport Hotkeys
         if is_shift_down and reaper.ImGui_IsKeyPressed(ctx, reaper.ImGui_Key_1(), false) then
-            reaper.Main_OnCommand(40349, 0)
+            N2N_MIDI_Panic(false)
         end -- Panic (!)
         if reaper.ImGui_IsKeyPressed(ctx, reaper.ImGui_Key_F9(), false) then
             reaper.Main_OnCommand(1013, 0)
@@ -1858,6 +1893,7 @@ function IM_GUI_Loop()
         end -- Play
         if reaper.ImGui_IsKeyPressed(ctx, reaper.ImGui_Key_F11(), false) then
             reaper.Main_OnCommand(1016, 0)
+            N2N_MIDI_Panic(true)
         end -- Stop
         if reaper.ImGui_IsKeyPressed(ctx, reaper.ImGui_Key_F12(), false) then
             reaper.Main_OnCommand(1008, 0)
@@ -3714,7 +3750,7 @@ Form: I V C V C B C O]]
         local paused = (state & 2) ~= 0
         local playing = (state & 1) ~= 0 and not paused
         local items = {
-            {"!",40349},
+            {"!",40345},
             {"F9",1013},
             {"F10",1007},
             {"F11",1016},
@@ -3741,9 +3777,10 @@ Form: I V C V C B C O]]
             DrawTransportIcon(draw_list,i,x+nav_btn_w/2,y+btn_height/2,icon_color)
             if click then
                 if i==6 then reaper.GetSetRepeat(repeat_on and 0 or 1)
+                elseif i==1 then N2N_MIDI_Panic(false)
                 else
                     reaper.Main_OnCommand(v[2],0)
-                    if i==4 then reaper.Main_OnCommand(40349,0) end
+                    if i==4 then N2N_MIDI_Panic(true) end
                 end
             end
         end
