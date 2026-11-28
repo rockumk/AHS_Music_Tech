@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.29
+version: 7.8.0-dev.30
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.29 -
+  # N2N Drum Arranger v7.8.0-dev.30 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -139,7 +139,7 @@ slider17:0<-100,100,0.01>-N2N Mix Intensity
 slider18:0<-500,500,1>-Visual Sync (ms)
 
 @init
-version_display = "v7.8.0-dev.29";
+version_display = "v7.8.0-dev.30";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -2732,7 +2732,7 @@ function tip_draw() local(tw,th,x,y) (
             tip_last_x=tip_x;tip_last_y=tip_y;tip_since=time_precise();
         );
         time_precise()-tip_since>=1 ? (
-            gfx_setfont(1,os_font,max(10,fontsize-1));
+            gfx_setfont(1,os_font,max(15,fontsize+3));
             gfx_measurestr(#tip_current,tw,th);
             x=max(0,min(tip_x+(tip_w-tw-10)/2,gfx_w-tw-10));
             y=tip_y-th-12;
