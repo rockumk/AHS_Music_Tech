@@ -1,5 +1,5 @@
 -- @description N2N Topline
--- @version 5.4-dev.2
+-- @version 5.4-dev.3
 -- @author Rock Kennedy and Gemini 4 Hydrogen (which did an absolutely fabulous job of transforming the vision into solid Lua code)
 -- @about
 --   Numbers2Notes Topline Melody Editor (1200x640 minimum):
@@ -919,6 +919,7 @@ local function on_script_exit()
   if reaper.GetExtState(HUB_EXT_SEC,"owner")==hub_token then
     reaper.DeleteExtState(HUB_EXT_SEC,"owner",false)
     reaper.DeleteExtState(HUB_EXT_SEC,"heartbeat",false)
+    reaper.DeleteExtState(HUB_EXT_SEC,"focus",false)
   end
   for _, pr in ipairs(state.previews) do send_midi_note_off(pr.pitch, pr.chan) end; state.previews = {}
   if state.kbd_held_pitch then send_midi_note_off(state.kbd_held_pitch, state.kbd_held_chan); state.kbd_held_pitch = nil end
@@ -2286,6 +2287,13 @@ end
 local function main()
   if reaper.EnumProjects(-1,"")~=owner_project then gfx.quit(); on_script_exit(); return end
   reaper.SetExtState(HUB_EXT_SEC,"heartbeat",tostring(reaper.time_precise()),false)
+  if reaper.GetExtState(HUB_EXT_SEC,"focus")~="" then
+    reaper.DeleteExtState(HUB_EXT_SEC,"focus",false)
+    if reaper.JS_Window_Find and reaper.JS_Window_SetFocus then
+      state.hwnd=state.hwnd or reaper.JS_Window_Find(WIN_TITLE,true)
+      if state.hwnd then reaper.JS_Window_SetFocus(state.hwnd) end
+    end
+  end
   if not state.drag and (gfx.mouse_cap&3)==0 then
     local requested,region=read_hub_request()
     if requested then apply_hub_request(requested,region) end
