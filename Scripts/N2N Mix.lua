@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.7
+-- @version 0.2.8
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -38,7 +38,11 @@ local stroke=nil
 local ui_font=nil
 local UI_SIZE=13
 local CELL_H=26
-local LEFT_W=475
+local LEFT_W=535
+local ui={role=true,timbre=true,pan_transition=false,pan_start=nil,pan_stroke=nil}
+function ui.header_width()
+  return 161+3*(22+3)+6+(ui.role and 153 or 0)+(ui.timbre and 153 or 0)
+end
 local ALL_W=68
 local TARGET_H=48
 local edit_mode="levels"
@@ -169,7 +173,7 @@ local function project_layout_signature()
   return table.concat(parts,"\n")
 end
 local function refresh()
-  pan_scan_pending=true;pan_dirty={};pan_drag=nil
+  pan_scan_pending=true;pan_dirty={};pan_drag=nil;ui.pan_start=nil;ui.pan_stroke=nil
   layout_sig=project_layout_signature()  local a,err=read_sections()
   if not a then sections={};rows={};groups={};status=err;return false end
   sections=a; rows={}; groups={}; dirty={}; master_dirty=false; transition_start=nil
@@ -178,7 +182,7 @@ local function refresh()
     local t=r.GetTrack(proj,i)
     if r.GetMediaTrackInfo_Value(t,"B_SHOWINMIXER")>0 then
       local _,name=r.GetTrackName(t)
-      local row={track=t,key=track_key(t),name=name,fxguid=get_owned(t),cells={},ramps={},pans={},base={},reports={},deps={},depth=0}
+      local row={track=t,key=track_key(t),name=name,fxguid=get_owned(t),cells={},ramps={},pans={},panramps={},base={},reports={},deps={},depth=0}
       local _,initial=r.GetSetMediaTrackInfo_String(t,"P_EXT:N2N_MIX_INITIAL_DB","",false)
       row.initial=clamp(tonumber(initial) or 0,-60,30)
       row.bus=false
@@ -199,12 +203,13 @@ local function refresh()
       row.timbre_allowed=row.role~=10 and row.role~=12
       for j,s in ipairs(sections) do
         local prefix=row.key..":"..s.key
-        row.cells[j]={};row.ramps[j]={};row.pans[j]={}
+        row.cells[j]={};row.ramps[j]={};row.pans[j]={};row.panramps[j]={}
         for b=1,#s.bars do
           local v=clamp(num("cell:"..prefix..":"..b,4),1,9)
           row.cells[j][b]=v==7 and 6 or v
           row.ramps[j][b]=num("ramp:"..prefix..":"..b,0)
           row.pans[j][b]=clamp(num("pan:"..prefix..":"..b,0),-100,100)
+          row.panramps[j][b]=num("panramp:"..prefix..":"..b,0)
         end
         local cached=tonumber(get("base:"..prefix,""))
         if cached and fx_index(row) then row.base[j]=cached end
@@ -625,6 +630,39 @@ local function restore_performance_room(t,f)
     r.GetSetMediaTrackInfo_String(t.track,"P_EXT:N2N_PERF_SAVED_ROOM","",true)
   end
 end
+-- A transition stores a span ID, leaving the fixed pan values available
+-- as fallback endpoints. Neighboring fixed cells determine the audible ramp.
+function ui.pan_contour(t)
+  local all,map={},{}
+  for j,s in ipairs(sections) do
+    map[j]={}
+    for b,bar in ipairs(s.bars) do
+      local x={a=bar.a,b=bar.b,v=t.pans[j][b],ramp=t.panramps[j][b] or 0}
+      all[#all+1]=x;map[j][b]=x
+    end
+  end
+  local i=1
+  while i<=#all do
+    local x=all[i]
+    if x.ramp==0 then x.g0=x.v;x.g1=x.v;i=i+1
+    else
+      local first=i
+      while i<#all and all[i+1].ramp==x.ramp and math.abs(all[i].b-all[i+1].a)<0.001 do i=i+1 end
+      local last=i
+      local prev,nextb=all[first-1],all[last+1]
+      local a=prev and math.abs(prev.b-x.a)<0.001 and (prev.g1 or prev.v) or x.v
+      local z=nextb and math.abs(all[last].b-nextb.a)<0.001 and nextb.v or all[last].v
+      local begin,finish=x.a,all[last].b
+      for k=first,last do
+        local b=all[k]
+        b.g0=a+(z-a)*(b.a-begin)/(finish-begin)
+        b.g1=a+(z-a)*(b.b-begin)/(finish-begin)
+      end
+      i=last+1
+    end
+  end
+  return all,map
+end
 local function apply_pan(t,f)
   local state=r.GetPlayStateEx(proj)
   if (state&4)~=0 or r.GetGlobalAutomationOverride()>1 or r.GetMediaTrackInfo_Value(t.track,"I_AUTOMODE")>1 then error("Use Read or Trim/Read before editing pan: "..t.name,0) end
@@ -633,13 +671,7 @@ local function apply_pan(t,f)
   if not has_position(t,f) then error("Updated Position slider 11 required: "..t.name,0) end
   local e=r.GetFXEnvelope(t.track,f,10,false)
   if e and r.CountAutomationItems(e)>0 then error("Position envelope contains automation items: "..t.name,0) end
-  local bars={}
-  for j,s in ipairs(sections) do
-    for b,bar in ipairs(s.bars) do
-      local v=t.pans[j][b]
-      bars[#bars+1]={a=bar.a,b=bar.b,g0=v,g1=v}
-    end
-  end
+  local bars=ui.pan_contour(t)
   write_points(t,contour_points(bars,0),f,-100,100,10)
 end
 local function configure_perf(t)
@@ -1085,16 +1117,20 @@ local function request_start()
   if policy=="current" and r.GetMediaTrackInfo_Value(r.GetMasterTrack(proj),"B_MUTE")~=0 then status="Master is muted. Choose the full-mix option.";return end
   pending_start=policy;alert_text="Processing please wait.";alert_until=r.time_precise()+1.2
 end
+-- Normalize endpoints as inclusive cell ranges, including folded regions.
+function ui.span_bounds(j,b,k,n)
+  local aj,ab,zj,zb=j,b,k,n
+  if j>k or (j==k and (b or 1)>(n or 1)) then aj,ab,zj,zb=k,n,j,b end
+  if j==k and (not b or not n) then return j,1,j,#sections[j].bars end
+  return aj,ab or 1,zj,zb or #sections[zj].bars
+end
 local function edit_cell(t,j,b,chosen)
   if sections[j].countin then return end
   local chosen=chosen or tool
   if chosen==9 then
     if not transition_start or transition_start.t~=t then transition_start={t=t,j=j,b=b};status="Select transition end on the same track.";return end
     local s0=transition_start;transition_start=nil
-    local start_j,end_j=math.min(s0.j,j),math.max(s0.j,j)
-    local start_b,end_b=s0.b,b
-    if s0.j>j then start_b,end_b=b,s0.b end
-    if start_j==end_j and start_b and end_b then start_b,end_b=math.min(start_b,end_b),math.max(start_b,end_b) end
+    local start_j,start_b,end_j,end_b=ui.span_bounds(s0.j,s0.b,j,b)
     local ramp=new_ramp()
     for k=start_j,end_j do
       if not sections[k].countin then
@@ -1273,7 +1309,58 @@ local function open_track_plugin(t,fx,j,b,arranger)
   end
   r.TrackFX_Show(t.track,fx,3)
 end
-local function plugin_menu(t,j,b)
+function ui.is_topline(t)
+  return t.name:lower():find("n2n topline",1,true)~=nil
+end
+function ui.launch_topline(t,j)
+  if job or pending_start or not valid(t.track) then return end
+  local sec="N2N_TOPLINE_HUB"
+  local owner=r.GetExtState(sec,"owner")
+  local hb=tonumber(r.GetExtState(sec,"heartbeat"))
+  local running=owner~="" and hb and math.abs(r.time_precise()-hb)<2
+  if running and owner:match("^[^\t]+")~=tostring(proj) then
+    r.MB("Close Topline in the other project before opening this track.","N2N Topline",0);return
+  end
+  local path
+  if not running then
+    if r.JS_Window_Find and r.JS_Window_Find("N2N Topline",true) then
+      r.MB("Close the existing Topline window and reopen it to enable navigation.","N2N Topline",0);return
+    end
+    local source=debug.getinfo(1,"S").source:sub(2)
+    local dir=source:match("^(.*[/\\])")
+    if dir then
+      local candidate=dir.."N2N Topline.lua"
+      local file=io.open(candidate,"rb")
+      if file then file:close();path=candidate end
+    end
+    local function search(dir,depth)
+      if depth>7 then return end
+      local i=0
+      while true do
+        local file=r.EnumerateFiles(dir,i);if not file then break end
+        if file:lower()=="n2n topline.lua" then return dir.."/"..file end
+        i=i+1
+      end
+      i=0
+      while true do
+        local sub=r.EnumerateSubdirectories(dir,i);if not sub then break end
+        local found=search(dir.."/"..sub,depth+1);if found then return found end
+        i=i+1
+      end
+    end
+    path=path or search(r.GetResourcePath().."/Scripts",0)
+    if not path then r.MB("Install N2N Topline.lua first.","N2N Mix",0);return end
+  end
+  local region=j and sections[j].id or -1
+  r.GetSetMediaTrackInfo_String(t.track,"P_EXT:N2N:TOPLINE","1",true)
+  r.SetExtState(sec,"request",table.concat({tostring(proj),t.key,tostring(region),tostring(r.time_precise())},"\t"),false)
+  if not running then
+    local cmd=r.AddRemoveReaScript(true,0,path,true)
+    if cmd and cmd>0 then r.Main_OnCommand(cmd,0)
+    else r.DeleteExtState(sec,"request",false);r.MB("Could not launch N2N Topline.","N2N Mix",0) end
+  end
+end
+local function plugin_menu(t,j,b,no_divider)
   local inst=r.TrackFX_GetInstrument(t.track)
   local arrangers={}
   for fx=0,r.TrackFX_GetCount(t.track)-1 do
@@ -1281,8 +1368,10 @@ local function plugin_menu(t,j,b)
     local kind=is_arranger_name(name or "")
     if kind then arrangers[#arrangers+1]={fx=fx,label=kind};if inst==fx then inst=-1 end end
   end
-  if inst>=0 or #arrangers>0 then
-    r.ImGui_Separator(ctx)
+  local top=ui.is_topline(t)
+  if inst>=0 or #arrangers>0 or top then
+    if not no_divider then r.ImGui_Separator(ctx) end
+    if top and r.ImGui_Selectable(ctx,"Open N2N Topline",false) then ui.launch_topline(t,j) end
     for _,a in ipairs(arrangers) do
       if r.ImGui_Selectable(ctx,"Open "..a.label.."##"..a.fx,false) then open_track_plugin(t,a.fx,j,b,true) end
     end
@@ -1607,6 +1696,29 @@ local function track_header(t)
   r.ImGui_DrawList_PushClipRect(dl,x+5,y,x+w-5,y+CELL_H,true)
   r.ImGui_DrawList_AddText(dl,x+6,y+(CELL_H-th)/2,contrast(rr,gg,bb),t.name)
   r.ImGui_DrawList_PopClipRect(dl)
+  if not job then
+    local n=mono_push(true)
+    if r.ImGui_BeginPopupContextItem(ctx,"##trackmenu"..t.key) then
+      plugin_menu(t,nil,nil,true)
+      r.ImGui_EndPopup(ctx)
+    end
+    r.ImGui_PopStyleColor(ctx,n)
+  end
+end
+function ui.track_switch(t,label,param)
+  local value=r.GetMediaTrackInfo_Value(t.track,param)
+  local active=value~=0
+  r.ImGui_SameLine(ctx,0,3)
+  r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),active and 0x8A8A8AFF or 0x303030FF)
+  r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ButtonHovered(),0x555555FF)
+  r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ButtonActive(),0x707070FF)
+  r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Text(),active and 0x151515FF or 0xD0D0D0FF)
+  if r.ImGui_Button(ctx,label.."##"..param..t.key,22,CELL_H) and not job and not pending_start then
+    if param=="I_SOLO" then r.SetMediaTrackInfo_Value(t.track,param,active and 0 or 2)
+    else r.SetMediaTrackInfo_Value(t.track,param,active and 0 or 1) end
+    r.TrackList_AdjustWindows(false);r.UpdateArrange()
+  end
+  r.ImGui_PopStyleColor(ctx,4)
 end
 local function tool_button(i)
   local dl=r.ImGui_GetWindowDrawList(ctx)
@@ -1627,44 +1739,90 @@ local function set_pan(t,j,b,v)
   for k=first,last do
     local s=sections[k]
     for n=(j and b or 1),(j and b or #s.bars) do
-      t.pans[k][n]=v
-      put("pan:"..t.key..":"..s.key..":"..n,v)
+      t.pans[k][n]=v;t.panramps[k][n]=0
+      put("pan:"..t.key..":"..s.key..":"..n,v);put("panramp:"..t.key..":"..s.key..":"..n,0)
     end
   end
   pan_dirty[t]=true
+end
+function ui.paint_pan_transition(t,j,b,k,n)
+  local aj,ab,zj,zb=ui.span_bounds(j,b,k,n)
+  local id=new_ramp()
+  for s=aj,zj do
+    for p=(s==aj and ab or 1),(s==zj and zb or #sections[s].bars) do
+      t.panramps[s][p]=id
+      put("panramp:"..t.key..":"..sections[s].key..":"..p,id)
+    end
+  end
+  pan_dirty[t]=true;ui.pan_start=nil
+end
+function ui.pan_transition_cell(t,j,b)
+  if not j then return false end
+  for n=b or 1,b or #sections[j].bars do
+    if t.panramps[j][n]~=0 then return true end
+  end
+  return false
+end
+function ui.pan_label(v)
+  return v==0 and "C" or (v<0 and "L" or "R")..math.floor(math.abs(v)+0.5)
 end
 local function pan_summary(t,j,b)
   local value
   for k=j or 1,j or #sections do
     for n=(j and b or 1),(j and b or #sections[k].bars) do
       local p=t.pans[k][n]
+      if t.panramps[k][n]~=0 then return nil end
       if value~=nil and value~=p then return nil end
       value=p
     end
   end
   return value
 end
-local function pan_cell(t,j,b,w)
+local function pan_cell(t,j,b,w,map)
   local dl=r.ImGui_GetWindowDrawList(ctx)
   local x,y=r.ImGui_GetCursorScreenPos(ctx)
   local id="##pan"..t.key..":"..(j or 0)..":"..(b or 0)
   local v=pan_summary(t,j,b)
   local available=has_position(t,perf_index(t)) and t.position_ready~=false
   r.ImGui_InvisibleButton(ctx,id,w,CELL_H)
-  local hover=r.ImGui_IsItemHovered(ctx)
+  local hover=r.ImGui_IsItemHovered(ctx,r.ImGui_HoveredFlags_AllowWhenBlockedByActiveItem())
   local rr,gg,bb=rgb(r.GetTrackColor(t.track))
   local light=rgba(math.floor(rr*.55+110),math.floor(gg*.55+110),math.floor(bb*.55+110),255)
   local dark=rgba(math.floor(rr*.70),math.floor(gg*.70),math.floor(bb*.70),255)
+  local transition=ui.pan_transition_cell(t,j,b)
   local split=x+w*((v or 0)+100)/200
   r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+CELL_H,light)
-  r.ImGui_DrawList_AddRectFilled(dl,x,y,split,y+CELL_H,dark)
-  r.ImGui_DrawList_AddLine(dl,x+w/2,y+2,x+w/2,y+CELL_H-2,0xFFFFFFA0,1)
-  if v~=nil then r.ImGui_DrawList_AddLine(dl,split,y,split,y+CELL_H,0x111111FF,2) end
+  if transition and map then
+    local first,last=b or 1,b or #sections[j].bars
+    local ta,tz=map[j][first].a,map[j][last].b
+    for k=first,last do
+      local p=map[j][k]
+      local xa,xb=x+w*(p.a-ta)/(tz-ta),x+w*(p.b-ta)/(tz-ta)
+      local ya=y+CELL_H*(1-(p.g0+100)/200)
+      local yb=y+CELL_H*(1-(p.g1+100)/200)
+      r.ImGui_DrawList_AddQuadFilled(dl,xa,ya,xb,yb,xb,y+CELL_H,xa,y+CELL_H,dark)
+      r.ImGui_DrawList_AddLine(dl,xa,ya,xb,yb,0x111111FF,2)
+    end
+  else
+    r.ImGui_DrawList_AddRectFilled(dl,x,y,split,y+CELL_H,dark)
+    r.ImGui_DrawList_AddLine(dl,x+w/2,y+2,x+w/2,y+CELL_H-2,0xFFFFFFA0,1)
+    if v~=nil then r.ImGui_DrawList_AddLine(dl,split,y,split,y+CELL_H,0x111111FF,2) end
+  end
   r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+CELL_H,hover and 0xFFFFFFFF or 0x00000060,0,0,hover and 2 or 1)
   local label=not available and "No Pan FX" or v==nil and "Mixed" or v==0 and "C" or (v<0 and "L" or "R")..math.abs(v)
-  centered(dl,x,y,w,CELL_H,label,0x101010FF)
+  if transition and available and map then
+    local a=map[j][b or 1].g0;local z=map[j][b or #sections[j].bars].g1
+    centered(dl,x,y,w,CELL_H,ui.pan_label(a).." > "..ui.pan_label(z),0x101010FF)
+  else centered(dl,x,y,w,CELL_H,label,0x101010FF) end
   if not job and not pending_start then
-    if available and hover and r.ImGui_IsMouseClicked(ctx,0) then pan_drag={id=id} end
+    if available and hover and r.ImGui_IsMouseClicked(ctx,0) then
+      if ui.pan_transition then
+        if j then ui.pan_stroke={t=t,j=j,b=b} else status="Select a section or bar for a pan transition." end
+      else pan_drag={id=id} end
+    end
+    if available and hover and ui.pan_stroke and ui.pan_stroke.t==t and j and r.ImGui_IsMouseDown(ctx,0) then
+      ui.pan_stroke.endj=j;ui.pan_stroke.endb=b
+    end
     if available and pan_drag and pan_drag.id==id and r.ImGui_IsMouseDown(ctx,0) then
       local mx=r.ImGui_GetMousePos(ctx)
       local p=clamp(math.floor(((mx-x)/w*200-100)+0.5),-100,100)
@@ -1676,6 +1834,7 @@ local function pan_cell(t,j,b,w)
         if r.ImGui_Selectable(ctx,"Center",v==0) then set_pan(t,j,b,0) end
         if r.ImGui_Selectable(ctx,"Hard Left",v==-100) then set_pan(t,j,b,-100) end
         if r.ImGui_Selectable(ctx,"Hard Right",v==100) then set_pan(t,j,b,100) end
+        if j and r.ImGui_Selectable(ctx,"Transition",transition) then ui.paint_pan_transition(t,j,b,j,b) end
       else r.ImGui_Text(ctx,"Position slider 11 unavailable") end
       plugin_menu(t,j,b)
       r.ImGui_EndPopup(ctx)
@@ -2013,8 +2172,9 @@ local function draw()
   end
   -- Reserve enough width for both centered palettes and the far-right
   -- notation selector, even if a previously saved window was narrower.
+  LEFT_W=ui.header_width()
   local _,section_w=section_tool_width()
-  local min_w=LEFT_W+ALL_W+12+math.max(section_w,cell_palette_width()+2*(notation_width()+8))+28
+  local min_w=math.max(LEFT_W,300)+ALL_W+12+math.max(section_w,cell_palette_width()+2*(notation_width()+8))+28
   r.ImGui_SetNextWindowSizeConstraints(ctx,min_w,300,100000,100000)
   r.ImGui_SetNextWindowSize(ctx,math.max(1300,min_w),480,r.ImGui_Cond_FirstUseEver())
   r.ImGui_SetNextWindowBgAlpha(ctx,1)
@@ -2030,6 +2190,12 @@ local function draw()
     else button("Cancel",function() finish("Cancelled. Undo to revert partial changes.") end) end
     r.ImGui_PopStyleVar(ctx)
     r.ImGui_PopStyleColor(ctx,nmono+1)
+    if not job then
+      same()
+      local n=mono_push(true)
+      if r.ImGui_Button(ctx,show_parameters and "Hide Envelope Lanes" or "Show Envelope Lanes",155,0) then set_parameters_visible() end
+      r.ImGui_PopStyleColor(ctx,n)
+    end
     same();r.ImGui_TextWrapped(ctx,status)
     master_options()
     if job then
@@ -2045,13 +2211,13 @@ local function draw()
       local function mode_button(label,mode,w)
         local selected=edit_mode==mode
         if selected then r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),0xD3B86DFF) end
-        if r.ImGui_Button(ctx,label.."##editmode",w,CELL_H) then edit_mode=mode;transition_start=nil end
+        if r.ImGui_Button(ctx,label.."##editmode",w,CELL_H) then edit_mode=mode;transition_start=nil;ui.pan_start=nil end
         if selected then r.ImGui_PopStyleColor(ctx) end
       end
       mode_button("Levels","levels",84)
       same();mode_button("Pan","pan",84)
       same();mode_button("Target Luffs","targets",104)
-      same();if r.ImGui_Button(ctx,show_parameters and "Hide Parameters" or "Show Parameters",130,CELL_H) then set_parameters_visible() end
+
       r.ImGui_PopStyleVar(ctx)
       r.ImGui_PopStyleColor(ctx,mc)
       if edit_mode=="pan" then
@@ -2107,7 +2273,14 @@ local function draw()
           end
         end
         r.ImGui_TableNextRow(ctx,0,CELL_H)
-        r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Track / Role / Timbre")
+        r.ImGui_TableSetColumnIndex(ctx,0)
+        r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Track")
+        local n=mono_push(true)
+        r.ImGui_SameLine(ctx)
+        if r.ImGui_Button(ctx,ui.role and "Role -" or "Role +",64,CELL_H) then ui.role=not ui.role;put("show_role",ui.role and 1 or 0) end
+        r.ImGui_SameLine(ctx)
+        if r.ImGui_Button(ctx,ui.timbre and "Timbre -" or "Timbre +",76,CELL_H) then ui.timbre=not ui.timbre;put("show_timbre",ui.timbre and 1 or 0) end
+        r.ImGui_PopStyleColor(ctx,n)
         r.ImGui_TableSetColumnIndex(ctx,1)
         do
           local dl=r.ImGui_GetWindowDrawList(ctx)
@@ -2133,6 +2306,8 @@ local function draw()
           r.ImGui_TableNextRow(ctx,0,targets and TARGET_H or CELL_H)
           r.ImGui_TableSetColumnIndex(ctx,0)
           track_header(t)
+          ui.track_switch(t,"S","I_SOLO");ui.track_switch(t,"A","I_RECARM");ui.track_switch(t,"M","B_MUTE")
+          if ui.role then
           r.ImGui_SameLine(ctx,0,GAP)
           local role_colors=mono_push(true)
           r.ImGui_SetNextItemWidth(ctx,150)
@@ -2148,6 +2323,8 @@ local function draw()
             r.ImGui_EndCombo(ctx)
           end
           r.ImGui_PopStyleColor(ctx,role_colors)
+          end
+          if ui.timbre then
           r.ImGui_SameLine(ctx,0,GAP)
           local tint=mono_push(true)
           r.ImGui_SetNextItemWidth(ctx,150)
@@ -2170,6 +2347,7 @@ local function draw()
             r.ImGui_EndCombo(ctx)
           end
           r.ImGui_PopStyleColor(ctx,tint)
+          end
           r.ImGui_TableSetColumnIndex(ctx,1)
           if targets then
             r.ImGui_SetNextItemWidth(ctx,ALL_W)
@@ -2185,9 +2363,10 @@ local function draw()
             local plan=make_perf_plan(t)
             across(function(c) target_cell(t,c.j,c.b,c.w,plan,t.depth>0 and bus_offsets[c.j] or 0) end)
           elseif pan_mode then
-            pan_cell(t,nil,nil,ALL_W)
+            local _,map=ui.pan_contour(t)
+            pan_cell(t,nil,nil,ALL_W,map)
             r.ImGui_TableSetColumnIndex(ctx,2)
-            across(function(c) pan_cell(t,c.j,c.b,c.w) end)
+            across(function(c) pan_cell(t,c.j,c.b,c.w,map) end)
           else
             row_level_cell(t)
             r.ImGui_TableSetColumnIndex(ctx,2)
@@ -2210,6 +2389,15 @@ local function draw()
         draw_cell_palette()
         r.ImGui_SameLine(ctx,x+avail-notation_width())
         radio("Simple",false);same();radio("Traditional",true)
+      elseif edit_mode=="pan" then
+        r.ImGui_SameLine(ctx,song_palette_x(x,avail,180))
+        local n=mono_push(true)
+        r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),not ui.pan_transition and 0xD3B86DFF or 0xC4C4C4FF)
+        if r.ImGui_Button(ctx,"Position",86,CELL_H) then ui.pan_transition=false;ui.pan_start=nil end
+        r.ImGui_PopStyleColor(ctx);same()
+        r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),ui.pan_transition and 0xD3B86DFF or 0xC4C4C4FF)
+        if r.ImGui_Button(ctx,"Transition",90,CELL_H) then ui.pan_transition=true;ui.pan_start=nil end
+        r.ImGui_PopStyleColor(ctx);r.ImGui_PopStyleColor(ctx,n)
       end
     end
     r.ImGui_End(ctx)
@@ -2224,7 +2412,17 @@ local function draw()
         transition_start={t=s.t,j=s.j,b=s.b};edit_cell(s.t,s.endj,s.endb,9)
       else edit_cell(s.t,s.j,s.b,9) end
     end
-    stroke=nil;pan_drag=nil;last_paint=nil;apply_dirty()
+    if ui.pan_stroke and not job then
+      local s=ui.pan_stroke
+      if s.endj and (s.j~=s.endj or s.b~=s.endb) then
+        ui.paint_pan_transition(s.t,s.j,s.b,s.endj,s.endb)
+      elseif ui.pan_start and ui.pan_start.t==s.t then
+        ui.paint_pan_transition(s.t,ui.pan_start.j,ui.pan_start.b,s.j,s.b)
+      else
+        ui.pan_start={t=s.t,j=s.j,b=s.b};status="Select pan transition end on the same track."
+      end
+    end
+    ui.pan_stroke=nil;stroke=nil;pan_drag=nil;last_paint=nil;apply_dirty()
   end
   return open
 end
@@ -2243,11 +2441,12 @@ last_preset=clamp(math.floor(num("preset",DEFAULT_PRESET)),1,#presets)
 last_custom=clamp(num("custom",-16),-35,-8)
 preset,custom=last_preset,last_custom
 show_parameters=num("show_parameters",0)==1
+ui.role=num("show_role",1)==1;ui.timbre=num("show_timbre",1)==1
 traditional=num("traditional",0)==1
 refresh()
 local function loop()
   if r.EnumProjects(-1,"")~=proj then if job then fail("Project changed") end;return end
-  if not job and not stroke and not transition_start and not next(dirty) and not next(pan_dirty) and not master_dirty and r.time_precise()>=refresh_at and stopped() then
+  if not job and not stroke and not transition_start and not ui.pan_start and not ui.pan_stroke and not next(dirty) and not next(pan_dirty) and not master_dirty and r.time_precise()>=refresh_at and stopped() then
     refresh_at=r.time_precise()+0.75
     if project_layout_signature()~=layout_sig then refresh() end
   end
