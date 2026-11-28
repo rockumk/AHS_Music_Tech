@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.4.0-dev.10
+version: 12.4.0-dev.11
 author: Rock Kennedy
 about:
-  # N2N Arp v12.4.0-dev.10
+  # N2N Arp v12.4.0-dev.11
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -31,7 +31,7 @@ slider17:0<-100,100,0.01>-N2N Mix Intensity
 @init
 scale_dirty = 0;
 last_input_mode = -1;
-thisversion = "v12.4.0-dev.10";
+thisversion = "v12.4.0-dev.11";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -2080,7 +2080,11 @@ ui_gap_small = 5;
 ui_gap_large = 15; 
 btn_h = 20;        
 tab_start_x = 173;
-tab_right_x=tab_start_x+27*ttabw+special_tab_w-5; 
+tab_right_x=tab_start_x+27*ttabw+special_tab_w-5;
+mix_speed_x=tab_right_x-stretch_w;
+mix_stretch_x=mix_speed_x-2*ttabw-5;
+mix_hub_x=tab_right_x+5;
+mix_level_x=mix_speed_x-29; 
 
 !mb && !rmb ? ( 
     capture_id = 0; 
@@ -2127,13 +2131,21 @@ function centered_btn(x,y,w,h,txt) local(tw,th) (
 function btn(x,y,w,h,txt) ( rect(x,y,w,h, 0.3,0.3,0.3,1); draw_text(x+5,y+2,txt,1,1,1); (mb && p_mb == 0 && mx>=x && mx<x+w && my>=y && my<y+h); );
 
 // Display-only mix controls and guarded requests to the running N2N hub.
-function mix_request(cmd) local(addr,now) (
+function mix_request(cmd,payload) local(addr,now) (
     now=time_precise();
     abs(now-gmem[8320000])<2 && my_slot>=1 && my_slot<=512 && gmem[reg_base+my_slot]==my_key ? (
         addr=8320004+(my_slot-1)*4;
         gmem[addr]=my_key;
         gmem[addr+2]=now;
+        gmem[addr+3]=payload;
         gmem[addr+1]=cmd;
+        1;
+    ) : 0;
+);
+function section_play_request(tab,preroll) (
+    !mix_request(4,tab*3+preroll) ? (
+        section_error_tab=tab;
+        section_error_until=time_precise()+0.45;
     );
 );
 function mix_hub_button(x,y,w,label,cmd) local(hov,online,tw,th) (
@@ -2142,12 +2154,18 @@ function mix_hub_button(x,y,w,label,cmd) local(hov,online,tw,th) (
     rect(x,y,w,20,hov&&online?.33:.18,hov&&online?.33:.18,hov&&online?.33:.18,1);
     gfx_measurestr(label,tw,th);
     draw_text(x+(w-tw)/2,y+(20-th)/2,label,online?.9:.4,online?.9:.4,online?.9:.4);
-    online && hov && mb && !p_mb && capture_id==0 ? mix_request(cmd);
+    online && hov && mb && !p_mb && capture_id==0 && !chan_popup_active && !color_popup_active ? mix_request(cmd,0);
 );
-function mix_status_strip(x,y) local(p,cx,cy,i,a,rr,gg,bb,v,px) (
+function mix_display(x,y,w,kind) local(p,cx,cy,i,a,v,px,hov,mx0,mw) (
+    hov=mx>=x && mx<x+w && my>=y && my<y+20;
+    rect(x,y,w,20,hov?.25:.16,hov?.25:.16,hov?.25:.16,1);
+    hov && !chan_popup_active && !color_popup_active ? (
+        mix_hover=1;
+        mb && !p_mb && capture_id==0 ? mix_request(3,0);
+    );
+    kind==0 ? (
     // Prominence: 0 unset, 1 mute, 2/3 down, 4 mid, 5/6 up, 8 star, 9 transition.
-    p=floor(slider15+.5); cx=x+12; cy=y+10;
-    rect(x,y,24,20,.16,.16,.16,1);
+    p=floor(slider15+.5); cx=x+w/2; cy=y+10;
     gfx_set(.86,.86,.86,1);
     p==0 ? gfx_line(cx-4,cy,cx+4,cy) :
     p==1 ? (gfx_circle(cx,cy,6,0,1);gfx_line(cx-4,cy+4,cx+4,cy-4);) :
@@ -2165,20 +2183,21 @@ function mix_status_strip(x,y) local(p,cx,cy,i,a,rr,gg,bb,v,px) (
             i+=1;
         );
     );
-    // Bipolar Performance Intensity bar.
-    x+=28;rect(x,y,48,20,.16,.16,.16,1);
-    cx=x+24;v=max(-100,min(100,slider17));px=cx+v*.21;
-    v>=0 ? rect(cx,y+9,px-cx,8,.48,.76,.42,1) : rect(px,y+9,cx-px,8,.78,.50,.32,1);
-    gfx_set(.7,.7,.7,1);gfx_line(cx,y+8,cx,y+18);
-    draw_text(x+3,y+1,"INT",.7,.7,.7);
-    // Position (L / C / R).
-    x+=52;rect(x,y,48,20,.16,.16,.16,1);
-    cx=x+24;px=cx+max(-100,min(100,slider16))*.20;
-    gfx_set(.45,.45,.45,1);gfx_line(x+4,y+13,x+44,y+13);gfx_line(cx,y+9,cx,y+17);
-    rect(px-2,y+9,4,8,.85,.85,.85,1);
-    draw_text(x+3,y+1,"PAN",.7,.7,.7);
-    x+=53;mix_hub_button(x,y,38,"INST",1);
-    x+=42;mix_hub_button(x,y,38,"N2N",2);
+    ) : (
+        // Keep the label and the bipolar meter side by side.
+        mx0=x+31; mw=max(8,w-36); cx=mx0+mw/2;
+        kind==1 ? (
+            v=max(-100,min(100,slider17));px=cx+v*mw*.005;
+            v>=0 ? rect(cx,y+6,px-cx,8,.48,.76,.42,1) : rect(px,y+6,cx-px,8,.78,.50,.32,1);
+            gfx_set(.7,.7,.7,1);gfx_line(cx,y+4,cx,y+16);
+            draw_text(x+3,y+3,"INT",.8,.8,.8);
+        ) : (
+            px=cx+max(-100,min(100,slider16))*mw*.005;
+            gfx_set(.45,.45,.45,1);gfx_line(mx0,y+10,mx0+mw,y+10);gfx_line(cx,y+5,cx,y+15);
+            rect(px-2,y+6,4,8,.85,.85,.85,1);
+            draw_text(x+3,y+3,"PAN",.8,.8,.8);
+        );
+    );
 );
 
 
@@ -2224,7 +2243,7 @@ local(bw, bh, i, r, c, bx, by, bit, is_set, current_mask, base_ptr)
     (mb && p_mb == 0 && !(mx>=px && mx<px+bw*4+4 && my>=py-22 && my<py+bh*4+4) && popup_cooldown == 0) ? chan_popup_active = 0;
 );
 
-mx=mouse_x; my=mouse_y; mb=mouse_cap&1; rmb=mouse_cap&2; p_mb=l_mb; l_mb=mb; gfx_clear = 0.05; p_mx=l_mx; l_mx=mx; 
+mx=mouse_x; my=mouse_y; mb=mouse_cap&1; rmb=mouse_cap&2; p_mb=l_mb; l_mb=mb; p_rmb=l_rmb; l_rmb=rmb; gfx_clear = 0.05; p_mx=l_mx; l_mx=mx; 
 UI_TOP_X=10; UI_TOP_Y=10; HDR_X=UI_TOP_X; HDR_Y=UI_TOP_Y;
 
 
@@ -2373,17 +2392,35 @@ drawhold_x  = draw_x;
 drawhold_y  = draw_y;
 
 
-// Compact scale and mix status on the same row, after the lane controls.
-draw_x = 995;
-draw_y = drawhold_y + 136;
-gfx_setfont(1,os_font,max(8,fontsize-2),'b');
+// Restore normal font and original 55px / 8px scale spacing.
+draw_x=997; draw_y=drawhold_y+136;
+gfx_setfont(1,os_font,fontsize,'b');
 draw_text(949,draw_y+4,"GRV:",.6,.6,.6);
 gr_max=mem[LOCAL_GROOVE_DB+32];
 gr_max==0?gfx_set(.3,.3,.3,1):gr_max>1?gfx_set(1,0,0,1):gfx_set(0,1,0,1);
-gfx_circle(983,draw_y+10,4,1);
+gfx_circle(987,draw_y+10,4.5,1);
 draw_text(draw_x,draw_y+4,"SCALE:",.6,.6,.6);
-note_x=draw_x+39;
-scale_tonic == -1 ? (draw_text(note_x,draw_y+4,"---",1,.2,.2);note_x+=24;) : (
+note_x=draw_x+55;
+scale_tonic==-1 ? draw_text(note_x,draw_y+4,"---",1,.2,.2) : (
+    // Measure at normal size; only reduce spacing/font for unusually dense scales.
+    scale_room=mix_level_x-note_x-5;
+    scale_font=fontsize;
+    loop(2,
+        gfx_setfont(1,os_font,scale_font,'b');
+        scale_note_count=0;scale_text_width=0;i=0;
+        loop(13,
+            pc=(scale_tonic+i)%12;
+            mem[scale_state_base+pc] ? (
+            t_n=pc;
+            t_n==0?strcpy(#t,"C"):t_n==1?strcpy(#t,"C#"):t_n==2?strcpy(#t,"D"):t_n==3?strcpy(#t,"D#"):t_n==4?strcpy(#t,"E"):t_n==5?strcpy(#t,"F"):t_n==6?strcpy(#t,"F#"):t_n==7?strcpy(#t,"G"):t_n==8?strcpy(#t,"G#"):t_n==9?strcpy(#t,"A"):t_n==10?strcpy(#t,"A#"):strcpy(#t,"B");
+                gfx_measurestr(#t,tw,th);scale_text_width+=tw;scale_note_count+=1;
+            );i+=1;
+        );
+        scale_text_width>scale_room-max(0,scale_note_count-1) && scale_font==fontsize ? (
+            scale_font=max(8,floor(fontsize*(scale_room-max(0,scale_note_count-1))/max(1,scale_text_width)));
+        );
+    );
+    scale_gap=max(0,min(8,(scale_room-scale_text_width)/max(1,scale_note_count-1)));
     i=0;loop(13,
         pc=(scale_tonic+i)%12;
         mem[scale_state_base+pc] ? (
@@ -2391,13 +2428,20 @@ scale_tonic == -1 ? (draw_text(note_x,draw_y+4,"---",1,.2,.2);note_x+=24;) : (
             t_n==0?strcpy(#t,"C"):t_n==1?strcpy(#t,"C#"):t_n==2?strcpy(#t,"D"):t_n==3?strcpy(#t,"D#"):t_n==4?strcpy(#t,"E"):t_n==5?strcpy(#t,"F"):t_n==6?strcpy(#t,"F#"):t_n==7?strcpy(#t,"G"):t_n==8?strcpy(#t,"G#"):t_n==9?strcpy(#t,"A"):t_n==10?strcpy(#t,"A#"):strcpy(#t,"B");
             pc==scale_tonic?gfx_set(1,.2,.2,1):gfx_set(.8,.8,.8,1);
             gfx_x=note_x;gfx_y=draw_y+4;gfx_drawstr(#t);
-            gfx_measurestr(#t,tw,th);note_x+=tw+2;
-        );
-        i+=1;
+            gfx_measurestr(#t,tw,th);note_x+=tw+scale_gap;
+        );i+=1;
     );
 );
-mix_status_strip(max(1155,note_x+5),draw_y);
 gfx_setfont(1,os_font,fontsize,'b');
+mix_hover=0;
+my_slot>=1 && my_slot<=512 ? (
+    section_reply_addr=8320004+(my_slot-1)*4;
+    gmem[section_reply_addr]==my_key && gmem[section_reply_addr+1]==0 && gmem[section_reply_addr+3]<0 ? (
+        section_error_tab=floor(-gmem[section_reply_addr+3]/3);
+        section_error_until=time_precise()+0.45;
+        gmem[section_reply_addr+3]=0;
+    );
+);
 
 draw_x  = drawhold_x;
 draw_y  = drawhold_y;
@@ -2544,7 +2588,24 @@ loop(3,
                 gfx_setfont(1, os_font, fontsize, 'b'); 
                 is_ed ? draw_text(draw_x+3, draw_y+5, #tn, 0, 0, 0) : draw_text(draw_x+3, draw_y+4, #tn, 1, 1, 1);
                 
-                (mb && p_mb == 0 && mx>=draw_x && mx<draw_x+item_w-24 && my>=draw_y && my<draw_y+26) ? ( 
+                // Match Drum Arranger: transport gestures take precedence over browse/lock.
+                tab_hover=mx>=draw_x && mx<draw_x+item_w-5 && my>=draw_y && my<draw_y+26;
+                !chan_popup_active && !color_popup_active && capture_id==0 && tab_hover ? (
+                    mb && !p_mb && shift_dn ? (
+                        last_tab_clk=0;
+                        section_play_request(gui_t,1);
+                    ) : rmb && !p_rmb ? (
+                        gfx_x=mx; gfx_y=my;
+                        section_play_menu=gfx_showmenu("-2|-1|Play|Stop|Pause");
+                        section_play_menu>0 ? (
+                            last_tab_clk=0;
+                            section_play_menu<=3 ? section_play_request(gui_t,3-section_play_menu) :
+                            section_play_menu==4 ? mix_request(5,0) :
+                            section_play_menu==5 ? mix_request(6,0);
+                        );
+                    );
+                );
+                (!shift_dn && mb && p_mb == 0 && mx>=draw_x && mx<draw_x+item_w-24 && my>=draw_y && my<draw_y+26) ? ( 
                                 rec_cues_active ? (
                                     send_tab_trigger(gui_t);
                                     mem[tab_flash_base + gui_t] = 10;
@@ -2566,16 +2627,14 @@ loop(3,
                 gfx_set(0.0, 0.0, 0.0, 1); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 6, 0); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 5, 0); gfx_circle(draw_x+item_w-17, ly=draw_y+8, 4, 0); 
                 lx=draw_x+item_w-25; ly=draw_y+9; lw=17; lh=14; rect(lx,ly,lw,lh, 0,0,0,1); 
 
-                (mb && p_mb == 0 && mx>=lx-3 && mx<lx+lw+3 && my>=ly-2 && my<ly+lh+2) ? ( 
+                (!shift_dn && mb && p_mb == 0 && mx>=lx-3 && mx<lx+lw+3 && my>=ly-2 && my<ly+lh+2) ? ( 
                     rec_cues_active == 0 ? (
                         mem[ui_locked_tab]=(mem[ui_locked_tab]==gui_t?-1:gui_t); 
                         gmem[GM_BASE+1]=mem[ui_locked_tab]; mem[ui_play_offset] = 0; playback_shift = 0; 
                     );
                 );
 
-                (rmb && !p_rmb && mx>=lx-3 && mx<lx+lw+3 && my>=ly-2 && my<ly+lh+2) ? ( 
-                    rec_cues_active == 0 ? ( mem[ui_edit_tab] = gui_t; mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; );
-                );
+                // Right-click is handled by the section transport menu.
                 
                 // Locked: cyan lock body with a small play-shaped marker.
                 // Unlocked: the existing grey body and hoop remain neutral.
@@ -2594,6 +2653,9 @@ loop(3,
                 
                 f_amt = mem[tab_flash_base + gui_t];
                 f_amt > 0 ? ( rect(draw_x, draw_y, item_w-5, 26, 1, 1, 1, f_amt/10); mem[tab_flash_base + gui_t] -= 1; );
+                gui_t==section_error_tab && time_precise()<section_error_until ? (
+                    rect(draw_x,draw_y,item_w-5,26,1,.05,.05,min(.85,(section_error_until-time_precise())*4));
+                );
                 
                 draw_x += item_w; 
             );
@@ -2933,7 +2995,7 @@ x2 += item_w + ui_gap_small;
 
 
     curr_sub_val = eff_sub(t_e);
-    hf_x=tab_right_x+5; track_label_w=90;
+    hf_x=mix_hub_x; track_label_w=90;
     track_num>0 ? (
         rect(hf_x,row1_y,track_label_w,22,track_r,track_g,track_b,1);
         lum=track_r*.299+track_g*.587+track_b*.114;
@@ -2946,12 +3008,17 @@ x2 += item_w + ui_gap_small;
         draw_text(hf_x+(90-tw)/2,ROW2_Y+(86-th)/2,#track_num_text,1,1,1);
         gfx_setfont(1,os_font,fontsize,'b');
     );
+    hf_x=mix_speed_x; hf_w=stretch_w;
     (curr_sub_val == 24 || curr_sub_val == 32) ? (
-         box_h = 19; hf_act = eff_half(t_e);
-        rect(hf_x, ctrl_y, 90, box_h, 0.2, 0.2, 0.2, 1);
-
-    (mb && p_mb == 0 && mx>=hf_x && mx<hf_x+90 && my>=ctrl_y && my<ctrl_y+box_h) ? (
-        mem[half_speed_ov_base+t_e] = !mem[half_speed_ov_base+t_e];
+        box_h=19; hf_act=eff_half(t_e);
+        rect(hf_x,ctrl_y,hf_w,box_h,.2,.2,.2,1);
+        (mb && !p_mb && mx>=hf_x && mx<hf_x+hf_w && my>=ctrl_y && my<ctrl_y+box_h) ? (
+            mem[half_speed_ov_base+t_e]=!mem[half_speed_ov_base+t_e];
+        );
+        rect(hf_x+(hf_act?hf_w/2:0),ctrl_y,hf_w/2,box_h,.6,.6,.6,1);
+        draw_text(hf_x+10,ctrl_y+2,"1x",hf_act?.5:0,hf_act?.5:0,hf_act?.5:0);
+        draw_text(hf_x+hf_w/2+10,ctrl_y+2,"1/2",hf_act?0:.5,hf_act?0:.5,hf_act?0:.5);
+        gfx_set(0,0,0,1);gfx_line(hf_x+hf_w/2,ctrl_y,hf_x+hf_w/2,ctrl_y+box_h);
     );
 
         !hf_act ? ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(hf_x, ctrl_y, 45, box_h); ); 
@@ -2965,8 +3032,8 @@ x2 += item_w + ui_gap_small;
 
 
 
-    st_x = tab_right_x-stretch_w;
-    btn(st_x, ctrl_y, stretch_w, 19, "  STRETCH") ? ( 
+    st_x=mix_stretch_x;
+    centered_btn(st_x,ctrl_y,2*ttabw-5,19,"STRETCH") ? ( 
         gfx_x = st_x; gfx_y = ctrl_y + 20;
         sel_stretch = gfx_showmenu("Stretch Pattern 2x (Short)|Stretch Pattern 2x (Long)|Stretch Pattern 4x (Short)|Stretch Pattern 4x (Long)||Stretch Selected Lane 2x (Short)|Stretch Selected Lane 2x (Long)|Stretch Selected Lane 4x (Short)|Stretch Selected Lane 4x (Long)");
         
@@ -2995,6 +3062,12 @@ x2 += item_w + ui_gap_small;
         );
     );
 ); // <--- END OF PATTERN SETTINGS WRAP
+gfx_setfont(1,os_font,fontsize,'b');
+mix_hub_button(mix_hub_x,ctrl_y,42,"INST",1);
+mix_hub_button(mix_hub_x+47,ctrl_y,43,"N2N",2);
+mix_display(mix_level_x,ctrl_y+23,24,0);
+mix_display(mix_speed_x,ctrl_y+23,stretch_w,1);
+mix_display(mix_hub_x,ctrl_y+23,90,2);
 
 
 
@@ -3690,3 +3763,13 @@ mouse_hwheel = 0;
 );
 
 mem[ui_power_off] ? (rect(0,0,gfx_w,gfx_h,0,0,0,0.62); draw_power_button(10,ROW2_Y););
+
+// Display-only hover popup overlays the grid.
+mix_hover && !chan_popup_active && !color_popup_active && !mb && !rmb ? (
+    gfx_setfont(1,os_font,fontsize,'b');
+    gfx_measurestr("Display only! Click to open N2N Mix.",mix_tip_w,mix_tip_h);
+    mix_tip_x=max(0,min(mx+10,gfx_w-mix_tip_w-12));mix_tip_y=my+22;
+    rect(mix_tip_x,mix_tip_y,mix_tip_w+10,mix_tip_h+8,.09,.09,.09,1);
+    gfx_set(.55,.55,.55,1);gfx_rect(mix_tip_x,mix_tip_y,mix_tip_w+10,mix_tip_h+8,0);
+    draw_text(mix_tip_x+5,mix_tip_y+4,"Display only! Click to open N2N Mix.",1,1,1);
+);
