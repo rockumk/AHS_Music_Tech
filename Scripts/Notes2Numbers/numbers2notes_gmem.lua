@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.21
+-- @version 1.9.22
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -334,6 +334,17 @@ local function pattern_path(is_arp, mode, factory)
     reaper.RecursiveCreateDirectory(p,0)
     return p
 end
+-- The native legacy dialog may remember an unrelated directory. Use an
+-- explicit initial folder when js_ReaScriptAPI is installed.
+local function browse_pattern_file(dir,title,extension)
+    local r=reaper
+    if r.JS_Dialog_BrowseForOpenFiles then
+        local filter="N2N pattern files (*"..extension..")\0*"..extension.."\0"
+        local result,path=r.JS_Dialog_BrowseForOpenFiles(title,dir,"",filter,false)
+        return result>0 and path and path~="",path
+    end
+    return r.GetUserFileNameForRead(dir.."/",title,extension)
+end
 local function update_catalogue(LIB,is_arp,mode)
     local r=reaper
     local dir=pattern_path(is_arp,mode,true)
@@ -433,7 +444,7 @@ local function service_pattern_library(LIB,is_arp)
                 path=cat.dir.."/"..cat.names[index]
             else
                 local accepted
-                accepted,path=r.GetUserFileNameForRead(dir.."/","Load "..kind.." pattern"..(is_arp and " ("..ARP_MODES[mode]..")" or ""),extension)
+                accepted,path=browse_pattern_file(dir,"Load "..kind.." pattern"..(is_arp and " ("..ARP_MODES[mode]..")" or ""),extension)
                 if not accepted then r.gmem_write(LIB,0); return end
             end
             local file,why=io.open(path,"rb"); if not file then error(why or "Cannot open pattern") end
@@ -1515,7 +1526,7 @@ function DB.manual_choice(session,cmd)
     else
         if r.GetPlayStateEx(session.project)~=0 then error("Stop playback before loading or restoring a drum pattern set.",0) end
         if cmd==2 then
-            local accepted,path=r.GetUserFileNameForRead(dir.."/","Load Drum Pattern Set",".n2drumset")
+            local accepted,path=browse_pattern_file(dir,"Load Drum Pattern Set",".n2drumset")
             if not accepted then return false end
             session.target=DB.unpack_set(DB.read(path,45000000))
         else
