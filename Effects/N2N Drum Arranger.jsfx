@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.15
+version: 7.8.0-dev.16
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.15 -
+  # N2N Drum Arranger v7.8.0-dev.16 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -132,9 +132,12 @@ slider8:0<0,128,1>-View Scroll
 slider9:0<0,1,1{P, M}>-Swing Source (Default=P)
 slider11:14<10,30,1>-Grid Row Height
 slider12:1<0,1,1>-Song Form Protocol
+// Display-only mirrors written by N2N Mix; never used in MIDI generation.
+slider15:0<-60,30,0.01>-N2N Mix Level
+slider16:0<-100,100,0.01>-N2N Mix Position
 
 @init
-version_display = "v7.8.0-dev.15";
+version_display = "v7.8.0-dev.16";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
