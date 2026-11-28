@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.13
+-- @version 1.9.14
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -846,7 +846,8 @@ local function pattern_grid(ctx,t,width,scale,gap)
         end
     end
 end
-function export.DrawTracks(ctx,font)
+export.ToplineFooterLauncher=true
+function export.DrawTracks(ctx,font,open_topline)
     local r=reaper
     local percent=track_scale
     local scale=percent/100
@@ -992,7 +993,8 @@ function export.DrawTracks(ctx,font)
     if normal_font then r.ImGui_PopFont(ctx) end
     -- Launch advanced cueing in place of the temporary width fields.
     -- Cueing on the left, zoom in the middle, and Topline at the right edge.
-    local zoom_button,readout_width,launcher_width,topline_width=24,52,196,190
+    local zoom_button,readout_width,launcher_width=24,52,196
+    local topline_width=math.max(220,r.ImGui_CalcTextSize(ctx,"Open N2N Topline Editor")+12)
     local readout=("%d%%"):format(percent)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),3,1)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),2,2)
@@ -1014,7 +1016,9 @@ function export.DrawTracks(ctx,font)
     if r.ImGui_Button(ctx,"+##track_zoom",zoom_button,footer_height) then adjust_track_scale(TRACK_SCALE_STEP) end
     if percent>=TRACK_SCALE_MAX then r.ImGui_EndDisabled(ctx) end
     r.ImGui_SameLine(ctx,box_x+panel_width-topline_width)
-    if r.ImGui_Button(ctx,"Open N2N Topline Editor",topline_width,footer_height) then export.OpenEditor("n2ntopline","N2N Topline") end
+    if r.ImGui_Button(ctx,"Open N2N Topline Editor",topline_width,footer_height) then
+        if open_topline then open_topline() else export.OpenEditor("n2ntopline","N2N Topline") end
+    end
     r.ImGui_PopStyleVar(ctx,2)
     if id_popup then
         if id_popup_open then r.ImGui_OpenPopup(ctx,"N2N Instance ID"); id_popup_open=false end
