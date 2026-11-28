@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.24
+version: 7.8.0-dev.25
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.24 -
+  # N2N Drum Arranger v7.8.0-dev.25 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -139,7 +139,7 @@ slider17:0<-100,100,0.01>-N2N Mix Intensity
 slider18:0<-500,500,1>-Visual Sync (ms)
 
 @init
-version_display = "v7.8.0-dev.24";
+version_display = "v7.8.0-dev.25";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -1415,6 +1415,10 @@ bank_l=mem_pos; mem_pos+=TOTAL_TABS*vel_stride_tab;
 bank_h=mem_pos; mem_pos+=TOTAL_TABS*6;
 bank_meta=mem_pos; mem_pos+=35000;
 bank_seen=mem_pos; mem_pos+=TOTAL_TABS+1;
+// Temporary destination mapping for single-pattern imports. No existing row is remapped.
+lib_pair_map=mem_pos; mem_pos+=2048;
+lib_new_note=mem_pos; mem_pos+=MAX_ROWS;
+lib_new_chan=mem_pos; mem_pos+=MAX_ROWS;
 bank_epoch+=1; bank_stage_token=0; bank_announce_at=0;
 form_count=0; form_rev=-1;
 function form_find(q) local(lo,hi,m,ans) (
@@ -1961,19 +1965,82 @@ mem[LOCAL_GROOVE_DB + 32] = max_gr;
 // CUE SYSTEM LOGIC
 // =========================================================
 (gmem[6200000]==3 && gmem[6200001]==slider5 && gmem[6200012]==my_key) ? (
-    lib_t=gmem[6200002]; lib_t>=1 && lib_t<TOTAL_TABS ? (
-        memset(grid_base+lib_t*vel_stride_tab,0,vel_stride_tab); memset(vel_base+lib_t*vel_stride_tab,0,vel_stride_tab); memset(step_len_base+lib_t*vel_stride_tab,0,vel_stride_tab);
-        mem[bars_ov_base+lib_t]=gmem[6200003]; lib_sub=gmem[6200004]; mem[subdiv_ov_base+lib_t]=lib_sub==8?0:lib_sub==12?1:lib_sub==16?2:lib_sub==24?3:4;
-        mem[hum_ov_base+lib_t]=gmem[6200005]; mem[swing_ov_base+lib_t]=gmem[6200006]; mem[half_speed_ov_base+lib_t]=gmem[6200007]; mem[tab_mute_base+lib_t]=gmem[6200010]&2;
-        lib_i=0; loop(min(16384,max(0,gmem[6200009])),
-            lib_a=6200016+lib_i*6; lib_r=0; lib_match=-1;
-            loop(MAX_ROWS, lib_match<0 && mem[row_note_base+lib_r]==gmem[lib_a] && mem[row_chan_base+lib_r]==gmem[lib_a+1] ? lib_match=lib_r; lib_r+=1;);
-            lib_s=gmem[lib_a+2]; lib_match>=0 && lib_s>=0 && lib_s<MAX_STEPS ? (
-                lib_p=lib_t*vel_stride_tab+lib_match*vel_stride_row+lib_s;
-                mem[vel_base+lib_p]=gmem[lib_a+3]; mem[grid_base+lib_p]=gmem[lib_a+4]; mem[step_len_base+lib_p]=gmem[lib_a+5];
-            ); lib_i+=1;
-        ); check_tab_population(lib_t); flush_inventory_to_gmem(); needs_tab_update=1;
-    ); gmem[6200000]=0;
+    lib_t=gmem[6200002];
+    lib_t>=1 && lib_t<TOTAL_TABS && lib_t==floor(lib_t) ? (
+        lib_count=min(16384,max(0,floor(gmem[6200009])));
+        // Build a MIDI note/channel lookup and plan missing rows before touching the destination.
+        memset(lib_pair_map,-1,2048);
+        memset(lib_new_note,-1,MAX_ROWS);
+        lib_r=0; loop(MAX_ROWS,
+            lib_note=mem[row_note_base+lib_r]; lib_chan=mem[row_chan_base+lib_r];
+            lib_note>=0 && lib_note<128 && lib_chan>=1 && lib_chan<=16 ? (
+                lib_key=(lib_chan-1)*128+lib_note;
+                mem[lib_pair_map+lib_key]<0 ? mem[lib_pair_map+lib_key]=lib_r;
+            );
+            lib_r+=1;
+        );
+        lib_next_free=0; lib_ok=1; lib_i=0;
+        while(lib_i<lib_count && lib_ok) (
+            lib_a=6200016+lib_i*6;
+            lib_note=gmem[lib_a]; lib_chan=gmem[lib_a+1];
+            lib_key=(lib_chan-1)*128+lib_note;
+            lib_note<0 || lib_note>=128 || lib_chan<1 || lib_chan>16 || lib_note!=floor(lib_note) || lib_chan!=floor(lib_chan) ? lib_ok=0 : (
+                mem[lib_pair_map+lib_key]<0 ? (
+                    lib_free=-1;
+                    while(lib_next_free<MAX_ROWS && lib_free<0) (
+                        lib_r=lib_next_free; lib_next_free+=1;
+                        mem[row_note_base+lib_r]<0 && strlen(row_name_str_base+lib_r)==0 ? (
+                            // A blank map row can still contain old pattern data. Never reinterpret it.
+                            lib_used=0; lib_scan_t=0;
+                            while(lib_scan_t<TOTAL_TABS && !lib_used) (
+                                lib_s=0;
+                                lib_p=lib_scan_t*vel_stride_tab+lib_r*vel_stride_row;
+                                while(lib_s<MAX_STEPS && !lib_used) (
+                                    mem[grid_base+lib_p+lib_s]!=0 || mem[vel_base+lib_p+lib_s]!=0 || mem[step_len_base+lib_p+lib_s]!=0 ? lib_used=1;
+                                    lib_s+=1;
+                                );
+                                lib_scan_t+=1;
+                            );
+                            !lib_used ? lib_free=lib_r;
+                        );
+                    );
+                    lib_free<0 ? lib_ok=0 : (
+                        mem[lib_pair_map+lib_key]=lib_free;
+                        mem[lib_new_note+lib_free]=lib_note;
+                        mem[lib_new_chan+lib_free]=lib_chan;
+                    );
+                );
+            );
+            lib_i+=1;
+        );
+        lib_ok ? (
+            lib_r=0; loop(MAX_ROWS,
+                mem[lib_new_note+lib_r]>=0 ? (
+                    mem[row_note_base+lib_r]=mem[lib_new_note+lib_r];
+                    mem[row_chan_base+lib_r]=mem[lib_new_chan+lib_r];
+                    mem[row_mute_base+lib_r]=0; mem[row_solo_base+lib_r]=0;
+                    mem[row_level_base+lib_r]=80; mem[row_human_base+lib_r]=-1;
+                    mem[row_len_base+lib_r]=20; mem[row_offs_base+lib_r]=0;
+                    mem[row_color_base+lib_r]=0; mem[row_name_idx+lib_r]=41;
+                    sprintf(row_name_str_base+lib_r,"Drum %d",mem[row_note_base+lib_r]);
+                );
+                lib_r+=1;
+            );
+            memset(grid_base+lib_t*vel_stride_tab,0,vel_stride_tab); memset(vel_base+lib_t*vel_stride_tab,0,vel_stride_tab); memset(step_len_base+lib_t*vel_stride_tab,0,vel_stride_tab);
+            mem[bars_ov_base+lib_t]=gmem[6200003]; lib_sub=gmem[6200004]; mem[subdiv_ov_base+lib_t]=lib_sub==8?0:lib_sub==12?1:lib_sub==16?2:lib_sub==24?3:4;
+            mem[hum_ov_base+lib_t]=gmem[6200005]; mem[swing_ov_base+lib_t]=gmem[6200006]; mem[half_speed_ov_base+lib_t]=gmem[6200007]; mem[tab_mute_base+lib_t]=gmem[6200010]&2;
+            lib_i=0; loop(lib_count,
+                lib_a=6200016+lib_i*6; lib_key=(gmem[lib_a+1]-1)*128+gmem[lib_a];
+                lib_match=mem[lib_pair_map+lib_key]; lib_s=gmem[lib_a+2];
+                lib_match>=0 && lib_s>=0 && lib_s<MAX_STEPS ? (
+                    lib_p=lib_t*vel_stride_tab+lib_match*vel_stride_row+lib_s;
+                    mem[vel_base+lib_p]=gmem[lib_a+3]; mem[grid_base+lib_p]=gmem[lib_a+4]; mem[step_len_base+lib_p]=gmem[lib_a+5];
+                ); lib_i+=1;
+            );
+            check_tab_population(lib_t); flush_inventory_to_gmem(); needs_tab_update=1;
+            gmem[6200000]=0;
+        ) : gmem[6200000]=8;
+    ) : gmem[6200000]=10;
 );
 
 service_drum_bank();
