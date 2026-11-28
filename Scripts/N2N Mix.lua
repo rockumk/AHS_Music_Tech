@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.2
+-- @version 0.2.3
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -39,6 +39,8 @@ local ui_font=nil
 local UI_SIZE=13
 local CELL_H=26
 local LEFT_W=535
+local ALL_W=68
+local edit_mode="levels"
 local GAP=3
 local display_cols={}
 local font_new_api=nil
@@ -1119,6 +1121,65 @@ local function popup_level(t,j,b,v,id)
   end
   r.ImGui_PopStyleColor(ctx,n)
 end
+-- The whole-row cell is a derived summary, not another independent setting.
+-- All edits go through the same stored bar values as the ordinary grid.
+local function row_level(t)
+  local v
+  for j,s in ipairs(sections) do
+    if not s.countin then
+      for _,level in ipairs(t.cells[j]) do
+        if level==9 or (v~=nil and level~=v) then return 0 end
+        v=level
+      end
+    end
+  end
+  return v
+end
+local function set_row_level(t,v)
+  if job or not v or v==9 or v==0 then return end
+  transition_start=nil
+  for j,s in ipairs(sections) do
+    if not s.countin then edit_cell(t,j,nil,v) end
+  end
+end
+local function row_level_cell(t)
+  local v=row_level(t)
+  local w,h=ALL_W,CELL_H
+  local dl=r.ImGui_GetWindowDrawList(ctx)
+  local x,y=r.ImGui_GetCursorScreenPos(ctx)
+  local id="##alllevel"..t.key
+  local clicked=r.ImGui_InvisibleButton(ctx,id,w,h)
+  local hover=r.ImGui_IsItemHovered(ctx)
+  local rr,gg,bb=rgb(r.GetTrackColor(t.track))
+  local light=rgba(math.floor(rr*.55+110),math.floor(gg*.55+110),math.floor(bb*.55+110),255)
+  local dark=rgba(math.floor(rr*.70),math.floor(gg*.70),math.floor(bb*.70),255)
+  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+h,light,0)
+  if v and v~=0 then
+    local f=fill_for(v)
+    if f>0 then r.ImGui_DrawList_AddRectFilled(dl,x,y+h*(1-f),x+w,y+h,dark,0) end
+  end
+  r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+h,hover and 0xFFFFFFFF or 0x00000080,0,0,hover and 2 or 1)
+  if job or v==nil then centered(dl,x,y,w,h,"—",0x101010FF)
+  elseif v==0 then centered(dl,x,y,w,h,"Mixed",0x101010FF)
+  else symbol(dl,x,y,w,h,v) end
+  if not job and v~=nil then
+    if clicked then
+      if tool~=9 then set_row_level(t,tool) else status="Select a fixed level to paint the whole row." end
+    end
+    local n=mono_push(true)
+    if r.ImGui_BeginPopupContextItem(ctx,"##alloptions"..t.key) then
+      for _,k in ipairs(tool_ids) do
+        if k~=9 then
+          local label=traditional and (trad[k].."  "..simple[k]) or simple[k]
+          if r.ImGui_Selectable(ctx,label,v==k) then set_row_level(t,k) end
+        end
+      end
+      r.ImGui_EndPopup(ctx)
+    end
+    r.ImGui_PopStyleColor(ctx,n)
+    if hover then r.ImGui_SetTooltip(ctx,tool==9 and "Whole row: choose a fixed level. Transition is unavailable." or ("Whole row: "..simple[tool]..". Right-click for levels.")) end
+  end
+end
 local function cell(t,j,b,w,fills,ri,ci)
   local s=sections[j]
   local v=b and t.cells[j][b] or t.cells[j][1]
@@ -1228,6 +1289,41 @@ local function draw_section_tile(dl,x,y,w,h,f0,f1,label,selected,hover,segments)
   end
   r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+h,rim,rad,0,selected and 2 or 1)
   if label~="" then centered(dl,x,y,w,h,label,0x101010FF) end
+end
+local function all_intensity_cell()
+  local v
+  for _,s in ipairs(sections) do
+    if not s.countin then
+      for _,b in ipairs(s.bars) do
+        if v==nil then v=b.int elseif v~=b.int then v=0 end
+        if v==5 then v=0 end
+      end
+    end
+  end
+  local dl=r.ImGui_GetWindowDrawList(ctx)
+  local x,y=r.ImGui_GetCursorScreenPos(ctx)
+  local clicked=r.ImGui_InvisibleButton(ctx,"##allintensity",ALL_W,CELL_H)
+  local hover=r.ImGui_IsItemHovered(ctx)
+  local f=section_fill[v] or (v==0 and 0.5 or 0)
+  local label=job or v==nil
+  label=label and "—" or v==0 and "Mixed" or v==4 and "V.Strong" or intens_names[v]
+  draw_section_tile(dl,x,y,ALL_W,CELL_H,f,f,label,false,hover)
+  local function set_all(k)
+    if k==5 then status="Select a fixed section level to paint the whole row.";return end
+    for j,s in ipairs(sections) do if not s.countin then set_intensity(j,nil,k) end end
+  end
+  if not job and v~=nil then
+    if clicked then set_all(intensity_tool) end
+    local n=mono_push(true)
+    if r.ImGui_BeginPopupContextItem(ctx,"##allintensityoptions") then
+      for _,k in ipairs(intensity_ids) do
+        if k~=5 and r.ImGui_Selectable(ctx,intens_names[k],v==k) then intensity_tool=k;set_all(k) end
+      end
+      r.ImGui_EndPopup(ctx)
+    end
+    r.ImGui_PopStyleColor(ctx,n)
+    if hover then r.ImGui_SetTooltip(ctx,"Set every section to the selected section level. Transition is unavailable.") end
+  end
 end
 local function intensity_cell(c,contour,ci)
   local s=sections[c.j]
@@ -1381,7 +1477,7 @@ end
 -- The song grid has a frozen track header. Tool palettes are anchored to
 -- the visible editing area, not to the full window or the scrolled song.
 local function song_palette_x(x,avail,w)
-  local left=x+LEFT_W+6
+  local left=x+LEFT_W+ALL_W+12
   return left+math.max(0,(x+avail-left-w)/2)
 end
 local function section_tool_width()
@@ -1491,7 +1587,7 @@ local function draw()
   -- Reserve enough width for both centered palettes and the far-right
   -- notation selector, even if a previously saved window was narrower.
   local _,section_w=section_tool_width()
-  local min_w=LEFT_W+6+math.max(section_w,cell_palette_width()+2*(notation_width()+8))+28
+  local min_w=LEFT_W+ALL_W+12+math.max(section_w,cell_palette_width()+2*(notation_width()+8))+28
   r.ImGui_SetNextWindowSizeConstraints(ctx,min_w,300,100000,100000)
   r.ImGui_SetNextWindowSize(ctx,math.max(1300,min_w),480,r.ImGui_Cond_FirstUseEver())
   r.ImGui_SetNextWindowBgAlpha(ctx,1)
@@ -1529,7 +1625,15 @@ local function draw()
       local section_w,palette_w=section_tool_width()
       local start_x=r.ImGui_GetCursorPosX(ctx)
       local avail=r.ImGui_GetContentRegionAvail(ctx)
-      r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Section levels")
+      -- Mode buttons occupy the fixed left portion; future modes can sit beside Levels.
+      local mc=mono_push(true)
+      r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),4)
+      local levels_selected=edit_mode=="levels"
+      if levels_selected then r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),0xD3B86DFF) end
+      if r.ImGui_Button(ctx,"Levels##editmode",84,CELL_H) then edit_mode="levels" end
+      if levels_selected then r.ImGui_PopStyleColor(ctx) end
+      r.ImGui_PopStyleVar(ctx)
+      r.ImGui_PopStyleColor(ctx,mc)
       r.ImGui_SameLine(ctx,song_palette_x(start_x,avail,palette_w))
       for i,k in ipairs(intensity_ids) do
         if i>1 then same() end
@@ -1559,12 +1663,13 @@ local function draw()
       end
       display_cols=cols
       local flags=r.ImGui_TableFlags_ScrollX() | r.ImGui_TableFlags_ScrollY() | r.ImGui_TableFlags_SizingFixedFit()
-      -- Only two actual table columns: the entire song strip can exceed the native
-      -- ImGui column limit without losing the frozen track header.
-      if r.ImGui_BeginTable(ctx,"##mixgrid",2,flags,0,job and 0 or -(CELL_H+29),LEFT_W+total+32) then
+      -- Freeze both the track information and whole-row control. The song
+      -- strip remains one scrollable column to avoid ImGui's column limit.
+      if r.ImGui_BeginTable(ctx,"##mixgrid_v2",3,flags,0,job and 0 or -(CELL_H+29),LEFT_W+ALL_W+total+38) then
         r.ImGui_TableSetupColumn(ctx,"Track",r.ImGui_TableColumnFlags_WidthFixed(),LEFT_W)
+        r.ImGui_TableSetupColumn(ctx,"All",r.ImGui_TableColumnFlags_WidthFixed(),ALL_W)
         r.ImGui_TableSetupColumn(ctx,"Song",r.ImGui_TableColumnFlags_WidthFixed(),total+8)
-        r.ImGui_TableSetupScrollFreeze(ctx,1,2)
+        r.ImGui_TableSetupScrollFreeze(ctx,2,2)
         local function across(fn)
           for i,c in ipairs(cols) do
             if i>1 then r.ImGui_SameLine(ctx,0,GAP) end
@@ -1573,11 +1678,19 @@ local function draw()
         end
         r.ImGui_TableNextRow(ctx,0,CELL_H)
         r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Track / Role / Timbre / Target")
-        r.ImGui_TableSetColumnIndex(ctx,1);across(color_header)
+        r.ImGui_TableSetColumnIndex(ctx,1)
+        do
+          local dl=r.ImGui_GetWindowDrawList(ctx)
+          local x,y=r.ImGui_GetCursorScreenPos(ctx)
+          r.ImGui_Dummy(ctx,ALL_W,CELL_H)
+          centered(dl,x,y,ALL_W,CELL_H,"All",r.ImGui_GetStyleColor(ctx,r.ImGui_Col_Text()))
+        end
+        r.ImGui_TableSetColumnIndex(ctx,2);across(color_header)
         r.ImGui_TableNextRow(ctx,0,CELL_H)
         r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Section intensity")
         local contour=intensity_contour()
-        r.ImGui_TableSetColumnIndex(ctx,1);across(function(c,ci) intensity_cell(c,contour,ci) end)
+        r.ImGui_TableSetColumnIndex(ctx,1);all_intensity_cell()
+        r.ImGui_TableSetColumnIndex(ctx,2);across(function(c,ci) intensity_cell(c,contour,ci) end)
         for ri,t in ipairs(rows) do
           r.ImGui_TableNextRow(ctx,0,CELL_H)
           r.ImGui_TableSetColumnIndex(ctx,0)
@@ -1628,7 +1741,8 @@ local function draw()
             for j,base in pairs(t.base) do t.base[j]=clamp(base+t.target-old,-30,24);put("base:"..t.key..":"..sections[j].key,t.base[j]) end
             dirty[t]=true
           end
-          r.ImGui_TableSetColumnIndex(ctx,1)
+          r.ImGui_TableSetColumnIndex(ctx,1);row_level_cell(t)
+          r.ImGui_TableSetColumnIndex(ctx,2)
           local fills=transition_fills(t)
           across(function(c,ci) cell(t,c.j,c.b,c.w,fills,ri,ci) end)
         end
