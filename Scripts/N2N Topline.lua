@@ -1,5 +1,5 @@
 -- @description N2N Topline
--- @version 5.4-dev.4
+-- @version 5.4-dev.5
 -- @author Rock Kennedy and Gemini 4 Hydrogen (which did an absolutely fabulous job of transforming the vision into solid Lua code)
 -- @about
 --   Numbers2Notes Topline Melody Editor (1200x640 minimum):
@@ -178,6 +178,21 @@ function state.capture_window()
     state.win_x,state.win_y=x,y;state.has_saved_win_pos=true
   end
 end
+-- Session view is keyed to the original project, independent of draft serialization.
+function state.view_key()
+  return "view:"..owner_project_key
+end
+function state.save_session_view()
+  reaper.SetExtState(EXT_GLOBAL_SEC,state.view_key(),table.concat({state.px_per_qn,state.v_scale,state.scroll_x_qn,state.scroll_y_px}," "),false)
+end
+function state.load_session_view()
+  local a,b,c,d=reaper.GetExtState(EXT_GLOBAL_SEC,state.view_key()):match("^(%S+) (%S+) (%S+) (%S+)$")
+  a,b,c,d=tonumber(a),tonumber(b),tonumber(c),tonumber(d)
+  if a and b and c and d then
+    state.px_per_qn=clamp(a,20,480);state.v_scale=clamp(b,.45,3)
+    state.scroll_x_qn=math.max(0,c);state.scroll_y_px=math.max(0,d);state.has_saved_view=true
+  end
+end
 local function save_global_prefs()
   local s = function(k, v) reaper.SetExtState(EXT_GLOBAL_SEC, k, tostring(v), true) end
   s("dark_mode", CONFIG.dark_mode and "1" or "0"); s("auto_scroll", state.auto_scroll and "1" or "0")
@@ -191,6 +206,7 @@ local function save_global_prefs()
   s("win_pos_v3", state.has_saved_win_pos and "1" or "0")
   s("piano_keys",state.piano_keys and "1" or "0")
   s("px_per_qn",state.px_per_qn);s("v_scale",state.v_scale)
+  state.save_session_view()
   s("mod_vscroll", state.wheel_mods.v_scroll); s("mod_hscroll", state.wheel_mods.h_scroll)
   s("mod_hzoom", state.wheel_mods.h_zoom); s("mod_vzoom", state.wheel_mods.v_zoom)
 end
@@ -1777,6 +1793,7 @@ function state.transport_icon(i,x,y)
 end
 function state.raise_window(hwnd)
   if not hwnd then return end
+  if reaper.JS_Window_IsWindow and not reaper.JS_Window_IsWindow(hwnd) then return end
   if reaper.JS_Window_IsVisible and not reaper.JS_Window_IsVisible(hwnd) and reaper.JS_Window_Show then reaper.JS_Window_Show(hwnd,"SHOW") end
   if reaper.JS_Window_SetZOrder then reaper.JS_Window_SetZOrder(hwnd,"TOP") end
   if reaper.JS_Window_SetForeground then reaper.JS_Window_SetForeground(hwnd) end
@@ -2352,6 +2369,10 @@ local function handle_keyboard()
   elseif char == 6697265 then state.transport_action(4)
   elseif char == 6697266 then state.transport_action(5)
   elseif char == 33 then state.transport_action(1)
+  elseif char == 0x686f6d65 then state.transport_action(7)
+  elseif char == 0x7067646e then state.transport_action(8)
+  elseif char == 0x70677570 then state.transport_action(9)
+  elseif char == 0x656e64 then state.transport_action(10)
   elseif not ctrl and not alt and (char == 109 or char == 77) then toggle_mute_selected()
   elseif char == 1 or (ctrl and (char == 65 or char == 97)) then select_all()
   elseif char == 3 or (ctrl and (char == 67 or char == 99)) then copy_selected()
@@ -2421,7 +2442,7 @@ local function main()
   end
   state.ui_controls = {}
   update_previews()
-  if not handle_keyboard() then state.capture_window();on_script_exit();gfx.quit();return end
+  if not handle_keyboard() then on_script_exit();gfx.quit();return end
 
   -- Cross-platform minimum size enforcement (1200x640 client area via JS_Window_Resize)
   if gfx.dock(-1) == 0 and (gfx.w < MIN_WIN_W or gfx.h < MIN_WIN_H) and (not state.drag or state.drag.type ~= "win_resize") then
@@ -2511,6 +2532,7 @@ local function init()
   reaper.SetExtState(HUB_EXT_SEC,"heartbeat",tostring(reaper.time_precise()),false)
   load_global_prefs()
   local had_proj_state = load_project_state()
+  state.load_session_view()
   local requested,region=read_hub_request()
   if requested then
     local guid=reaper.GetTrackGUID(requested)
