@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.14
+-- @version 0.2.15
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -1038,7 +1038,10 @@ local function start(policy)
   if math.abs(r.Master_GetPlayRate(proj)-1)>0.0001 then status="Set project play rate to 1.0.";return end
   if r.GetGlobalAutomationOverride()>1 then status="Disable global automation write/bypass override.";return end
   attach()
-  if r.gmem_read(0)==1 then status="Another analysis is armed.";return end
+  if r.gmem_read(0)==1 then
+    status="An analysis flag is still armed. Close any other N2N Mix instance and reopen REAPER before retrying."
+    return
+  end
   local cmd=action_id()
   if not cmd then status="Native dry-run action not found.";return end
   local q,selected,skipped={},{},{}
@@ -1115,7 +1118,7 @@ local function request_start()
     if answer==6 then policy="all" end
   end
   if policy=="current" and r.GetMediaTrackInfo_Value(r.GetMasterTrack(proj),"B_MUTE")~=0 then status="Master is muted. Choose the full-mix option.";return end
-  pending_start=policy;alert_text="Processing please wait.";alert_until=r.time_precise()+1.2
+  pending_start=policy;status="Preparing Auto Mix...";alert_text="";alert_until=0
 end
 -- Normalize endpoints as inclusive cell ranges, including folded regions.
 function ui.span_bounds(j,b,k,n)
@@ -1932,7 +1935,11 @@ local function install_visible_position()
     if ok then ready=ready+1 else missing=missing+1;r.ShowConsoleMsg("N2N Mix Pan: "..t.name..": "..tostring(err).."\n") end
   end
   r.Undo_EndBlock2(proj,"N2N Mix: initialize track position",-1)
-  if missing>0 then status=string.format("Position ready on %d/%d tracks. Update Performance Dynamics with slider 11; see console.",ready,#rows) end
+  if missing>0 then
+    local msg=string.format("Position ready on %d/%d tracks. Update Performance Dynamics with slider 11; see console.",ready,#rows)
+    r.ShowConsoleMsg("N2N Mix: "..msg.."\n")
+    if not ui.start_rejected then status=msg end
+  end
 end
 local function apply_dirty()
   if (not next(dirty) and not next(pan_dirty) and not master_dirty) or job or r.EnumProjects(-1,"")~=proj or (r.GetPlayStateEx(proj)&4)~=0 then return end
@@ -2207,15 +2214,21 @@ local function show_target_popup()
   if job or pending_start then return end
   if not stopped() then status="Stop transport before Auto Mix.";return end
   ui.section_hover=nil
+  ui.target_x,ui.target_y=r.ImGui_GetItemRectMin(ctx)
   target_popup=true
 end
 local function master_options()
   if target_popup then
     r.ImGui_OpenPopup(ctx,"Auto Mix Settings")
+    r.ImGui_SetNextWindowPos(ctx,(ui.target_x or 0)+10,(ui.target_y or 0)+10,r.ImGui_Cond_Always())
     target_popup=false
   end
   local chosen,custom_requested
-  if r.ImGui_BeginPopupModal(ctx,"Auto Mix Settings",nil,r.ImGui_WindowFlags_AlwaysAutoResize()) then
+  r.ImGui_PushStyleColor(ctx,r.ImGui_Col_PopupBg(),0x000000FF)
+  r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Text(),0xFFFFFFFF)
+  r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Border(),0x515151FF)
+  local flags=r.ImGui_WindowFlags_AlwaysAutoResize()|r.ImGui_WindowFlags_NoTitleBar()|r.ImGui_WindowFlags_NoSavedSettings()|r.ImGui_WindowFlags_NoMove()
+  if r.ImGui_BeginPopupModal(ctx,"Auto Mix Settings",nil,flags) then
     r.ImGui_Text(ctx,"Choose master loudness")
     local n=mono_push(true)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),4)
@@ -2228,24 +2241,35 @@ local function master_options()
     r.ImGui_PopStyleColor(ctx,n)
     r.ImGui_Separator(ctx)
     r.ImGui_Text(ctx,"Other master targets")
-    n=mono_push(true)
+    -- Draw text after hit testing so normal and hovered text can differ.
     for i,p in ipairs(presets) do
-      if i<#presets then
-        if r.ImGui_Selectable(ctx,string.format("%s  |  %.0f LUFS",p[1],p[2]),false) then chosen={i,last_custom} end
-      elseif r.ImGui_Selectable(ctx,"Custom...",false) then custom_requested=true end
+      local label=i<#presets and string.format("%s  |  %.0f LUFS",p[1],p[2]) or "Custom..."
+      local x,y=r.ImGui_GetCursorScreenPos(ctx)
+      local w,h=340,22
+      local clicked=r.ImGui_InvisibleButton(ctx,"##master_target"..i,w,h)
+      local hovered=r.ImGui_IsItemHovered(ctx)
+      local dl=r.ImGui_GetWindowDrawList(ctx)
+      if hovered then r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+h,0xD4D4D4FF,3) end
+      local _,th=r.ImGui_CalcTextSize(ctx,label)
+      r.ImGui_DrawList_AddText(dl,x+6,y+(h-th)/2,hovered and 0x111111FF or 0xFFFFFFFF,label)
+      if clicked then
+        if i<#presets then chosen={i,last_custom} else custom_requested=true end
+      end
     end
-    r.ImGui_PopStyleColor(ctx,n)
     r.ImGui_Separator(ctx)
     r.ImGui_Text(ctx,"Integrated LUFS (LUFS-I)")
     r.ImGui_PushTextWrapPos(ctx,r.ImGui_GetCursorPosX(ctx)+340)
     r.ImGui_TextWrapped(ctx,string.format("Gain-only normalization with a %.1f dBFS sample-peak ceiling. The result may be quieter than the target to avoid clipping. This is not a true-peak limiter or a guarantee of streaming compliance.",peak_ceiling))
     r.ImGui_PopTextWrapPos(ctx)
     n=mono_push(true)
+    local avail=r.ImGui_GetContentRegionAvail(ctx)
+    r.ImGui_SetCursorPosX(ctx,r.ImGui_GetCursorPosX(ctx)+math.max(0,(avail-100)/2))
     local cancel=r.ImGui_Button(ctx,"Cancel",100,26)
     r.ImGui_PopStyleColor(ctx,n)
     if chosen or custom_requested or cancel then r.ImGui_CloseCurrentPopup(ctx) end
     r.ImGui_EndPopup(ctx)
   end
+  r.ImGui_PopStyleColor(ctx,3)
   if custom_requested then
     local ok,s=r.GetUserInputs("Custom Master Loudness",1,"Target LUFS-I (-35 to -8):",tostring(last_custom))
     if ok then
@@ -2376,7 +2400,8 @@ local function draw()
     local nmono=mono_push(true)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),5)
     r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),0xDADADAFF)
-    if not job then button("Auto Mix",show_target_popup)
+    if not job then
+      if pending_start then r.ImGui_Button(ctx,"Preparing...") else button("Auto Mix",show_target_popup) end
     else button("Cancel",function() finish("Cancelled. Undo to revert partial changes.") end) end
     r.ImGui_PopStyleVar(ctx)
     r.ImGui_PopStyleColor(ctx,nmono+1)
@@ -2651,16 +2676,33 @@ local function loop()
     refresh_at=r.time_precise()+0.75
     if project_layout_signature()~=layout_sig then refresh() end
   end
-  if pending_start and r.time_precise()>=alert_until then
-    local policy=pending_start;pending_start=nil;alert_text=""
+  if pending_start then
+    local policy=pending_start;pending_start=nil;alert_text="";alert_until=0
+    ui.start_rejected=false
     local ok,e=pcall(start,policy)
     if not ok then if job then fail(e) else status=tostring(e) end end
+    if job then
+      alert_text="Processing please wait.";alert_until=r.time_precise()+1.2
+      job.ready_at=alert_until
+      ui.start_rejected=false
+    else
+      ui.start_rejected=true
+      pan_scan_pending=false -- do not overwrite a preflight failure
+      local msg=status
+      r.ShowConsoleMsg("N2N Mix Auto Mix start blocked: "..msg.."\n")
+      r.MB(msg,"Auto Mix could not start",0)
+    end
   end
   if job then
     local ok,e=pcall(step)
-    if not ok then fail(e) end
-  end
-  install_visible_position()
+    if not ok then
+      local msg=tostring(e)
+      fail(e)
+      ui.start_rejected=true;pan_scan_pending=false
+      r.ShowConsoleMsg("N2N Mix Auto Mix failed: "..msg.."\n")
+      r.MB(msg,"Auto Mix stopped",0)
+    end
+  else install_visible_position() end
   local ok,open=pcall(draw)
   if not ok then if job then fail(open) end;r.ShowConsoleMsg("N2N Mix GUI error: "..tostring(open).."\n");return end
   if open then r.defer(loop) elseif job then finish("Closed. Undo to revert partial changes.") end
