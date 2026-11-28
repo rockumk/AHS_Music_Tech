@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.4.0-dev.16
+version: 12.4.0-dev.17
 author: Rock Kennedy
 about:
-  # N2N Arp v12.4.0-dev.16
+  # N2N Arp v12.4.0-dev.17
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -32,7 +32,7 @@ slider18:0<-500,500,1>-Visual Sync (ms)
 @init
 scale_dirty = 0;
 last_input_mode = -1;
-thisversion = "v12.4.0-dev.16";
+thisversion = "v12.4.0-dev.17";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -1331,7 +1331,7 @@ function library_request(op,t,entry,revision) local(n,r,k,p,a) (
 
 function show_pattern_library(t) local(base,rev,count,k,j,n,addr,builtins,first_file,sel,mode,p) (
     mode=slider14;
-    strcpy(#lib_menu,"Save Pattern...|Load Pattern...|Export Factory Pattern...|Browse Factory Patterns...|Force Silence|Inherit (clear pattern)");
+    strcpy(#lib_menu,"Save Pattern...|Load Pattern...||Export Pattern to Presets...|Browse Presets...||Force Silence|Inherit (clear pattern)||#PRESETS");
     mode==0 ? (
         strcat(#lib_menu,"|Ascending|Descending|Up and Down|Block Chords|Broken Chords|Syncopated"); builtins=6;
     ) : mode==1 ? (
@@ -1346,7 +1346,8 @@ function show_pattern_library(t) local(base,rev,count,k,j,n,addr,builtins,first_
         count=min(100,max(0,floor(gmem[base+1])));
         k=0; loop(count,
             addr=base+2+k*100;
-            strcat(#lib_menu,"|Factory: ");
+            strcat(#lib_menu,"|");
+            strcat(#lib_menu,"Preset: ");
             n=min(99,max(0,floor(gmem[addr])));
             j=1; loop(n,
                 str_setchar(#lib_menu,strlen(#lib_menu),gmem[addr+j]);
@@ -1367,13 +1368,13 @@ function show_pattern_library(t) local(base,rev,count,k,j,n,addr,builtins,first_
         mem[tab_mute_base+t]=sel==5?2:0;
         scan_active_tab(); needs_tab_update=1;
     ) :
-    sel>=7 && sel<=6+builtins ? (
-        p=sel-6;
+    sel>=8 && sel<=7+builtins ? (
+        p=sel-7;
         mode==0 ? (p>=4 ? p+=1;) : mode==1 ? (p+=7;) : (p+=10;);
         factory_pattern(p,t);
     ) :
-    sel>6+builtins && sel<=6+builtins+count ? (
-        library_request(6,t,sel-6-builtins,rev);
+    sel>7+builtins && sel<=7+builtins+count ? (
+        library_request(6,t,sel-7-builtins,rev);
     );
 );
 
