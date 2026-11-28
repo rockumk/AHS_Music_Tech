@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.30
+-- @version 2.0.4-dev.31
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -1761,7 +1761,8 @@ function IM_GUI_Loop()
     local window_sec = "N2N_EDITOR_WINDOWS"
     reaper.SetExtState(window_sec,"numbers2notes:heartbeat",tostring(reaper.time_precise()),false)
     local focus_request = reaper.GetExtState(window_sec,"numbers2notes:focus")
-    if focus_request ~= "" then
+    local arranger_focus = gmem_export and gmem_export.ServiceArrangerUIRequests and gmem_export.ServiceArrangerUIRequests()
+    if focus_request ~= "" or arranger_focus then
         reaper.DeleteExtState(window_sec,"numbers2notes:focus",false)
         reaper.ImGui_SetNextWindowFocus(ctx)
         Raise_N2N_Window("Numbers2Notes - Nashville Number Charts for Reaper")
