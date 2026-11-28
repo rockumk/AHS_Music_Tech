@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.20
+-- @version 2.0.4-dev.21
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -3515,7 +3515,7 @@ Form: I V C V C B C O]]
         local nav_btn_w = 26
 
         -- Helper function to draw F-Key text without triggering layout bugs
-        local function DrawFloatingLabel(text, x, y, width)
+        local function DrawFloatingLabel(text, x, y, width, color)
             reaper.ImGui_PushFont(ctx, fontsmall)
             local text_w = reaper.ImGui_CalcTextSize(ctx, text)
             reaper.ImGui_PopFont(ctx)
@@ -3525,7 +3525,7 @@ Form: I V C V C B C O]]
                 font_small_size,
                 x + (width - text_w) / 2,
                 y + floating_label_y_offset,
-                white_color,
+                color or white_color,
                 text
             )
         end
@@ -3551,126 +3551,83 @@ Form: I V C V C B C O]]
         reaper.ImGui_Dummy(ctx, 90, 1)
         r.ImGui_SameLine(ctx)
 
-        cx, cy = reaper.ImGui_GetCursorScreenPos(ctx)
-        DrawFloatingLabel("!", cx, cy, nav_btn_w)
-        reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Text(), black_color)
-        reaper.ImGui_PushStyleColor(
-            ctx,
-            reaper.ImGui_Col_Button(),
-            reaper.ImGui_ColorConvertDouble4ToU32(230 / 255.0, 210 / 255.0, 0, 1.0)
-        )
-        if reaper.ImGui_Button(ctx, "!", nav_btn_w, btn_height) then
-            reaper.Main_OnCommand(40349, 0)
+        local function DrawTransportIcon(dl,i,x,y,color)
+          local function ln(a,b,c,d,w)
+            r.ImGui_DrawList_AddLine(dl,x+a,y+b,x+c,y+d,color,w or 1.6)
+          end
+          local function rect(a,b,c,d)
+            r.ImGui_DrawList_AddRectFilled(dl,x+a,y+b,x+c,y+d,color,0.7)
+          end
+          local function tri(a,b,c,d,e,f)
+            r.ImGui_DrawList_AddTriangleFilled(dl,x+a,y+b,x+c,y+d,x+e,y+f,color)
+          end
+          if i==1 then
+            -- Panic / all notes off.
+            ln(0,-6,0,1,2);r.ImGui_DrawList_AddCircleFilled(dl,x,y+5,1.3,color)
+          elseif i==2 then
+            r.ImGui_DrawList_AddCircleFilled(dl,x,y,5.5,color)
+          elseif i==3 then
+            tri(-4,-6,-4,6,6,0)
+          elseif i==4 then
+            rect(-5,-5,5,5)
+          elseif i==5 then
+            rect(-5,-6,-1,6);rect(1,-6,5,6)
+          elseif i==6 then
+            -- Two arrows in a compact repeat loop.
+            ln(-6,0,-6,-4);ln(-6,-4,4,-4)
+            ln(1,-7,4,-4);ln(1,-1,4,-4)
+            ln(6,0,6,4);ln(6,4,-4,4)
+            ln(-1,1,-4,4);ln(-1,7,-4,4)
+          elseif i==7 then
+            rect(-7,-6,-5,6);tri(4,-6,4,6,-4,0)
+          elseif i==8 then
+            ln(5,0,-5,0);ln(-5,0,0,-5);ln(-5,0,0,5)
+          elseif i==9 then
+            ln(-5,0,5,0);ln(5,0,0,-5);ln(5,0,0,5)
+          elseif i==10 then
+            rect(5,-6,7,6);tri(-4,-6,-4,6,4,0)
+          end
         end
-        reaper.ImGui_PopStyleColor(ctx, 2)
-        r.ImGui_SameLine(ctx)
 
-        cx, cy = reaper.ImGui_GetCursorScreenPos(ctx)
-        DrawFloatingLabel("F9", cx, cy, nav_btn_w)
-        reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Text(), white_color)
-        reaper.ImGui_PushStyleColor(
-            ctx,
-            reaper.ImGui_Col_Button(),
-            reaper.ImGui_ColorConvertDouble4ToU32(150 / 255.0, 10 / 255.0, 10 / 255.0, 1.0)
-        )
-        if reaper.ImGui_Button(ctx, "●", nav_btn_w, btn_height) then
-            reaper.Main_OnCommand(1013, 0)
-        end
-        reaper.ImGui_PopStyleColor(ctx, 2)
-        r.ImGui_SameLine(ctx)
-
-        cx, cy = reaper.ImGui_GetCursorScreenPos(ctx)
-        DrawFloatingLabel("F10", cx, cy, nav_btn_w)
-        reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Text(), white_color)
-        reaper.ImGui_PushStyleColor(
-            ctx,
-            reaper.ImGui_Col_Button(),
-            reaper.ImGui_ColorConvertDouble4ToU32(10 / 255.0, 150 / 255.0, 10 / 255.0, 1.0)
-        )
-        if reaper.ImGui_Button(ctx, "►", nav_btn_w, btn_height) then
-            reaper.Main_OnCommand(1007, 0)
-        end
-        reaper.ImGui_PopStyleColor(ctx, 2)
-        r.ImGui_SameLine(ctx)
-
-        cx, cy = reaper.ImGui_GetCursorScreenPos(ctx)
-        DrawFloatingLabel("F11", cx, cy, nav_btn_w)
-        reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Text(), white_color)
-        reaper.ImGui_PushStyleColor(
-            ctx,
-            reaper.ImGui_Col_Button(),
-            reaper.ImGui_ColorConvertDouble4ToU32(180 / 255.0, 70 / 255.0, 0, 1.0)
-        )
-        if reaper.ImGui_Button(ctx, "■", nav_btn_w, btn_height) then
-            reaper.Main_OnCommand(1016, 0)
-            reaper.Main_OnCommand(40349, 0)
-        end
-        reaper.ImGui_PopStyleColor(ctx, 2)
-        r.ImGui_SameLine(ctx)
-
-        cx, cy = reaper.ImGui_GetCursorScreenPos(ctx)
-        DrawFloatingLabel("F12", cx, cy, nav_btn_w)
-        reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Text(), white_color)
-        reaper.ImGui_PushStyleColor(
-            ctx,
-            reaper.ImGui_Col_Button(),
-            reaper.ImGui_ColorConvertDouble4ToU32(150 / 255.0, 0, 200 / 255.0, 1.0)
-        )
-        if reaper.ImGui_Button(ctx, "||", nav_btn_w, btn_height) then
-            reaper.Main_OnCommand(1008, 0)
-        end
-        reaper.ImGui_PopStyleColor(ctx, 2)
-        r.ImGui_SameLine(ctx)
-
-        -- Loop/repeat toggle follows REAPER's current transport state.
         local repeat_on = reaper.GetSetRepeat(-1) == 1
-        reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Text(), repeat_on and black_color or white_color)
-        local repeat_gray = repeat_on and 0.72 or 0.30
-        reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Button(),
-            reaper.ImGui_ColorConvertDouble4ToU32(repeat_gray, repeat_gray, repeat_gray, 1.0))
-        if reaper.ImGui_Button(ctx, "↻##N2N_Repeat", nav_btn_w, btn_height) then
-            reaper.GetSetRepeat(repeat_on and 0 or 1)
+        local state = reaper.GetPlayState()
+        local recording = (state & 4) ~= 0
+        local paused = (state & 2) ~= 0
+        local playing = (state & 1) ~= 0 and not paused
+        local items = {
+            {"!",40349},
+            {"F9",1013},
+            {"F10",1007},
+            {"F11",1016},
+            {"F12",1008},
+            {"",nil},
+            {"Home",40042},
+            {"Pg ↓",40172},
+            {"Pg ↑",40173},
+            {"End",40043},
+        }
+        for i,v in ipairs(items) do
+            if i>1 then r.ImGui_SameLine(ctx,0,(i==2 or i==7) and 6 or 3) end
+            local x,y = reaper.ImGui_GetCursorScreenPos(ctx)
+            local active = (i==2 and recording) or (i==3 and playing) or (i==5 and paused) or (i==6 and repeat_on)
+            local accent = i==2 and 0xCF7777FF or i==3 and 0x9DC6A7FF or 0xD3B86DFF
+            local icon_color = active and accent or (i==2 and 0xBA8585FF or 0xCCCCCCFF)
+            if v[1]~="" then DrawFloatingLabel(v[1],x,y,nav_btn_w,0x929292FF) end
+            local click = reaper.ImGui_InvisibleButton(ctx,"##n2ntransport"..i,nav_btn_w,btn_height)
+            local hover = reaper.ImGui_IsItemHovered(ctx)
+            local pressed = reaper.ImGui_IsItemActive(ctx)
+            local bg = pressed and 0x4A4A4AFF or hover and 0x393939FF or active and 0x333333FF or 0x252525FF
+            reaper.ImGui_DrawList_AddRectFilled(draw_list,x,y,x+nav_btn_w,y+btn_height,bg,4)
+            reaper.ImGui_DrawList_AddRect(draw_list,x,y,x+nav_btn_w,y+btn_height,active and accent or 0x515151FF,4,0,1)
+            DrawTransportIcon(draw_list,i,x+nav_btn_w/2,y+btn_height/2,icon_color)
+            if click then
+                if i==6 then reaper.GetSetRepeat(repeat_on and 0 or 1)
+                else
+                    reaper.Main_OnCommand(v[2],0)
+                    if i==4 then reaper.Main_OnCommand(40349,0) end
+                end
+            end
         end
-        if reaper.ImGui_IsItemHovered(ctx) then
-            reaper.ImGui_SetTooltip(ctx, repeat_on and "Loop: On" or "Loop: Off")
-        end
-        reaper.ImGui_PopStyleColor(ctx, 2)
-        r.ImGui_SameLine(ctx)
-
-        cx, cy = reaper.ImGui_GetCursorScreenPos(ctx)
-
-        reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Text(), white_color)
-        DrawFloatingLabel("Home", cx, cy, nav_btn_w)
-        reaper.ImGui_PushStyleColor(
-            ctx,
-            reaper.ImGui_Col_Button(),
-            reaper.ImGui_ColorConvertDouble4ToU32(0.1, 0.1, 0.1, 1.0)
-        )
-        if reaper.ImGui_Button(ctx, "▐◄", nav_btn_w, btn_height) then
-            reaper.Main_OnCommand(40042, 0)
-        end
-        r.ImGui_SameLine(ctx)
-
-        cx, cy = reaper.ImGui_GetCursorScreenPos(ctx)
-        DrawFloatingLabel("Pg ↓", cx, cy, nav_btn_w)
-        if reaper.ImGui_Button(ctx, "←", nav_btn_w, btn_height) then
-            reaper.Main_OnCommand(40172, 0)
-        end
-        r.ImGui_SameLine(ctx)
-
-        cx, cy = reaper.ImGui_GetCursorScreenPos(ctx)
-        DrawFloatingLabel("Pg ↑", cx, cy, nav_btn_w)
-        if reaper.ImGui_Button(ctx, "→", nav_btn_w, btn_height) then
-            reaper.Main_OnCommand(40173, 0)
-        end
-        r.ImGui_SameLine(ctx)
-
-        cx, cy = reaper.ImGui_GetCursorScreenPos(ctx)
-        DrawFloatingLabel("End", cx, cy, nav_btn_w)
-        if reaper.ImGui_Button(ctx, "►▌", nav_btn_w, btn_height) then
-            reaper.Main_OnCommand(40043, 0)
-        end
-        reaper.ImGui_PopStyleColor(ctx, 2)
 
         reaper.ImGui_EndGroup(ctx) -- Close Row 1
 
