@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.6
+-- @version 0.2.7
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -42,6 +42,10 @@ local LEFT_W=475
 local ALL_W=68
 local TARGET_H=48
 local edit_mode="levels"
+local show_parameters=false
+local pan_dirty={}
+local pan_scan_pending=true
+local pan_drag=nil
 local GAP=3
 local display_cols={}
 local font_new_api=nil
@@ -165,6 +169,7 @@ local function project_layout_signature()
   return table.concat(parts,"\n")
 end
 local function refresh()
+  pan_scan_pending=true;pan_dirty={};pan_drag=nil
   layout_sig=project_layout_signature()  local a,err=read_sections()
   if not a then sections={};rows={};groups={};status=err;return false end
   sections=a; rows={}; groups={}; dirty={}; master_dirty=false; transition_start=nil
@@ -173,7 +178,7 @@ local function refresh()
     local t=r.GetTrack(proj,i)
     if r.GetMediaTrackInfo_Value(t,"B_SHOWINMIXER")>0 then
       local _,name=r.GetTrackName(t)
-      local row={track=t,key=track_key(t),name=name,fxguid=get_owned(t),cells={},ramps={},base={},reports={},deps={},depth=0}
+      local row={track=t,key=track_key(t),name=name,fxguid=get_owned(t),cells={},ramps={},pans={},base={},reports={},deps={},depth=0}
       local _,initial=r.GetSetMediaTrackInfo_String(t,"P_EXT:N2N_MIX_INITIAL_DB","",false)
       row.initial=clamp(tonumber(initial) or 0,-60,30)
       row.bus=false
@@ -194,11 +199,12 @@ local function refresh()
       row.timbre_allowed=row.role~=10 and row.role~=12
       for j,s in ipairs(sections) do
         local prefix=row.key..":"..s.key
-        row.cells[j]={};row.ramps[j]={}
+        row.cells[j]={};row.ramps[j]={};row.pans[j]={}
         for b=1,#s.bars do
           local v=clamp(num("cell:"..prefix..":"..b,4),1,9)
           row.cells[j][b]=v==7 and 6 or v
           row.ramps[j][b]=num("ramp:"..prefix..":"..b,0)
+          row.pans[j][b]=clamp(num("pan:"..prefix..":"..b,0),-100,100)
         end
         local cached=tonumber(get("base:"..prefix,""))
         if cached and fx_index(row) then row.base[j]=cached end
@@ -267,6 +273,16 @@ local function active_env(env)
   local ok,c=r.GetEnvelopeStateChunk(env,"",false)
   return not ok or c:match("[\r\n]ACT%s+1")~=nil
 end
+local function is_performance_name(n)
+  n=(n or ""):lower()
+  return n:find("performance dynamics",1,true) or n:find("tickle whale",1,true)
+end
+local function has_position(t,f)
+  if not f or f<0 or r.TrackFX_GetNumParams(t.track,f)<=10 then return false end
+  local ok,name=r.TrackFX_GetParamName(t.track,f,10,"")
+  local _,lo,hi=r.TrackFX_GetParam(t.track,f,10)
+  return ok and (name:lower():find("position",1,true) or name:lower():find("pan",1,true)) and lo and hi and lo<=-100 and hi>=100
+end
 local function safe_row(t)
   if not valid(t.track) then return false,"Track no longer exists: "..t.name end
   if r.GetMediaTrackInfo_Value(t.track,"I_FXEN")==0 then return false,"Track FX chain bypassed: "..t.name end
@@ -293,7 +309,7 @@ local function safe_row(t)
   local pf=perf_index(t)
   if pf then
     local _,n=r.TrackFX_GetFXName(t.track,pf,"")
-    if not n:find(PERFNAME,1,true) then return false,"Owned Performance Dynamics GUID mismatch: "..t.name end
+    if not is_performance_name(n) then return false,"Owned Performance Dynamics GUID mismatch: "..t.name end
     if i and pf~=i-1 then return false,"Move Performance Dynamics immediately before N2N Mix Meter: "..t.name end
     local pe=r.GetFXEnvelope(t.track,pf,0,false)
     if pe and r.CountAutomationItems(pe)>0 then return false,"Performance intensity envelope has automation items: "..t.name end
@@ -311,9 +327,10 @@ local function ensure_fx(t)
   r.GetSetMediaTrackInfo_String(t.track,"P_EXT:N2N_MIX_FX",t.fxguid,true)
   return f
 end
-local function envelope(t,live,fx)
+local function envelope(t,live,fx,param)
   local f=fx or ensure_fx(t)
-  local env=r.GetFXEnvelope(t.track,f,0,true)
+  param=param or 0
+  local env=r.GetFXEnvelope(t.track,f,param,true)
   if not env then error("Cannot create gain envelope: "..t.name) end
   local ok,c=r.GetEnvelopeStateChunk(env,"",false)
   if not ok then error("Cannot read gain envelope: "..t.name) end
@@ -322,19 +339,19 @@ local function envelope(t,live,fx)
   lo,hi=tonumber(lo),tonumber(hi)
   if not lo or not hi or hi<=lo then error("Unrecognized PARMENV range: "..t.name) end
   c=c:gsub("([\r\n]ACT%s+)%d+", function(p) return p.."1" end,1)
-  c=c:gsub("([\r\n]VIS%s+)%d+", function(p) return p.."0" end,1)
+  c=c:gsub("([\r\n]VIS%s+)%d+", function(p) return p..(show_parameters and "1" or "0") end,1)
   c=c:gsub("([\r\n]ARM%s+)%d+", function(p) return p.."0" end,1)
   if live then return env,lo,hi,c end
   if not r.SetEnvelopeStateChunk(env,c,false) then error("Cannot configure gain envelope: "..t.name) end
-  env=r.GetFXEnvelope(t.track,f,0,false)
+  env=r.GetFXEnvelope(t.track,f,param,false)
   if r.CountAutomationItems(env)>0 then error("Unexpected automation items: "..t.name) end
   r.DeleteEnvelopePointRangeEx(env,-1,-1e9,1e9)
   return env,lo,hi
 end
-local function write_points(t,pts,fx,minval,maxval)
+local function write_points(t,pts,fx,minval,maxval,param)
   minval,maxval=minval or -60,maxval or 30
   local live=(r.GetPlayStateEx(proj)&1)~=0
-  local env,lo,hi,chunk=envelope(t,live,fx)
+  local env,lo,hi,chunk=envelope(t,live,fx,param)
   if live then
     -- Replace the point list in one host update during playback, rather than
     -- leaving a temporarily empty gain envelope between individual calls.
@@ -546,17 +563,97 @@ local function make_perf_plan(t)
   end
   return map
 end
+-- Install or reuse the processor for position on every visible track.
+-- The older ten-slider version is deliberately not treated as a pan FX.
+local function ensure_position_fx(t)
+  local f=perf_index(t)
+  if f then
+    local _,name=r.TrackFX_GetFXName(t.track,f,"")
+    if not is_performance_name(name) then return nil,"Owned performance FX mismatch: "..t.name end
+  else
+    local found
+    for i=0,r.TrackFX_GetCount(t.track)-1 do
+      local _,name=r.TrackFX_GetFXName(t.track,i,"")
+      if is_performance_name(name) then
+        if found then return nil,"Multiple performance processors: "..t.name end
+        found=i
+      end
+    end
+    if found then
+      if not has_position(t,found) then return nil,"Update Performance Dynamics: "..t.name.." (no Position slider 11)" end
+      for _,p in ipairs({0,10}) do
+        local e=r.GetFXEnvelope(t.track,found,p,false)
+        if e and active_env(e) then return nil,"Existing unowned performance automation: "..t.name end
+      end
+      f=found
+    else
+      if not stopped() then return nil,"Stop transport to install Performance Dynamics." end
+      local meter=fx_index(t)
+      local at=meter or r.TrackFX_GetCount(t.track)
+      f=r.TrackFX_AddByName(t.track,"JS: Performance Dynamics.jsfx",false,-1000-at)
+      if f<0 then f=r.TrackFX_AddByName(t.track,"JS: Performance Dynamics",false,-1000-at) end
+      if f<0 then return nil,"Install the updated Performance Dynamics JSFX." end
+      if not has_position(t,f) then
+        r.TrackFX_Delete(t.track,f)
+        return nil,"Installed Performance Dynamics has no Position slider 11. Update the JSFX."
+      end
+    end
+    t.perfguid=r.TrackFX_GetFXGUID(t.track,f)
+    r.GetSetMediaTrackInfo_String(t.track,"P_EXT:N2N_PERF_FX",t.perfguid,true)
+  end
+  if not has_position(t,f) then return nil,"Update Performance Dynamics: "..t.name.." (no Position slider 11)" end
+  local meter=fx_index(t)
+  if meter and f~=meter-1 then return nil,"Move Performance Dynamics immediately before N2N Mix Meter: "..t.name end
+  if r.TrackFX_GetOffline(t.track,f) then return nil,"Bring Performance Dynamics online: "..t.name end
+  return f
+end
+-- None means no expressive intensity, not bypass of the entire pan processor.
+local function position_only(t,f)
+  local _,room=r.GetSetMediaTrackInfo_String(t.track,"P_EXT:N2N_PERF_SAVED_ROOM","",false)
+  if room=="" then
+    r.GetSetMediaTrackInfo_String(t.track,"P_EXT:N2N_PERF_SAVED_ROOM",tostring(r.TrackFX_GetParam(t.track,f,8)),true)
+  end
+  r.TrackFX_SetParam(t.track,f,8,0)
+  r.TrackFX_SetEnabled(t.track,f,true)
+  write_points(t,{{0,0,0}},f,-100,100,0)
+  t.perfplan=nil
+end
+local function restore_performance_room(t,f)
+  local _,room=r.GetSetMediaTrackInfo_String(t.track,"P_EXT:N2N_PERF_SAVED_ROOM","",false)
+  if tonumber(room) then
+    r.TrackFX_SetParam(t.track,f,8,tonumber(room))
+    r.GetSetMediaTrackInfo_String(t.track,"P_EXT:N2N_PERF_SAVED_ROOM","",true)
+  end
+end
+local function apply_pan(t,f)
+  local state=r.GetPlayStateEx(proj)
+  if (state&4)~=0 or r.GetGlobalAutomationOverride()>1 or r.GetMediaTrackInfo_Value(t.track,"I_AUTOMODE")>1 then error("Use Read or Trim/Read before editing pan: "..t.name,0) end
+  if r.GetMediaTrackInfo_Value(t.track,"I_FXEN")==0 then error("Track FX chain bypassed: "..t.name,0) end
+  f=f or perf_index(t)
+  if not has_position(t,f) then error("Updated Position slider 11 required: "..t.name,0) end
+  local e=r.GetFXEnvelope(t.track,f,10,false)
+  if e and r.CountAutomationItems(e)>0 then error("Position envelope contains automation items: "..t.name,0) end
+  local bars={}
+  for j,s in ipairs(sections) do
+    for b,bar in ipairs(s.bars) do
+      local v=t.pans[j][b]
+      bars[#bars+1]={a=bar.a,b=bar.b,g0=v,g1=v}
+    end
+  end
+  write_points(t,contour_points(bars,0),f,-100,100,10)
+end
 local function configure_perf(t)
   local f=perf_index(t)
   if not t.timbre_allowed or t.model<0 then
-    if f then r.TrackFX_SetEnabled(t.track,f,false) end
+    if has_position(t,f) then position_only(t,f)
+    elseif f then r.TrackFX_SetEnabled(t.track,f,false) end
     t.perfplan=nil;return
   end
   local meter=ensure_fx(t)
   if not f then
     for i=0,r.TrackFX_GetCount(t.track)-1 do
       local _,n=r.TrackFX_GetFXName(t.track,i,"")
-      if n:find(PERFNAME,1,true) then error("Unowned Performance Dynamics on "..t.name.."; remove it or use None.",0) end
+      if is_performance_name(n) then error("Unowned Performance Dynamics on "..t.name.."; remove it or use None.",0) end
     end
     if not stopped() then error("Stop playback to install Performance Dynamics: "..t.name,0) end
     f=r.TrackFX_AddByName(t.track,"JS: Performance Dynamics.jsfx",false,-1000-meter)
@@ -568,12 +665,13 @@ local function configure_perf(t)
   if f~=fx_index(t)-1 then error("Performance Dynamics must immediately precede the meter: "..t.name,0) end
   if r.TrackFX_GetOffline(t.track,f) then error("Bring Performance Dynamics online: "..t.name,0) end
   r.TrackFX_SetEnabled(t.track,f,true)
+  restore_performance_room(t,f)
   r.TrackFX_SetParam(t.track,f,1,t.model)
   -- Preserve user-adjustable timbre, room and timing settings. This initial
   -- integration requires the supplied boost/cut volume mode.
   r.TrackFX_SetParam(t.track,f,6,0)
   t.perfboost=r.TrackFX_GetParam(t.track,f,4)
-  t.perfcut=r.TrackFX_GetParam(t.track,f,5)
+  t.perfcut=math.abs(r.TrackFX_GetParam(t.track,f,5))
   t.perfplan=make_perf_plan(t)
   local bars={}
   for j,s in ipairs(sections) do
@@ -1185,10 +1283,10 @@ local function plugin_menu(t,j,b)
   end
   if inst>=0 or #arrangers>0 then
     r.ImGui_Separator(ctx)
-    if inst>=0 and r.ImGui_Selectable(ctx,"Open Instrument",false) then open_track_plugin(t,inst,j,b,false) end
     for _,a in ipairs(arrangers) do
       if r.ImGui_Selectable(ctx,"Open "..a.label.."##"..a.fx,false) then open_track_plugin(t,a.fx,j,b,true) end
     end
+    if inst>=0 and r.ImGui_Selectable(ctx,"Open Instrument",false) then open_track_plugin(t,inst,j,b,false) end
   end
 end
 local function popup_level(t,j,b,v,id)
@@ -1523,8 +1621,109 @@ local function tool_button(i)
   if hover then r.ImGui_SetTooltip(ctx,i==9 and "Transition" or simple[i]) end
   if clicked then tool=i;transition_start=nil end
 end
+local function set_pan(t,j,b,v)
+  v=clamp(math.floor(v+0.5),-100,100)
+  local first,last=j or 1,j or #sections
+  for k=first,last do
+    local s=sections[k]
+    for n=(j and b or 1),(j and b or #s.bars) do
+      t.pans[k][n]=v
+      put("pan:"..t.key..":"..s.key..":"..n,v)
+    end
+  end
+  pan_dirty[t]=true
+end
+local function pan_summary(t,j,b)
+  local value
+  for k=j or 1,j or #sections do
+    for n=(j and b or 1),(j and b or #sections[k].bars) do
+      local p=t.pans[k][n]
+      if value~=nil and value~=p then return nil end
+      value=p
+    end
+  end
+  return value
+end
+local function pan_cell(t,j,b,w)
+  local dl=r.ImGui_GetWindowDrawList(ctx)
+  local x,y=r.ImGui_GetCursorScreenPos(ctx)
+  local id="##pan"..t.key..":"..(j or 0)..":"..(b or 0)
+  local v=pan_summary(t,j,b)
+  r.ImGui_InvisibleButton(ctx,id,w,CELL_H)
+  local hover=r.ImGui_IsItemHovered(ctx)
+  local rr,gg,bb=rgb(r.GetTrackColor(t.track))
+  local light=rgba(math.floor(rr*.55+110),math.floor(gg*.55+110),math.floor(bb*.55+110),255)
+  local dark=rgba(math.floor(rr*.70),math.floor(gg*.70),math.floor(bb*.70),255)
+  local split=x+w*((v or 0)+100)/200
+  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+CELL_H,light)
+  r.ImGui_DrawList_AddRectFilled(dl,x,y,split,y+CELL_H,dark)
+  r.ImGui_DrawList_AddLine(dl,x+w/2,y+2,x+w/2,y+CELL_H-2,0xFFFFFFA0,1)
+  if v~=nil then r.ImGui_DrawList_AddLine(dl,split,y,split,y+CELL_H,0x111111FF,2) end
+  r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+CELL_H,hover and 0xFFFFFFFF or 0x00000060,0,0,hover and 2 or 1)
+  local label=v==nil and "Mixed" or v==0 and "C" or (v<0 and "L" or "R")..math.abs(v)
+  centered(dl,x,y,w,CELL_H,label,0x101010FF)
+  if not job and not pending_start then
+    if hover and r.ImGui_IsMouseClicked(ctx,0) then pan_drag={id=id} end
+    if pan_drag and pan_drag.id==id and r.ImGui_IsMouseDown(ctx,0) then
+      local mx=r.ImGui_GetMousePos(ctx)
+      local p=clamp(math.floor(((mx-x)/w*200-100)+0.5),-100,100)
+      if v~=p then set_pan(t,j,b,p) end
+    end
+    local n=mono_push(true)
+    if r.ImGui_BeginPopupContextItem(ctx,id.."menu") then
+      if r.ImGui_Selectable(ctx,"Center",v==0) then set_pan(t,j,b,0) end
+      if r.ImGui_Selectable(ctx,"Hard Left",v==-100) then set_pan(t,j,b,-100) end
+      if r.ImGui_Selectable(ctx,"Hard Right",v==100) then set_pan(t,j,b,100) end
+      plugin_menu(t,j,b)
+      r.ImGui_EndPopup(ctx)
+    end
+    r.ImGui_PopStyleColor(ctx,n)
+  end
+end
+local function set_parameters_visible()
+  show_parameters=not show_parameters
+  put("show_parameters",show_parameters and 1 or 0)
+  for _,t in ipairs(rows) do
+    local f,p=fx_index(t),perf_index(t)
+    local list={}
+    if f then list[#list+1]={f,0} end
+    if p then
+      list[#list+1]={p,0}
+      if has_position(t,p) then list[#list+1]={p,10} end
+    end
+    for _,v in ipairs(list) do
+      local e=r.GetFXEnvelope(t.track,v[1],v[2],false)
+      if e then
+        local ok,chunk=r.GetEnvelopeStateChunk(e,"",false)
+        if ok then
+          chunk=chunk:gsub("([\r\n]VIS%s+)%d+",function(prefix) return prefix..(show_parameters and "1" or "0") end,1)
+          r.SetEnvelopeStateChunk(e,chunk,false)
+        end
+      end
+    end
+  end
+  r.TrackList_AdjustWindows(false);r.UpdateArrange()
+end
+local function install_visible_position()
+  if not pan_scan_pending or not stopped() or job or pending_start then return end
+  pan_scan_pending=false
+  local missing,ready=0,0
+  r.Undo_BeginBlock2(proj)
+  for _,t in ipairs(rows) do
+    local ok,err=pcall(function()
+      local f,msg=ensure_position_fx(t)
+      if not f then error(msg,0) end
+      if t.model<0 or not t.timbre_allowed then position_only(t,f)
+      else r.TrackFX_SetEnabled(t.track,f,true) end
+      apply_pan(t,f)
+    end)
+    if ok then ready=ready+1 else missing=missing+1;r.ShowConsoleMsg("N2N Mix Pan: "..t.name..": "..tostring(err).."\n") end
+  end
+  r.Undo_EndBlock2(proj,"N2N Mix: initialize track position",-1)
+  if missing>0 then status=string.format("Position ready on %d/%d tracks. Update Performance Dynamics with slider 11; see console.",ready,#rows) end
+end
 local function apply_dirty()
-  if (not next(dirty) and not master_dirty) or job or r.EnumProjects(-1,"")~=proj or (r.GetPlayStateEx(proj)&4)~=0 then return end
+  if (not next(dirty) and not next(pan_dirty) and not master_dirty) or job or r.EnumProjects(-1,"")~=proj or (r.GetPlayStateEx(proj)&4)~=0 then return end
   if r.GetGlobalAutomationOverride()>1 then status="Disable global automation write/bypass before editing.";return end
   r.Undo_BeginBlock2(proj)
   local ok,e=pcall(function()
@@ -1536,6 +1735,14 @@ local function apply_dirty()
         ensure_fx(master);apply_master(num("mastergain",0))
       end
     end
+    for t in pairs(pan_dirty) do
+      if valid(t.track) and r.GetMediaTrackInfo_Value(t.track,"B_SHOWINMIXER")>0 then
+        local f,msg=ensure_position_fx(t)
+        if not f then error(msg,0) end
+        if t.model<0 or not t.timbre_allowed then position_only(t,f) end
+        apply_pan(t,f)
+      end
+    end
     for t in pairs(dirty) do
       if valid(t.track) and r.GetMediaTrackInfo_Value(t.track,"B_SHOWINMIXER")>0 and (fx_index(t) or perf_index(t) or t.model>=0) then
         local safe,msg=safe_row(t);if not safe then error(msg) end
@@ -1545,7 +1752,7 @@ local function apply_dirty()
     end
   end)
   r.Undo_EndBlock2(proj,"N2N Mix grid edit",-1)
-  dirty={};master_dirty=false
+  dirty={};pan_dirty={};master_dirty=false
   if not ok then note("Grid update stopped: "..tostring(e)) end
 end
 local function same() r.ImGui_SameLine(ctx) end
@@ -1837,10 +2044,16 @@ local function draw()
         if selected then r.ImGui_PopStyleColor(ctx) end
       end
       mode_button("Levels","levels",84)
+      same();mode_button("Pan","pan",84)
       same();mode_button("Target Luffs","targets",104)
+      same();if r.ImGui_Button(ctx,show_parameters and "Hide Parameters" or "Show Parameters",130,CELL_H) then set_parameters_visible() end
       r.ImGui_PopStyleVar(ctx)
       r.ImGui_PopStyleColor(ctx,mc)
-      if edit_mode=="targets" then
+      if edit_mode=="pan" then
+        local legend="Position (%)   |   L100           C           R100"
+        r.ImGui_SameLine(ctx,song_palette_x(start_x,avail,r.ImGui_CalcTextSize(ctx,legend)))
+        r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,legend)
+      elseif edit_mode=="targets" then
         local legend="Target LUFS  |  M: measured section LUFS  |  G: base gain correction (dB)"
         r.ImGui_SameLine(ctx,song_palette_x(start_x,avail,r.ImGui_CalcTextSize(ctx,legend)))
         r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,legend)
@@ -1900,14 +2113,16 @@ local function draw()
         r.ImGui_TableSetColumnIndex(ctx,2);across(color_header)
         r.ImGui_TableNextRow(ctx,0,CELL_H)
         local targets=edit_mode=="targets" and not job
-        r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,targets and "Section offset (dB)" or "Section intensity")
+        local pan_mode=edit_mode=="pan" and not job
+        r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,targets and "Section offset (dB)" or pan_mode and "Position (L / R)" or "Section intensity")
         local contour=intensity_contour()
         local bus_offsets={}
         if targets then for j,s in ipairs(sections) do bus_offsets[j]=section_intensity(s,j) end end
         r.ImGui_TableSetColumnIndex(ctx,1)
-        if targets then r.ImGui_Dummy(ctx,ALL_W,CELL_H) else all_intensity_cell() end
+        if targets or pan_mode then r.ImGui_Dummy(ctx,ALL_W,CELL_H) else all_intensity_cell() end
         r.ImGui_TableSetColumnIndex(ctx,2)
         if targets then across(function(c) target_section_cell(c,contour) end)
+        elseif pan_mode then across(function(c) r.ImGui_Dummy(ctx,c.w,CELL_H) end)
         else across(function(c,ci) intensity_cell(c,contour,ci) end) end
         for ri,t in ipairs(rows) do
           r.ImGui_TableNextRow(ctx,0,targets and TARGET_H or CELL_H)
@@ -1964,6 +2179,10 @@ local function draw()
             r.ImGui_TableSetColumnIndex(ctx,2)
             local plan=make_perf_plan(t)
             across(function(c) target_cell(t,c.j,c.b,c.w,plan,t.depth>0 and bus_offsets[c.j] or 0) end)
+          elseif pan_mode then
+            pan_cell(t,nil,nil,ALL_W)
+            r.ImGui_TableSetColumnIndex(ctx,2)
+            across(function(c) pan_cell(t,c.j,c.b,c.w) end)
           else
             row_level_cell(t)
             r.ImGui_TableSetColumnIndex(ctx,2)
@@ -2000,7 +2219,7 @@ local function draw()
         transition_start={t=s.t,j=s.j,b=s.b};edit_cell(s.t,s.endj,s.endb,9)
       else edit_cell(s.t,s.j,s.b,9) end
     end
-    stroke=nil;last_paint=nil;apply_dirty()
+    stroke=nil;pan_drag=nil;last_paint=nil;apply_dirty()
   end
   return open
 end
@@ -2018,11 +2237,12 @@ r.ImGui_Attach(ctx,ui_font)
 last_preset=clamp(math.floor(num("preset",DEFAULT_PRESET)),1,#presets)
 last_custom=clamp(num("custom",-16),-35,-8)
 preset,custom=last_preset,last_custom
+show_parameters=num("show_parameters",0)==1
 traditional=num("traditional",0)==1
 refresh()
 local function loop()
   if r.EnumProjects(-1,"")~=proj then if job then fail("Project changed") end;return end
-  if not job and not stroke and not transition_start and not next(dirty) and not master_dirty and r.time_precise()>=refresh_at and stopped() then
+  if not job and not stroke and not transition_start and not next(dirty) and not next(pan_dirty) and not master_dirty and r.time_precise()>=refresh_at and stopped() then
     refresh_at=r.time_precise()+0.75
     if project_layout_signature()~=layout_sig then refresh() end
   end
@@ -2035,6 +2255,7 @@ local function loop()
     local ok,e=pcall(step)
     if not ok then fail(e) end
   end
+  install_visible_position()
   local ok,open=pcall(draw)
   if not ok then if job then fail(open) end;r.ShowConsoleMsg("N2N Mix GUI error: "..tostring(open).."\n");return end
   if open then r.defer(loop) elseif job then finish("Closed. Undo to revert partial changes.") end
