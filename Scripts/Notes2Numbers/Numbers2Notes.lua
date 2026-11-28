@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.25
+-- @version 2.0.4-dev.26
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -2481,6 +2481,37 @@ Form: I V C V C B C O]]
                         else
                             r.MB("N2N Mix.lua was not found at:\n"..path.."\n\nInstall N2N Mix in the Scripts folder, one level above Notes2Numbers.","Numbers2Notes",0)
                         end
+                    end
+                end
+            end
+            r.ImGui_PopStyleVar(ctx)
+            r.ImGui_Dummy(ctx,0,24)
+            r.ImGui_Text(ctx,"N2N Topline")
+            r.ImGui_Separator(ctx)
+            r.ImGui_PushTextWrapPos(ctx,r.ImGui_GetCursorPosX(ctx)+560)
+            r.ImGui_TextWrapped(ctx,"N2N Topline is ideal for melody creation. It displays the song's harmony in the background of the note editor, making it easy to compose melodies against the changing chords. It also supports MPE (MIDI Polyphonic Expression) for expressive, individual-note pitch bends and other per-note expression.")
+            r.ImGui_PopTextWrapPos(ctx)
+            r.ImGui_Dummy(ctx,0,12)
+            r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),4)
+            if r.ImGui_Button(ctx,"Open N2N Topline Editor",180,30) then
+                local sec="N2N_TOPLINE_HUB"
+                local hb=tonumber(r.GetExtState(sec,"heartbeat"))
+                local hwnd=r.JS_Window_Find and r.JS_Window_SetFocus and r.JS_Window_Find("N2N Topline",true)
+                if hb and math.abs(r.time_precise()-hb)<3 then
+                    r.SetExtState(sec,"focus",tostring(r.time_precise()),false)
+                    if hwnd then r.JS_Window_SetFocus(hwnd) end
+                elseif hwnd then
+                    r.JS_Window_SetFocus(hwnd)
+                else
+                    local path=canonical_script_path(script_path.."../N2N Topline.lua")
+                    local file=io.open(path,"rb")
+                    if file then
+                        file:close()
+                        local cmd=r.AddRemoveReaScript(true,0,path,true)
+                        if cmd and cmd>0 then r.Main_OnCommand(cmd,0)
+                        else r.MB("Could not launch N2N Topline:\n"..path,"Numbers2Notes",0) end
+                    else
+                        r.MB("N2N Topline.lua was not found at:\n"..path,"Numbers2Notes",0)
                     end
                 end
             end
