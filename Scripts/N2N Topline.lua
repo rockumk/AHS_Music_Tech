@@ -1,5 +1,5 @@
 -- @description N2N Topline
--- @version 5.4-dev.7
+-- @version 5.4-dev.8
 -- @author Rock Kennedy and Gemini 4 Hydrogen (which did an absolutely fabulous job of transforming the vision into solid Lua code)
 -- @about
 --   Numbers2Notes Topline Melody Editor (1200x640 minimum):
@@ -882,13 +882,16 @@ local function restore_auto_arm_track()
 end
 
 local function apply_auto_arm_if_enabled(tr)
+  if state.stop_preview_notes then state.stop_preview_notes() end
   restore_auto_arm_track(); if not state.auto_arm_preview or not tr or not reaper.ValidatePtr2(0, tr, "MediaTrack*") then return end
   state.saved_track_states[tr] = { recarm=reaper.GetMediaTrackInfo_Value(tr,"I_RECARM"), recmon=reaper.GetMediaTrackInfo_Value(tr,"I_RECMON"), recinput=reaper.GetMediaTrackInfo_Value(tr,"I_RECINPUT") }
-  if reaper.GetMediaTrackInfo_Value(tr, "I_RECINPUT") < 4096 then reaper.SetMediaTrackInfo_Value(tr, "I_RECINPUT", 4096 | (63 << 5)) end
+  local input=math.floor(reaper.GetMediaTrackInfo_Value(tr,"I_RECINPUT"))
+  if input<4096 or ((input>>5)&63)<62 or (input&31)~=0 then reaper.SetMediaTrackInfo_Value(tr,"I_RECINPUT",4096 | (63<<5)) end
   reaper.SetMediaTrackInfo_Value(tr, "I_RECMON", 1); reaper.SetMediaTrackInfo_Value(tr, "I_RECARM", 1)
 end
 
 local function select_output_track(tr)
+  if state.stop_preview_notes then state.stop_preview_notes() end
   if tr and reaper.ValidatePtr2(0, tr, "MediaTrack*") then local _, tn = reaper.GetTrackName(tr); if tn == HIDDEN_TRACK_NAME then return end end
   if not tr or not reaper.ValidatePtr2(0, tr, "MediaTrack*") then
     restore_auto_arm_track(); state.output_track = nil; state.output_track_guid = ""; state.track_note_names = {}; update_hidden_track_send(); save_project_state(); return
@@ -909,8 +912,67 @@ end
 --------------------------------------------------------------------------------
 -- 9. PREVIEW & gmem HARMONY
 --------------------------------------------------------------------------------
-local function send_midi_note_on(pitch, vel, chan) reaper.StuffMIDIMessage(0, 0x90+clamp(math.floor(chan or 0),0,15), clamp(math.floor(pitch),0,127), clamp(math.floor(vel or 100),1,127)) end
-local function send_midi_note_off(pitch, chan) reaper.StuffMIDIMessage(0, 0x80+clamp(math.floor(chan or 0),0,15), clamp(math.floor(pitch),0,127), 0) end
+-- StuffMIDIMessage sends to the virtual MIDI keyboard input. Make the
+-- output track receive that input for audition, without leaving it armed.
+function state.restore_preview_route()
+  local route=state.preview_route
+  state.preview_route=nil
+  if not route or not reaper.ValidatePtr2(owner_project,route.track,"MediaTrack*") then return end
+  for _,k in ipairs({"I_RECARM","I_RECMON","I_RECINPUT","I_RECMODE"}) do
+    if reaper.GetMediaTrackInfo_Value(route.track,k)==route.applied[k] then
+      reaper.SetMediaTrackInfo_Value(route.track,k,route.original[k])
+    end
+  end
+end
+function state.ensure_preview_route(chan)
+  local tr=state.output_track
+  if not tr or not reaper.ValidatePtr2(owner_project,tr,"MediaTrack*") then
+    state.status_msg="Select an output track for note preview.";return false
+  end
+  local input=math.floor(reaper.GetMediaTrackInfo_Value(tr,"I_RECINPUT"))
+  local dev=(input>>5)&63
+  local ch=input&31
+  local ready=input>=4096 and (dev==62 or dev==63) and (ch==0 or ch==chan+1)
+      and reaper.GetMediaTrackInfo_Value(tr,"I_RECARM")==1
+      and reaper.GetMediaTrackInfo_Value(tr,"I_RECMON")==1
+  if ready then return true end
+  if (reaper.GetPlayState()&4)~=0 then
+    state.status_msg="Preview needs a monitored MIDI input; stop recording to enable it.";return false
+  end
+  if state.preview_route then state.restore_preview_route() end
+  local route={track=tr,original={},applied={I_RECARM=1,I_RECMON=1,I_RECINPUT=4096|(62<<5),I_RECMODE=2}}
+  for k in pairs(route.applied) do route.original[k]=reaper.GetMediaTrackInfo_Value(tr,k) end
+  -- Record disabled / input monitoring only: never arm a new recording.
+  for _,k in ipairs({"I_RECMODE","I_RECINPUT","I_RECMON","I_RECARM"}) do
+    reaper.SetMediaTrackInfo_Value(tr,k,route.applied[k])
+  end
+  state.preview_route=route
+  state.preview_release_at=reaper.time_precise()+.4
+  return true
+end
+local function send_midi_note_on(pitch, vel, chan)
+  chan=clamp(math.floor(chan or 0),0,15)
+  if not state.ensure_preview_route(chan) then return false end
+  reaper.StuffMIDIMessage(0,0x90+chan,clamp(math.floor(pitch),0,127),clamp(math.floor(vel or 100),1,127))
+  return true
+end
+local function send_midi_note_off(pitch, chan)
+  reaper.StuffMIDIMessage(0,0x80+clamp(math.floor(chan or 0),0,15),clamp(math.floor(pitch),0,127),0)
+  state.preview_release_at=reaper.time_precise()+.4
+end
+function state.stop_preview_notes()
+  for _,pr in ipairs(state.previews) do send_midi_note_off(pr.pitch,pr.chan) end
+  state.previews={}
+  if state.kbd_held_pitch then send_midi_note_off(state.kbd_held_pitch,state.kbd_held_chan);state.kbd_held_pitch=nil end
+  state.restore_preview_route()
+end
+function state.preview_key(pitch)
+  if state.kbd_held_pitch==pitch then return end
+  if state.kbd_held_pitch then send_midi_note_off(state.kbd_held_pitch,state.kbd_held_chan);state.kbd_held_pitch=nil end
+  if pitch and send_midi_note_on(pitch,state.default_vel,0) then
+    state.kbd_held_pitch=pitch;state.kbd_held_chan=0
+  end
+end
 
 local function check_preview_arm_hint()
   if state.output_track and reaper.ValidatePtr2(0, state.output_track, "MediaTrack*") and not state.auto_arm_preview then
@@ -923,12 +985,13 @@ end
 local function trigger_preview_note(pitch, vel, chan, duration)
   chan = chan or 0
   for i = #state.previews, 1, -1 do local pr = state.previews[i]; if pr.pitch == pitch and pr.chan == chan then send_midi_note_off(pr.pitch, pr.chan); table.remove(state.previews, i) end end
-  send_midi_note_on(pitch, vel or 100, chan); table.insert(state.previews, { pitch=pitch, chan=chan, expire=reaper.time_precise()+(duration or 0.22) }); check_preview_arm_hint()
+  if send_midi_note_on(pitch,vel or 100,chan) then table.insert(state.previews,{pitch=pitch,chan=chan,expire=reaper.time_precise()+(duration or .22)}) end
 end
 
 local function update_previews()
   local now = reaper.time_precise()
   for i = #state.previews, 1, -1 do if now >= state.previews[i].expire then send_midi_note_off(state.previews[i].pitch, state.previews[i].chan); table.remove(state.previews, i) end end
+  if state.preview_route and #state.previews==0 and not state.kbd_held_pitch and now>=(state.preview_release_at or 0) then state.restore_preview_route() end
 end
 
 local function on_script_exit()
@@ -939,8 +1002,7 @@ local function on_script_exit()
     reaper.DeleteExtState(HUB_EXT_SEC,"heartbeat",false)
     reaper.DeleteExtState(HUB_EXT_SEC,"focus",false)
   end
-  for _, pr in ipairs(state.previews) do send_midi_note_off(pr.pitch, pr.chan) end; state.previews = {}
-  if state.kbd_held_pitch then send_midi_note_off(state.kbd_held_pitch, state.kbd_held_chan); state.kbd_held_pitch = nil end
+  state.stop_preview_notes()
   save_global_prefs()
   -- The original project may have been closed. Never save into a different tab.
   local i=0
@@ -1849,6 +1911,7 @@ function state.draw_section_popup(canvas_w)
 end
 function state.transport_action(i)
   local cmds={40349,1013,1007,1016,1008,0,40042,40172,40173,40043}
+  if i==2 then state.stop_preview_notes() end
   if i==6 then reaper.GetSetRepeat(reaper.GetSetRepeat(-1)==1 and 0 or 1)
   else reaper.Main_OnCommand(cmds[i],0);if i==4 then reaper.Main_OnCommand(40349,0) end end
 end
@@ -1882,6 +1945,7 @@ local function draw_transport_bar(canvas_w)
 end
 
 local function draw_lanes_drawer()
+  state.legend_hover_pitch=nil
   if not state.show_drawer then return end
   local dx, dy, dh = gfx.w - state.drawer_w, state.titlebar_h + state.toolbar_h, gfx.h - (state.titlebar_h + state.toolbar_h)
   set_col(CONFIG.dark_mode and {0.15,0.16,0.20} or {0.97,0.97,0.99}); gfx.rect(dx, dy, state.drawer_w, dh, 1)
@@ -1936,6 +2000,7 @@ local function draw_lanes_drawer()
   for idx,s in ipairs({0,2,4,5,7,9,11}) do
     local x=kx+(idx-1)*kw
     local col=STEP_COLORS[s].active
+    if state.kbd_held_pitch==60+state.tonic_pc+s then col=mix_rgb(col,{1,1,1},.28) end
     draw_bordered_roundrect(x,y,kw-1,kh,3,1,{.08,.08,.09},col)
     set_col(contrast_text_col(col));gfx.setfont(1,"Segoe UI",16)
     draw_text_centered(CONFIG.step_definitions[s].nns,x,y+bh+4,kw-1,kh-bh-8)
@@ -1945,6 +2010,7 @@ local function draw_lanes_drawer()
     local s,boundary=k[1],k[2]
     local x=kx+boundary*kw-math.floor(bw/2)
     local col=STEP_COLORS[s].active
+    if state.kbd_held_pitch==60+state.tonic_pc+s then col=mix_rgb(col,{1,1,1},.28) end
     draw_bordered_roundrect(x-1,y,bw+2,bh+2,3,1,{.06,.06,.07},{.06,.06,.07})
     draw_bordered_roundrect(x,y,bw,bh,3,1,{.08,.08,.09},col)
     set_col(contrast_text_col(col));gfx.setfont(1,"Segoe UI",13)
@@ -1953,8 +2019,9 @@ local function draw_lanes_drawer()
   end
   gfx.setfont(1,"Segoe UI",12)
   set_col(CONFIG.dark_mode and {.78,.82,.88} or {.30,.33,.38})
-  local info="Hover over a key for its color value."
+  local info="Click to audition; hover for color value."
   if hovered~=nil then
+    state.legend_hover_pitch=60+state.tonic_pc+hovered
     local def=CONFIG.step_definitions[hovered]
     info=def.nns.."  |  "..CONFIG.note_names[(state.tonic_pc+hovered)%12+1].."  |  "..def.hex
   end
@@ -2039,6 +2106,15 @@ local function handle_mouse()
     state.last_mouse_cap = cap; return
   end
 
+  if state.drag and state.drag.type=="legend_keyboard" then
+    if l_down then state.preview_key(state.legend_hover_pitch)
+    else state.preview_key(nil);state.drag=nil end
+    state.last_mouse_cap=cap;return
+  end
+  if l_pressed and state.legend_hover_pitch then
+    state.preview_key(state.legend_hover_pitch);state.drag={type="legend_keyboard"}
+    state.last_mouse_cap=cap;return
+  end
   if l_pressed or r_pressed then
     for i = #state.ui_controls, 1, -1 do
       local c = state.ui_controls[i]
@@ -2100,7 +2176,7 @@ local function handle_mouse()
 
   if l_pressed and mx < state.keyboard_w and my >= top_area and my < grid_bottom_y then
     local p = screen_y_to_pitch(my, alt)
-    if p then state.kbd_held_pitch = p; state.kbd_held_chan = 0; send_midi_note_on(p, state.default_vel, 0); check_preview_arm_hint(); state.drag = { type="keyboard" } end
+    if p then state.preview_key(p);state.drag={type="keyboard"};state.last_mouse_cap=cap;return end
   end
 
   if l_pressed and state.show_vel_lane and my >= canvas_h and my <= canvas_h + state.vel_lane_h and mx >= state.keyboard_w and mx < right_x then
@@ -2241,10 +2317,7 @@ local function handle_mouse()
       state.scroll_y_px = clamp(d.orig_sy - (my-d.start_my), 0, math.max(0, state.total_h-(grid_bottom_y-top_area)))
     elseif d.type == "keyboard" and l_down then
       local p = screen_y_to_pitch(my, alt)
-      if p and p ~= state.kbd_held_pitch then
-        if state.kbd_held_pitch then send_midi_note_off(state.kbd_held_pitch,0) end
-        state.kbd_held_pitch=p; send_midi_note_on(p,state.default_vel,0); check_preview_arm_hint()
-      end
+      if p then state.preview_key(p) end
     elseif (d.type == "h_create" or d.type == "h_resize") and l_down then
       d.note.end_qn = math.max(((d.type=="h_create") and d.anchor_qn or d.note.start_qn) + get_grid_qn()*0.25, snap_qn(screen_x_to_qn(mx)))
     elseif d.type == "h_move" and l_down then
@@ -2338,8 +2411,8 @@ local function handle_mouse()
     if released then
       if d.type == "win_move" or d.type == "win_resize" then
         save_global_prefs()
-      elseif d.type == "keyboard" and state.kbd_held_pitch then
-        send_midi_note_off(state.kbd_held_pitch, 0); state.kbd_held_pitch = nil
+      elseif d.type == "keyboard" then
+        state.preview_key(nil)
       elseif d.type == "node4_drag" then
         if d.kind == "n4" and d.hover_dst then
           local ok, msg = can_connect_notes(d.note, d.hover_dst)
