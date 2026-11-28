@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.17
+-- @version 0.2.18
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -68,14 +68,58 @@ local layout_sig=""
 local last_stats=""
 local last_verified=""
 local ctx
-local function note(s) log[#log+1]=s; status=s end
+local function note(s) ui.report(s); status=s end
 local function clamp(x,a,b) return math.max(a,math.min(b,x)) end
 local function get(k,d)
   local ok,v=r.GetProjExtState(proj,STORE,k)
   if ok>0 then return v end
   return d
 end
-local function put(k,v) r.SetProjExtState(proj,STORE,k,tostring(v)) end
+local function put(k,v)
+  v=tostring(v)
+  if get(k,nil)~=v then
+    r.SetProjExtState(proj,STORE,k,v)
+    r.MarkProjectDirty(proj)
+  end
+end
+-- Project-local report and measurements; never use global ExtState for mix data.
+function ui.save_report()
+  local value=table.concat(log,"\n")
+  -- Encode newlines and percent signs for safe project-state round trips.
+  value=value:gsub("[%%\r\n]",function(c) return string.format("%%%02X",c:byte()) end)
+  put("report_text",value)
+  put("last_stats",last_stats);put("last_verified",last_verified)
+end
+function ui.report(message)
+  message=tostring(message or ""):gsub("\r\n","\n"):gsub("\n+$","")
+  if message=="" then return end
+  log[#log+1]=message
+  -- Keep the report bounded without discarding the newest diagnostics.
+  if #log>4096 then table.remove(log,1) end
+  if not job then ui.save_report() end
+end
+function ui.restore_report()
+  local value=get("report_text",""):gsub("%%(%x%x)",function(h) return string.char(tonumber(h,16)) end)
+  log={}
+  if value~="" then log[1]=value end
+  last_stats=get("last_stats","");last_verified=get("last_verified","")
+end
+function ui.select_mode(mode)
+  edit_mode=mode;transition_start=nil;ui.pan_start=nil
+  put("edit_mode",mode)
+end
+function ui.load_measurement(prefix)
+  local v=get("measurement:"..prefix,"")
+  local state,lufs,peak,coverage=v:match("^([^,]+),([^,]+),([^,]+),([^,]+)$")
+  state,lufs,peak,coverage=tonumber(state),tonumber(lufs),tonumber(peak),tonumber(coverage)
+  if (state==1 or state==2) and lufs and peak and coverage and math.abs(coverage-1)<=0.02 then
+    return {state=state,lufs=lufs,peak=peak,coverage=coverage}
+  end
+end
+function ui.save_measurement(t,j,v)
+  if not v or (v.state~=1 and v.state~=2) or math.abs(v.coverage-1)>0.02 then return end
+  put("measurement:"..t.key..":"..sections[j].key,string.format("%d,%.9g,%.9g,%.9g",v.state,v.lufs,v.peak,v.coverage))
+end
 local function num(k,d) return tonumber(get(k,"")) or d end
 local function new_ramp()
   local id=num("ramp_serial",0)+1;put("ramp_serial",id);return id
@@ -110,6 +154,7 @@ local function read_sections()
   for j,s in ipairs(a) do
     if s.a<0 or (j>1 and s.a<a[j-1].b-0.00001) then return nil,"Overlapping or negative-time regions are not supported." end
     s.key=string.format("%d:%s:%.6f:%.6f",s.id,s.name,s.a,s.b)
+    expanded[s.key]=num("expanded:"..s.key,0)==1
     s.countin=s.name:lower():gsub("[^a-z]","")=="countin"
     s.int=clamp(num("int:"..s.key,2),1,6)
     s.bars={}
@@ -213,6 +258,7 @@ local function refresh()
         end
         local cached=tonumber(get("base:"..prefix,""))
         if cached and fx_index(row) then row.base[j]=cached end
+        if fx_index(row) then row.reports[j]=ui.load_measurement(prefix) end
       end
       rows[#rows+1]=row; byptr[t]=row
     end
@@ -683,8 +729,8 @@ function ui.mirror_mix_points(t,pts,kind)
             local env=r.GetFXEnvelope(t.track,fx,p,false)
             if not env or r.CountAutomationItems(env)==0 then
               local success,err=pcall(write_points,t,pts,fx,lo,hi,p,true)
-              if not success then r.ShowConsoleMsg("N2N Mix display mirror: "..t.name..": "..tostring(err).."\n") end
-            else r.ShowConsoleMsg("N2N Mix display mirror: automation items on "..t.name.."; skipped.\n") end
+              if not success then ui.report("N2N Mix display mirror: "..t.name..": "..tostring(err).."\n") end
+            else ui.report("N2N Mix display mirror: automation items on "..t.name.."; skipped.\n") end
           end
           break
         end
@@ -949,6 +995,9 @@ local function finish(msg)
   if not job then return end
   cleanup()
   note(msg..string.format(" (%d dry runs)",job.renders or 0))
+  ui.select_mode("report")
+  put("run_outcome",msg:match("^Auto Mix complete") and "complete" or "incomplete")
+  ui.save_report()
   r.Undo_EndBlock2(proj,"N2N Mix: "..job.kind,-1)
   job=nil;pass=nil
   if msg:match("^Auto Mix complete") then alert_text="Processing done.";alert_until=r.time_precise()+1.8 else alert_text="";alert_until=0 end
@@ -1002,7 +1051,7 @@ local function complete_pass(stats)
     end
     if #failures>0 then
       local detail=p.name..": "..done.."/"..total.." reports; "..#failures.." incomplete.\n"..table.concat(failures,"\n")
-      r.ShowConsoleMsg("N2N Mix analysis:\n"..detail.."\nTrack state:\n"..table.concat(diagnostics,"\n").."\nNative render stats: "..tostring(stats).."\n")
+      ui.report("N2N Mix analysis:\n"..detail.."\nTrack state:\n"..table.concat(diagnostics,"\n").."\nNative render stats: "..tostring(stats).."\n")
       if not p.retried then
         p.retried=true
         for _,t in ipairs(missing_rows) do
@@ -1013,7 +1062,7 @@ local function complete_pass(stats)
         note(p.name..": incomplete reports; retrying with anticipative FX disabled on affected tracks.")
         return
       end
-      error(p.name..": "..#failures.." incomplete; "..failures[1]..". Full details in REAPER console",0)
+      error(p.name..": "..#failures.." incomplete; "..failures[1]..". Full details in N2N Mix Report",0)
     end
     note(string.format("%s: %d/%d reports complete.",p.name,done,total))
   end
@@ -1026,14 +1075,21 @@ local function complete_pass(stats)
         put("base:"..t.key..":"..sections[j].key,t.base[j] or "")
       end
       apply_row(t)
+      -- Only persist measurements for validated, applied track passes.
+      for j,v in pairs(t.reports) do
+        ui.save_measurement(t,j,v)
+        ui.report(string.format("%s / %s: %s | peak %.2f dBFS | coverage %.1f%% | base %+.2f dB",
+          t.name,sections[j].name,v.state==1 and string.format("%.2f LUFS-I",v.lufs) or "quiet (below gate)",
+          v.peak,v.coverage*100,t.base[j] or 0))
+      end
       job.temporary[t.track]=nil
       end
     end
   elseif p.kind=="master" then
     local lufs,peak=stats_value(stats,"LUFSI"),stats_value(stats,"PEAK")
     if not lufs or not peak or lufs<=-70 then
-      r.ShowConsoleMsg("N2N Mix master render: "..tostring(stats).."\n")
-      error("No valid native master loudness/peak result; see REAPER console",0)
+      ui.report("N2N Mix master render: "..tostring(stats).."\n")
+      error("No valid native master loudness/peak result; see N2N Mix Report",0)
     end
     local requested=master_target()-lufs
     local gain=clamp(math.min(requested,peak_ceiling-peak-0.25),-60,30)
@@ -1045,8 +1101,8 @@ local function complete_pass(stats)
   elseif p.kind=="verify" then
     local lufs,peak=stats_value(stats,"LUFSI"),stats_value(stats,"PEAK")
     if not lufs or not peak then
-      r.ShowConsoleMsg("N2N Mix verification render: "..tostring(stats).."\n")
-      error("No native verification result; see REAPER console",0)
+      ui.report("N2N Mix verification render: "..tostring(stats).."\n")
+      error("No native verification result; see N2N Mix Report",0)
     end
     last_verified=string.format("Verified master: %.2f LUFS-I, %.2f dBFS sample peak (target %.1f LUFS).",lufs,peak,master_target())
     if peak>peak_ceiling+0.1 then
@@ -1081,7 +1137,7 @@ local function arm(p)
       configure_perf(t)
       pf=perf_index(t)
       if has_position(t,pf) then apply_pan(t,pf)
-      elseif msg then r.ShowConsoleMsg("N2N Mix Pan: "..t.name..": "..msg.."\n") end
+      elseif msg then ui.report("N2N Mix Pan: "..t.name..": "..msg.."\n") end
     end
     f=fx_index(t)
     r.TrackFX_SetNamedConfigParm(t.track,f,"force_auto_bypass","0")
@@ -1110,7 +1166,7 @@ local function step()
     arm(p);return
   end
   job.renders=job.renders+1
-  r.ShowConsoleMsg(string.format("N2N Mix dry run %d: %s\n",job.renders,pass.name))
+  ui.report(string.format("N2N Mix dry run %d: %s\n",job.renders,pass.name))
   local _,stats=r.GetSetProjectInfo_String(proj,"RENDER_STATS",tostring(job.cmd),false)
   complete_pass(stats)
 end
@@ -1149,14 +1205,14 @@ local function start(policy)
       q[#q+1]={kind="track",name=label.." ("..#eligible.." tracks)",rows=eligible}
     end
   end
-  if #skipped>0 then r.ShowConsoleMsg("N2N Mix: preserving muted tracks: "..table.concat(skipped,", ").."\n") end
+  if #skipped>0 then ui.report("N2N Mix: preserving muted tracks: "..table.concat(skipped,", ").."\n") end
   if #q==0 then status="No unmuted tracks to analyze.";return end
   q[#q+1]={kind="master",name="Master",rows={master}}
   q[#q+1]={kind="verify",name="Master verification",rows={master}}
   for _,p in ipairs(q) do for _,t in ipairs(p.rows) do selected[t]=true end end
   for t in pairs(selected) do
     local ok,e=safe_row(t);if not ok then status=e;return end
-    if ui.has_volume_envelope(t) then r.ShowConsoleMsg("N2N Mix: preserving conventional volume automation and fader on "..t.name..". Per-track targets are pre-fader; downstream and master analysis include its effect.\n") end
+    if ui.has_volume_envelope(t) then ui.report("N2N Mix: preserving conventional volume automation and fader on "..t.name..". Per-track targets are pre-fader; downstream and master analysis include its effect.\n") end
   end
   local a,b=r.GetSet_LoopTimeRange2(proj,false,false,0,0,false)
   r.Undo_BeginBlock2(proj)
@@ -1185,7 +1241,7 @@ local function start(policy)
       local names={};for _,t in ipairs(p.rows) do names[#names+1]=t.name end
       plan[#plan+1]=p.name..": "..table.concat(names,", ")
     end
-    r.ShowConsoleMsg("N2N Mix planned stages:\n"..table.concat(plan,"\n").."\n")
+    ui.report("N2N Mix planned stages:\n"..table.concat(plan,"\n").."\n")
   end)
   if not ok then fail(e) end
 end
@@ -1791,7 +1847,7 @@ local function color_header(c)
     else
       r.ImGui_DrawList_AddTriangleFilled(dl,tx-9,ty-9,tx-9,ty,tx,ty,col)
     end
-    if fold_clicked and not job and not pending_start then expanded[s.key]=not expanded[s.key] end
+    if fold_clicked and not job and not pending_start then expanded[s.key]=not expanded[s.key];put("expanded:"..s.key,expanded[s.key] and 1 or 0) end
   end
 end
 -- A small input-capable floating strip, rather than a non-clickable tooltip.
@@ -2020,12 +2076,12 @@ local function install_visible_position()
       ui.mirror_existing_intensity(t)
     end)
     t.position_ready=ok
-    if ok then ready=ready+1 else missing=missing+1;r.ShowConsoleMsg("N2N Mix Pan: "..t.name..": "..tostring(err).."\n") end
+    if ok then ready=ready+1 else missing=missing+1;ui.report("N2N Mix Pan: "..t.name..": "..tostring(err).."\n") end
   end
   r.Undo_EndBlock2(proj,"N2N Mix: initialize track position",-1)
   if missing>0 then
-    local msg=string.format("Position ready on %d/%d tracks. Update Performance Dynamics with slider 11; see console.",ready,#rows)
-    r.ShowConsoleMsg("N2N Mix: "..msg.."\n")
+    local msg=string.format("Position ready on %d/%d tracks. Update Performance Dynamics with slider 11; see Report.",ready,#rows)
+    ui.report("N2N Mix: "..msg.."\n")
     if not ui.start_rejected then status=msg end
   end
 end
@@ -2238,6 +2294,40 @@ function ui.open_numbers2notes()
   if cmd and cmd>0 then r.Main_OnCommand(cmd,0)
   else r.MB("Could not launch Numbers2Notes.","N2N Mix",0) end
 end
+-- REAPER's native all-notes/all-sounds-off action reaches instrument FX
+-- and MIDI outputs; StuffMIDIMessage would only inject at a MIDI input.
+function ui.panic(report)
+  if r.EnumProjects(-1,"")~=proj then return end
+  local action=40345
+  local old_name,new_name="",""
+  if r.SectionFromUniqueID and r.kbd_getTextFromCmd then
+    local section=r.SectionFromUniqueID(0)
+    if section then
+      old_name=r.kbd_getTextFromCmd(40349,section) or ""
+      new_name=r.kbd_getTextFromCmd(40345,section) or ""
+      local function all_off(name)
+        name=name:lower():gsub("%-"," ")
+        return name:find("all notes off",1,true) and name:find("all sounds off",1,true)
+      end
+      -- Prefer the action that explicitly sends both all-notes-off and all-sounds-off.
+      if not all_off(new_name) and all_off(old_name) then action=40349 end
+    end
+  end
+  r.Main_OnCommandEx(action,0,proj)
+  if r.GetPlayStateEx(proj)==0 then ui.panic_due=r.time_precise()+0.075;ui.panic_action=action end
+  if report then
+    ui.report(string.format("MIDI Panic: invoked native action %d (%s); previous button action 40349: %s. A second reset is scheduled if transport is stopped.",
+      action,action==40345 and new_name or old_name,old_name~="" and old_name or "name unavailable"))
+    status="MIDI panic sent."
+  end
+end
+function ui.service_panic()
+  if not ui.panic_due or r.time_precise()<ui.panic_due then return end
+  ui.panic_due=nil
+  if r.EnumProjects(-1,"")==proj and r.GetPlayStateEx(proj)==0 then
+    r.Main_OnCommandEx(ui.panic_action or 40345,0,proj)
+  end
+end
 local function transport()
   local repeat_on=r.GetSetRepeat(-1)==1
   local state=r.GetPlayStateEx(proj)
@@ -2245,7 +2335,7 @@ local function transport()
   local paused=(state&2)~=0
   local playing=(state&1)~=0 and not paused
   local items={
-    {"!",40349},
+    {"!",40345},
     {"F9",1013,r.ImGui_Key_F9()},
     {"F10",1007,r.ImGui_Key_F10()},
     {"F11",1016,r.ImGui_Key_F11()},
@@ -2283,9 +2373,10 @@ local function transport()
     end
     if (click or key) and not pending_start then
       if i==6 then r.GetSetRepeat(repeat_on and 0 or 1)
+      elseif i==1 then ui.panic(true)
       else
         r.Main_OnCommand(v[2],0)
-        if i==4 then r.Main_OnCommand(40349,0) end
+        if i==4 then ui.panic(false);ui.panic_due=r.time_precise()+0.075 end
       end
     end
   end
@@ -2523,12 +2614,13 @@ local function draw()
       local function mode_button(label,mode,w)
         local selected=edit_mode==mode
         if selected then r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),0xD3B86DFF) end
-        if r.ImGui_Button(ctx,label.."##editmode",w,CELL_H) then edit_mode=mode;transition_start=nil;ui.pan_start=nil end
+        if r.ImGui_Button(ctx,label.."##editmode",w,CELL_H) then ui.select_mode(mode) end
         if selected then r.ImGui_PopStyleColor(ctx) end
       end
       mode_button("Levels","levels",84)
       same();mode_button("Pan","pan",84)
       same();mode_button("Target Luffs","targets",104)
+      same();mode_button("Report","report",84)
 
       r.ImGui_PopStyleVar(ctx)
       r.ImGui_PopStyleColor(ctx,mc)
@@ -2540,7 +2632,7 @@ local function draw()
         local legend="Target LUFS  |  M: measured section LUFS  |  G: base gain correction (dB)"
         r.ImGui_SameLine(ctx,song_palette_x(start_x,avail,r.ImGui_CalcTextSize(ctx,legend)))
         r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,legend)
-      else
+      elseif edit_mode=="levels" then
       r.ImGui_SameLine(ctx,song_palette_x(start_x,avail,palette_w))
       for i,k in ipairs(intensity_ids) do
         if i>1 then same() end
@@ -2556,7 +2648,23 @@ local function draw()
       end
     end
     r.ImGui_Separator(ctx)
-    if #sections>0 then
+    if edit_mode=="report" and not job then
+      local flags=r.ImGui_TableFlags_ScrollY() | r.ImGui_TableFlags_SizingStretchProp()
+      if r.ImGui_BeginTable(ctx,"##mixreport",1,flags,0,-(CELL_H+29)) then
+        r.ImGui_TableSetupColumn(ctx,"Report")
+        r.ImGui_TableNextRow(ctx);r.ImGui_TableSetColumnIndex(ctx,0)
+        r.ImGui_TextWrapped(ctx,"N2N Mix Report | Saved with the project")
+        local outcome=get("run_outcome","")
+        if outcome~="" then r.ImGui_TextWrapped(ctx,"Last accepted run: "..outcome..". Measurements reflect the time of that run; reanalyze after changing source audio.") end
+        r.ImGui_Separator(ctx)
+        if #log==0 then r.ImGui_TextWrapped(ctx,"No report yet. Run Auto Mix to generate one.") end
+        for _,entry in ipairs(log) do
+          r.ImGui_TableNextRow(ctx);r.ImGui_TableSetColumnIndex(ctx,0)
+          r.ImGui_TextWrapped(ctx,entry)
+        end
+        r.ImGui_EndTable(ctx)
+      end
+    elseif #sections>0 then
       local cols,total={},0
       for j,s in ipairs(sections) do
         if expanded[s.key] then
@@ -2763,10 +2871,14 @@ preset,custom=last_preset,last_custom
 show_parameters=num("show_parameters",0)==1
 ui.role=num("show_role",1)==1;ui.timbre=num("show_timbre",1)==1
 traditional=num("traditional",0)==1
+ui.restore_report()
+edit_mode=get("edit_mode","levels")
+if edit_mode~="levels" and edit_mode~="pan" and edit_mode~="targets" and edit_mode~="report" then edit_mode="levels" end
 refresh()
 local function loop()
   if r.EnumProjects(-1,"")~=proj then if job then fail("Project changed") end;return end
   r.SetExtState("N2N_EDITOR_WINDOWS","n2nmix:heartbeat",tostring(r.time_precise()),false)
+  ui.service_panic()
   if not job and not stroke and not transition_start and not ui.pan_start and not ui.pan_stroke and not next(dirty) and not next(pan_dirty) and not master_dirty and r.time_precise()>=refresh_at and stopped() then
     refresh_at=r.time_precise()+0.75
     if project_layout_signature()~=layout_sig then refresh() end
@@ -2774,6 +2886,8 @@ local function loop()
   if pending_start then
     local policy=pending_start;pending_start=nil;alert_text="";alert_until=0
     ui.start_rejected=false
+    log={}
+    ui.report("Auto Mix requested.")
     local ok,e=pcall(start,policy)
     if not ok then if job then fail(e) else status=tostring(e) end end
     if job then
@@ -2784,7 +2898,8 @@ local function loop()
       ui.start_rejected=true
       pan_scan_pending=false -- do not overwrite a preflight failure
       local msg=status
-      r.ShowConsoleMsg("N2N Mix Auto Mix start blocked: "..msg.."\n")
+      ui.report("N2N Mix Auto Mix start blocked: "..msg.."\n")
+      ui.select_mode("report")
       r.MB(msg,"Auto Mix could not start",0)
     end
   end
@@ -2794,12 +2909,13 @@ local function loop()
       local msg=tostring(e)
       fail(e)
       ui.start_rejected=true;pan_scan_pending=false
-      r.ShowConsoleMsg("N2N Mix Auto Mix failed: "..msg.."\n")
+      ui.report("N2N Mix Auto Mix failed: "..msg.."\n")
+      ui.select_mode("report")
       r.MB(msg,"Auto Mix stopped",0)
     end
   else install_visible_position() end
   local ok,open=pcall(draw)
-  if not ok then if job then fail(open) end;r.ShowConsoleMsg("N2N Mix GUI error: "..tostring(open).."\n");return end
+  if not ok then if job then fail(open) end;ui.report("N2N Mix GUI error: "..tostring(open).."\n");r.MB(tostring(open),"N2N Mix GUI error",0);return end
   if open then r.defer(loop) elseif job then finish("Closed. Undo to revert partial changes.") end
 end
 r.atexit(function()
