@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.24
+-- @version 2.0.4-dev.25
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -29,18 +29,36 @@
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require "imgui" "0.8.6" -- Version of IMGUI used during development.
 
+-- Canonicalize script paths before registering actions or loading modules.
+-- Preserve Windows drive/UNC roots and Unix roots; do not treat "." as a module.
+local function canonical_script_path(path)
+    path=path:gsub("\\","/")
+    local root,rest=path:match("^(//[^/]+/[^/]+/?)/*(.*)$")
+    if not root then root,rest=path:match("^(%a:/)/*(.*)$") end
+    if not root then root,rest=path:match("^(/)/*(.*)$") end
+    root,rest=root or "",rest or path
+    if root~="" and root:sub(-1)~="/" then root=root.."/" end
+    local parts={}
+    for part in rest:gmatch("[^/]+") do
+        if part==".." then
+            if #parts>0 and parts[#parts]~=".." then parts[#parts]=nil
+            elseif root=="" then parts[#parts+1]=part end
+        elseif part~="." then parts[#parts+1]=part end
+    end
+    return root..table.concat(parts,"/")
+end
 local info = debug.getinfo(1, "S")
 -----------------------------------------------   REQUIRED FILES
-local script_path = info.source:match [[^@?(.*[\/])[^\/]-$]]
-package.path = package.path .. ";" .. "?.lua"
-local advanced_user_setup = require(script_path .. "numbers2notes_advanced_user_setup")
-local musictheory = require(script_path .. "numbers2notes_musictheory")
-local spectrum = require(script_path .. "numbers2notes_spectrum")
-local songs = require(script_path .. "numbers2notes_songs")
-local help = require(script_path .. "numbers2notes_help")
-local form = require(script_path .. "numbers2notes_form")
-local config = require(script_path .. "numbers2notes_config")
-local gmem_export = require(script_path .. "numbers2notes_gmem")
+local script_path = canonical_script_path(info.source:gsub("^@","")):match("^(.*[/])")
+package.path = script_path .. "?.lua;" .. package.path
+local advanced_user_setup = require("numbers2notes_advanced_user_setup")
+local musictheory = require("numbers2notes_musictheory")
+local spectrum = require("numbers2notes_spectrum")
+local songs = require("numbers2notes_songs")
+local help = require("numbers2notes_help")
+local form = require("numbers2notes_form")
+local config = require("numbers2notes_config")
+local gmem_export = require("numbers2notes_gmem")
 reaper.gmem_attach("N2N_Ecosystem_RSKennedy")
 local track_table = config.track_table
 local pluginsources = config.pluginsources
@@ -2453,7 +2471,7 @@ Form: I V C V C B C O]]
                     if hwnd then
                         r.JS_Window_SetFocus(hwnd)
                     else
-                        local path=script_path.."../N2N Mix.lua"
+                        local path=canonical_script_path(script_path.."../N2N Mix.lua")
                         local file=io.open(path,"rb")
                         if file then
                             file:close()
