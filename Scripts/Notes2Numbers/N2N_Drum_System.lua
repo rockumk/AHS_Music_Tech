@@ -1,5 +1,5 @@
 -- @description N2N Drum System
--- @version 2.1
+-- @version 2.2
 
 local script_path = debug.getinfo(1, "S").source:match("@(.*[\\/])")
 package.path = package.path .. ";" .. script_path .. "?.lua"
@@ -454,6 +454,7 @@ local function scan_tracks()
         if track then
             local track_key = tostring(track)
             local fx_a = get_best_matching_fx(track, "JS: N2N Drum Arranger.jsfx", {"JS: N2N Drum Arranger", "N2N Drum Arranger"})
+            if fx_a == nil then fx_a = get_best_matching_fx(track, "JS: N2N Rhythm.jsfx", {"JS: N2N Rhythm", "N2N Rhythm"}) end
             local fx_b = get_best_matching_fx(track, "VST3i: MONSTER Drums v3", {
                 "MONSTER Drum v3", "MONSTER Drums v3", "Monster Drum v3", "Monster Drums v3",
                 "MONSTER Drum", "MONSTER Drums", "Monster Drum", "Monster Drums"

@@ -1,6 +1,6 @@
 -- @description N2N Drum Layout Tool
 -- @author Rock Kennedy + ChatGPT
--- @version 2.4
+-- @version 2.5
 
 local r = reaper
 
@@ -242,7 +242,7 @@ local function find_drum_track_by_fx()
     local fx_count = r.TrackFX_GetCount(tr)
     for fx = 0, fx_count - 1 do
       local retval, buf = r.TrackFX_GetFXName(tr, fx, "")
-      if retval and buf:find(TARGET_FX_NAME, 1, true) then
+      if retval and (buf:find(TARGET_FX_NAME, 1, true) or buf:find("N2N Rhythm", 1, true)) then
         return tr
       end
     end

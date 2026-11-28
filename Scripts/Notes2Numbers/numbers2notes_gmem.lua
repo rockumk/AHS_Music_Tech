@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.31
+-- @version 1.9.32
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -286,7 +286,7 @@ function export.PublishSongForm(stretched_index, force)
         local tr=r.GetTrack(project,i)
         for fx=0,r.TrackFX_GetCount(tr)-1 do
             local _,name=r.TrackFX_GetFXName(tr,fx,"")
-            if name:lower():find("n2n drum arranger",1,true) or name:lower():find("n2n arp",1,true) then
+            if name:lower():find("n2n drum arranger",1,true) or name:lower():find("n2n rhythm",1,true) or name:lower():find("n2n arp",1,true) then
                 local id=math.floor(r.TrackFX_GetParam(tr,fx,4)+0.5)
                 if id>=1 and id<=512 then
                     local key=r.gmem_read(8000000+id)
@@ -527,7 +527,7 @@ local function kind_of(track,fx)
     end
     if not ok or not name then return end
     local lower=name:lower()
-    if lower:find("n2n drum arranger",1,true) then return "DRUM" end
+    if lower:find("n2n drum arranger",1,true) or lower:find("n2n rhythm",1,true) then return "DRUM" end
     if lower:find("n2n arp",1,true) then return "ARP" end
 end
 local function is_topline(tr,name)

@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.38
+-- @version 2.0.4-dev.39
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -1251,7 +1251,7 @@ function Draw_Track_Builder_Modal()
                 if template and template[5] then
                     for _, fx in ipairs(template[5]) do
                         local name = (fx[1] or ""):lower()
-                        if name:find("n2n drum arranger",1,true) or name:find("n2n arp",1,true) then
+                        if name:find("n2n drum arranger",1,true) or name:find("n2n rhythm",1,true) or name:find("n2n arp",1,true) then
                             has_arranger = true; break
                         end
                     end
@@ -4127,7 +4127,7 @@ function Compile_Dynamic_Track_Table(recipe)
                     for _, fx_info in ipairs(t_data[5]) do
                         if
                             fx_info[1] and
-                                (fx_info[1]:find("N2N Drum Arranger") or
+                                (fx_info[1]:find("N2N Drum Arranger") or fx_info[1]:find("N2N Rhythm") or
                                     (active_choice and fx_info[1] == (active_choice.search or "")))
                          then
                             fx_info[3] = chosen_drum_preset
@@ -4161,7 +4161,7 @@ function Track_Needs_Cue_Child(tr)
 
     for _, fx_info in ipairs(tr[5]) do
         local fx_name = fx_info[1]
-        if fx_name and (fx_name:find("N2N Drum Arranger") or fx_name:find("N2N Arp")) then
+        if fx_name and (fx_name:find("N2N Drum Arranger") or fx_name:find("N2N Rhythm") or fx_name:find("N2N Arp")) then
             return true
         end
     end
@@ -6266,7 +6266,7 @@ function Find_All_Tracks_With_Drum_FX()
             local retval, buf = r.TrackFX_GetFXName(tr, fx, "")
             if retval and buf then
                 local normalized = buf:lower()
-                if normalized:find("n2n drum arranger") then
+                if normalized:find("n2n drum arranger",1,true) or normalized:find("n2n rhythm",1,true) then
                     table.insert(matching_tracks, tr)
                     break -- Found it on this track, move to next track
                 end
