@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.22
+-- @version 2.0.4-dev.23
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -1707,6 +1707,13 @@ function Get_Transport_Sections(header_text, chord_text)
 end 
 
 function IM_GUI_Loop()
+    local window_sec = "N2N_EDITOR_WINDOWS"
+    reaper.SetExtState(window_sec,"numbers2notes:heartbeat",tostring(reaper.time_precise()),false)
+    local focus_request = reaper.GetExtState(window_sec,"numbers2notes:focus")
+    if focus_request ~= "" then
+        reaper.DeleteExtState(window_sec,"numbers2notes:focus",false)
+        reaper.ImGui_SetNextWindowFocus(ctx)
+    end
     if gmem_export then
         gmem_export.PublishSongForm(Get_Stretched_ABCD_Index, false)
         gmem_export.PublishTrackIdentity(false)
@@ -2315,6 +2322,10 @@ Form: I V C V C B C O]]
                 feedback_tab_mode = 11
                 r.ImGui_EndTabItem(ctx)
             end
+            if r.ImGui_BeginTabItem(ctx, "Mix") then
+                feedback_tab_mode = 12
+                r.ImGui_EndTabItem(ctx)
+            end
             if r.ImGui_BeginTabItem(ctx, "Groove") then
                 feedback_tab_mode = 10
                 r.ImGui_EndTabItem(ctx)
@@ -2420,6 +2431,20 @@ Form: I V C V C B C O]]
         end
         if feedback_tab_mode == 11 then
             gmem_export.DrawTracks(ctx, fontsmall)
+        end
+        if feedback_tab_mode == 12 then
+            r.ImGui_Dummy(ctx,0,8)
+            r.ImGui_Text(ctx,"N2N Mix")
+            r.ImGui_Separator(ctx)
+            r.ImGui_PushTextWrapPos(ctx,r.ImGui_GetCursorPosX(ctx)+560)
+            r.ImGui_TextWrapped(ctx,"N2N Mix is a song-structure-aware mixer for Numbers2Notes. Set the musical prominence, dynamics and stereo position of each instrument by section or bar, then use Auto Mix to balance tracks and buses against a master loudness target.")
+            r.ImGui_PopTextWrapPos(ctx)
+            r.ImGui_Dummy(ctx,0,12)
+            r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),4)
+            if r.ImGui_Button(ctx,"Open N2N Mix",180,30) then
+                gmem_export.OpenEditor("n2nmix","N2N Mix")
+            end
+            r.ImGui_PopStyleVar(ctx)
         end
 
         if feedback_tab_mode == 0 then
@@ -3725,8 +3750,8 @@ Form: I V C V C B C O]]
     if open then
         r.defer(IM_GUI_Loop)
     else
-
-
+        reaper.DeleteExtState("N2N_EDITOR_WINDOWS","numbers2notes:heartbeat",false)
+        reaper.DeleteExtState("N2N_EDITOR_WINDOWS","numbers2notes:focus",false)
         ctx = nil
         Autosave()
         SaveLastNumbers2NotesChart()
@@ -9220,6 +9245,10 @@ end
 
 -- _______________________________________________________________________ MAIN FUNCTION  ____________________
 --Initialize_Track_Setup()
+reaper.atexit(function()
+    reaper.DeleteExtState("N2N_EDITOR_WINDOWS","numbers2notes:heartbeat",false)
+    reaper.DeleteExtState("N2N_EDITOR_WINDOWS","numbers2notes:focus",false)
+end)
 LoadLastNumbers2NotesChart()
 
 -- RUN THE STARTUP AUDIT
