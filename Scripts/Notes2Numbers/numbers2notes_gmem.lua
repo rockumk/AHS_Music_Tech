@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.18
+-- @version 1.9.19
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -545,7 +545,7 @@ local function locate(t)
     end
 end
 -- UI requests from the arranger: per-instance key, command, timestamp, payload.
--- 1 instrument, 2 hub, 3 mixer, 4 section playback (tab*3 + pre-roll bars).
+-- 1 instrument, 2 hub, 3 mixer, 4 section playback (tab*3 + pre-roll bars), 5 stop, 6 pause.
 local HUB_UI_BASE=8320000
 local pending_arranger_play
 -- Negative payload is a failure acknowledgement, consumed by the requesting FX.
@@ -634,7 +634,7 @@ function export.ServiceArrangerUIRequests(stretched_index)
         if cmd~=0 then
             local key,stamp,payload=r.gmem_read(base),r.gmem_read(base+2),r.gmem_read(base+3)
             r.gmem_write(base+1,0)
-            if (cmd==1 or cmd==2 or cmd==3 or cmd==4) and key>0 and key==r.gmem_read(REG_BASE+id) and math.abs(now-stamp)<2 then
+            if (cmd==1 or cmd==2 or cmd==3 or cmd==4 or cmd==5 or cmd==6) and key>0 and key==r.gmem_read(REG_BASE+id) and math.abs(now-stamp)<2 then
                 local inventory,counts=scan(project)
                 if counts[id]==1 then
                     for _,t in ipairs(inventory) do
@@ -642,6 +642,14 @@ function export.ServiceArrangerUIRequests(stretched_index)
                             if cmd==2 then raise=true
                             elseif cmd==3 then mix=true
                             elseif cmd==4 then play_arranger_section(project,id,key,stamp,payload,stretched_index)
+                            elseif cmd==5 then
+                                pending_arranger_play=nil
+                                r.Main_OnCommand(1016,0)
+                            elseif cmd==6 then
+                                pending_arranger_play=nil
+                                local state=r.GetPlayStateEx(project)
+                                -- Pause is not a toggle: never resume an already paused transport.
+                                if (state&1)~=0 and (state&2)==0 then r.OnPauseButtonEx(project) end
                             else
                                 local tr=t.track
                                 local fx=r.TrackFX_GetInstrument(tr)
