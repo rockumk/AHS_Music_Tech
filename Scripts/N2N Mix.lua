@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.13
+-- @version 0.2.14
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -2085,17 +2085,26 @@ function ui.canonical_script_path(path)
     end
     return root..table.concat(parts,"/")
 end
+function ui.raise_window(title)
+    local r=reaper
+    local hwnd=r.JS_Window_Find and r.JS_Window_Find(title,true)
+    if not hwnd and r.JS_Window_FindTop then hwnd=r.JS_Window_FindTop(title,true) end
+    if not hwnd then return false end
+    if r.JS_Window_IsVisible and not r.JS_Window_IsVisible(hwnd) and r.JS_Window_Show then r.JS_Window_Show(hwnd,"SHOW") end
+    if r.JS_Window_SetZOrder then r.JS_Window_SetZOrder(hwnd,"TOP") end
+    if r.JS_Window_SetForeground then r.JS_Window_SetForeground(hwnd) end
+    if r.JS_Window_SetFocus then r.JS_Window_SetFocus(hwnd) end
+    return true
+end
 function ui.open_numbers2notes()
   local sec="N2N_EDITOR_WINDOWS"
   local hb=tonumber(r.GetExtState(sec,"numbers2notes:heartbeat"))
   if hb and math.abs(r.time_precise()-hb)<3 then
     r.SetExtState(sec,"numbers2notes:focus",tostring(r.time_precise()),false)
+    ui.raise_window("Numbers2Notes - Nashville Number Charts for Reaper")
     return
   end
-  if r.JS_Window_Find and r.JS_Window_SetFocus then
-    local hwnd=r.JS_Window_Find("Numbers2Notes - Nashville Number Charts for Reaper",true)
-    if hwnd then r.JS_Window_SetFocus(hwnd);return end
-  end
+  if ui.raise_window("Numbers2Notes - Nashville Number Charts for Reaper") then return end
   local function search(dir,depth)
     if depth>7 then return end
     local i=0
@@ -2357,6 +2366,7 @@ local function draw()
   if focus~="" then
     r.DeleteExtState("N2N_EDITOR_WINDOWS","n2nmix:focus",false)
     r.ImGui_SetNextWindowFocus(ctx)
+    ui.raise_window("N2N Mix")
   end
   local visible,open=r.ImGui_Begin(ctx,"N2N Mix",true)
   if visible then
