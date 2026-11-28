@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.11
+-- @version 1.9.12
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -615,6 +615,39 @@ local function find_script(wanted)
     end
     return search(r.GetResourcePath().."/Scripts",0)
 end
+-- Shared launcher for the chart, mixer and standalone Topline editor.
+-- ReaImGui scripts use their own focus mailbox, avoiding a JS extension
+-- dependency for those windows. Topline's native gfx window uses JS focus.
+function export.OpenEditor(wanted,title)
+    local r=reaper
+    local sec="N2N_EDITOR_WINDOWS"
+    local heartbeat=tonumber(r.GetExtState(sec,wanted..":heartbeat"))
+    if heartbeat and math.abs(r.time_precise()-heartbeat)<3 then
+        r.SetExtState(sec,wanted..":focus",tostring(r.time_precise()),false)
+        return
+    end
+    if wanted=="n2ntopline" then
+        local top="N2N_TOPLINE_HUB"
+        local hb=tonumber(r.GetExtState(top,"heartbeat"))
+        if hb and math.abs(r.time_precise()-hb)<3 then
+            r.SetExtState(top,"focus",tostring(r.time_precise()),false)
+            if r.JS_Window_Find and r.JS_Window_SetFocus then
+                local hwnd=r.JS_Window_Find(title,true)
+                if hwnd then r.JS_Window_SetFocus(hwnd) end
+            end
+            return
+        end
+    end
+    if r.JS_Window_Find and r.JS_Window_SetFocus then
+        local hwnd=r.JS_Window_Find(title,true)
+        if hwnd then r.JS_Window_SetFocus(hwnd);return end
+    end
+    local path=find_script(wanted)
+    if not path then r.MB("Install "..title..".lua first.","Numbers2Notes",0);return end
+    local cmd=r.AddRemoveReaScript(true,0,path,true)
+    if cmd and cmd>0 then r.Main_OnCommand(cmd,0)
+    else r.MB("Could not launch "..title..".","Numbers2Notes",0) end
+end
 local function launch_cue()
     local r=reaper
     local path=find_script("n2ncue")
@@ -949,7 +982,7 @@ function export.DrawTracks(ctx,font)
     if normal_font then r.ImGui_PopFont(ctx) end
     -- Launch advanced cueing in place of the temporary width fields.
     -- Size controls remain at the right end of the non-scrolling footer.
-    local zoom_button,readout_width,launcher_width=24,52,220
+    local zoom_button,readout_width,launcher_width,topline_width=24,52,196,158
     local readout=("%d%%"):format(percent)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),3,1)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),2,2)
@@ -957,6 +990,8 @@ function export.DrawTracks(ctx,font)
     r.ImGui_SetCursorPosX(ctx,box_x)
     if r.ImGui_Button(ctx,"N2N Advanced Cueing",launcher_width,footer_height) then launch_cue() end
     if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,"Open N2NCue for manual cue placement and live cueing") end
+    r.ImGui_SameLine(ctx,box_x+panel_width-(2*zoom_button+readout_width+6)-topline_width-12)
+    if r.ImGui_Button(ctx,"Open N2N Topline",topline_width,footer_height) then export.OpenEditor("n2ntopline","N2N Topline") end
     r.ImGui_SameLine(ctx,box_x+panel_width-(2*zoom_button+readout_width+6))
     if percent<=TRACK_SCALE_MIN then r.ImGui_BeginDisabled(ctx) end
     if r.ImGui_Button(ctx,"-##track_zoom",zoom_button,footer_height) then adjust_track_scale(-TRACK_SCALE_STEP) end
