@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.16
+-- @version 1.9.17
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -544,27 +544,64 @@ local function locate(t)
         if reaper.TrackFX_GetFXGUID(t.track,fx)==t.guid then return fx end
     end
 end
--- UI requests from the arranger: per-instance key, command, timestamp.
+-- UI requests from the arranger: per-instance key, command, timestamp, payload.
+-- 1 instrument, 2 hub, 3 mixer, 4 section playback (tab*3 + pre-roll bars).
 local HUB_UI_BASE=8320000
-function export.ServiceArrangerUIRequests()
+local function play_arranger_section(project, id, key, payload, stretched_index)
+    local r=reaper
+    if type(stretched_index)~="function" or payload~=math.floor(payload) or payload<3 or payload>236 then return end
+    local tab,preroll=math.floor(payload/3),payload%3
+    -- Rebuild from the active project's rendered regions before resolving the request.
+    if not export.PublishSongForm(stretched_index,true) then return end
+    if r.gmem_read(FORM_BASE+10+id)~=key then return end
+    local pos=(r.GetPlayStateEx(project)&1)~=0 and r.GetPlayPositionEx(project) or r.GetCursorPositionEx(project)
+    local q=r.TimeMap2_timeToQN(project,pos)
+    local first,upcoming,current
+    local count=math.min(FORM_MAX,math.max(0,math.floor(r.gmem_read(FORM_BASE+2))))
+    for i=0,count-1 do
+        local p=FORM_BASE+1024+i*3
+        local a,b,t=r.gmem_read(p),r.gmem_read(p+1),r.gmem_read(p+2)
+        if t==tab then
+            first=first or a
+            if q>=a-1e-8 and q<b-1e-8 then current=a;break end
+            if a>=q-1e-8 and not upcoming then upcoming=a end
+        end
+    end
+    local start=current or upcoming or first
+    if not start then
+        r.MB("This section/variation is not present in the rendered song structure.","Numbers2Notes",0)
+        return
+    end
+    local target=r.TimeMap2_QNToTime(project,start)
+    if preroll>0 then
+        local _,measure=r.TimeMap2_timeToBeats(project,target)
+        target=r.TimeMap2_beatsToTime(project,0,math.max(0,measure-preroll))
+    end
+    r.Main_OnCommand(1016,0)
+    r.SetEditCurPos2(project,math.max(0,target),true,false)
+    r.Main_OnCommand(1007,0)
+end
+function export.ServiceArrangerUIRequests(stretched_index)
     local r=reaper
     local project=r.EnumProjects(-1,"")
     local now=r.time_precise()
     r.gmem_attach("N2N_Ecosystem_RSKennedy")
     r.gmem_write(HUB_UI_BASE,now)
-    local raise=false
+    local raise,mix=false,false
     for id=1,512 do
         local base=HUB_UI_BASE+4+(id-1)*4
         local cmd=r.gmem_read(base+1)
         if cmd~=0 then
-            local key,stamp=r.gmem_read(base),r.gmem_read(base+2)
+            local key,stamp,payload=r.gmem_read(base),r.gmem_read(base+2),r.gmem_read(base+3)
             r.gmem_write(base+1,0)
-            if (cmd==1 or cmd==2) and key>0 and key==r.gmem_read(REG_BASE+id) and math.abs(now-stamp)<2 then
+            if (cmd==1 or cmd==2 or cmd==3 or cmd==4) and key>0 and key==r.gmem_read(REG_BASE+id) and math.abs(now-stamp)<2 then
                 local inventory,counts=scan(project)
                 if counts[id]==1 then
                     for _,t in ipairs(inventory) do
                         if t.id==id and locate(t) then
                             if cmd==2 then raise=true
+                            elseif cmd==3 then mix=true
+                            elseif cmd==4 then play_arranger_section(project,id,key,payload,stretched_index)
                             else
                                 local tr=t.track
                                 local fx=r.TrackFX_GetInstrument(tr)
@@ -600,7 +637,7 @@ function export.ServiceArrangerUIRequests()
             end
         end
     end
-    return raise
+    return raise,mix
 end
 function export.PublishTrackIdentity(force)
     local r=reaper
