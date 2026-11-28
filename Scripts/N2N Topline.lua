@@ -1,5 +1,5 @@
 -- @description N2N Topline
--- @version 5.4-dev.5
+-- @version 5.4-dev.6
 -- @author Rock Kennedy and Gemini 4 Hydrogen (which did an absolutely fabulous job of transforming the vision into solid Lua code)
 -- @about
 --   Numbers2Notes Topline Melody Editor (1200x640 minimum):
@@ -155,7 +155,7 @@ local state = {
   mpe_release_tail_ms=500, mpe_chan_min=1, mpe_chan_max=15,
 
   toolbar_h=50, regions_h=56, reserved_h=14, ruler_h=24, keyboard_w=152, hscroll_h=18, vscroll_w=18,
-  vel_lane_h=68, param_bar_h=38, transport_h=44,
+  vel_lane_h=68, param_bar_h=38, transport_h=52,
   show_vel_lane=true, show_drawer=false, drawer_w=340,
 
   scroll_x_qn=0, scroll_y_px=0, px_per_qn=110, v_scale=1.0, has_saved_view=false,
@@ -1403,7 +1403,6 @@ local function draw_regions_bar(canvas_w)
             end
           })
 
-          if hov then state.hover_section(sec,cx,btn_y,cw,top_half_h) end
           local fill_col = hov and mix_rgb(sec.rgb, {1,1,1}, 0.16) or sec.rgb
           draw_bordered_roundrect(cx + 1, btn_y, cw - 2, btn_h, 7, is_sel and 2.5 or 1.0, is_sel and (CONFIG.dark_mode and {1,0.90,0.35} or {0.10,0.12,0.16}) or mix_rgb(sec.rgb,{0,0,0},0.25), fill_col, is_sel and 1.0 or 0.86)
           if cw > 26 then
