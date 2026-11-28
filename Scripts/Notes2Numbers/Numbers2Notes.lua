@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.40
+-- @version 2.0.4-dev.41
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -16,6 +16,7 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
+--   + Combined Theory and Chains into one scrollable Theory panel.
 --   + Added Drums tab with a shortcut to REAPER's MIDI note names folder.
 --   # Added small chord audition buttons to left panel.
 --   + Improved warnings for missing sections.
@@ -1847,10 +1848,10 @@ function IM_GUI_Loop()
     Push_N2N_Styles(ctx)
     reaper.ImGui_PushFont(ctx, font)
 
-    -- The Tracks tab owns its own scrolling region; don't pass its wheel
+    -- Tracks and Theory own their scrolling regions; don't pass their wheel
     -- gestures to the outer Numbers2Notes window.
     local active_window_flags = window_flags
-    if feedback_tab_mode == 11 then
+    if feedback_tab_mode == 11 or feedback_tab_mode == 6 then
         active_window_flags = active_window_flags | r.ImGui_WindowFlags_NoScrollWithMouse()
     end
     local visible, open =
@@ -2456,10 +2457,6 @@ Form: I V C V C B C O]]
             end
             if r.ImGui_BeginTabItem(ctx, "Theory") then
                 feedback_tab_mode = 6
-                r.ImGui_EndTabItem(ctx)
-            end
-            if r.ImGui_BeginTabItem(ctx, "Chains") then
-                feedback_tab_mode = 7
                 r.ImGui_EndTabItem(ctx)
             end
             if r.ImGui_BeginTabItem(ctx, "Import") then
@@ -3341,132 +3338,32 @@ Form: I V C V C B C O]]
         end
 
         if feedback_tab_mode == 6 then
-            reaper.ImGui_Text(ctx, "Chord and Progression Popularity")
-            reaper.ImGui_Separator(ctx)
-            reaper.ImGui_Text(ctx, "For more detailed, up-to-date information see:\n")
-            Link("https://www.hooktheory.com/trends")
-            reaper.ImGui_Separator(ctx)
-            reaper.ImGui_Dummy(ctx, 4, 10)
-            for itt = 1, 12, 1 do
-                if string.len(musictheory.major_trend_table[itt][1]) == 1 then
-                    chordlabler = musictheory.major_trend_table[itt][1] .. " "
-                else
-                    chordlabler = musictheory.major_trend_table[itt][1]
-                end
-                if chosentheorychord == itt then
-                    if reaper.ImGui_RadioButton(ctx, chordlabler, true) then
-                        chosentheorychord = itt
-                    end
-                else
-                    if reaper.ImGui_RadioButton(ctx, chordlabler, false) then
-                        chosentheorychord = itt
-                    end
-                end
-
-                reaper.ImGui_SameLine(ctx)
-                the_root_colors = musictheory.root_colors[musictheory.major_trend_table[itt][4]]
-                thecolor =
-                    reaper.ImGui_ColorConvertDouble4ToU32(
-                    the_root_colors[1] * (1.0 / 255.0),
-                    the_root_colors[2] * (1.0 / 255.0),
-                    the_root_colors[3] * (1.0 / 255.0),
-                    1
-                )
-
-                reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_PlotHistogram(), thecolor)
-                reaper.ImGui_ProgressBar(
-                    ctx,
-                    musictheory.major_trend_table[itt][2] / 50,
-                    500,
-                    20,
-                    musictheory.major_trend_table[itt][2] .. "% of chords"
-                )
-                reaper.ImGui_PopStyleColor(ctx, 1)
-            end
-            reaper.ImGui_Dummy(ctx, 4, 10)
-            reaper.ImGui_Separator(ctx)
-            reaper.ImGui_Dummy(ctx, 4, 10)
-            reaper.ImGui_Text(ctx, musictheory.major_trend_table[chosentheorychord][1] .. " Moves to...")
-            next_chords = musictheory.major_trend_table[chosentheorychord][3]
-            for i1, v1 in pairs(next_chords) do
-                if string.len(v1[1]) == 1 then
-                    followchordlable = v1[1] .. "  "
-                elseif string.len(v1[1]) == 2 then
-                    followchordlable = v1[1] .. " "
-                else
-                    followchordlable = v1[1] .. ""
-                end
-                if i1 > 6 then
-                    reaper.ImGui_SameLine(ctx)
-
-                    reaper.ImGui_Text(ctx, "   ")
-                    reaper.ImGui_SameLine(ctx)
-                    reaper.ImGui_Text(ctx, v1[1])
-                    reaper.ImGui_SameLine(ctx)
-                    --reaper.ImGui_ProgressBar(ctx, musictheory.major_trend_table[itt][2] / 50, 500, 20, musictheory
-                    rooty = string.gsub(v1[1], "m", "")
-
-                    the_root_colors = musictheory.root_colors[rooty]
-                    thecolor =
-                        reaper.ImGui_ColorConvertDouble4ToU32(
-                        the_root_colors[1] * (1.0 / 255.0),
-                        the_root_colors[2] * (1.0 / 255.0),
-                        the_root_colors[3] * (1.0 / 255.0),
-                        1
-                    )
-                    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), thecolor)
-                    r.ImGui_Button(ctx, v1[2] .. "% of the time", v1[2] * 10, nil)
-                    reaper.ImGui_PopStyleColor(ctx, 1)
-                else
-                    reaper.ImGui_Text(ctx, followchordlable)
-                    reaper.ImGui_SameLine(ctx)
-                    --reaper.ImGui_ProgressBar(ctx, musictheory.major_trend_table[itt][2] / 50, 500, 20, musictheory
-                    rooty = string.gsub(v1[1], "m", "")
-
-                    the_root_colors = musictheory.root_colors[rooty]
-                    thecolor =
-                        reaper.ImGui_ColorConvertDouble4ToU32(
-                        the_root_colors[1] * (1.0 / 255.0),
-                        the_root_colors[2] * (1.0 / 255.0),
-                        the_root_colors[3] * (1.0 / 255.0),
-                        1
-                    )
-                    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), thecolor)
-                    r.ImGui_Button(ctx, v1[2] .. "% of the time", v1[2] * 10, nil)
-                    reaper.ImGui_PopStyleColor(ctx, 1)
-                end
-            end
-        end
-
-        if feedback_tab_mode == 7 then
-            reaper.ImGui_Text(ctx, "Classic Chord Progressions")
-            reaper.ImGui_SameLine(ctx)
-            Link("https://www.hooktheory.com/theorytab/common-chord-progressions")
-
-            reaper.ImGui_Separator(ctx)
-
-            for i, v in pairs(musictheory.chains_table) do
+            -- Match the existing feedback panel and retain its transparent child background.
+            if r.ImGui_BeginChild(ctx, "##N2NTheoryScroll", 592, 620, 0) then
+                reaper.ImGui_Text(ctx, "Chord and Progression Popularity")
                 reaper.ImGui_Separator(ctx)
-                reaper.ImGui_Text(ctx, "       #" .. i .. ") " .. v[1])
-
-                thecolor = reaper.ImGui_ColorConvertDouble4ToU32(.95, .95, .95, 1)
-                r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), thecolor)
-                if i < 10 then
-                    if r.ImGui_Button(ctx, "Add #" .. i .. "  -->", nil) then
-                        insert_number_text("\n" .. v[2] .. "\n")
+                reaper.ImGui_Text(ctx, "For more detailed, up-to-date information see:\n")
+                Link("https://www.hooktheory.com/trends")
+                reaper.ImGui_Separator(ctx)
+                reaper.ImGui_Dummy(ctx, 4, 10)
+                for itt = 1, 12, 1 do
+                    if string.len(musictheory.major_trend_table[itt][1]) == 1 then
+                        chordlabler = musictheory.major_trend_table[itt][1] .. " "
+                    else
+                        chordlabler = musictheory.major_trend_table[itt][1]
                     end
-                else
-                    if r.ImGui_Button(ctx, "Add #" .. i .. " -->", nil) then
-                        insert_number_text("\n" .. v[2] .. "\n")
+                    if chosentheorychord == itt then
+                        if reaper.ImGui_RadioButton(ctx, chordlabler, true) then
+                            chosentheorychord = itt
+                        end
+                    else
+                        if reaper.ImGui_RadioButton(ctx, chordlabler, false) then
+                            chosentheorychord = itt
+                        end
                     end
-                end
 
-                reaper.ImGui_PopStyleColor(ctx, 1)
-
-                for ji, kv in pairs(v[3]) do
                     reaper.ImGui_SameLine(ctx)
-
-                    the_root_colors = musictheory.root_colors[kv[3]]
+                    the_root_colors = musictheory.root_colors[musictheory.major_trend_table[itt][4]]
                     thecolor =
                         reaper.ImGui_ColorConvertDouble4ToU32(
                         the_root_colors[1] * (1.0 / 255.0),
@@ -3474,10 +3371,114 @@ Form: I V C V C B C O]]
                         the_root_colors[3] * (1.0 / 255.0),
                         1
                     )
-                    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), thecolor)
-                    r.ImGui_Button(ctx, kv[2], 44)
+
+                    reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_PlotHistogram(), thecolor)
+                    reaper.ImGui_ProgressBar(
+                        ctx,
+                        musictheory.major_trend_table[itt][2] / 50,
+                        500,
+                        20,
+                        musictheory.major_trend_table[itt][2] .. "% of chords"
+                    )
                     reaper.ImGui_PopStyleColor(ctx, 1)
                 end
+                reaper.ImGui_Dummy(ctx, 4, 10)
+                reaper.ImGui_Separator(ctx)
+                reaper.ImGui_Dummy(ctx, 4, 10)
+                reaper.ImGui_Text(ctx, musictheory.major_trend_table[chosentheorychord][1] .. " Moves to...")
+                next_chords = musictheory.major_trend_table[chosentheorychord][3]
+                for i1, v1 in pairs(next_chords) do
+                    if string.len(v1[1]) == 1 then
+                        followchordlable = v1[1] .. "  "
+                    elseif string.len(v1[1]) == 2 then
+                        followchordlable = v1[1] .. " "
+                    else
+                        followchordlable = v1[1] .. ""
+                    end
+                    if i1 > 6 then
+                        reaper.ImGui_SameLine(ctx)
+
+                        reaper.ImGui_Text(ctx, "   ")
+                        reaper.ImGui_SameLine(ctx)
+                        reaper.ImGui_Text(ctx, v1[1])
+                        reaper.ImGui_SameLine(ctx)
+                        --reaper.ImGui_ProgressBar(ctx, musictheory.major_trend_table[itt][2] / 50, 500, 20, musictheory
+                        rooty = string.gsub(v1[1], "m", "")
+
+                        the_root_colors = musictheory.root_colors[rooty]
+                        thecolor =
+                            reaper.ImGui_ColorConvertDouble4ToU32(
+                            the_root_colors[1] * (1.0 / 255.0),
+                            the_root_colors[2] * (1.0 / 255.0),
+                            the_root_colors[3] * (1.0 / 255.0),
+                            1
+                        )
+                        r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), thecolor)
+                        r.ImGui_Button(ctx, v1[2] .. "% of the time", v1[2] * 10, nil)
+                        reaper.ImGui_PopStyleColor(ctx, 1)
+                    else
+                        reaper.ImGui_Text(ctx, followchordlable)
+                        reaper.ImGui_SameLine(ctx)
+                        --reaper.ImGui_ProgressBar(ctx, musictheory.major_trend_table[itt][2] / 50, 500, 20, musictheory
+                        rooty = string.gsub(v1[1], "m", "")
+
+                        the_root_colors = musictheory.root_colors[rooty]
+                        thecolor =
+                            reaper.ImGui_ColorConvertDouble4ToU32(
+                            the_root_colors[1] * (1.0 / 255.0),
+                            the_root_colors[2] * (1.0 / 255.0),
+                            the_root_colors[3] * (1.0 / 255.0),
+                            1
+                        )
+                        r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), thecolor)
+                        r.ImGui_Button(ctx, v1[2] .. "% of the time", v1[2] * 10, nil)
+                        reaper.ImGui_PopStyleColor(ctx, 1)
+                    end
+                end
+                r.ImGui_Dummy(ctx, 0, 16)
+                r.ImGui_Separator(ctx)
+                r.ImGui_Dummy(ctx, 0, 8)
+                reaper.ImGui_Text(ctx, "Classic Chord Progressions")
+                reaper.ImGui_SameLine(ctx)
+                Link("https://www.hooktheory.com/theorytab/common-chord-progressions")
+
+                reaper.ImGui_Separator(ctx)
+
+                for i, v in pairs(musictheory.chains_table) do
+                    reaper.ImGui_Separator(ctx)
+                    reaper.ImGui_Text(ctx, "       #" .. i .. ") " .. v[1])
+
+                    thecolor = reaper.ImGui_ColorConvertDouble4ToU32(.95, .95, .95, 1)
+                    r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), thecolor)
+                    if i < 10 then
+                        if r.ImGui_Button(ctx, "Add #" .. i .. "  -->", nil) then
+                            insert_number_text("\n" .. v[2] .. "\n")
+                        end
+                    else
+                        if r.ImGui_Button(ctx, "Add #" .. i .. " -->", nil) then
+                            insert_number_text("\n" .. v[2] .. "\n")
+                        end
+                    end
+
+                    reaper.ImGui_PopStyleColor(ctx, 1)
+
+                    for ji, kv in pairs(v[3]) do
+                        reaper.ImGui_SameLine(ctx)
+
+                        the_root_colors = musictheory.root_colors[kv[3]]
+                        thecolor =
+                            reaper.ImGui_ColorConvertDouble4ToU32(
+                            the_root_colors[1] * (1.0 / 255.0),
+                            the_root_colors[2] * (1.0 / 255.0),
+                            the_root_colors[3] * (1.0 / 255.0),
+                            1
+                        )
+                        r.ImGui_PushStyleColor(ctx, r.ImGui_Col_Button(), thecolor)
+                        r.ImGui_Button(ctx, kv[2], 44)
+                        reaper.ImGui_PopStyleColor(ctx, 1)
+                    end
+                end
+                r.ImGui_EndChild(ctx)
             end
         end
 
