@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.41
+-- @version 2.0.4-dev.42
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -16,6 +16,7 @@
 --   numbers2notes_spectrum.lua
 
 -- @changelog
+--   + Open the actual N2N Drum Arranger map directory from the Drums tab.
 --   + Combined Theory and Chains into one scrollable Theory panel.
 --   + Added Drums tab with a shortcut to REAPER's MIDI note names folder.
 --   # Added small chord audition buttons to left panel.
@@ -2557,12 +2558,12 @@ Form: I V C V C B C O]]
             r.ImGui_Dummy(ctx,0,8)
             r.ImGui_Text(ctx,"Drum Maps")
             r.ImGui_Separator(ctx)
-            local midi_note_names_path = r.GetResourcePath() .. "/MIDINoteNames"
-            if r.ImGui_Button(ctx,"Open MIDI Note Names Directory",0,30) then
+            local midi_note_names_path = r.GetResourcePath() .. "/Data/AHS_Music_Tech/DrumArranger"
+            if r.ImGui_Button(ctx,"Open Drum Arranger Map Directory",0,30) then
                 if r.CF_ShellExecute then
                     r.CF_ShellExecute(midi_note_names_path)
                 else
-                    r.ShowMessageBox("SWS Extension is required to open the folder automatically.\n\n" .. midi_note_names_path,"MIDI Note Names",0)
+                    r.ShowMessageBox("SWS Extension is required to open the folder automatically.\n\n" .. midi_note_names_path,"Drum Arranger Maps",0)
                 end
             end
             r.ImGui_TextWrapped(ctx,midi_note_names_path)
