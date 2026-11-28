@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.18
+version: 7.8.0-dev.19
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.18 -
+  # N2N Drum Arranger v7.8.0-dev.19 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -138,7 +138,7 @@ slider16:0<-100,100,0.01>-N2N Mix Position
 slider17:0<-100,100,0.01>-N2N Mix Intensity
 
 @init
-version_display = "v7.8.0-dev.18";
+version_display = "v7.8.0-dev.19";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -2414,6 +2414,13 @@ function mix_request(cmd,payload) local(addr,now) (
         gmem[addr+2]=now;
         gmem[addr+3]=payload;
         gmem[addr+1]=cmd;
+        1;
+    ) : 0;
+);
+function section_play_request(tab,preroll) (
+    !mix_request(4,tab*3+preroll) ? (
+        section_error_tab=tab;
+        section_error_until=time_precise()+0.45;
     );
 );
 function mix_hub_button(x,y,w,label,cmd) local(hov,online,tw,th) (
@@ -2595,6 +2602,15 @@ btn(draw_x, draw_y, item_w, "?") ? ( help_active = !help_active; );
 draw_x += item_w + ui_gap_small;
 // Mix controls are drawn from the actual Bridge B/C/D, User 1 and Drop rectangles below.
 mix_hover=0;
+// Read a failed request acknowledgement before drawing the section buttons.
+my_slot>=1 && my_slot<=512 ? (
+    section_reply_addr=8320004+(my_slot-1)*4;
+    gmem[section_reply_addr]==my_key && gmem[section_reply_addr+1]==0 && gmem[section_reply_addr+3]<0 ? (
+        section_error_tab=floor(-gmem[section_reply_addr+3]/3);
+        section_error_until=time_precise()+0.45;
+        gmem[section_reply_addr+3]=0;
+    );
+);
 
 
 
@@ -2752,13 +2768,13 @@ loop(3,
             !help_active && !color_popup_active && capture_id==0 && tab_hover ? (
                 mb && !p_mb && shift_dn ? (
                     last_tab_clk=0;
-                    mix_request(4,gui_t*3+1);
+                    section_play_request(gui_t,1);
                 ) : rmb && !p_rmb ? (
                     gfx_x=mx; gfx_y=my;
                     section_play_menu=gfx_showmenu("-2|-1|Play");
                     section_play_menu>0 ? (
                         last_tab_clk=0;
-                        mix_request(4,gui_t*3+3-section_play_menu);
+                        section_play_request(gui_t,3-section_play_menu);
                     );
                 );
             );
@@ -2819,6 +2835,9 @@ loop(3,
             
             f_amt = mem[tab_flash_base + gui_t];
             f_amt > 0 ? ( rect(draw_x, draw_y, item_w-5, 26, 1, 1, 1, f_amt/10); mem[tab_flash_base + gui_t] -= 1; );
+            gui_t==section_error_tab && time_precise()<section_error_until ? (
+                rect(draw_x,draw_y,item_w-5,26,1,.05,.05,min(.85,(section_error_until-time_precise())*4));
+            );
             
             draw_x += item_w; // FLOW: Advance cursor by tab width
         );
@@ -4231,9 +4250,9 @@ help_active ? (
 // Draw the display-only hover popup last so it stays above the section grid.
 mix_hover && !help_active && !color_popup_active && !mb && !rmb ? (
     gfx_setfont(1,os_font,fontsize,'b');
-    gfx_measurestr("Display only Click for N2N Mix",mix_tip_w,mix_tip_h);
+    gfx_measurestr("Display only! Click to open N2N Mix.",mix_tip_w,mix_tip_h);
     mix_tip_x=max(0,min(mx+10,gfx_w-mix_tip_w-12)); mix_tip_y=my+22;
     rect(mix_tip_x,mix_tip_y,mix_tip_w+10,mix_tip_h+8,.09,.09,.09,1);
     gfx_set(.55,.55,.55,1);gfx_rect(mix_tip_x,mix_tip_y,mix_tip_w+10,mix_tip_h+8,0);
-    draw_text(mix_tip_x+5,mix_tip_y+4,"Display only Click for N2N Mix",1,1,1);
+    draw_text(mix_tip_x+5,mix_tip_y+4,"Display only! Click to open N2N Mix.",1,1,1);
 );
