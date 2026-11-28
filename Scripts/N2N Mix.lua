@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.3
+-- @version 0.2.4
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -1371,6 +1371,17 @@ local function intensity_cell(c,contour,ci)
   r.ImGui_PopStyleColor(ctx,n)
   if hover then r.ImGui_SetTooltip(ctx,"Paint "..intens_names[intensity_tool].." by clicking or dragging. Right-click for choices.") end
 end
+local function play_section(s,bars_early)
+  if job or pending_start or r.EnumProjects(-1,"")~=proj then return end
+  local state=r.GetPlayStateEx(proj)
+  if (state&4)~=0 then status="Stop recording before jumping to a section.";return end
+  -- Same 4/4 convention as the existing N2N grid; QN conversion
+  -- respects tempo changes and avoids a fixed seconds-per-bar assumption.
+  local q=r.TimeMap2_timeToQN(proj,s.a)
+  local pos=math.max(0,r.TimeMap2_QNToTime(proj,q-4*bars_early))
+  r.SetEditCurPos2(proj,pos,true,true)
+  if (state&1)==0 or (state&2)~=0 then r.Main_OnCommand(1007,0) end
+end
 local function color_header(c)
   local s=sections[c.j]
   local id="##sec"..c.j..":"..(c.b or 0)
@@ -1383,8 +1394,23 @@ local function color_header(c)
   r.ImGui_DrawList_PushClipRect(dl,x+2,y,x+c.w-2,y+CELL_H,true)
   centered(dl,x,y,c.w,CELL_H,label,contrast(rr,gg,bb))
   r.ImGui_DrawList_PopClipRect(dl)
-  if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,s.name..(c.b and " | Bar "..c.b or "").." — click to fold / unfold") end
-  if clicked and not job then expanded[s.key]=not expanded[s.key] end
+  if r.ImGui_IsItemHovered(ctx) then
+    r.ImGui_SetTooltip(ctx,s.name..(c.b and " | Bar "..c.b or "").."\nClick: fold / unfold\nShift-click: play one bar early\nRight-click: playback options")
+  end
+  if not job and not pending_start then
+    if clicked then
+      if r.ImGui_IsKeyDown(ctx,r.ImGui_Mod_Shift()) then play_section(s,1)
+      else expanded[s.key]=not expanded[s.key] end
+    end
+    local n=mono_push(true)
+    if r.ImGui_BeginPopupContextItem(ctx,"##secplay"..c.j..":"..(c.b or 0)) then
+      if r.ImGui_Selectable(ctx,"Play") then play_section(s,0) end
+      if r.ImGui_Selectable(ctx,"Play -1 Bar") then play_section(s,1) end
+      if r.ImGui_Selectable(ctx,"Play -2 Bars") then play_section(s,2) end
+      r.ImGui_EndPopup(ctx)
+    end
+    r.ImGui_PopStyleColor(ctx,n)
+  end
 end
 local function track_header(t)
   local dl=r.ImGui_GetWindowDrawList(ctx)
