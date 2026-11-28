@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.16
+-- @version 0.2.17
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -665,13 +665,12 @@ function ui.pan_contour(t)
   end
   return all,map
 end
--- Display mirrors use the identical contour, not the native track fader.
--- Look up by label rather than assuming contiguous JSFX parameter indices:
--- the Drum Arranger leaves slider13/14 unused.
+-- Display-only arranger parameters, independent of gain correction.
+-- Look up by label because the Drum Arranger leaves slider13/14 unused.
 function ui.mirror_mix_points(t,pts,kind)
   if not valid(t.track) then return end
-  local label=kind=="level" and "n2n mix level" or "n2n mix position"
-  local lo,hi=kind=="level" and -60 or -100,kind=="level" and 30 or 100
+  local label=kind=="prominence" and "n2n mix prominence" or kind=="intensity" and "n2n mix intensity" or "n2n mix position"
+  local lo,hi=kind=="prominence" and 0 or -100,kind=="prominence" and 9 or 100
   for fx=0,r.TrackFX_GetCount(t.track)-1 do
     local _,name=r.TrackFX_GetFXName(t.track,fx,"")
     local n=(name or ""):lower()
@@ -693,11 +692,33 @@ function ui.mirror_mix_points(t,pts,kind)
     end
   end
 end
-function ui.mirror_existing_gain(t)
-  local fx=fx_index(t)
-  if not fx then return end
+-- The symbolic level follows the painted cell exactly, including Transition.
+-- Square envelope segments keep the symbol stable until a new bar begins.
+function ui.mirror_prominence(t)
+  local pts={{0,0,1}}
+  local function add(time,v)
+    if math.abs(pts[#pts][1]-time)<1e-7 then pts[#pts]={time,v,1}
+    elseif pts[#pts][2]~=v then pts[#pts+1]={time,v,1} end
+  end
+  local ending=0
+  for j,s in ipairs(sections) do
+    if s.a>ending+1e-6 then add(ending,0) end
+    for b,bar in ipairs(s.bars) do add(bar.a,s.countin and 0 or t.cells[j][b]) end
+    ending=s.b
+  end
+  if #sections>0 then add(ending,0) end
+  ui.mirror_mix_points(t,pts,"prominence")
+end
+-- Copy an already-existing intensity envelope on initialization, so an
+-- updated arranger immediately displays the current automation.
+function ui.mirror_existing_intensity(t)
+  local fx=perf_index(t)
+  if not fx or not r.TrackFX_GetEnabled(t.track,fx) then ui.mirror_mix_points(t,{{0,0,1}},"intensity");return end
   local env=r.GetFXEnvelope(t.track,fx,0,false)
-  if not env or not active_env(env) or r.CountAutomationItems(env)>0 then return end
+  if not env or not active_env(env) then
+    ui.mirror_mix_points(t,{{0,r.TrackFX_GetParam(t.track,fx,0),1}},"intensity");return
+  end
+  if r.CountAutomationItems(env)>0 then return end
   local ok,c=r.GetEnvelopeStateChunk(env,"",false)
   if not ok then return end
   local lo,hi=c:match("<PARMENV%s+%S+%s+([%+%-%.%deE]+)%s+([%+%-%.%deE]+)")
@@ -706,9 +727,9 @@ function ui.mirror_existing_gain(t)
   local pts={}
   for i=0,r.CountEnvelopePointsEx(env,-1)-1 do
     local got,time,v,shape=r.GetEnvelopePointEx(env,-1,i)
-    if got then pts[#pts+1]={time,-60+90*(v-lo)/(hi-lo),shape} end
+    if got then pts[#pts+1]={time,-100+200*(v-lo)/(hi-lo),shape} end
   end
-  if #pts>0 then ui.mirror_mix_points(t,pts,"level") end
+  if #pts>0 then ui.mirror_mix_points(t,pts,"intensity") end
 end
 local function apply_pan(t,f)
   local state=r.GetPlayStateEx(proj)
@@ -724,11 +745,14 @@ local function apply_pan(t,f)
   ui.mirror_mix_points(t,pts,"position")
 end
 local function configure_perf(t)
+  ui.mirror_prominence(t)
   local f=perf_index(t)
   if not t.timbre_allowed or t.model<0 then
     if has_position(t,f) then position_only(t,f)
     elseif f then r.TrackFX_SetEnabled(t.track,f,false) end
-    t.perfplan=nil;return
+    t.perfplan=nil
+    ui.mirror_mix_points(t,{{0,0,1}},"intensity")
+    return
   end
   local meter=ensure_fx(t)
   if not f then
@@ -765,7 +789,9 @@ local function configure_perf(t)
       end
     end
   end
-  write_points(t,contour_points(bars,0),f,-100,100)
+  local pts=contour_points(bars,0)
+  write_points(t,pts,f,-100,100)
+  ui.mirror_mix_points(t,pts,"intensity")
 end
 
 local function apply_row(t)
@@ -833,7 +859,7 @@ local function apply_row(t)
   end
   local pts=contour_points(result,t.initial or 0)
   write_points(t,pts)
-  ui.mirror_mix_points(t,pts,"level")
+  ui.mirror_prominence(t)
 end
 -- Global silence is applied at the master, after effects and busses.
 -- Normal section intensity stays at the sources; only the portion below Soft
@@ -1990,7 +2016,8 @@ local function install_visible_position()
       if t.model<0 or not t.timbre_allowed then position_only(t,f)
       else r.TrackFX_SetEnabled(t.track,f,true) end
       apply_pan(t,f)
-      ui.mirror_existing_gain(t)
+      ui.mirror_prominence(t)
+      ui.mirror_existing_intensity(t)
     end)
     t.position_ready=ok
     if ok then ready=ready+1 else missing=missing+1;r.ShowConsoleMsg("N2N Mix Pan: "..t.name..": "..tostring(err).."\n") end
@@ -2024,10 +2051,15 @@ local function apply_dirty()
       end
     end
     for t in pairs(dirty) do
-      if valid(t.track) and r.GetMediaTrackInfo_Value(t.track,"B_SHOWINMIXER")>0 and (fx_index(t) or perf_index(t) or t.model>=0) then
-        local safe,msg=safe_row(t);if not safe then error(msg) end
-        configure_perf(t)
-        apply_row(t)
+      if valid(t.track) and r.GetMediaTrackInfo_Value(t.track,"B_SHOWINMIXER")>0 then
+        if fx_index(t) or perf_index(t) or t.model>=0 then
+          local safe,msg=safe_row(t);if not safe then error(msg) end
+          configure_perf(t)
+          apply_row(t)
+        else
+          ui.mirror_prominence(t)
+          ui.mirror_mix_points(t,{{0,0,1}},"intensity")
+        end
       end
     end
   end)
