@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.5
+-- @version 0.2.6
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -38,14 +38,18 @@ local stroke=nil
 local ui_font=nil
 local UI_SIZE=13
 local CELL_H=26
-local LEFT_W=535
+local LEFT_W=475
 local ALL_W=68
+local TARGET_H=48
 local edit_mode="levels"
 local GAP=3
 local display_cols={}
 local font_new_api=nil
 local preset=1
 local custom=-16
+local DEFAULT_PRESET=1
+local last_preset,last_custom=1,-16
+local target_popup=false
 local peak_ceiling=-2 -- sample-peak guard; not a true-peak guarantee
 local boundary_ramp=0.250 -- seconds; ordinary level changes, not explicit transitions
 local alert_text,alert_until="",0
@@ -939,6 +943,9 @@ local function start(policy)
   r.Undo_BeginBlock2(proj)
   job={queue=q,index=1,kind="Auto Mix",cmd=cmd,a=a,b=b,cursor=r.GetCursorPositionEx(proj),repeat_state=r.GetSetRepeatEx(proj,-1),ready_at=r.time_precise(),perf={},states={},temporary={},renders=0,keep_solo=policy=="current" and r.AnyTrackSolo(proj)}
   last_verified="";last_stats=""
+  -- Persist only an accepted Auto Mix run, not merely opening the dialog.
+  last_preset,last_custom=preset,custom
+  put("preset",last_preset);put("custom",last_custom)
   local ok,e=pcall(function()
     if policy=="all" then
       for i=-1,r.CountTracks(proj)-1 do
@@ -1405,7 +1412,6 @@ local function all_intensity_cell()
       r.ImGui_EndPopup(ctx)
     end
     r.ImGui_PopStyleColor(ctx,n)
-    if hover then r.ImGui_SetTooltip(ctx,"Set every section to the selected section level. Transition is unavailable.") end
   end
 end
 local function intensity_cell(c,contour,ci)
@@ -1453,7 +1459,6 @@ local function intensity_cell(c,contour,ci)
     r.ImGui_EndPopup(ctx)
   end
   r.ImGui_PopStyleColor(ctx,n)
-  if hover then r.ImGui_SetTooltip(ctx,"Paint "..intens_names[intensity_tool].." by clicking or dragging. Right-click for choices.") end
 end
 local function play_section(s,bars_early)
   if job or pending_start or r.EnumProjects(-1,"")~=proj then return end
@@ -1478,9 +1483,6 @@ local function color_header(c)
   r.ImGui_DrawList_PushClipRect(dl,x+2,y,x+c.w-2,y+CELL_H,true)
   centered(dl,x,y,c.w,CELL_H,label,contrast(rr,gg,bb))
   r.ImGui_DrawList_PopClipRect(dl)
-  if r.ImGui_IsItemHovered(ctx) then
-    r.ImGui_SetTooltip(ctx,s.name..(c.b and " | Bar "..c.b or "").."\nClick: fold / unfold\nShift-click: play one bar early\nRight-click: playback options")
-  end
   if not job and not pending_start then
     if clicked then
       if r.ImGui_IsKeyDown(ctx,r.ImGui_Mod_Shift()) then play_section(s,1)
@@ -1651,6 +1653,110 @@ local function transport()
   end
   r.ImGui_EndGroup(ctx)
 end
+local function show_target_popup()
+  if job or pending_start then return end
+  if not stopped() then status="Stop transport before Auto Mix.";return end
+  target_popup=true
+end
+local function master_options()
+  if target_popup then
+    r.ImGui_OpenPopup(ctx,"Auto Mix Settings")
+    target_popup=false
+  end
+  local chosen,custom_requested
+  if r.ImGui_BeginPopupModal(ctx,"Auto Mix Settings",nil,r.ImGui_WindowFlags_AlwaysAutoResize()) then
+    r.ImGui_Text(ctx,"Choose master loudness")
+    local n=mono_push(true)
+    r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),4)
+    if r.ImGui_Button(ctx,"Use Default",320,30) then chosen={DEFAULT_PRESET,last_custom} end
+    r.ImGui_Text(ctx,"YouTube / general listening  |  -14 LUFS")
+    if r.ImGui_Button(ctx,"Use Last Used Settings",320,30) then chosen={last_preset,last_custom} end
+    local previous=last_preset==#presets and last_custom or presets[last_preset][2]
+    r.ImGui_Text(ctx,string.format("%s  |  %.1f LUFS",presets[last_preset][1],previous))
+    r.ImGui_PopStyleVar(ctx)
+    r.ImGui_PopStyleColor(ctx,n)
+    r.ImGui_Separator(ctx)
+    r.ImGui_Text(ctx,"Other master targets")
+    n=mono_push(true)
+    for i,p in ipairs(presets) do
+      if i<#presets then
+        if r.ImGui_Selectable(ctx,string.format("%s  |  %.0f LUFS",p[1],p[2]),false) then chosen={i,last_custom} end
+      elseif r.ImGui_Selectable(ctx,"Custom...",false) then custom_requested=true end
+    end
+    r.ImGui_PopStyleColor(ctx,n)
+    r.ImGui_Separator(ctx)
+    r.ImGui_Text(ctx,"Integrated LUFS (LUFS-I)")
+    r.ImGui_PushTextWrapPos(ctx,r.ImGui_GetCursorPosX(ctx)+340)
+    r.ImGui_TextWrapped(ctx,string.format("Gain-only normalization with a %.1f dBFS sample-peak ceiling. The result may be quieter than the target to avoid clipping. This is not a true-peak limiter or a guarantee of streaming compliance.",peak_ceiling))
+    r.ImGui_PopTextWrapPos(ctx)
+    n=mono_push(true)
+    local cancel=r.ImGui_Button(ctx,"Cancel",100,26)
+    r.ImGui_PopStyleColor(ctx,n)
+    if chosen or custom_requested or cancel then r.ImGui_CloseCurrentPopup(ctx) end
+    r.ImGui_EndPopup(ctx)
+  end
+  if custom_requested then
+    local ok,s=r.GetUserInputs("Custom Master Loudness",1,"Target LUFS-I (-35 to -8):",tostring(last_custom))
+    if ok then
+      local v=tonumber(s)
+      if v and v>=-35 and v<=-8 then chosen={#presets,v}
+      else r.MB("Enter a numeric LUFS target between -35 and -8.","Custom Master Loudness",0);target_popup=true end
+    else target_popup=true end
+  end
+  if chosen then
+    preset,custom=chosen[1],chosen[2]
+    request_start()
+  end
+end
+-- Read-only nominal target display. Measurements and base corrections are
+-- section-level, not per-bar measurements, and are labelled accordingly.
+local function target_cell(t,j,b,w,plan,bus_offset)
+  local s=sections[j]
+  local dl=r.ImGui_GetWindowDrawList(ctx)
+  local x,y=r.ImGui_GetCursorScreenPos(ctx)
+  r.ImGui_Dummy(ctx,w,TARGET_H)
+  local rr,gg,bb=rgb(r.GetTrackColor(t.track))
+  local color=rgba(math.floor(rr*.55+110),math.floor(gg*.55+110),math.floor(bb*.55+110),255)
+  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+w,y+TARGET_H,color,0)
+  r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+TARGET_H,0x00000050)
+  if s.countin then centered(dl,x,y,w,TARGET_H,"—",0x101010FF);return end
+  local energy,duration=0,0
+  for k=b or 1,b or #s.bars do
+    local p=plan[j][k]
+    local dt=(s.bars[k].b-s.bars[k].a)/16
+    for i=1,16 do
+      local u=(i-0.5)/16
+      if not p.mute then energy=energy+dt*10^((p.want(u)+bus_offset)/10) end
+      duration=duration+dt
+    end
+  end
+  local label=energy>0 and duration>0 and string.format("%.1f",t.target+10*math.log(energy/duration,10)) or "Mute"
+  local report=t.reports[j]
+  local measured=report and (report.state==1 and string.format("M %.1f",report.lufs) or report.state==2 and "M quiet" or "M —") or "M —"
+  local base=t.base[j]
+  local gain=base and string.format("G %+.1f",base) or "G —"
+  centered(dl,x,y,w,16,label,0x101010FF)
+  centered(dl,x,y+16,w,16,measured,0x252525FF)
+  centered(dl,x,y+32,w,16,gain,0x252525FF)
+end
+local function target_section_cell(c,contour)
+  local s=sections[c.j]
+  local dl=r.ImGui_GetWindowDrawList(ctx)
+  local x,y=r.ImGui_GetCursorScreenPos(ctx)
+  r.ImGui_Dummy(ctx,c.w,CELL_H)
+  local energy,duration=0,0
+  for k=c.b or 1,c.b or #s.bars do
+    local d=contour[c.j][k]
+    local dt=(d.b-d.a)/16
+    for i=1,16 do
+      local f=d.f0+(d.f1-d.f0)*(i-0.5)/16
+      if f>0 then energy=energy+dt*10^(section_db(f)/10) end
+      duration=duration+dt
+    end
+  end
+  local label=s.countin and "—" or energy>0 and duration>0 and string.format("%+.1f dB",10*math.log(energy/duration,10)) or "Silent"
+  draw_section_tile(dl,x,y,c.w,CELL_H,0,0,label,false,false)
+end
 local function alert_window()
   if alert_text=="" or r.time_precise()>=alert_until then return end
   local flags=r.ImGui_WindowFlags_NoTitleBar() | r.ImGui_WindowFlags_NoResize() |
@@ -1708,41 +1814,37 @@ local function draw()
     local nmono=mono_push(true)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),5)
     r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),0xDADADAFF)
-    if not job then button("Auto Mix",request_start)
+    if not job then button("Auto Mix",show_target_popup)
     else button("Cancel",function() finish("Cancelled. Undo to revert partial changes.") end) end
     r.ImGui_PopStyleVar(ctx)
     r.ImGui_PopStyleColor(ctx,nmono+1)
     same();r.ImGui_TextWrapped(ctx,status)
+    master_options()
     if job then
       local d,n=poll()
       r.ImGui_ProgressBar(ctx,n>0 and d/n or 0,-1,0,n>0 and string.format("Stage %d/%d | %d/%d reports",job.index,#job.queue,d,n) or string.format("Stage %d/%d | Native render statistics",job.index,#job.queue))
     else
-      r.ImGui_Text(ctx,"Master Target");same()
-      nmono=mono_push(false)
-      r.ImGui_SetNextItemWidth(ctx,205)
-      if r.ImGui_BeginCombo(ctx,"##mastertarget",presets[preset][1]) then
-        for i,p in ipairs(presets) do if r.ImGui_Selectable(ctx,p[1],i==preset) then preset=i;put("preset",i) end end
-        r.ImGui_EndCombo(ctx)
-      end
-      if preset==#presets then
-        same();r.ImGui_SetNextItemWidth(ctx,145)
-        local ch,v=r.ImGui_InputDouble(ctx,"##customlufs",custom,1,1,"%.1f")
-        if ch then custom=clamp(v,-35,-8);put("custom",custom) end
-      end
-      r.ImGui_PopStyleColor(ctx,nmono)
-      same();r.ImGui_Text(ctx,string.format("%.1f LUFS | sample peak %.1f dBFS",master_target(),peak_ceiling))
       local section_w,palette_w=section_tool_width()
       local start_x=r.ImGui_GetCursorPosX(ctx)
       local avail=r.ImGui_GetContentRegionAvail(ctx)
       -- Mode buttons occupy the fixed left portion; future modes can sit beside Levels.
       local mc=mono_push(true)
       r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),4)
-      local levels_selected=edit_mode=="levels"
-      if levels_selected then r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),0xD3B86DFF) end
-      if r.ImGui_Button(ctx,"Levels##editmode",84,CELL_H) then edit_mode="levels" end
-      if levels_selected then r.ImGui_PopStyleColor(ctx) end
+      local function mode_button(label,mode,w)
+        local selected=edit_mode==mode
+        if selected then r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),0xD3B86DFF) end
+        if r.ImGui_Button(ctx,label.."##editmode",w,CELL_H) then edit_mode=mode;transition_start=nil end
+        if selected then r.ImGui_PopStyleColor(ctx) end
+      end
+      mode_button("Levels","levels",84)
+      same();mode_button("Target Luffs","targets",104)
       r.ImGui_PopStyleVar(ctx)
       r.ImGui_PopStyleColor(ctx,mc)
+      if edit_mode=="targets" then
+        local legend="Target LUFS  |  M: measured section LUFS  |  G: base gain correction (dB)"
+        r.ImGui_SameLine(ctx,song_palette_x(start_x,avail,r.ImGui_CalcTextSize(ctx,legend)))
+        r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,legend)
+      else
       r.ImGui_SameLine(ctx,song_palette_x(start_x,avail,palette_w))
       for i,k in ipairs(intensity_ids) do
         if i>1 then same() end
@@ -1754,6 +1856,7 @@ local function draw()
         local f1=k==5 and 1 or f0
         draw_section_tile(dl,x,y,section_w,CELL_H,f0,f1,intens_names[k],k==intensity_tool,hover)
         if clicked then intensity_tool=k end
+      end
       end
     end
     r.ImGui_Separator(ctx)
@@ -1786,22 +1889,28 @@ local function draw()
           end
         end
         r.ImGui_TableNextRow(ctx,0,CELL_H)
-        r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Track / Role / Timbre / Target")
+        r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Track / Role / Timbre")
         r.ImGui_TableSetColumnIndex(ctx,1)
         do
           local dl=r.ImGui_GetWindowDrawList(ctx)
           local x,y=r.ImGui_GetCursorScreenPos(ctx)
           r.ImGui_Dummy(ctx,ALL_W,CELL_H)
-          centered(dl,x,y,ALL_W,CELL_H,"All",r.ImGui_GetStyleColor(ctx,r.ImGui_Col_Text()))
+          centered(dl,x,y,ALL_W,CELL_H,edit_mode=="targets" and not job and "Base LUFS" or "All",r.ImGui_GetStyleColor(ctx,r.ImGui_Col_Text()))
         end
         r.ImGui_TableSetColumnIndex(ctx,2);across(color_header)
         r.ImGui_TableNextRow(ctx,0,CELL_H)
-        r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Section intensity")
+        local targets=edit_mode=="targets" and not job
+        r.ImGui_TableSetColumnIndex(ctx,0);r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,targets and "Section offset (dB)" or "Section intensity")
         local contour=intensity_contour()
-        r.ImGui_TableSetColumnIndex(ctx,1);all_intensity_cell()
-        r.ImGui_TableSetColumnIndex(ctx,2);across(function(c,ci) intensity_cell(c,contour,ci) end)
+        local bus_offsets={}
+        if targets then for j,s in ipairs(sections) do bus_offsets[j]=section_intensity(s,j) end end
+        r.ImGui_TableSetColumnIndex(ctx,1)
+        if targets then r.ImGui_Dummy(ctx,ALL_W,CELL_H) else all_intensity_cell() end
+        r.ImGui_TableSetColumnIndex(ctx,2)
+        if targets then across(function(c) target_section_cell(c,contour) end)
+        else across(function(c,ci) intensity_cell(c,contour,ci) end) end
         for ri,t in ipairs(rows) do
-          r.ImGui_TableNextRow(ctx,0,CELL_H)
+          r.ImGui_TableNextRow(ctx,0,targets and TARGET_H or CELL_H)
           r.ImGui_TableSetColumnIndex(ctx,0)
           track_header(t)
           r.ImGui_SameLine(ctx,0,GAP)
@@ -1841,19 +1950,26 @@ local function draw()
             r.ImGui_EndCombo(ctx)
           end
           r.ImGui_PopStyleColor(ctx,tint)
-          r.ImGui_SameLine(ctx,0,GAP);r.ImGui_SetNextItemWidth(ctx,57)
-          local tc=mono_push(false)
-          local ch,v=r.ImGui_InputDouble(ctx,"##target"..t.key,t.target,0,0,"%.1f")
-          r.ImGui_PopStyleColor(ctx,tc)
-          if ch and not job then
-            local old=t.target;t.target=clamp(v,-60,-8);put("target:"..t.key,t.target)
-            for j,base in pairs(t.base) do t.base[j]=clamp(base+t.target-old,-30,24);put("base:"..t.key..":"..sections[j].key,t.base[j]) end
-            dirty[t]=true
+          r.ImGui_TableSetColumnIndex(ctx,1)
+          if targets then
+            r.ImGui_SetNextItemWidth(ctx,ALL_W)
+            local tc=mono_push(false)
+            local ch,v=r.ImGui_InputDouble(ctx,"##target"..t.key,t.target,0,0,"%.1f")
+            r.ImGui_PopStyleColor(ctx,tc)
+            if ch then
+              local old=t.target;t.target=clamp(v,-60,-8);put("target:"..t.key,t.target)
+              for j,base in pairs(t.base) do t.base[j]=clamp(base+t.target-old,-30,24);put("base:"..t.key..":"..sections[j].key,t.base[j]) end
+              dirty[t]=true
+            end
+            r.ImGui_TableSetColumnIndex(ctx,2)
+            local plan=make_perf_plan(t)
+            across(function(c) target_cell(t,c.j,c.b,c.w,plan,t.depth>0 and bus_offsets[c.j] or 0) end)
+          else
+            row_level_cell(t)
+            r.ImGui_TableSetColumnIndex(ctx,2)
+            local fills=transition_fills(t)
+            across(function(c,ci) cell(t,c.j,c.b,c.w,fills,ri,ci) end)
           end
-          r.ImGui_TableSetColumnIndex(ctx,1);row_level_cell(t)
-          r.ImGui_TableSetColumnIndex(ctx,2)
-          local fills=transition_fills(t)
-          across(function(c,ci) cell(t,c.j,c.b,c.w,fills,ri,ci) end)
         end
         r.ImGui_EndTable(ctx)
       end
@@ -1865,10 +1981,12 @@ local function draw()
       r.ImGui_Dummy(ctx,0,13)
       local x=r.ImGui_GetCursorPosX(ctx);local avail=r.ImGui_GetContentRegionAvail(ctx)
       transport()
-      r.ImGui_SameLine(ctx,song_palette_x(x,avail,cell_palette_width()))
-      draw_cell_palette()
-      r.ImGui_SameLine(ctx,x+avail-notation_width())
-      radio("Simple",false);same();radio("Traditional",true)
+      if edit_mode=="levels" then
+        r.ImGui_SameLine(ctx,song_palette_x(x,avail,cell_palette_width()))
+        draw_cell_palette()
+        r.ImGui_SameLine(ctx,x+avail-notation_width())
+        radio("Simple",false);same();radio("Traditional",true)
+      end
     end
     r.ImGui_End(ctx)
   end
@@ -1897,8 +2015,9 @@ else
   ui_font=r.ImGui_CreateFont("sans-serif",UI_SIZE)
 end
 r.ImGui_Attach(ctx,ui_font)
-preset=clamp(num("preset",1),1,#presets)
-custom=num("custom",-16)
+last_preset=clamp(math.floor(num("preset",DEFAULT_PRESET)),1,#presets)
+last_custom=clamp(num("custom",-16),-35,-8)
+preset,custom=last_preset,last_custom
 traditional=num("traditional",0)==1
 refresh()
 local function loop()
