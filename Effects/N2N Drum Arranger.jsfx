@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.25
+version: 7.8.0-dev.26
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.25 -
+  # N2N Drum Arranger v7.8.0-dev.26 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -139,7 +139,7 @@ slider17:0<-100,100,0.01>-N2N Mix Intensity
 slider18:0<-500,500,1>-Visual Sync (ms)
 
 @init
-version_display = "v7.8.0-dev.25";
+version_display = "v7.8.0-dev.26";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -1682,7 +1682,7 @@ function library_request(op,t,entry,revision) (
 
 function show_pattern_library(t) local(base,rev,count,k,j,n,addr,builtins,first_file,sel,mode,p) (
     mode=0;
-    strcpy(#lib_menu,"Save Pattern...|Load Pattern...|Export Factory Pattern...|Browse Factory Patterns...|Force Silence|Inherit (clear pattern)|Save Pattern Set...|Load Pattern Set...|Restore Last Arrangement|Restore Previous Backup|Restore Pre-Load Backup");
+    strcpy(#lib_menu,"Save Pattern...|Load Pattern...||Save All Patterns...|Load All Patterns...||Export Pattern to Presets...|Browse Presets...||Force Silence|Inherit (clear pattern)||Restore Last Arrangement|Restore Previous Backup|Restore Pre-Load Backup||#PRESETS");
     strcat(#lib_menu,"|Backbeat|Four on the Floor|Half-Time|Double-Time|Shuffle|Basic Funk|Basic Hip-Hop|Count-In"); builtins=8;
     base=6300000+mode*16384;
     rev=gmem[base]; count=0;
@@ -1691,7 +1691,8 @@ function show_pattern_library(t) local(base,rev,count,k,j,n,addr,builtins,first_
         count=min(100,max(0,floor(gmem[base+1])));
         k=0; loop(count,
             addr=base+2+k*100;
-            strcat(#lib_menu,"|Factory: ");
+            strcat(#lib_menu,"|");
+            strcat(#lib_menu,"Preset: ");
             n=min(99,max(0,floor(gmem[addr])));
             j=1; loop(n,
                 str_setchar(#lib_menu,strlen(#lib_menu),gmem[addr+j]);
@@ -1703,23 +1704,24 @@ function show_pattern_library(t) local(base,rev,count,k,j,n,addr,builtins,first_
     );
     sel=gfx_showmenu(#lib_menu);
     sel==1 || sel==2 ? library_request(sel,t,0,0) :
-    sel==3 ? library_request(4,t,0,0) :
-    sel==4 ? library_request(7,t,0,0) :
-    sel==5 || sel==6 ? (
+    sel==3 || sel==4 ? bank_request(sel-2) :
+    sel==5 ? library_request(4,t,0,0) :
+    sel==6 ? library_request(7,t,0,0) :
+    sel==7 || sel==8 ? (
         memset(grid_base+t*vel_stride_tab,0,vel_stride_tab);
         memset(vel_base+t*vel_stride_tab,0,vel_stride_tab);
         memset(step_len_base+t*vel_stride_tab,0,vel_stride_tab);
-        mem[tab_mute_base+t]=sel==5?2:0;
+        mem[tab_mute_base+t]=sel==7?2:0;
         scan_active_tab(); needs_tab_update=1;
     ) :
-    sel>=7 && sel<=11 ? bank_request(sel-6) :
-    sel>=12 && sel<=11+builtins ? (
-        p=sel-11;
+    sel>=9 && sel<=11 ? bank_request(sel-6) :
+    sel>=13 && sel<=12+builtins ? (
+        p=sel-12;
         
         factory_pattern(p,t);
     ) :
-    sel>11+builtins && sel<=11+builtins+count ? (
-        library_request(6,t,sel-11-builtins,rev);
+    sel>12+builtins && sel<=12+builtins+count ? (
+        library_request(6,t,sel-12-builtins,rev);
     );
 );
 
