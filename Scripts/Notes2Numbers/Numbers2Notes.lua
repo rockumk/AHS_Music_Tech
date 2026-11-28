@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.37
+-- @version 2.0.4-dev.38
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -1822,7 +1822,7 @@ function IM_GUI_Loop()
     local focus_request = reaper.GetExtState(window_sec,"numbers2notes:focus")
     local arranger_focus,arranger_mix
     if gmem_export and gmem_export.ServiceArrangerUIRequests then
-        arranger_focus,arranger_mix=gmem_export.ServiceArrangerUIRequests(Get_Stretched_ABCD_Index)
+        arranger_focus,arranger_mix=gmem_export.ServiceArrangerUIRequests(Get_Stretched_ABCD_Index,N2N_MIDI_Panic)
     end
     if arranger_mix then Open_N2N_Mix() end
     if focus_request ~= "" or arranger_focus then

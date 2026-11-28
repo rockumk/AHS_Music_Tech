@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.27
+version: 7.8.0-dev.28
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.27 -
+  # N2N Drum Arranger v7.8.0-dev.28 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -139,7 +139,7 @@ slider17:0<-100,100,0.01>-N2N Mix Intensity
 slider18:0<-500,500,1>-Visual Sync (ms)
 
 @init
-version_display = "v7.8.0-dev.27";
+version_display = "v7.8.0-dev.28";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -1886,6 +1886,34 @@ load_kit_from_slider;
 );
 
 @block
+// Panic runs on the audio thread, never sends MIDI directly from @gfx.
+// A local reset still works without the Numbers2Notes hub, while the
+// hub request invokes the project-wide native reset when available.
+panic_local_request || (panic_local_due>0 && time_precise()>=panic_local_due) ? (
+    panic_first=panic_local_request;
+    panic_local_request=0;
+    panic_local_due=0;
+    (panic_first || play_state==0) ? (
+        panic_i=0;
+        loop(128,
+            mem[kill_note+panic_i]>0 ? (
+                panic_ch=max(1,min(16,mem[kill_chan+panic_i]));
+                midisend(0,0x80|(panic_ch-1),panic_i%128);
+                mem[kill_note+panic_i]=0;
+            );
+            panic_i+=1;
+        );
+        preview_trig=0;
+        panic_ch=0;
+        loop(16,
+            midisend(0,0xB0|panic_ch,64);
+            midisend(0,0xB0|panic_ch,123);
+            midisend(0,0xB0|panic_ch,120);
+            panic_ch+=1;
+        );
+        panic_first && play_state==0 ? panic_local_due=time_precise()+0.075;
+    );
+);
 
 // --- SEND QUEUED RECORDING NOTES ---
 midi_trigger_queued >= 0 ? (
@@ -2690,6 +2718,17 @@ function mix_request(cmd,payload) local(addr,now) (
         1;
     ) : 0;
 );
+function panic_button(x,y,w,h) local(hov,tw,th) (
+    hov=mx>=x && mx<x+w && my>=y && my<y+h;
+    gfx_setfont(1,os_font,fontsize,'b');
+    rect(x,y,w,h,hov?.37:.30,hov?.27:.30,hov?.12:.30,1);
+    gfx_measurestr("!",tw,th);
+    draw_text(x+(w-tw)/2,y+(h-th)/2,"!",1,.68,.18);
+    hov && mb && !p_mb && capture_id==0 && !help_active && !color_popup_active ? (
+        panic_local_request=1;
+        mix_request(7,0);
+    );
+);
 function section_play_request(tab,preroll) (
     !mix_request(4,tab*3+preroll) ? (
         section_error_tab=tab;
@@ -2876,6 +2915,8 @@ btn(draw_x, draw_y, item_w, "?") ? (
     color_popup_active=0;capture_id=0;
 );
 draw_x += item_w + ui_gap_small;
+panic_button(draw_x,draw_y,18,BTN_H);
+draw_x += 18 + ui_gap_small;
 // Mix controls are drawn from the actual Bridge B/C/D, User 1 and Drop rectangles below.
 mix_hover=0;
 // Read a failed request acknowledgement before drawing the section buttons.

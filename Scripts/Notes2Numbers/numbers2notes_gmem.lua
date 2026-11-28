@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.30
+-- @version 1.9.31
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -655,7 +655,7 @@ local function play_arranger_section(project, id, key, stamp, payload, stretched
         r.Main_OnCommand(1007,0)
     end
 end
-function export.ServiceArrangerUIRequests(stretched_index)
+function export.ServiceArrangerUIRequests(stretched_index,panic)
     local r=reaper
     local project=r.EnumProjects(-1,"")
     local now=r.time_precise()
@@ -668,7 +668,7 @@ function export.ServiceArrangerUIRequests(stretched_index)
         if cmd~=0 then
             local key,stamp,payload=r.gmem_read(base),r.gmem_read(base+2),r.gmem_read(base+3)
             r.gmem_write(base+1,0)
-            if (cmd==1 or cmd==2 or cmd==3 or cmd==4 or cmd==5 or cmd==6) and key>0 and key==r.gmem_read(REG_BASE+id) and math.abs(now-stamp)<2 then
+            if (cmd==1 or cmd==2 or cmd==3 or cmd==4 or cmd==5 or cmd==6 or cmd==7) and key>0 and key==r.gmem_read(REG_BASE+id) and math.abs(now-stamp)<2 then
                 local inventory,counts=scan(project)
                 if counts[id]==1 then
                     for _,t in ipairs(inventory) do
@@ -676,9 +676,12 @@ function export.ServiceArrangerUIRequests(stretched_index)
                             if cmd==2 then raise=true
                             elseif cmd==3 then mix=true
                             elseif cmd==4 then play_arranger_section(project,id,key,stamp,payload,stretched_index)
+                            elseif cmd==7 then
+                                if type(panic)=="function" then panic(false) end
                             elseif cmd==5 then
                                 pending_arranger_play=nil
                                 r.Main_OnCommand(1016,0)
+                                if type(panic)=="function" then panic(true) end
                             elseif cmd==6 then
                                 pending_arranger_play=nil
                                 local state=r.GetPlayStateEx(project)
