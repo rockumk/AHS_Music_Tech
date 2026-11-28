@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.31
+-- @version 2.0.4-dev.32
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -69,6 +69,30 @@ local function Raise_N2N_Window(title)
     if r.JS_Window_SetForeground then r.JS_Window_SetForeground(hwnd) end
     if r.JS_Window_SetFocus then r.JS_Window_SetFocus(hwnd) end
     return true
+end
+local function Open_N2N_Mix()
+    local r=reaper
+    -- N2N Mix is a sibling of the Notes2Numbers folder.
+    -- Keep this launcher independent of the installed helper version.
+    local sec="N2N_EDITOR_WINDOWS"
+    local hb=tonumber(r.GetExtState(sec,"n2nmix:heartbeat"))
+    if hb and math.abs(r.time_precise()-hb)<3 then
+        r.SetExtState(sec,"n2nmix:focus",tostring(r.time_precise()),false)
+        Raise_N2N_Window("N2N Mix")
+    else
+        if not Raise_N2N_Window("N2N Mix") then
+            local path=canonical_script_path(script_path.."../N2N Mix.lua")
+            local file=io.open(path,"rb")
+            if file then
+                file:close()
+                local cmd=r.AddRemoveReaScript(true,0,path,true)
+                if cmd and cmd>0 then r.Main_OnCommand(cmd,0)
+                else r.MB("Could not launch N2N Mix:\n"..path,"Numbers2Notes",0) end
+            else
+                r.MB("N2N Mix.lua was not found at:\n"..path.."\n\nInstall N2N Mix in the Scripts folder, one level above Notes2Numbers.","Numbers2Notes",0)
+            end
+        end
+    end
 end
 local function Open_N2N_Topline_Editor()
     local r=reaper
@@ -1761,7 +1785,11 @@ function IM_GUI_Loop()
     local window_sec = "N2N_EDITOR_WINDOWS"
     reaper.SetExtState(window_sec,"numbers2notes:heartbeat",tostring(reaper.time_precise()),false)
     local focus_request = reaper.GetExtState(window_sec,"numbers2notes:focus")
-    local arranger_focus = gmem_export and gmem_export.ServiceArrangerUIRequests and gmem_export.ServiceArrangerUIRequests()
+    local arranger_focus,arranger_mix
+    if gmem_export and gmem_export.ServiceArrangerUIRequests then
+        arranger_focus,arranger_mix=gmem_export.ServiceArrangerUIRequests(Get_Stretched_ABCD_Index)
+    end
+    if arranger_mix then Open_N2N_Mix() end
     if focus_request ~= "" or arranger_focus then
         reaper.DeleteExtState(window_sec,"numbers2notes:focus",false)
         reaper.ImGui_SetNextWindowFocus(ctx)
@@ -2495,27 +2523,7 @@ Form: I V C V C B C O]]
             r.ImGui_Dummy(ctx,0,12)
             r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),4)
             if r.ImGui_Button(ctx,"Open N2N Mix",180,30) then
-                -- N2N Mix is a sibling of the Notes2Numbers folder.
-                -- Keep this launcher independent of the installed helper version.
-                local sec="N2N_EDITOR_WINDOWS"
-                local hb=tonumber(r.GetExtState(sec,"n2nmix:heartbeat"))
-                if hb and math.abs(r.time_precise()-hb)<3 then
-                    r.SetExtState(sec,"n2nmix:focus",tostring(r.time_precise()),false)
-                    Raise_N2N_Window("N2N Mix")
-                else
-                    if not Raise_N2N_Window("N2N Mix") then
-                        local path=canonical_script_path(script_path.."../N2N Mix.lua")
-                        local file=io.open(path,"rb")
-                        if file then
-                            file:close()
-                            local cmd=r.AddRemoveReaScript(true,0,path,true)
-                            if cmd and cmd>0 then r.Main_OnCommand(cmd,0)
-                            else r.MB("Could not launch N2N Mix:\n"..path,"Numbers2Notes",0) end
-                        else
-                            r.MB("N2N Mix.lua was not found at:\n"..path.."\n\nInstall N2N Mix in the Scripts folder, one level above Notes2Numbers.","Numbers2Notes",0)
-                        end
-                    end
-                end
+                Open_N2N_Mix()
             end
             r.ImGui_PopStyleVar(ctx)
             r.ImGui_Dummy(ctx,0,24)
