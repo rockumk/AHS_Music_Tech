@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.1
+-- @version 0.2.2
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -1378,6 +1378,74 @@ local function radio(label,value)
   r.ImGui_DrawList_AddText(dl,x+19,y+(CELL_H-th)/2,text_color,label)
   if clicked then traditional=value;put("traditional",value and 1 or 0) end
 end
+-- The song grid has a frozen track header. Tool palettes are anchored to
+-- the visible editing area, not to the full window or the scrolled song.
+local function song_palette_x(x,avail,w)
+  local left=x+LEFT_W+6
+  return left+math.max(0,(x+avail-left-w)/2)
+end
+local function section_tool_width()
+  local w=0
+  for _,k in ipairs(intensity_ids) do w=math.max(w,r.ImGui_CalcTextSize(ctx,intens_names[k])+18) end
+  return w,w*#intensity_ids+4*(#intensity_ids-1)
+end
+-- Keep the current volume palette separate from the transport and notation
+-- layout, so other editing contexts can provide their own tools later.
+local function cell_palette_width()
+  local w=0
+  for _,i in ipairs(tool_ids) do w=w+(i==9 and 82 or 32) end
+  return w+4*(#tool_ids-1)
+end
+local function draw_cell_palette()
+  for k,i in ipairs(tool_ids) do if k>1 then same() end;tool_button(i) end
+end
+local function notation_width()
+  return r.ImGui_CalcTextSize(ctx,"Simple")+r.ImGui_CalcTextSize(ctx,"Traditional")+48
+end
+local function transport()
+  local repeat_on=r.GetSetRepeat(-1)==1
+  local items={
+    {"!","!",0xE6D200FF,0x000000FF,40349},
+    {"●","F9",0x960A0AFF,0xFFFFFFFF,1013,r.ImGui_Key_F9()},
+    {"►","F10",0x0A960AFF,0xFFFFFFFF,1007,r.ImGui_Key_F10()},
+    {"■","F11",0xB44600FF,0xFFFFFFFF,1016,r.ImGui_Key_F11()},
+    {"||","F12",0x9600C8FF,0xFFFFFFFF,1008,r.ImGui_Key_F12()},
+    {"↻","",repeat_on and 0xB8B8B8FF or 0x4D4D4DFF,repeat_on and 0x000000FF or 0xFFFFFFFF},
+    {"▐◄","Home",0x1A1A1AFF,0xFFFFFFFF,40042,r.ImGui_Key_Home()},
+    {"←","Pg ↓",0x1A1A1AFF,0xFFFFFFFF,40172,r.ImGui_Key_PageDown()},
+    {"→","Pg ↑",0x1A1A1AFF,0xFFFFFFFF,40173,r.ImGui_Key_PageUp()},
+    {"►▌","End",0x1A1A1AFF,0xFFFFFFFF,40043,r.ImGui_Key_End()},
+  }
+  local keys_allowed=r.ImGui_IsWindowFocused(ctx) and not r.ImGui_IsAnyItemActive(ctx)
+  local dl=r.ImGui_GetWindowDrawList(ctx)
+  local label_color=r.ImGui_GetStyleColor(ctx,r.ImGui_Col_Text())
+  local w,h=26,22
+  r.ImGui_BeginGroup(ctx)
+  for i,v in ipairs(items) do
+    if i>1 then same() end
+    local x,y=r.ImGui_GetCursorScreenPos(ctx)
+    if v[2]~="" then
+      local tw,th=r.ImGui_CalcTextSize(ctx,v[2])
+      r.ImGui_DrawList_AddText(dl,x+(w-tw)/2,y-th-1,label_color,v[2])
+    end
+    r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Text(),v[4])
+    r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),v[3])
+    local click=r.ImGui_Button(ctx,v[1].."##mixtransport"..i,w,h)
+    r.ImGui_PopStyleColor(ctx,2)
+    local key=keys_allowed and v[6] and r.ImGui_IsKeyPressed(ctx,v[6],false)
+    if i==1 and keys_allowed then
+      key=r.ImGui_IsKeyDown(ctx,r.ImGui_Mod_Shift()) and r.ImGui_IsKeyPressed(ctx,r.ImGui_Key_1(),false)
+    end
+    if (click or key) and not pending_start then
+      if i==6 then r.GetSetRepeat(repeat_on and 0 or 1)
+      else
+        r.Main_OnCommand(v[5],0)
+        if i==4 then r.Main_OnCommand(40349,0) end
+      end
+    end
+  end
+  r.ImGui_EndGroup(ctx)
+end
 local function alert_window()
   if alert_text=="" or r.time_precise()>=alert_until then return end
   local flags=r.ImGui_WindowFlags_NoTitleBar() | r.ImGui_WindowFlags_NoResize() |
@@ -1420,7 +1488,12 @@ local function draw()
       r.ImGui_PushFont(ctx,ui_font)
     end
   end
-  r.ImGui_SetNextWindowSize(ctx,1000,480,r.ImGui_Cond_FirstUseEver())
+  -- Reserve enough width for both centered palettes and the far-right
+  -- notation selector, even if a previously saved window was narrower.
+  local _,section_w=section_tool_width()
+  local min_w=LEFT_W+6+math.max(section_w,cell_palette_width()+2*(notation_width()+8))+28
+  r.ImGui_SetNextWindowSizeConstraints(ctx,min_w,300,100000,100000)
+  r.ImGui_SetNextWindowSize(ctx,math.max(1300,min_w),480,r.ImGui_Cond_FirstUseEver())
   r.ImGui_SetNextWindowBgAlpha(ctx,1)
   local visible,open=r.ImGui_Begin(ctx,"N2N Mix",true)
   if visible then
@@ -1453,13 +1526,11 @@ local function draw()
       end
       r.ImGui_PopStyleColor(ctx,nmono)
       same();r.ImGui_Text(ctx,string.format("%.1f LUFS | sample peak %.1f dBFS",master_target(),peak_ceiling))
-      local section_w=0
-      for _,k in ipairs(intensity_ids) do section_w=math.max(section_w,r.ImGui_CalcTextSize(ctx,intens_names[k])+18) end
-      local palette_w=section_w*#intensity_ids+4*(#intensity_ids-1)
+      local section_w,palette_w=section_tool_width()
       local start_x=r.ImGui_GetCursorPosX(ctx)
       local avail=r.ImGui_GetContentRegionAvail(ctx)
       r.ImGui_AlignTextToFramePadding(ctx);r.ImGui_Text(ctx,"Section levels")
-      r.ImGui_SameLine(ctx,math.max(start_x+r.ImGui_CalcTextSize(ctx,"Section levels")+8,start_x+(avail-palette_w)/2))
+      r.ImGui_SameLine(ctx,song_palette_x(start_x,avail,palette_w))
       for i,k in ipairs(intensity_ids) do
         if i>1 then same() end
         local dl=r.ImGui_GetWindowDrawList(ctx)
@@ -1490,7 +1561,7 @@ local function draw()
       local flags=r.ImGui_TableFlags_ScrollX() | r.ImGui_TableFlags_ScrollY() | r.ImGui_TableFlags_SizingFixedFit()
       -- Only two actual table columns: the entire song strip can exceed the native
       -- ImGui column limit without losing the frozen track header.
-      if r.ImGui_BeginTable(ctx,"##mixgrid",2,flags,0,job and 0 or -(CELL_H+12),LEFT_W+total+32) then
+      if r.ImGui_BeginTable(ctx,"##mixgrid",2,flags,0,job and 0 or -(CELL_H+29),LEFT_W+total+32) then
         r.ImGui_TableSetupColumn(ctx,"Track",r.ImGui_TableColumnFlags_WidthFixed(),LEFT_W)
         r.ImGui_TableSetupColumn(ctx,"Song",r.ImGui_TableColumnFlags_WidthFixed(),total+8)
         r.ImGui_TableSetupScrollFreeze(ctx,1,2)
@@ -1566,14 +1637,15 @@ local function draw()
     end
     if not job then
       r.ImGui_Separator(ctx)
-      local w=0
-      for _,i in ipairs(tool_ids) do w=w+(i==9 and 82 or 32) end
-      w=w+4*(#tool_ids-1)
+      -- Space above the transport for the same floating shortcut labels
+      -- as Numbers2Notes. All three footer groups share one horizontal row.
+      r.ImGui_Dummy(ctx,0,13)
       local x=r.ImGui_GetCursorPosX(ctx);local avail=r.ImGui_GetContentRegionAvail(ctx)
+      transport()
+      r.ImGui_SameLine(ctx,song_palette_x(x,avail,cell_palette_width()))
+      draw_cell_palette()
+      r.ImGui_SameLine(ctx,x+avail-notation_width())
       radio("Simple",false);same();radio("Traditional",true)
-      local radio_w=r.ImGui_CalcTextSize(ctx,"Simple")+r.ImGui_CalcTextSize(ctx,"Traditional")+52
-      r.ImGui_SameLine(ctx,math.max(x+radio_w,x+(avail-w)/2))
-      for k,i in ipairs(tool_ids) do if k>1 then same() end;tool_button(i) end
     end
     r.ImGui_End(ctx)
   end
