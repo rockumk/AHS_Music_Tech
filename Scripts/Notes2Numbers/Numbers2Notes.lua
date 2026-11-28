@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.34
+-- @version 2.0.4-dev.35
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -1799,6 +1799,7 @@ function IM_GUI_Loop()
         gmem_export.PublishSongForm(Get_Stretched_ABCD_Index, false)
         gmem_export.PublishTrackIdentity(false)
         gmem_export.ServicePatternLibrary()
+        if gmem_export.ServiceDrumPatternSets then gmem_export.ServiceDrumPatternSets() end
     end
     local rv
     local rc
