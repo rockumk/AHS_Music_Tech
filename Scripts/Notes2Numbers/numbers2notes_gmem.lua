@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.26
+-- @version 1.9.27
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -1770,11 +1770,196 @@ function DB.tick()
     end
     if automatic then DB.begin(project,automatic,0,auto_key) end
 end
+-- Arp full sets are independent of drum sets and retain the target's MIDI routing.
+-- 128 internal slots, including empty/inherited slots and explicit silence.
+local AB={base=6700000,data=6704096,sig="N2N_ARP_SET 1\n",poll=0,serial=0}
+function AB.slot(id) return AB.base+32+(id-1)*4 end
+function AB.mode(t)
+    local fx=locate(t)
+    if fx==nil then error("Arp no longer exists",0) end
+    local mode=math.floor(reaper.TrackFX_GetParam(t.track,fx,13)+.5)
+    if not ARP_MODES[mode] then error("Invalid Arp mode",0) end
+    return mode
+end
+function AB.values(blob,record)
+    if record~=-1 then return DB.values(blob,record) end
+    if #blob~=777*8 then error("Invalid Arp global record size",0) end
+    local a={}
+    for i=1,#blob,8 do
+        local v=string.unpack("<d",blob,i)
+        if not valid_number(v,-1000000,1000000) then error("Invalid Arp setting",0) end
+        a[#a+1]=v
+    end
+    local ranges={{1,127},{0,25},{0,4},{1,4},{0,100},{0,1},{1,127},{0,100},{0,2}}
+    for i,range in ipairs(ranges) do
+        if not valid_number(a[i],range[1],range[2]) then error("Invalid Arp global setting",0) end
+    end
+    if a[3]%1~=0 or a[4]%1~=0 or a[6]%1~=0 or a[9]%1~=0 then error("Invalid Arp discrete setting",0) end
+    for row=1,128 do
+        local function v(group) return a[9+group*128+row] end
+        if not valid_number(v(0),0,1) or not valid_number(v(1),0,1)
+            or not valid_number(v(2),-1,100) or not valid_number(v(3),-1,100)
+            or not valid_number(v(4),-1,127) then error("Invalid Arp row setting",0) end
+    end
+    return a
+end
+function AB.pack(records)
+    local out={AB.sig}
+    for i=1,129 do out[#out+1]=string.pack("<s4",records[i]) end
+    return table.concat(out)
+end
+function AB.unpack(data)
+    if data:sub(1,#AB.sig)~=AB.sig then error("Not an N2N Arp pattern set",0) end
+    local records,pos={},#AB.sig+1
+    for i=1,129 do
+        local blob;blob,pos=string.unpack("<s4",data,pos)
+        AB.values(blob,i-2)
+        records[i]=blob
+    end
+    if pos~=#data+1 then error("Unexpected data in Arp pattern set",0) end
+    return records
+end
+function AB.send(s,op,record,blob)
+    local r=reaper
+    if r.gmem_read(AB.base)~=0 then error("Arp-set transfer mailbox is occupied",0) end
+    local a=blob and AB.values(blob,record)
+    if a then for i,v in ipairs(a) do r.gmem_write(AB.data+i-1,v) end end
+    r.gmem_write(AB.base+1,s.id);r.gmem_write(AB.base+2,s.key)
+    r.gmem_write(AB.base+3,record);r.gmem_write(AB.base+4,a and #a or 0)
+    r.gmem_write(AB.base+5,0);r.gmem_write(AB.base+6,s.token)
+    s.pending=op;s.deadline=r.time_precise()+5
+    r.gmem_write(AB.base,op)
+end
+function AB.abort(message)
+    local r=reaper
+    local s=AB.active
+    if s and r.gmem_read(AB.base+6)==s.token then r.gmem_write(AB.base,0) end
+    AB.active=nil
+    if s then r.MB(tostring(message),"Arp Pattern Set",0) end
+end
+function AB.begin(project,t,key,cmd)
+    local r=reaper
+    AB.serial=AB.serial+1
+    local s={project=project,t=t,id=t.id,key=key,token=math.floor(r.time_precise()*1000)%1000000000+AB.serial,
+        phase="capture",record=-1,records={},mode=AB.mode(t)}
+    AB.active=s
+    if r.GetPlayStateEx(project)~=0 then error("Stop playback before saving or loading an entire Arp pattern set.",0) end
+    local root=r.GetResourcePath().."/Data/AHS_Music_Tech/Arp/Pattern Sets"
+    local dir=root.."/"..ARP_MODES[s.mode]
+    r.RecursiveCreateDirectory(dir,0)
+    if cmd==1 then
+        local ok,name=r.GetUserInputs("Save All Arp Patterns",1,"Set name:","My Arrangement")
+        if not ok then AB.active=nil;return end
+        name=name:match("^%s*(.-)%s*$")
+        if name=="" or name=="." or name==".." or name:find("[/\\:*?\"<>|%c]") then error("Invalid Arp set name",0) end
+        if name:sub(-9):lower()~=".n2arpset" then name=name..".n2arpset" end
+        s.path=dir.."/"..name
+        local f=io.open(s.path,"rb")
+        if f then f:close();if r.MB("Replace the existing Arp set?","Save All Arp Patterns",4)~=6 then AB.active=nil;return end end
+    else
+        local ok,path=browse_pattern_file(dir,"Load All Arp Patterns",".n2arpset")
+        if not ok then AB.active=nil;return end
+        s.target=AB.unpack(DB.read(path,70000000))
+        local targetmode=AB.values(s.target[1],-1)[9]
+        local prompt="Replace all Arp patterns and musical settings? The current arrangement will be backed up first."
+        if targetmode~=s.mode then
+            prompt="Saved mode: "..ARP_MODES[targetmode].."\nCurrent mode: "..ARP_MODES[s.mode].."\n\nSwitch to the saved mode and load all patterns? The current arrangement will be backed up first."
+        end
+        if r.MB(prompt,"Load All Arp Patterns",4)~=6 then AB.active=nil;return end
+        local recovery=root.."/Recovery/"..DB.project_id(project)
+        r.RecursiveCreateDirectory(recovery,0)
+        s.recovery=recovery.."/"..DB.safe_id(t.guid)..".n2arpset"
+    end
+    if r.GetPlayStateEx(project)~=0 or AB.mode(t)~=s.mode then error("Transport or mode changed before Arp transfer.",0) end
+    AB.send(s,1,-1)
+end
+function AB.advance(s)
+    local r=reaper
+    local fx=locate(s.t)
+    local a=AB.slot(s.id)
+    if r.EnumProjects(-1,"")~=s.project or fx==nil or r.gmem_read(REG_BASE+s.id)~=s.key
+        or math.floor(r.TrackFX_GetParam(s.t.track,fx,4)+.5)~=s.id
+        or r.gmem_read(a)~=s.key or math.abs(r.time_precise()-r.gmem_read(a+1))>4 then error("Arp became unavailable during transfer.",0) end
+    local op=r.gmem_read(AB.base)
+    if r.gmem_read(AB.base+6)~=s.token then error("Arp-set transfer ownership changed.",0) end
+    if op==-1 then error("Arp rejected the pattern-set operation; no staged load was committed.",0) end
+    local expected=s.pending==1 and 2 or s.pending==6 and 7 or 5
+    if op~=expected then
+        if r.time_precise()>s.deadline then error("Arp-set transfer timed out. Enable FX processing while stopped and retry.",0) end
+        return
+    end
+    if s.pending==6 then
+        r.gmem_write(AB.base,0);r.MarkProjectDirty(s.project);AB.active=nil;return
+    end
+    if r.GetPlayStateEx(s.project)~=0 or AB.mode(s.t)~=s.mode then error("Transport or mode changed during Arp transfer; operation cancelled.",0) end
+    if s.phase=="capture" then
+        local n,epoch=r.gmem_read(AB.base+4),r.gmem_read(AB.base+5)
+        if not valid_number(n,1,65543) or n%1~=0 then error("Invalid Arp transfer size",0) end
+        if s.epoch and epoch~=s.epoch then error("Arp state changed during capture; operation cancelled.",0) end
+        s.epoch=epoch
+        local parts={}
+        for i=0,n-1 do parts[i+1]=string.pack("<d",r.gmem_read(AB.data+i)) end
+        local blob=table.concat(parts)
+        AB.values(blob,s.record)
+        s.records[s.record+2]=blob
+        r.gmem_write(AB.base,0)
+        if s.record<127 then s.record=s.record+1;AB.send(s,1,s.record);return end
+        if s.path then DB.write_manual(s.path,AB.pack(s.records));AB.active=nil;return end
+        DB.write_manual(s.recovery,AB.pack(s.records))
+        s.phase="stage";s.record=-1;AB.send(s,3,-1);return
+    end
+    r.gmem_write(AB.base,0)
+    if s.pending==3 then
+        if r.gmem_read(AB.base+5)~=s.epoch then error("Arp state changed before load; no patterns changed.",0) end
+        s.record=-1
+    else s.record=s.record+1 end
+    if s.record<=127 then AB.send(s,4,s.record,s.target[s.record+2])
+    else AB.send(s,6,-1) end
+end
+function AB.tick()
+    local r=reaper
+    local now=r.time_precise()
+    local project=r.EnumProjects(-1,"")
+    if AB.active then AB.advance(AB.active);return end
+    if DB.active then return end
+    if now<AB.poll then return end
+    AB.poll=now+.1
+    -- Fast idle path: look only at pending request slots, scan tracks on demand.
+    for id=1,512 do
+        local a=AB.slot(id)
+        local cmd=r.gmem_read(a+2)
+        if cmd==1 or cmd==2 then
+            local key=r.gmem_read(a)
+            r.gmem_write(a+2,0)
+            if key>0 and key==r.gmem_read(REG_BASE+id) and math.abs(now-r.gmem_read(a+1))<4 and math.abs(now-r.gmem_read(a+3))<30 then
+                local inventory,counts=scan(project)
+                if counts[id]==1 then
+                    for _,t in ipairs(inventory) do
+                        if t.kind=="ARP" and t.id==id and locate(t)~=nil then AB.begin(project,t,key,cmd);return end
+                    end
+                end
+            end
+        end
+    end
+end
 function export.ServiceDrumPatternSets()
-    local ok,err=pcall(DB.tick)
+    local r=reaper
+    r.gmem_attach("N2N_Ecosystem_RSKennedy")
+    r.gmem_write(AB.base+8,r.time_precise())
+    -- Serialize the two bulk transfers. Both heartbeats remain live.
+    if AB.active then
+        r.gmem_write(DB.base+8,r.time_precise())
+    else
+        local ok,err=pcall(DB.tick)
+        if not ok then
+            if DB.active then DB.abort(err)
+            else DB.poll=r.time_precise()+DB.interval end
+        end
+    end
+    local ok,err=pcall(AB.tick)
     if not ok then
-        if DB.active then DB.abort(err)
-        else DB.poll=reaper.time_precise()+DB.interval end
+        if AB.active then AB.abort(err)
+        else AB.poll=r.time_precise()+1 end
     end
 end
 
