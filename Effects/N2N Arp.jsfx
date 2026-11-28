@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.4.0-dev.9
+version: 12.4.0-dev.10
 author: Rock Kennedy
 about:
-  # N2N Arp v12.4.0-dev.9
+  # N2N Arp v12.4.0-dev.10
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -24,13 +24,14 @@ slider12:20<1,127,1>-Global Note Len
 slider13:100<0,100,1>-Global Row Level
 slider14:0<0,2,1{Chords,Split (Chords and Bass),Bass}>-Input Mode
 // Display-only mirrors written by N2N Mix; never used in MIDI generation.
-slider15:0<-60,30,0.01>-N2N Mix Level
+slider15:0<0,9,1>-N2N Mix Prominence
 slider16:0<-100,100,0.01>-N2N Mix Position
+slider17:0<-100,100,0.01>-N2N Mix Intensity
 
 @init
 scale_dirty = 0;
 last_input_mode = -1;
-thisversion = "v12.4.0-dev.9";
+thisversion = "v12.4.0-dev.10";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -2125,6 +2126,62 @@ function centered_btn(x,y,w,h,txt) local(tw,th) (
 );
 function btn(x,y,w,h,txt) ( rect(x,y,w,h, 0.3,0.3,0.3,1); draw_text(x+5,y+2,txt,1,1,1); (mb && p_mb == 0 && mx>=x && mx<x+w && my>=y && my<y+h); );
 
+// Display-only mix controls and guarded requests to the running N2N hub.
+function mix_request(cmd) local(addr,now) (
+    now=time_precise();
+    abs(now-gmem[8320000])<2 && my_slot>=1 && my_slot<=512 && gmem[reg_base+my_slot]==my_key ? (
+        addr=8320004+(my_slot-1)*4;
+        gmem[addr]=my_key;
+        gmem[addr+2]=now;
+        gmem[addr+1]=cmd;
+    );
+);
+function mix_hub_button(x,y,w,label,cmd) local(hov,online,tw,th) (
+    online=abs(time_precise()-gmem[8320000])<2;
+    hov=mx>=x && mx<x+w && my>=y && my<y+20;
+    rect(x,y,w,20,hov&&online?.33:.18,hov&&online?.33:.18,hov&&online?.33:.18,1);
+    gfx_measurestr(label,tw,th);
+    draw_text(x+(w-tw)/2,y+(20-th)/2,label,online?.9:.4,online?.9:.4,online?.9:.4);
+    online && hov && mb && !p_mb && capture_id==0 ? mix_request(cmd);
+);
+function mix_status_strip(x,y) local(p,cx,cy,i,a,rr,gg,bb,v,px) (
+    // Prominence: 0 unset, 1 mute, 2/3 down, 4 mid, 5/6 up, 8 star, 9 transition.
+    p=floor(slider15+.5); cx=x+12; cy=y+10;
+    rect(x,y,24,20,.16,.16,.16,1);
+    gfx_set(.86,.86,.86,1);
+    p==0 ? gfx_line(cx-4,cy,cx+4,cy) :
+    p==1 ? (gfx_circle(cx,cy,6,0,1);gfx_line(cx-4,cy+4,cx+4,cy-4);) :
+    p==4 ? gfx_circle(cx,cy,3,1,1) :
+    p==8 ? (
+        gfx_set(1,.84,.30,1);
+        i=0;loop(5,a=-$pi/2+i*2*$pi/5;gfx_line(cx+7*cos(a),cy+7*sin(a),cx+7*cos(a+4*$pi/5),cy+7*sin(a+4*$pi/5),1);i+=1;);
+    ) :
+    p==9 ? (gfx_line(cx-7,cy+5,cx+7,cy-5);gfx_line(cx+7,cy-5,cx+2,cy-5);gfx_line(cx+7,cy-5,cx+7,cy);) :
+    (
+        i=0; loop(p==2||p==6?2:1,
+            a=cy+(i-(p==2||p==6?.5:0))*6;
+            p<4 ? (gfx_line(cx-5,a-3,cx,a+2);gfx_line(cx,a+2,cx+5,a-3);) :
+                  (gfx_line(cx-5,a+3,cx,a-2);gfx_line(cx,a-2,cx+5,a+3););
+            i+=1;
+        );
+    );
+    // Bipolar Performance Intensity bar.
+    x+=28;rect(x,y,48,20,.16,.16,.16,1);
+    cx=x+24;v=max(-100,min(100,slider17));px=cx+v*.21;
+    v>=0 ? rect(cx,y+9,px-cx,8,.48,.76,.42,1) : rect(px,y+9,cx-px,8,.78,.50,.32,1);
+    gfx_set(.7,.7,.7,1);gfx_line(cx,y+8,cx,y+18);
+    draw_text(x+3,y+1,"INT",.7,.7,.7);
+    // Position (L / C / R).
+    x+=52;rect(x,y,48,20,.16,.16,.16,1);
+    cx=x+24;px=cx+max(-100,min(100,slider16))*.20;
+    gfx_set(.45,.45,.45,1);gfx_line(x+4,y+13,x+44,y+13);gfx_line(cx,y+9,cx,y+17);
+    rect(px-2,y+9,4,8,.85,.85,.85,1);
+    draw_text(x+3,y+1,"PAN",.7,.7,.7);
+    x+=53;mix_hub_button(x,y,38,"INST",1);
+    x+=42;mix_hub_button(x,y,38,"N2N",2);
+);
+
+
 function draw_chan_popup(px, py, row_idx, is_input) 
 local(bw, bh, i, r, c, bx, by, bit, is_set, current_mask, base_ptr) 
 (
@@ -2316,35 +2373,31 @@ drawhold_x  = draw_x;
 drawhold_y  = draw_y;
 
 
-draw_x = draw_x - 50;
-draw_y = draw_y + 136;
-
-// SCALE DISPLAY
-draw_text(draw_x, draw_y+4, "SCALE:", 0.6,0.6,0.6); 
-scale_tonic == -1 ? ( draw_text(draw_x+45, draw_y+4, "---", 1, 0.2, 0.2); ) : (
-    note_x = draw_x + 55; 
-    i=0; loop(13, 
-        pc = (scale_tonic + i) % 12; 
-        mem[scale_state_base + pc] ? ( 
-            t_n = pc; 
-            t_n==0?strcpy(#t,"C"):t_n==1?strcpy(#t,"C#"):t_n==2?strcpy(#t,"D"):t_n==3?strcpy(#t,"D#"):t_n==4?strcpy(#t,"E"):t_n==5?strcpy(#t,"F"):t_n==6?strcpy(#t,"F#"):t_n==7?strcpy(#t,"G"):t_n==8?strcpy(#t,"G#"):t_n==9?strcpy(#t,"A"):t_n==10?strcpy(#t,"A#"):strcpy(#t,"B"); 
-            pc == scale_tonic ? gfx_set(1, 0.2, 0.2, 1) : gfx_set(0.8, 0.8, 0.8, 1); 
-            gfx_x = note_x; gfx_y = draw_y+4; gfx_drawstr(#t); 
-            gfx_measurestr(#t, tw, th); note_x += tw + 8; 
-        ); 
-        i+=1; 
+// Compact scale and mix status on the same row, after the lane controls.
+draw_x = 995;
+draw_y = drawhold_y + 136;
+gfx_setfont(1,os_font,max(8,fontsize-2),'b');
+draw_text(949,draw_y+4,"GRV:",.6,.6,.6);
+gr_max=mem[LOCAL_GROOVE_DB+32];
+gr_max==0?gfx_set(.3,.3,.3,1):gr_max>1?gfx_set(1,0,0,1):gfx_set(0,1,0,1);
+gfx_circle(983,draw_y+10,4,1);
+draw_text(draw_x,draw_y+4,"SCALE:",.6,.6,.6);
+note_x=draw_x+39;
+scale_tonic == -1 ? (draw_text(note_x,draw_y+4,"---",1,.2,.2);note_x+=24;) : (
+    i=0;loop(13,
+        pc=(scale_tonic+i)%12;
+        mem[scale_state_base+pc] ? (
+            t_n=pc;
+            t_n==0?strcpy(#t,"C"):t_n==1?strcpy(#t,"C#"):t_n==2?strcpy(#t,"D"):t_n==3?strcpy(#t,"D#"):t_n==4?strcpy(#t,"E"):t_n==5?strcpy(#t,"F"):t_n==6?strcpy(#t,"F#"):t_n==7?strcpy(#t,"G"):t_n==8?strcpy(#t,"G#"):t_n==9?strcpy(#t,"A"):t_n==10?strcpy(#t,"A#"):strcpy(#t,"B");
+            pc==scale_tonic?gfx_set(1,.2,.2,1):gfx_set(.8,.8,.8,1);
+            gfx_x=note_x;gfx_y=draw_y+4;gfx_drawstr(#t);
+            gfx_measurestr(#t,tw,th);note_x+=tw+2;
+        );
+        i+=1;
     );
 );
-draw_x += glchan_w + ui_gap_small;
-
-gr_max = mem[LOCAL_GROOVE_DB + 32];
-gfx_set(0.6, 0.6, 0.6, 1);
-gfx_x = draw_x -= 230; gfx_y =  gfx_y + 0; gfx_drawstr("GRV:");
-gr_max == 0 ? gfx_set(0.3, 0.3, 0.3, 1) : (gr_max > 1.0 ? gfx_set(1, 0, 0, 1) : gfx_set(0, 1, 0, 1));
-gfx_circle(draw_x+38, gfx_y + 6, 4.5, 1);
-
-
-
+mix_status_strip(max(1155,note_x+5),draw_y);
+gfx_setfont(1,os_font,fontsize,'b');
 
 draw_x  = drawhold_x;
 draw_y  = drawhold_y;
