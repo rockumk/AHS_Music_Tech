@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.20
+-- @version 1.9.21
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -1629,6 +1629,109 @@ function export.ServiceDrumPatternSets()
         if DB.active then DB.abort(err)
         else DB.poll=reaper.time_precise()+DB.interval end
     end
+end
+
+
+-- Drum map is authoritative. Do not monitor instrument preset changes or
+-- set a Drum Arranger FX preset: that could replace all serialized patterns.
+local kit_sync={poll=0,seen={},project=nil}
+function kit_sync.map_name(track,fx)
+    local ok,name=reaper.TrackFX_GetFormattedParamValue(track,fx,9,"")
+    if not ok then return "" end
+    return (name or ""):gsub("\\","/"):match("([^/]+)$") or ""
+end
+function kit_sync.monster_name(name)
+    local n=name:lower()
+    return n:find("monster drum",1,true)~=nil
+end
+function kit_sync.instrument(project,track)
+    local r=reaper
+    local function find(t)
+        local matches={}
+        for fx=0,r.TrackFX_GetCount(t)-1 do
+            local ok,name=r.TrackFX_GetFXName(t,fx,"")
+            if ok and kit_sync.monster_name(name or "") then matches[#matches+1]=fx end
+        end
+        return matches
+    end
+    local list=find(track)
+    if #list==1 then return track,list[1] end
+    if #list>1 then return nil,nil,"More than one Monster Drums instance on the track" end
+    local dest,destfx
+    for i=0,r.GetTrackNumSends(track,0)-1 do
+        if r.GetTrackSendInfo_Value(track,0,i,"B_MUTE")==0 and (math.floor(r.GetTrackSendInfo_Value(track,0,i,"I_MIDIFLAGS"))&31)~=31 then
+            local d=r.GetTrackSendInfo_Value(track,0,i,"P_DESTTRACK")
+            if d and r.ValidatePtr2(project,d,"MediaTrack*") then
+                local m=find(d)
+                if #m>1 or (#m==1 and dest and dest~=d) then return nil,nil,"Ambiguous Monster Drums destination" end
+                if #m==1 then dest,destfx=d,m[1] end
+            end
+        end
+    end
+    return dest,destfx
+end
+function kit_sync.apply(project,t,map)
+    local r=reaper
+    local preset=map:gsub("%.[Tt][Xx][Tt]$","")
+    -- The bundled Monster kit map names use [CATEGORY] NN Preset Name.
+    -- Generic note maps and other manufacturers' kits do not imply a Monster preset.
+    if not preset:match("^%[[^%]]+%]%s+%d%d%s+") then return true end
+    local track,fx,why=kit_sync.instrument(project,t.track)
+    if not track then return false,why or "No unambiguous Monster Drums instrument found" end
+    local _,current=r.TrackFX_GetPreset(track,fx,"")
+    if current==preset or current==map then return true end
+    local ok=r.TrackFX_SetPreset(track,fx,preset)
+    if not ok and map~=preset then ok=r.TrackFX_SetPreset(track,fx,map) end
+    if not ok then return false,"Monster Drums preset not found: "..preset end
+    r.MarkProjectDirty(project)
+    return true
+end
+function export.ServiceDrumKitSync()
+    local r=reaper
+    r.gmem_attach("N2N_Ecosystem_RSKennedy")
+    local now=r.time_precise()
+    -- Also informs the optional Launchpad companion that the hub owns preset changes.
+    r.gmem_write(6600009,now)
+    if now<kit_sync.poll then return end
+    kit_sync.poll=now+.5
+    local project=r.EnumProjects(-1,"")
+    if kit_sync.project~=project then kit_sync.project=project;kit_sync.seen={} end
+    local inventory,counts=scan(project)
+    local alive={}
+    for _,t in ipairs(inventory) do
+        if t.kind=="DRUM" and t.id>=1 and t.id<=512 and counts[t.id]==1 then
+            local fx=locate(t)
+            if fx~=nil then
+                local map=kit_sync.map_name(t.track,fx)
+                local guid=t.guid
+                local key="map:"..guid
+                local state=kit_sync.seen[guid]
+                alive[guid]=true
+                if not state then
+                    local ok,last=r.GetProjExtState(project,"N2N_DrumKitSync",key)
+                    -- First encounter establishes a baseline instead of overriding
+                    -- a user's existing instrument preset on project open.
+                    state={last=ok>0 and last or map}
+                    kit_sync.seen[guid]=state
+                    if ok==0 and map~="" then
+                        r.SetProjExtState(project,"N2N_DrumKitSync",key,map)
+                        r.MarkProjectDirty(project)
+                    end
+                end
+                if map~="" and map~=state.last and r.GetPlayStateEx(project)==0 then
+                    local ok,why=kit_sync.apply(project,t,map)
+                    -- One attempt per deliberate selection: a missing preset must
+                    -- not loop or replace an unrelated instrument.
+                    state.last=map
+                    r.SetProjExtState(project,"N2N_DrumKitSync",key,map)
+                    r.MarkProjectDirty(project)
+                    r.gmem_write(6602600+t.id,ok and 1 or -1)
+                    if not ok then r.MB(why.."\n\nDrum Arranger patterns were not changed by synchronization.","N2N Drum Kit Sync",0) end
+                end
+            end
+        end
+    end
+    for guid in pairs(kit_sync.seen) do if not alive[guid] then kit_sync.seen[guid]=nil end end
 end
 
 return export
