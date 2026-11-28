@@ -1,5 +1,5 @@
 -- @description N2N Topline
--- @version 5.4-dev.6
+-- @version 5.4-dev.7
 -- @author Rock Kennedy and Gemini 4 Hydrogen (which did an absolutely fabulous job of transforming the vision into solid Lua code)
 -- @about
 --   Numbers2Notes Topline Melody Editor (1200x640 minimum):
@@ -141,7 +141,7 @@ local state = {
   nns_chart_items={}, letter_chart_items={}, has_nns_chart=false, has_letter_chart=false, chord_lane_h=24, last_chart_poll=0,
   view_mode="diatonic", tonic_pc=0, mode_idx=1, sync_key_from_gmem=true,
   gmem_tonic_pc=0, gmem_modal_center=0, gmem_has_key=false,
-  in_scale_h=34, harmony_border_style="dotted", piano_keys=false,
+  in_scale_h=34, harmony_border_style="dotted",
 
   notes={}, next_note_id=1, clipboard={}, undo_stack={}, redo_stack={},
   harmony_source="gmem", gmem_guides={}, gmem_song_end_qn=0, clip_guides={},
@@ -204,7 +204,6 @@ local function save_global_prefs()
   s("view_mode", state.view_mode); s("mpe_enabled", state.mpe_enabled and "1" or "0"); s("mpe_bend_range", state.mpe_bend_range)
   s("win_x", state.win_x); s("win_y", state.win_y); s("win_w", state.win_w); s("win_h", state.win_h)
   s("win_pos_v3", state.has_saved_win_pos and "1" or "0")
-  s("piano_keys",state.piano_keys and "1" or "0")
   s("px_per_qn",state.px_per_qn);s("v_scale",state.v_scale)
   state.save_session_view()
   s("mod_vscroll", state.wheel_mods.v_scroll); s("mod_hscroll", state.wheel_mods.h_scroll)
@@ -230,7 +229,6 @@ local function load_global_prefs()
   local wx, wy, ww, wh = tonumber(g("win_x")), tonumber(g("win_y")), tonumber(g("win_w")), tonumber(g("win_h"))
   if g("win_pos_v3") == "1" and wx and wy then state.win_x, state.win_y = math.floor(wx), math.floor(wy); state.has_saved_win_pos = true end
   if ww and wh then state.win_w, state.win_h = math.max(MIN_WIN_W, math.floor(ww)), math.max(MIN_WIN_H, math.floor(wh)) end
-  state.piano_keys=g("piano_keys")=="1"
   state.px_per_qn=clamp(tonumber(g("px_per_qn")) or state.px_per_qn,20,480)
   state.v_scale=clamp(tonumber(g("v_scale")) or state.v_scale,0.45,3.0)
   local function rm(k, d) local v=g(k); return (v and v~="") and v or d end
@@ -1502,11 +1500,6 @@ local function draw_keyboard(grid_bottom_y)
       local sy = pitch_to_screen_y(p); local cy1, cy2 = math.max(top_area, sy + 1), math.min(grid_bottom_y - 1, sy + rh - 1)
       if cy2 > cy1 then
         local cols = get_step_colors(get_rel_step(p)); local is_hov = (state.hover_pitch == p or state.kbd_held_pitch == p); local kw, kf = state.keyboard_w - 10, (is_hov and cols.key_bright or cols.key_mid)
-        if state.piano_keys then
-          local black=not is_pitch_diatonic(p)
-          kw=black and math.floor(kw*.72) or kw
-          kf=black and (is_hov and {0.28,0.28,0.30} or {0.12,0.12,0.14}) or (is_hov and {0.78,0.83,0.88} or {0.91,0.91,0.91})
-        end
         set_col(kf); draw_filled_roundrect(4, cy1, kw, cy2 - cy1, 4); set_col(cols.active, 1.0); draw_filled_roundrect(4, cy1 + 1, 6, math.max(2, cy2 - cy1 - 2), 2)
         if is_hov then set_col(CONFIG.dark_mode and {1,1,1} or {0.12,0.14,0.18}, 0.95); gfx.roundrect(4, cy1, kw, cy2 - cy1, 4, 1); gfx.roundrect(5, cy1 + 1, kw - 2, math.max(1, cy2 - cy1 - 2), 3, 1) end
         if cy2 - cy1 >= 14 and sy >= top_area - 4 then local ll, rl = get_key_left_right_labels(p); set_col(contrast_text_col(kf)); draw_text_left(ll, 14, cy1, kw - 38, cy2 - cy1); draw_text_right(rl, 14, cy1, kw - 20, cy2 - cy1) end
@@ -1904,8 +1897,6 @@ local function draw_lanes_drawer()
   register_btn("harm_border_style", dx + 14, y, hw, 23, "Mid: " .. (state.harmony_border_style == "dotted" and "Dotted" or "Solid"), state.harmony_border_style == "solid", function() state.harmony_border_style = (state.harmony_border_style == "dotted") and "solid" or "dotted"; save_global_prefs() end)
   register_btn("phrase_mode_btn", dx + 20 + hw, y, hw, 23, "Paste: " .. (state.phrase_paste_mode == "replace" and "Replace" or "Merge"), state.phrase_paste_mode == "replace", function() state.phrase_paste_mode = (state.phrase_paste_mode == "replace") and "merge" or "replace"; save_global_prefs() end); y = y + 26
 
-  register_btn("piano_keys", dx+14,y,state.drawer_w-28,23,"Number Keys: "..(state.piano_keys and "Piano" or "Color"),state.piano_keys,function() state.piano_keys=not state.piano_keys;save_global_prefs() end);y=y+26
-
   local h_lbl = "Harmony View: N2N Pref"
   if state.harmony_source == "clip_pulled" then h_lbl = "Harmony View: Pulled Clip" elseif state.harmony_source == "diatonic" then h_lbl = "Harmony View: Diatonic"
   elseif state.harmony_source == "triad_1" then h_lbl = "Harmony View: Triad 1-3-5" elseif state.harmony_source == "manual" then h_lbl = "Harmony View: Manual" end
@@ -1932,12 +1923,42 @@ local function draw_lanes_drawer()
   end
   y = y + 54
 
-  gfx.setfont(1, "Segoe UI", 12); set_col(CONFIG.dark_mode and {0.78,0.82,0.88} or {0.30,0.33,0.38}); draw_text_left("NNS Colors 7 → 1 (1 = " .. CONFIG.note_names[state.tonic_pc + 1] .. ")", dx + 14, y, state.drawer_w - 28, 16); y = y + 18
-  for row = 0, 5 do for col = 0, 1 do
-    local s = 11 - (col * 6 + row); local def, cols = CONFIG.step_definitions[s], get_step_colors(s); local sx, sy = dx + 14 + col * (hw + 6), y + row * 21
-    set_col(cols.active); draw_filled_roundrect(sx, sy, 26, 18, 4); set_col(contrast_text_col(cols.active)); gfx.setfont(1, "Segoe UI", 11); draw_text_centered(def.nns, sx, sy, 26, 18)
-    set_col(CONFIG.dark_mode and {0.88,0.90,0.94} or {0.20,0.22,0.26}); draw_text_left(string.format("%s (%s)", CONFIG.note_names[(state.tonic_pc + s)%12 + 1], def.hex), sx + 30, sy, hw - 32, 18)
-  end end
+  -- One relative octave: 1 occupies C's position, independent of the song key.
+  -- Paint the seven natural-position keys first, then the five accidental keys.
+  gfx.setfont(1,"Segoe UI",12)
+  set_col(CONFIG.dark_mode and {0.78,0.82,0.88} or {0.30,0.33,0.38})
+  draw_text_left("NNS Colors (1 = "..CONFIG.note_names[state.tonic_pc+1]..")",dx+14,y,state.drawer_w-28,16)
+  y=y+21
+  local kx,kw=dx+14,math.floor((state.drawer_w-28)/7)
+  local kh,bh=92,54
+  local bw=math.floor(kw*.62)
+  local hovered
+  for idx,s in ipairs({0,2,4,5,7,9,11}) do
+    local x=kx+(idx-1)*kw
+    local col=STEP_COLORS[s].active
+    draw_bordered_roundrect(x,y,kw-1,kh,3,1,{.08,.08,.09},col)
+    set_col(contrast_text_col(col));gfx.setfont(1,"Segoe UI",16)
+    draw_text_centered(CONFIG.step_definitions[s].nns,x,y+bh+4,kw-1,kh-bh-8)
+    if gfx.mouse_x>=x and gfx.mouse_x<x+kw and gfx.mouse_y>=y and gfx.mouse_y<y+kh then hovered=s end
+  end
+  for _,k in ipairs({{1,1},{3,2},{6,4},{8,5},{10,6}}) do
+    local s,boundary=k[1],k[2]
+    local x=kx+boundary*kw-math.floor(bw/2)
+    local col=STEP_COLORS[s].active
+    draw_bordered_roundrect(x-1,y,bw+2,bh+2,3,1,{.06,.06,.07},{.06,.06,.07})
+    draw_bordered_roundrect(x,y,bw,bh,3,1,{.08,.08,.09},col)
+    set_col(contrast_text_col(col));gfx.setfont(1,"Segoe UI",13)
+    draw_text_centered(CONFIG.step_definitions[s].nns,x,y+3,bw,bh-6)
+    if gfx.mouse_x>=x and gfx.mouse_x<x+bw and gfx.mouse_y>=y and gfx.mouse_y<y+bh then hovered=s end
+  end
+  gfx.setfont(1,"Segoe UI",12)
+  set_col(CONFIG.dark_mode and {.78,.82,.88} or {.30,.33,.38})
+  local info="Hover over a key for its color value."
+  if hovered~=nil then
+    local def=CONFIG.step_definitions[hovered]
+    info=def.nns.."  |  "..CONFIG.note_names[(state.tonic_pc+hovered)%12+1].."  |  "..def.hex
+  end
+  draw_text_left(info,kx,y+kh+5,state.drawer_w-28,18)
 end
 
 --------------------------------------------------------------------------------
