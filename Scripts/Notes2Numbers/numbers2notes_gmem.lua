@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.29
+-- @version 1.9.30
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -990,7 +990,7 @@ local function pattern_grid(ctx,t,width,scale,gap)
                     local tw,th=r.ImGui_CalcTextSize(ctx,g[3])
                     if tw<=bw then
                         local lum=(g[4]*.299+g[5]*.587+g[6]*.114)*shade
-                        r.ImGui_DrawList_AddText(dl,bx+(bw-tw)/2,by+(h-th)/2,lum>.57 and 0x101010FF or 0xFFFFFFFF,g[3])
+                        r.ImGui_DrawList_AddText(dl,bx+(bw-tw)/2,by+math.floor((h-th)/2+.5)+1,lum>.57 and 0x101010FF or 0xFFFFFFFF,g[3])
                     end
                 end
                 if mx>=bx and mx<bx+bw and my>=by and my<by+h then
@@ -1052,6 +1052,8 @@ function export.DrawTracks(ctx,font,open_topline)
     local track_gap=math.max(1,math.floor(4*percent/170+.5))
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),track_gap,track_gap)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),px(2),0)
+    -- The monospace font's visible glyphs sit above its line-box center.
+    r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ButtonTextAlign(),.5,.85)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_WindowPadding(),4,4)
     r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ChildBg(),0x000000FF)
     local row_height=math.floor(px(14)*.75+.5)
@@ -1106,7 +1108,7 @@ function export.DrawTracks(ctx,font,open_topline)
                 r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ButtonHovered(),color(math.min(1,t.r+.12),math.min(1,t.g+.12),math.min(1,t.b+.12)))
                 r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ButtonActive(),color(t.r*.85,t.g*.85,t.b*.85))
                 r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Text(),lum>.55 and 0x101010FF or 0xFFFFFFFF)
-                r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ButtonTextAlign(),0,.5)
+                r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ButtonTextAlign(),0,.85)
                 if r.ImGui_Button(ctx,label,namew,row_height) then
                     r.SetOnlyTrackSelected(t.track)
                     r.TrackList_AdjustWindows(false)
@@ -1166,7 +1168,7 @@ function export.DrawTracks(ctx,font,open_topline)
         r.ImGui_EndChild(ctx)
     end
     r.ImGui_PopStyleColor(ctx)
-    r.ImGui_PopStyleVar(ctx,3)
+    r.ImGui_PopStyleVar(ctx,4)
     if normal_font then r.ImGui_PopFont(ctx) end
     -- Two launchers, aligned with the left and right edges of the panel.
     local launcher_width=196
