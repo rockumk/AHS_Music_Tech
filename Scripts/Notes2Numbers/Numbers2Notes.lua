@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.23
+-- @version 2.0.4-dev.24
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -2442,7 +2442,29 @@ Form: I V C V C B C O]]
             r.ImGui_Dummy(ctx,0,12)
             r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),4)
             if r.ImGui_Button(ctx,"Open N2N Mix",180,30) then
-                gmem_export.OpenEditor("n2nmix","N2N Mix")
+                -- N2N Mix is a sibling of the Notes2Numbers folder.
+                -- Keep this launcher independent of the installed helper version.
+                local sec="N2N_EDITOR_WINDOWS"
+                local hb=tonumber(r.GetExtState(sec,"n2nmix:heartbeat"))
+                if hb and math.abs(r.time_precise()-hb)<3 then
+                    r.SetExtState(sec,"n2nmix:focus",tostring(r.time_precise()),false)
+                else
+                    local hwnd=r.JS_Window_Find and r.JS_Window_SetFocus and r.JS_Window_Find("N2N Mix",true)
+                    if hwnd then
+                        r.JS_Window_SetFocus(hwnd)
+                    else
+                        local path=script_path.."../N2N Mix.lua"
+                        local file=io.open(path,"rb")
+                        if file then
+                            file:close()
+                            local cmd=r.AddRemoveReaScript(true,0,path,true)
+                            if cmd and cmd>0 then r.Main_OnCommand(cmd,0)
+                            else r.MB("Could not launch N2N Mix:\n"..path,"Numbers2Notes",0) end
+                        else
+                            r.MB("N2N Mix.lua was not found at:\n"..path.."\n\nInstall N2N Mix in the Scripts folder, one level above Notes2Numbers.","Numbers2Notes",0)
+                        end
+                    end
+                end
             end
             r.ImGui_PopStyleVar(ctx)
         end
