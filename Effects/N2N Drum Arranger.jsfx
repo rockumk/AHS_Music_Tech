@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.17
+version: 7.8.0-dev.18
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.17 -
+  # N2N Drum Arranger v7.8.0-dev.18 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -138,7 +138,7 @@ slider16:0<-100,100,0.01>-N2N Mix Position
 slider17:0<-100,100,0.01>-N2N Mix Intensity
 
 @init
-version_display = "v7.8.0-dev.17";
+version_display = "v7.8.0-dev.18";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -2406,12 +2406,13 @@ function btn(x,y,w,txt) (
 );
 
 // Display-only mix controls and guarded requests to the running N2N hub.
-function mix_request(cmd) local(addr,now) (
+function mix_request(cmd,payload) local(addr,now) (
     now=time_precise();
     abs(now-gmem[8320000])<2 && my_slot>=1 && my_slot<=512 && gmem[reg_base+my_slot]==my_key ? (
         addr=8320004+(my_slot-1)*4;
         gmem[addr]=my_key;
         gmem[addr+2]=now;
+        gmem[addr+3]=payload;
         gmem[addr+1]=cmd;
     );
 );
@@ -2421,12 +2422,18 @@ function mix_hub_button(x,y,w,label,cmd) local(hov,online,tw,th) (
     rect(x,y,w,20,hov&&online?.33:.18,hov&&online?.33:.18,hov&&online?.33:.18,1);
     gfx_measurestr(label,tw,th);
     draw_text(x+(w-tw)/2,y+(20-th)/2,label,online?.9:.4,online?.9:.4,online?.9:.4);
-    online && hov && mb && !p_mb && capture_id==0 ? mix_request(cmd);
+    online && hov && mb && !p_mb && capture_id==0 ? mix_request(cmd,0);
 );
-function mix_status_strip(x,y) local(p,cx,cy,i,a,rr,gg,bb,v,px) (
+function mix_display(x,y,w,kind) local(p,cx,cy,i,a,v,px,hov,mx0,mw) (
+    hov=mx>=x && mx<x+w && my>=y && my<y+20;
+    rect(x,y,w,20,hov?.25:.16,hov?.25:.16,hov?.25:.16,1);
+    hov && !help_active && !color_popup_active ? (
+        mix_hover=1;
+        mb && !p_mb && capture_id==0 ? mix_request(3,0);
+    );
+    kind==0 ? (
     // Prominence: 0 unset, 1 mute, 2/3 down, 4 mid, 5/6 up, 8 star, 9 transition.
-    p=floor(slider15+.5); cx=x+12; cy=y+10;
-    rect(x,y,24,20,.16,.16,.16,1);
+    p=floor(slider15+.5); cx=x+w/2; cy=y+10;
     gfx_set(.86,.86,.86,1);
     p==0 ? gfx_line(cx-4,cy,cx+4,cy) :
     p==1 ? (gfx_circle(cx,cy,6,0,1);gfx_line(cx-4,cy+4,cx+4,cy-4);) :
@@ -2444,20 +2451,21 @@ function mix_status_strip(x,y) local(p,cx,cy,i,a,rr,gg,bb,v,px) (
             i+=1;
         );
     );
-    // Bipolar Performance Intensity bar.
-    x+=28;rect(x,y,48,20,.16,.16,.16,1);
-    cx=x+24;v=max(-100,min(100,slider17));px=cx+v*.21;
-    v>=0 ? rect(cx,y+9,px-cx,8,.48,.76,.42,1) : rect(px,y+9,cx-px,8,.78,.50,.32,1);
-    gfx_set(.7,.7,.7,1);gfx_line(cx,y+8,cx,y+18);
-    draw_text(x+3,y+1,"INT",.7,.7,.7);
-    // Position (L / C / R).
-    x+=52;rect(x,y,48,20,.16,.16,.16,1);
-    cx=x+24;px=cx+max(-100,min(100,slider16))*.20;
-    gfx_set(.45,.45,.45,1);gfx_line(x+4,y+13,x+44,y+13);gfx_line(cx,y+9,cx,y+17);
-    rect(px-2,y+9,4,8,.85,.85,.85,1);
-    draw_text(x+3,y+1,"PAN",.7,.7,.7);
-    x+=53;mix_hub_button(x,y,38,"INST",1);
-    x+=42;mix_hub_button(x,y,38,"N2N",2);
+    ) : (
+        // Keep the label and the bipolar meter side by side.
+        mx0=x+31; mw=max(8,w-36); cx=mx0+mw/2;
+        kind==1 ? (
+            v=max(-100,min(100,slider17));px=cx+v*mw*.005;
+            v>=0 ? rect(cx,y+6,px-cx,8,.48,.76,.42,1) : rect(px,y+6,cx-px,8,.78,.50,.32,1);
+            gfx_set(.7,.7,.7,1);gfx_line(cx,y+4,cx,y+16);
+            draw_text(x+3,y+3,"INT",.8,.8,.8);
+        ) : (
+            px=cx+max(-100,min(100,slider16))*mw*.005;
+            gfx_set(.45,.45,.45,1);gfx_line(mx0,y+10,mx0+mw,y+10);gfx_line(cx,y+5,cx,y+15);
+            rect(px-2,y+6,4,8,.85,.85,.85,1);
+            draw_text(x+3,y+3,"PAN",.8,.8,.8);
+        );
+    );
 );
 
 
@@ -2585,8 +2593,8 @@ draw_x += item_w + ui_gap_small + 61;
 item_w = 18;
 btn(draw_x, draw_y, item_w, "?") ? ( help_active = !help_active; );
 draw_x += item_w + ui_gap_small;
-mix_status_strip(draw_x,draw_y);
-draw_x+=209;
+// Mix controls are drawn from the actual Bridge B/C/D, User 1 and Drop rectangles below.
+mix_hover=0;
 
 
 
@@ -2711,6 +2719,14 @@ loop(3,
         
         (my_row == current_tab_row) ? (
             item_w = mem[tab_w_base + gui_t]; // Using item_w dynamically from tab width
+            current_tab_row==1 ? (
+                gfx_setfont(1,os_font,fontsize,'b');
+                gui_t==18 ? mix_hub_button(draw_x,row1_y+3,item_w-5,"INST",1) :
+                gui_t==19 ? mix_hub_button(draw_x,row1_y+3,item_w-5,"N2N",2) :
+                gui_t==20 ? mix_display(draw_x,row1_y+3,item_w-5,0) :
+                gui_t==27 ? mix_display(draw_x,row1_y+3,item_w-5,1) :
+                gui_t==75 ? mix_display(draw_x,row1_y+3,item_w-5,2);
+            );
             // Capture the actual drawn tab rectangles; no changes to layout or clicks.
             arrow_show && gui_t == arrow_req ? (
                 arrow_req_x = draw_x; arrow_req_y = draw_y;
@@ -2731,8 +2747,23 @@ loop(3,
             is_ed ? draw_text(draw_x+3, draw_y+5, #tn, 0, 0, 0) : draw_text(draw_x+3, draw_y+4, #tn, 1, 1, 1);
             gfx_setfont(0);  
             
+            // Transport shortcuts take precedence over browsing and the sub-lock.
+            tab_hover=mx>=draw_x && mx<draw_x+item_w-5 && my>=draw_y && my<draw_y+26;
+            !help_active && !color_popup_active && capture_id==0 && tab_hover ? (
+                mb && !p_mb && shift_dn ? (
+                    last_tab_clk=0;
+                    mix_request(4,gui_t*3+1);
+                ) : rmb && !p_rmb ? (
+                    gfx_x=mx; gfx_y=my;
+                    section_play_menu=gfx_showmenu("-2|-1|Play");
+                    section_play_menu>0 ? (
+                        last_tab_clk=0;
+                        mix_request(4,gui_t*3+3-section_play_menu);
+                    );
+                );
+            );
             // Tab Clicking
-            (mb && p_mb == 0 && mx>=draw_x && mx<draw_x+item_w-24 && my>=draw_y && my<draw_y+26) ? ( 
+            (!shift_dn && mb && p_mb == 0 && mx>=draw_x && mx<draw_x+item_w-24 && my>=draw_y && my<draw_y+26) ? ( 
                 rec_cues_active ? (
                     send_tab_trigger(gui_t);
                     mem[tab_flash_base + gui_t] = 10;
@@ -2762,16 +2793,14 @@ loop(3,
             lx=draw_x+item_w-25; ly=draw_y+9; lw=17; lh=14;   
             rect(lx,ly,lw,lh, 0,0,0,1); 
 
-            (mb && p_mb == 0 && mx>=lx-3 && mx<lx+lw+3 && my>=ly-2 && my<ly+lh+2) ? ( 
+            (!shift_dn && mb && p_mb == 0 && mx>=lx-3 && mx<lx+lw+3 && my>=ly-2 && my<ly+lh+2) ? ( 
                 rec_cues_active == 0 ? (
                     mem[ui_locked_tab]=(mem[ui_locked_tab]==gui_t?-1:gui_t); 
                     gmem[GM_BASE+1]=mem[ui_locked_tab]; mem[ui_play_offset] = 0; playback_shift = 0; needs_tab_update = 1;
                 );
             );
 
-            (rmb && !p_rmb && mx>=lx-3 && mx<lx+lw+3 && my>=ly-2 && my<ly+lh+2) ? ( 
-                rec_cues_active == 0 ? ( mem[ui_edit_tab] = gui_t; mem[ui_locked_tab] == 0 ? mem[ui_locked_tab] = -1; );
-            );
+            // Right-click anywhere on the section opens the transport menu.
             
             // Locked: cyan lock body with a small play-shaped marker.
             // Unlocked: the existing grey body and hoop remain neutral.
@@ -4197,4 +4226,14 @@ help_active ? (
             capture_id = 90000; 
         );
     );
+);
+
+// Draw the display-only hover popup last so it stays above the section grid.
+mix_hover && !help_active && !color_popup_active && !mb && !rmb ? (
+    gfx_setfont(1,os_font,fontsize,'b');
+    gfx_measurestr("Display only Click for N2N Mix",mix_tip_w,mix_tip_h);
+    mix_tip_x=max(0,min(mx+10,gfx_w-mix_tip_w-12)); mix_tip_y=my+22;
+    rect(mix_tip_x,mix_tip_y,mix_tip_w+10,mix_tip_h+8,.09,.09,.09,1);
+    gfx_set(.55,.55,.55,1);gfx_rect(mix_tip_x,mix_tip_y,mix_tip_w+10,mix_tip_h+8,0);
+    draw_text(mix_tip_x+5,mix_tip_y+4,"Display only Click for N2N Mix",1,1,1);
 );
