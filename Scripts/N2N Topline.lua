@@ -1,5 +1,5 @@
 -- @description N2N Topline
--- @version 5.4-dev.3
+-- @version 5.4-dev.4
 -- @author Rock Kennedy and Gemini 4 Hydrogen (which did an absolutely fabulous job of transforming the vision into solid Lua code)
 -- @about
 --   Numbers2Notes Topline Melody Editor (1200x640 minimum):
@@ -54,7 +54,7 @@ end
 -- 2. CONFIGURATION
 --------------------------------------------------------------------------------
 local WIN_TITLE           = "N2N Topline"
-local MIN_WIN_W, MIN_WIN_H = 1200, 640
+local MIN_WIN_W, MIN_WIN_H = 1400, 640
 local GMEM_NAMESPACE      = "N2N_Ecosystem_RSKennedy"
 local GMEM_CHORD_BASE     = 3000000
 local GMEM_SCALE_BASE     = 3100000
@@ -141,7 +141,7 @@ local state = {
   nns_chart_items={}, letter_chart_items={}, has_nns_chart=false, has_letter_chart=false, chord_lane_h=24, last_chart_poll=0,
   view_mode="diatonic", tonic_pc=0, mode_idx=1, sync_key_from_gmem=true,
   gmem_tonic_pc=0, gmem_modal_center=0, gmem_has_key=false,
-  in_scale_h=34, harmony_border_style="dotted",
+  in_scale_h=34, harmony_border_style="dotted", piano_keys=false,
 
   notes={}, next_note_id=1, clipboard={}, undo_stack={}, redo_stack={},
   harmony_source="gmem", gmem_guides={}, gmem_song_end_qn=0, clip_guides={},
@@ -162,24 +162,23 @@ local state = {
   row_y={}, row_h={}, total_h=0,
   drag=nil, marquee=nil, hover_pitch=nil, hover_alt_seam=nil, last_mouse_cap=0,
   ui_controls={}, active_slider=nil, hscroll_geom=nil, vscroll_geom=nil, curve_handles={},
-  previews={}, kbd_held_pitch=nil, kbd_held_chan=0, status_msg="Ready",
+  previews={}, kbd_held_pitch=nil, kbd_held_chan=0, status_msg="Ready", section_hover=nil, last_view_save=0,
 }
 for i = 1, 32 do state.groove_data[i] = 0.0 end
 
 --------------------------------------------------------------------------------
 -- 4. GLOBAL & PROJECT PERSISTENCE
 --------------------------------------------------------------------------------
-local function save_global_prefs()
-  if state.hwnd and reaper.JS_Window_GetRect and gfx.dock(-1) == 0 then
-    local _, wx, wt, wr, wb = reaper.JS_Window_GetRect(state.hwnd)
-    if wx and wr then
-      state.win_x = wx
-      state.win_y = IS_MAC and wb or wt -- Cocoa bottom-left on macOS; top-left on Win/Linux
-      state.win_w = math.max(MIN_WIN_W, math.abs(wr - wx))
-      state.win_h = math.max(MIN_WIN_H, math.abs(wb - wt))
-      state.has_saved_win_pos = true
-    end
+-- Capture live geometry before gfx.quit destroys the native window.
+function state.capture_window()
+  if gfx.w<1 or gfx.h<1 or gfx.dock(-1)~=0 then return end
+  state.win_w,state.win_h=math.max(MIN_WIN_W,gfx.w),math.max(MIN_WIN_H,gfx.h)
+  local _,x,y=gfx.dock(-1,0,0,0,0)
+  if type(x)=="number" and type(y)=="number" then
+    state.win_x,state.win_y=x,y;state.has_saved_win_pos=true
   end
+end
+local function save_global_prefs()
   local s = function(k, v) reaper.SetExtState(EXT_GLOBAL_SEC, k, tostring(v), true) end
   s("dark_mode", CONFIG.dark_mode and "1" or "0"); s("auto_scroll", state.auto_scroll and "1" or "0")
   s("use_frameless", state.use_frameless and "1" or "0"); s("phrase_paste_mode", state.phrase_paste_mode)
@@ -189,7 +188,9 @@ local function save_global_prefs()
   s("mpe_release_tail_ms", state.mpe_release_tail_ms); s("in_scale_h", state.in_scale_h)
   s("view_mode", state.view_mode); s("mpe_enabled", state.mpe_enabled and "1" or "0"); s("mpe_bend_range", state.mpe_bend_range)
   s("win_x", state.win_x); s("win_y", state.win_y); s("win_w", state.win_w); s("win_h", state.win_h)
-  s("win_pos_v2", state.has_saved_win_pos and "1" or "0")
+  s("win_pos_v3", state.has_saved_win_pos and "1" or "0")
+  s("piano_keys",state.piano_keys and "1" or "0")
+  s("px_per_qn",state.px_per_qn);s("v_scale",state.v_scale)
   s("mod_vscroll", state.wheel_mods.v_scroll); s("mod_hscroll", state.wheel_mods.h_scroll)
   s("mod_hzoom", state.wheel_mods.h_zoom); s("mod_vzoom", state.wheel_mods.v_zoom)
 end
@@ -211,8 +212,11 @@ local function load_global_prefs()
   if g("mpe_enabled")=="0" then state.mpe_enabled=false elseif g("mpe_enabled")=="1" then state.mpe_enabled=true end
   local mbr=tonumber(g("mpe_bend_range")); if mbr and (mbr==2 or mbr==12 or mbr==24 or mbr==48) then state.mpe_bend_range=mbr end
   local wx, wy, ww, wh = tonumber(g("win_x")), tonumber(g("win_y")), tonumber(g("win_w")), tonumber(g("win_h"))
-  if g("win_pos_v2") == "1" and wx and wy then state.win_x, state.win_y = math.floor(wx), math.floor(wy); state.has_saved_win_pos = true end
+  if g("win_pos_v3") == "1" and wx and wy then state.win_x, state.win_y = math.floor(wx), math.floor(wy); state.has_saved_win_pos = true end
   if ww and wh then state.win_w, state.win_h = math.max(MIN_WIN_W, math.floor(ww)), math.max(MIN_WIN_H, math.floor(wh)) end
+  state.piano_keys=g("piano_keys")=="1"
+  state.px_per_qn=clamp(tonumber(g("px_per_qn")) or state.px_per_qn,20,480)
+  state.v_scale=clamp(tonumber(g("v_scale")) or state.v_scale,0.45,3.0)
   local function rm(k, d) local v=g(k); return (v and v~="") and v or d end
   state.wheel_mods.v_scroll=rm("mod_vscroll","None"); state.wheel_mods.h_scroll=rm("mod_hscroll","Shift")
   state.wheel_mods.h_zoom=rm("mod_hzoom","Ctrl"); state.wheel_mods.v_zoom=rm("mod_vzoom","Alt")
@@ -1215,8 +1219,9 @@ end
 local function apply_window_frame_style()
   if not state.hwnd or not reaper.JS_Window_SetStyle then return end
   if state.use_frameless and gfx.dock(-1) == 0 then
-    reaper.JS_Window_SetStyle(state.hwnd, "POPUP,SIZEBOX")
-    if reaper.JS_Window_AttachResizeGrip then reaper.JS_Window_AttachResizeGrip(state.hwnd) end
+    -- Windows SIZEBOX creates a native non-client border above the custom bar.
+    -- Our own resize grip handles resizing without that bright strip.
+    reaper.JS_Window_SetStyle(state.hwnd, IS_MAC and "POPUP,SIZEBOX" or "POPUP")
     state.frameless = true; state.titlebar_h = 28
   else
     reaper.JS_Window_SetStyle(state.hwnd, "CAPTION,SIZEBOX,SYSMENU,MAXIMIZEBOX,MINIMIZEBOX")
@@ -1243,7 +1248,7 @@ local function draw_toolbar()
   local ty = state.titlebar_h
   set_col(CONFIG.dark_mode and {0.13,0.14,0.17} or {0.98,0.98,0.99}); gfx.rect(0, ty, gfx.w, state.toolbar_h, 1)
   set_col(CONFIG.dark_mode and {0.22,0.24,0.28} or {0.86,0.88,0.91}); gfx.line(0, ty + state.toolbar_h - 1, gfx.w, ty + state.toolbar_h - 1)
-  local x, y, h = 8, ty + 9, 32
+  local x, y, h = 8, ty + 12, 26
 
   register_btn("file_menu", x, y, 50, h, "File", false, function(bx, by, bw, bh)
     gfx.x, gfx.y = bx, by + bh; local tracks, rep_sub, mrg_sub = {}, "", ""
@@ -1321,7 +1326,15 @@ local function draw_toolbar()
   end, play_teal, play_teal); x = x + 64
 
   register_btn("autoscroll_btn", x, y, 74, h, "AutoScroll", state.auto_scroll, function() state.auto_scroll = not state.auto_scroll; save_global_prefs() end); x = x + 78
-  if #get_selected_notes() > 0 then register_btn("clear_sel_btn", x, y, 66, h, "Clear Sel", false, function() deselect_all(); state.status_msg = "Selection cleared" end); x = x + 70 end
+  register_btn("clear_sel_btn", x, y, 66, h, "Clear Sel", false, function() deselect_all(); state.status_msg = "Selection cleared" end); x = x + 70
+  register_btn("open_instrument", x, y, 116, h, "Open Instrument", false, function()
+    local tr=state.output_track
+    if tr and reaper.ValidatePtr2(owner_project,tr,"MediaTrack*") then
+      local fx=reaper.TrackFX_GetInstrument(tr)
+      if fx>=0 then reaper.TrackFX_Show(tr,fx,3);return end
+    end
+    state.status_msg="Select an output track with an instrument first."
+  end); x=x+120
 
   local deleted_secs = {}; for _, s in ipairs(state.sections) do if s.deleted then table.insert(deleted_secs, s) end end
   if #deleted_secs > 0 then
@@ -1359,8 +1372,8 @@ local function draw_regions_bar(canvas_w)
           table.insert(state.ui_controls, {
             id = "sec_" .. i, x = cx, y = btn_y, w = cw, h = btn_h,
             on_click = function()
-              state.selected_section_uid = sec.uid; state.section_glow_uid = sec.uid; state.section_glow_until = reaper.time_precise() + 0.65; state.section_glow_held = true
-              reaper.SetEditCurPos(sec.pos_sec, true, true); state.status_msg = string.format("Active Section -> [%s] (%d notes)", sec.name, count_section_notes(sec.uid)); save_project_state()
+              local shifted=(gfx.mouse_cap&8)~=0
+              state.cue_section(sec,shifted and 1 or 0,shifted)
             end,
             on_right_click = function()
               gfx.x, gfx.y = gfx.mouse_x, gfx.mouse_y; local r_cnt, sel_cnt = count_section_notes(sec.uid), #get_selected_notes()
@@ -1374,6 +1387,7 @@ local function draw_regions_bar(canvas_w)
             end
           })
 
+          if hov then state.hover_section(sec,cx,btn_y,cw,top_half_h) end
           local fill_col = hov and mix_rgb(sec.rgb, {1,1,1}, 0.16) or sec.rgb
           draw_bordered_roundrect(cx + 1, btn_y, cw - 2, btn_h, 7, is_sel and 2.5 or 1.0, is_sel and (CONFIG.dark_mode and {1,0.90,0.35} or {0.10,0.12,0.16}) or mix_rgb(sec.rgb,{0,0,0},0.25), fill_col, is_sel and 1.0 or 0.86)
           if cw > 26 then
@@ -1473,6 +1487,11 @@ local function draw_keyboard(grid_bottom_y)
       local sy = pitch_to_screen_y(p); local cy1, cy2 = math.max(top_area, sy + 1), math.min(grid_bottom_y - 1, sy + rh - 1)
       if cy2 > cy1 then
         local cols = get_step_colors(get_rel_step(p)); local is_hov = (state.hover_pitch == p or state.kbd_held_pitch == p); local kw, kf = state.keyboard_w - 10, (is_hov and cols.key_bright or cols.key_mid)
+        if state.piano_keys then
+          local black=not is_pitch_diatonic(p)
+          kw=black and math.floor(kw*.72) or kw
+          kf=black and (is_hov and {0.28,0.28,0.30} or {0.12,0.12,0.14}) or (is_hov and {0.78,0.83,0.88} or {0.91,0.91,0.91})
+        end
         set_col(kf); draw_filled_roundrect(4, cy1, kw, cy2 - cy1, 4); set_col(cols.active, 1.0); draw_filled_roundrect(4, cy1 + 1, 6, math.max(2, cy2 - cy1 - 2), 2)
         if is_hov then set_col(CONFIG.dark_mode and {1,1,1} or {0.12,0.14,0.18}, 0.95); gfx.roundrect(4, cy1, kw, cy2 - cy1, 4, 1); gfx.roundrect(5, cy1 + 1, kw - 2, math.max(1, cy2 - cy1 - 2), 3, 1) end
         if cy2 - cy1 >= 14 and sy >= top_area - 4 then local ll, rl = get_key_left_right_labels(p); set_col(contrast_text_col(kf)); draw_text_left(ll, 14, cy1, kw - 38, cy2 - cy1); draw_text_right(rl, 14, cy1, kw - 20, cy2 - cy1) end
@@ -1730,32 +1749,127 @@ local function draw_bottom_controls(canvas_w)
   end
 end
 
+-- Transport colors and icon geometry match N2N Mix.
+function state.transport_button(id,x,y,w,h,label,active,accent,action,icon)
+  local hov=gfx.mouse_x>=x and gfx.mouse_x<=x+w and gfx.mouse_y>=y and gfx.mouse_y<=y+h
+  local pressed=hov and (gfx.mouse_cap&1)~=0
+  local bg=pressed and {0.29,0.29,0.29} or hov and {0.224,0.224,0.224} or active and {0.20,0.20,0.20} or {0.145,0.145,0.145}
+  local fg=active and accent or accent and id=="tr_2" and {0.73,0.52,0.52} or {0.80,0.80,0.80}
+  draw_bordered_roundrect(x,y,w,h,4,1,active and accent or {0.318,0.318,0.318},bg)
+  set_col(fg);gfx.setfont(1,"Segoe UI",13)
+  if icon then icon(x+w/2,y+h/2) else draw_text_centered(label,x,y,w,h) end
+  table.insert(state.ui_controls,{id=id,x=x,y=y,w=w,h=h,on_click=action})
+end
+function state.transport_icon(i,x,y)
+  local function ln(a,b,c,d) gfx.line(x+a,y+b,x+c,y+d,1) end
+  local function rect(a,b,c,d) gfx.rect(x+a,y+b,c-a,d-b,1) end
+  local function tri(a,b,c,d,e,f) gfx.triangle(x+a,y+b,x+c,y+d,x+e,y+f) end
+  if i==1 then rect(-1,-6,1,1);gfx.circle(x,y+5,1.3,1,1)
+  elseif i==2 then gfx.circle(x,y,5.5,1,1)
+  elseif i==3 then tri(-4,-6,-4,6,6,0)
+  elseif i==4 then rect(-5,-5,5,5)
+  elseif i==5 then rect(-5,-6,-1,6);rect(1,-6,5,6)
+  elseif i==6 then ln(-6,0,-6,-4);ln(-6,-4,4,-4);ln(1,-7,4,-4);ln(1,-1,4,-4);ln(6,0,6,4);ln(6,4,-4,4);ln(-1,1,-4,4);ln(-1,7,-4,4)
+  elseif i==7 then rect(-7,-6,-5,6);tri(4,-6,4,6,-4,0)
+  elseif i==8 then ln(5,0,-5,0);ln(-5,0,0,-5);ln(-5,0,0,5)
+  elseif i==9 then ln(-5,0,5,0);ln(5,0,0,-5);ln(5,0,0,5)
+  elseif i==10 then rect(5,-6,7,6);tri(-4,-6,-4,6,4,0) end
+end
+function state.raise_window(hwnd)
+  if not hwnd then return end
+  if reaper.JS_Window_IsVisible and not reaper.JS_Window_IsVisible(hwnd) and reaper.JS_Window_Show then reaper.JS_Window_Show(hwnd,"SHOW") end
+  if reaper.JS_Window_SetZOrder then reaper.JS_Window_SetZOrder(hwnd,"TOP") end
+  if reaper.JS_Window_SetForeground then reaper.JS_Window_SetForeground(hwnd) end
+  if reaper.JS_Window_SetFocus then reaper.JS_Window_SetFocus(hwnd) end
+end
+function state.open_numbers2notes()
+  local sec="N2N_EDITOR_WINDOWS"
+  local hb=tonumber(reaper.GetExtState(sec,"numbers2notes:heartbeat"))
+  local hwnd=reaper.JS_Window_Find and reaper.JS_Window_Find("Numbers2Notes - Nashville Number Charts for Reaper",true)
+  if hb and math.abs(reaper.time_precise()-hb)<3 then
+    reaper.SetExtState(sec,"numbers2notes:focus",tostring(reaper.time_precise()),false);state.raise_window(hwnd);return
+  end
+  if hwnd then state.raise_window(hwnd);return end
+  local src=debug.getinfo(1,"S").source:gsub("^@",""):gsub("\\","/")
+  local dir=src:match("^(.*[/])")
+  -- Existing older registrations can contain Notes2Numbers/../.
+  if dir then dir=dir:gsub("Notes2Numbers/%.%./","") end
+  local path=dir and dir.."Notes2Numbers/Numbers2Notes.lua"
+  local f=path and io.open(path,"rb")
+  if not f then state.status_msg="Numbers2Notes.lua not found.";return end
+  f:close()
+  local cmd=reaper.AddRemoveReaScript(true,0,path,true)
+  if cmd and cmd>0 then reaper.Main_OnCommand(cmd,0) else state.status_msg="Could not launch Numbers2Notes." end
+end
+function state.cue_section(sec,bars,play)
+  if (reaper.GetPlayState()&4)~=0 then state.status_msg="Stop recording before cueing.";return end
+  if reaper.GetPlayState()~=0 then reaper.Main_OnCommand(1016,0) end
+  local q=math.max(0,sec.start_qn-bars*(sec.bar_qn or 4))
+  reaper.SetEditCurPos(reaper.TimeMap2_QNToTime(0,q),true,false)
+  state.selected_section_uid=sec.uid;state.selected_phrase=nil
+  state.section_glow_uid=sec.uid;state.section_glow_until=reaper.time_precise()+.65
+  state.scroll_x_qn=q
+  state.status_msg="Active Section: "..sec.name
+  state.section_hover=nil
+  if play then reaper.Main_OnCommand(1007,0) end
+  save_project_state()
+end
+function state.hover_section(sec,x,y,w,h)
+  if (gfx.mouse_cap&3)~=0 then return end
+  local old=state.section_hover
+  if old and old.popup then
+    local p=old.popup
+    if gfx.mouse_x>=p.x and gfx.mouse_x<=p.x+p.w and gfx.mouse_y>=p.y and gfx.mouse_y<=p.y+p.h then return end
+  end
+  state.section_hover={sec=sec,x=x,y=y,w=w,h=h,expires=reaper.time_precise()+.45}
+end
+function state.draw_section_popup(canvas_w)
+  local h=state.section_hover;if not h then return end
+  local w,ph=96,30
+  local x=clamp(h.x-6,0,math.max(0,canvas_w-w))
+  local y=h.y-ph-2
+  if y<state.titlebar_h then y=h.y+h.h+2 end
+  local hover=gfx.mouse_x>=x and gfx.mouse_x<=x+w and gfx.mouse_y>=y and gfx.mouse_y<=y+ph
+  if hover then h.expires=reaper.time_precise()+.45 end
+  if reaper.time_precise()>h.expires then state.section_hover=nil;return end
+  h.popup={x=x,y=y,w=w,h=ph}
+  draw_bordered_roundrect(x,y,w,ph,4,1,{.32,.32,.32},{.10,.10,.10})
+  for i=1,3 do
+    state.transport_button("section_play_"..i,x+3+(i-1)*30,y+3,28,24,i==1 and "-2" or i==2 and "-1" or "",false,nil,function() state.cue_section(h.sec,3-i,true) end,i==3 and function(cx,cy) state.transport_icon(3,cx,cy) end or nil)
+  end
+end
+function state.transport_action(i)
+  local cmds={40349,1013,1007,1016,1008,0,40042,40172,40173,40043}
+  if i==6 then reaper.GetSetRepeat(reaper.GetSetRepeat(-1)==1 and 0 or 1)
+  else reaper.Main_OnCommand(cmds[i],0);if i==4 then reaper.Main_OnCommand(40349,0) end end
+end
 local function draw_transport_bar(canvas_w)
-  local trans_y, right_x, left_x = gfx.h - state.transport_h, get_grid_right_x(canvas_w), state.keyboard_w
-  set_col(CONFIG.dark_mode and {0.12,0.13,0.17} or {0.95,0.96,0.98}); gfx.rect(0, trans_y, canvas_w, state.transport_h, 1)
-  set_col(CONFIG.dark_mode and {0.24,0.26,0.30} or {0.84,0.86,0.90}); gfx.line(0, trans_y, canvas_w, trans_y)
-  local ps = reaper.GetPlayState(); local is_play, is_pause, is_rec, is_loop = (ps&1)==1, (ps&2)==2, (ps&4)==4, reaper.GetSetRepeat(-1)==1
-  local tx, ty, th = 10, trans_y + 5, 34
-  register_btn("tr_rec",   tx, ty, 52, th, "Rec",   is_rec,   function() reaper.Main_OnCommand(1013, 0) end, {190/255,48/255,48/255}, {102/255,40/255,40/255}); tx = tx + 56
-  register_btn("tr_play",  tx, ty, 54, th, "Play",  is_play,  function() reaper.Main_OnCommand(1007, 0) end, {30/255,165/255,165/255}, {20/255,102/255,102/255}); tx = tx + 58
-  register_btn("tr_loop",  tx, ty, 54, th, "Loop",  is_loop,  function() reaper.GetSetRepeat(2) end, {0.22,0.48,0.85}); tx = tx + 58
-  register_btn("tr_stop",  tx, ty, 54, th, "Stop",  not is_play and not is_pause, function() reaper.Main_OnCommand(1016, 0) end, {0.42,0.45,0.52}); tx = tx + 58
-  register_btn("tr_pause", tx, ty, 58, th, "Pause", is_pause, function() reaper.Main_OnCommand(1008, 0) end, {0.85,0.58,0.16}); tx = tx + 70
-
-  local active_secs = {}; for _, s in ipairs(state.sections) do if not s.deleted then table.insert(active_secs, s) end end
-  if #active_secs > 0 then
-    gfx.setfont(1, "Segoe UI", 12); set_col(CONFIG.dark_mode and {0.68,0.72,0.80} or {0.40,0.44,0.50}); draw_text_left("Jump (-1 Bar):", tx, ty, 88, th); tx = tx + 92
-    for i, sec in ipairs(active_secs) do
-      if tx + 32 <= canvas_w - 200 then
-        register_btn("jmp_" .. i, tx, ty, 30, th, sec.name:sub(1, 1):upper(), true, function()
-          local tqn = math.max(0, sec.start_qn - (sec.bar_qn or 4.0)); reaper.SetEditCurPos(reaper.TimeMap2_QNToTime(0, tqn), true, true)
-          local vis_qn = (right_x - left_x) / state.px_per_qn; if tqn < state.scroll_x_qn or tqn > state.scroll_x_qn + vis_qn * 0.85 then state.scroll_x_qn = math.max(0, tqn - vis_qn * 0.15) end
-          state.status_msg = string.format("Jumped 1 bar before [%s]", sec.name)
-        end, sec.rgb); tx = tx + 34
-      end
+  local trans_y=gfx.h-state.transport_h
+  set_col(CONFIG.dark_mode and {.12,.13,.17} or {.95,.96,.98});gfx.rect(0,trans_y,canvas_w,state.transport_h,1)
+  set_col(CONFIG.dark_mode and {.24,.26,.30} or {.84,.86,.90});gfx.line(0,trans_y,canvas_w,trans_y)
+  local ps=reaper.GetPlayState()
+  local tx,ty,th=10,trans_y+16,26
+  local labels={"!","F9","F10","F11","F12","","Home","Pg ↓","Pg ↑","End"}
+  for i=1,10 do
+    local active=(i==2 and (ps&4)~=0) or (i==3 and (ps&1)~=0 and (ps&2)==0) or (i==5 and (ps&2)~=0) or (i==6 and reaper.GetSetRepeat(-1)==1)
+    local accent=i==2 and {.81,.47,.47} or i==3 and {.62,.78,.65} or {.83,.72,.43}
+    gfx.setfont(1,"Segoe UI",11);set_col({.88,.88,.88});draw_text_centered(labels[i],tx,trans_y+1,30,14)
+    state.transport_button("tr_"..i,tx,ty,30,th,"",active,accent,function() state.transport_action(i) end,function(x,y) state.transport_icon(i,x,y) end)
+    tx=tx+((i==1 or i==6) and 36 or 33)
+  end
+  tx=tx+9
+  state.transport_button("open_n2n",tx,ty,156,th,"Open Numbers2Notes",false,nil,state.open_numbers2notes)
+  tx=tx+168
+  for i,sec in ipairs(state.sections) do
+    if not sec.deleted and tx+32<=canvas_w-160 then
+      register_btn("jmp_"..i,tx,ty,30,th,sec.name:sub(1,1):upper(),true,function()
+        local shifted=(gfx.mouse_cap&8)~=0;state.cue_section(sec,shifted and 1 or 0,shifted)
+      end,sec.rgb)
+      if gfx.mouse_x>=tx and gfx.mouse_x<=tx+30 and gfx.mouse_y>=ty and gfx.mouse_y<=ty+th then state.hover_section(sec,tx,ty,30,th) end
+      tx=tx+34
     end
   end
-  gfx.setfont(1, "Segoe UI", 12); set_col(CONFIG.dark_mode and {0.64,0.68,0.75} or {0.42,0.45,0.52}); draw_text_right(state.status_msg, tx + 6, ty, math.max(120, canvas_w - tx - 22), th)
+  gfx.setfont(1,"Segoe UI",12);set_col(CONFIG.dark_mode and {.64,.68,.75} or {.42,.45,.52});draw_text_right(state.status_msg,tx+6,ty,math.max(0,canvas_w-tx-22),th)
 end
 
 local function draw_lanes_drawer()
@@ -1773,6 +1887,8 @@ local function draw_lanes_drawer()
   register_btn("frameless_btn", dx + 20 + hw, y, hw, 23, "Dark Bar: " .. (state.use_frameless and "ON" or "OFF"), state.use_frameless, function() state.use_frameless = not state.use_frameless; apply_window_frame_style(); save_global_prefs() end); y = y + 26
   register_btn("harm_border_style", dx + 14, y, hw, 23, "Mid: " .. (state.harmony_border_style == "dotted" and "Dotted" or "Solid"), state.harmony_border_style == "solid", function() state.harmony_border_style = (state.harmony_border_style == "dotted") and "solid" or "dotted"; save_global_prefs() end)
   register_btn("phrase_mode_btn", dx + 20 + hw, y, hw, 23, "Paste: " .. (state.phrase_paste_mode == "replace" and "Replace" or "Merge"), state.phrase_paste_mode == "replace", function() state.phrase_paste_mode = (state.phrase_paste_mode == "replace") and "merge" or "replace"; save_global_prefs() end); y = y + 26
+
+  register_btn("piano_keys", dx+14,y,state.drawer_w-28,23,"Number Keys: "..(state.piano_keys and "Piano" or "Color"),state.piano_keys,function() state.piano_keys=not state.piano_keys;save_global_prefs() end);y=y+26
 
   local h_lbl = "Harmony View: N2N Pref"
   if state.harmony_source == "clip_pulled" then h_lbl = "Harmony View: Pulled Clip" elseif state.harmony_source == "diatonic" then h_lbl = "Harmony View: Diatonic"
@@ -2231,6 +2347,11 @@ local function handle_keyboard()
   elseif char == 1919379572 then move_selected_by_arrows(0, 1, shift, alt, false)
   elseif char == 6579564 or char == 8 then delete_selected()
   elseif char == 32 then reaper.Main_OnCommand(40044, 0)
+  elseif char == 26169 then state.transport_action(2)
+  elseif char == 6697264 then state.transport_action(3)
+  elseif char == 6697265 then state.transport_action(4)
+  elseif char == 6697266 then state.transport_action(5)
+  elseif char == 33 then state.transport_action(1)
   elseif not ctrl and not alt and (char == 109 or char == 77) then toggle_mute_selected()
   elseif char == 1 or (ctrl and (char == 65 or char == 97)) then select_all()
   elseif char == 3 or (ctrl and (char == 67 or char == 99)) then copy_selected()
@@ -2282,16 +2403,16 @@ local function apply_hub_request(tr,region)
       end
     end
   end
-  if state.hwnd and reaper.JS_Window_SetFocus then reaper.JS_Window_SetFocus(state.hwnd) end
+  state.raise_window(state.hwnd)
 end
 local function main()
-  if reaper.EnumProjects(-1,"")~=owner_project then gfx.quit(); on_script_exit(); return end
+  if reaper.EnumProjects(-1,"")~=owner_project then state.capture_window();on_script_exit();gfx.quit();return end
   reaper.SetExtState(HUB_EXT_SEC,"heartbeat",tostring(reaper.time_precise()),false)
   if reaper.GetExtState(HUB_EXT_SEC,"focus")~="" then
     reaper.DeleteExtState(HUB_EXT_SEC,"focus",false)
     if reaper.JS_Window_Find and reaper.JS_Window_SetFocus then
       state.hwnd=state.hwnd or reaper.JS_Window_Find(WIN_TITLE,true)
-      if state.hwnd then reaper.JS_Window_SetFocus(state.hwnd) end
+      state.raise_window(state.hwnd)
     end
   end
   if not state.drag and (gfx.mouse_cap&3)==0 then
@@ -2300,7 +2421,7 @@ local function main()
   end
   state.ui_controls = {}
   update_previews()
-  if not handle_keyboard() then gfx.quit(); on_script_exit(); return end
+  if not handle_keyboard() then state.capture_window();on_script_exit();gfx.quit();return end
 
   -- Cross-platform minimum size enforcement (1200x640 client area via JS_Window_Resize)
   if gfx.dock(-1) == 0 and (gfx.w < MIN_WIN_W or gfx.h < MIN_WIN_H) and (not state.drag or state.drag.type ~= "win_resize") then
@@ -2321,6 +2442,12 @@ local function main()
   end
 
   local now = reaper.time_precise()
+  state.capture_window()
+  if now-state.last_view_save>2 then
+    state.last_view_save=now
+    local sig=table.concat({state.win_x,state.win_y,state.win_w,state.win_h,state.px_per_qn,state.v_scale,state.scroll_x_qn,state.scroll_y_px},":")
+    if state.view_sig~=sig then state.view_sig=sig;save_global_prefs() end
+  end
   if now - state.last_region_poll > 0.75 then state.last_region_poll = now; refresh_regions_and_sections() end
   if now - state.last_chart_poll > 0.75 then state.last_chart_poll = now; refresh_chord_charts() end
   if state.harmony_source == "gmem" and (now - state.last_gmem_poll > 0.35) then
@@ -2346,6 +2473,7 @@ local function main()
   draw_lanes_drawer()
   draw_toolbar()
   draw_custom_titlebar_and_resize_grip()
+  state.draw_section_popup(canvas_w)
 
   handle_mouse()
   gfx.update()
@@ -2371,10 +2499,7 @@ local function setup_frameless_dark_titlebar()
   if reaper.JS_Window_Find then
     state.hwnd = reaper.JS_Window_Find(WIN_TITLE, true)
     apply_window_frame_style()
-    if state.hwnd and state.has_saved_win_pos and gfx.dock(-1) == 0 then
-      if reaper.JS_Window_Move then reaper.JS_Window_Move(state.hwnd, state.win_x, state.win_y) end
-      if reaper.JS_Window_Resize then reaper.JS_Window_Resize(state.hwnd, math.max(MIN_WIN_W, state.win_w), math.max(MIN_WIN_H, state.win_h)) end
-    end
+    -- gfx.init restores client size and screen location in a single call.
   end
 end
 
@@ -2421,7 +2546,9 @@ local function init()
 
   if not state.has_saved_view then state.scroll_y_px = math.max(0, (state.row_y[72] or 450)) end
   gfx.ext_retina = 1.0
-  gfx.init(WIN_TITLE, math.max(MIN_WIN_W, state.win_w), math.max(MIN_WIN_H, state.win_h), 0)
+  if state.has_saved_win_pos then
+    gfx.init(WIN_TITLE, math.max(MIN_WIN_W,state.win_w),math.max(MIN_WIN_H,state.win_h),0,state.win_x,state.win_y)
+  else gfx.init(WIN_TITLE,math.max(MIN_WIN_W,state.win_w),math.max(MIN_WIN_H,state.win_h),0) end
   setup_frameless_dark_titlebar()
   reaper.atexit(on_script_exit)
   main()
