@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.4.0-dev.11
+version: 12.4.0-dev.12
 author: Rock Kennedy
 about:
-  # N2N Arp v12.4.0-dev.11
+  # N2N Arp v12.4.0-dev.12
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -31,7 +31,7 @@ slider17:0<-100,100,0.01>-N2N Mix Intensity
 @init
 scale_dirty = 0;
 last_input_mode = -1;
-thisversion = "v12.4.0-dev.11";
+thisversion = "v12.4.0-dev.12";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -3020,17 +3020,6 @@ x2 += item_w + ui_gap_small;
         draw_text(hf_x+hf_w/2+10,ctrl_y+2,"1/2",hf_act?0:.5,hf_act?0:.5,hf_act?0:.5);
         gfx_set(0,0,0,1);gfx_line(hf_x+hf_w/2,ctrl_y,hf_x+hf_w/2,ctrl_y+box_h);
     );
-
-        !hf_act ? ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(hf_x, ctrl_y, 45, box_h); ); 
-        hf_act  ? ( gfx_set(0.6, 0.6, 0.6, 1); gfx_rect(hf_x+45, ctrl_y, 45, box_h); ); 
-        !hf_act ? gfx_set(0,0,0,1 ) : gfx_set(0.5,0.5,0.5,1); draw_text(hf_x+10, ctrl_y+2, "1x", 0,0,0);
-        hf_act ? gfx_set(0,0,0,1) : gfx_set(0.5,0.5,0.5,1); draw_text(hf_x+55, ctrl_y+2, "1/2", 0,0,0);
-        gfx_set(0,0,0,1); gfx_line(hf_x+45, ctrl_y, hf_x+45, ctrl_y+box_h);
-    );
-
-
-
-
 
     st_x=mix_stretch_x;
     centered_btn(st_x,ctrl_y,2*ttabw-5,19,"STRETCH") ? ( 
