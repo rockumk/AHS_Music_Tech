@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.20
+version: 7.8.0-dev.21
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.20 -
+  # N2N Drum Arranger v7.8.0-dev.21 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -136,9 +136,10 @@ slider12:1<0,1,1>-Song Form Protocol
 slider15:0<0,9,1>-N2N Mix Prominence
 slider16:0<-100,100,0.01>-N2N Mix Position
 slider17:0<-100,100,0.01>-N2N Mix Intensity
+slider18:0<-500,500,1>-Visual Sync (ms)
 
 @init
-version_display = "v7.8.0-dev.20";
+version_display = "v7.8.0-dev.21";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -2352,7 +2353,12 @@ l_my = my;
 gfx_getchar(); 
 
 ui_lock = (capture_id == 9999);
-help_active ? capture_id = 90000;
+// Help is modal: preserve raw click edge but suppress all underlying controls.
+help_click=help_active && mb && !p_mb;
+!mb && !rmb ? help_block_until_release=0;
+help_active || help_block_until_release ? (
+    mb=0;rmb=0;mouse_wheel=0;mouse_hwheel=0;capture_id=0;
+);
 
 UI_TOP_X=5; UI_TOP_Y=10; UI_GAP_X=40; UI_ROW_H=20;
 HDR_X=UI_TOP_X; HDR_Y=UI_TOP_Y; HDR_W=240; HDR_H=20;
@@ -2403,6 +2409,33 @@ function btn(x,y,w,txt) (
     rect(x,y,w,BTN_H, 0.3,0.3,0.3,1);
     draw_text(x+5,y+3,txt,1,1,1);
     (mb && p_mb == 0 && mx>=x && mx<x+w && my>=y && my<y+BTN_H);
+);
+
+// Saved visual-only delay in milliseconds. Never used by the MIDI engine.
+function visual_sync_phase(phase,total,source) local(rate,steps_per_sec) (
+    rate=eff_half(source)?0.5:1;
+    steps_per_sec=tempo/60*rate*eff_sub(source)/4;
+    fmod_pos(phase-slider18*.001*steps_per_sec,total);
+);
+function help_sync_button(x,y,w,label) local(tw,th,hover) (
+    hover=mx>=x && mx<x+w && my>=y && my<y+24;
+    rect(x,y,w,24,hover?.4:.29,hover?.4:.29,hover?.4:.29,1);
+    gfx_measurestr(label,tw,th);draw_text(x+(w-tw)/2,y+(24-th)/2,label,1,1,1);
+    help_click && hover;
+);
+function draw_visual_sync(x,y) local(delta,old) (
+    gfx_setfont(1,os_font,fontsize,'b');
+    draw_text(x,y,"VISUAL SYNC (ms)",.8,.9,.9);
+    old=slider18;delta=shift_dn?1:10;
+    help_sync_button(x,y+22,48,"-") ? slider18=max(-500,slider18-delta);
+    rect(x+53,y+22,100,24,.12,.12,.12,1);
+    sprintf(#visual_sync_text,"%+d ms",slider18);
+    gfx_measurestr(#visual_sync_text,vs_tw,vs_th);
+    draw_text(x+53+(100-vs_tw)/2,y+22+(24-vs_th)/2,#visual_sync_text,1,1,1);
+    help_sync_button(x+158,y+22,48,"+") ? slider18=min(500,slider18+delta);
+    help_sync_button(x+216,y+22,64,"RESET") ? slider18=0;
+    slider18!=old ? sliderchange(slider18);
+    draw_text(x,y+52,"+ delays the display; - advances it. Shift-click for 1 ms.",.8,.8,.8);
 );
 
 // Display-only mix controls and guarded requests to the running N2N hub.
@@ -2598,7 +2631,10 @@ draw_x += item_w + ui_gap_small + 61;
 
 // Help
 item_w = 18;
-btn(draw_x, draw_y, item_w, "?") ? ( help_active = !help_active; );
+btn(draw_x, draw_y, item_w, "?") ? (
+    help_active=1;help_block_until_release=1;help_click=0;mb=0;rmb=0;
+    color_popup_active=0;capture_id=0;
+);
 draw_x += item_w + ui_gap_small;
 // Mix controls are drawn from the actual Bridge B/C/D, User 1 and Drop rectangles below.
 mix_hover=0;
@@ -2985,6 +3021,10 @@ t_e = mem[ui_edit_tab];
             gfx_phase_pos=fmod_pos((beat_position+playback_shift)*gfx_phase_rate*gfx_phase_sub/4,gfx_phase_steps);
             gfx_phase_step=floor(gfx_phase_pos);
         );
+    );
+    gfx_phase_running && gfx_phase_steps>0 ? (
+        gfx_phase_pos=visual_sync_phase(gfx_phase_pos,gfx_phase_steps,gfx_phase_source);
+        gfx_phase_step=floor(gfx_phase_pos);
     );
     gfx_highlight_actual=gfx_phase_running && t_e==gfx_phase_source;
     gfx_highlight_ghost=gfx_phase_running && t_e==gfx_requested_tab && fb_tab==gfx_phase_source && is_ghosting;
@@ -4183,7 +4223,7 @@ help_active ? (
     gfx_set(0,0,0,0.85); gfx_rect(0,0,gfx_w,gfx_h);
     
     // RENAMED VARIABLES HERE TO PREVENT COLLISION
-    help_w = 550; help_h = 570; help_x = (gfx_w-help_w)/2; help_y = (gfx_h-help_h)/2;
+    help_w = 550; help_h = 650; help_x = (gfx_w-help_w)/2; help_y = (gfx_h-help_h)/2;
     
     rect(help_x, help_y, help_w, help_h, 0.2, 0.2, 0.2, 1);
     gfx_set(0.2*bri,  1.0*bri,  1.0*bri,1);
@@ -4228,6 +4268,7 @@ help_active ? (
     //gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - -> : Export Single Pattern (.n2drumpat)");
     //gfx_x = help_x+20; gfx_y += 16; gfx_drawstr(" - => : Export Pattern Bank (.n2drumpats)");
     
+    draw_visual_sync(help_x+20,help_y+450);
     // UPDATED THESE VARIABLES AS WELL
     // Compact read-only diagnostics for song-form/view troubleshooting.
     gfx_setfont(1,os_font,fontsize-1,'b');
@@ -4239,13 +4280,8 @@ help_active ? (
     ok_w = 60; ok_h = 25; ok_x = help_x + help_w - ok_w - 20; ok_y = help_y + help_h - ok_h - 20;
     rect(ok_x, ok_y, ok_w, ok_h, 0.4, 0.4, 0.4, 1);
     gfx_set(1,1,1,1); gfx_x = ok_x + 18; gfx_y = ok_y + 5; gfx_drawstr("OK");
-    mb ? (
-        (mx>=ok_x && mx<ok_x+ok_w && my>=ok_y && my<ok_y+ok_h) ? (
-            help_active = 0;
-            capture_id = 90000; 
-        ) : (
-            capture_id = 90000; 
-        );
+    help_click && mx>=ok_x && mx<ok_x+ok_w && my>=ok_y && my<ok_y+ok_h ? (
+        help_active=0;help_block_until_release=1;
     );
 );
 
