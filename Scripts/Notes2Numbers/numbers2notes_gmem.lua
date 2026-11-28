@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.25
+-- @version 1.9.26
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -1314,6 +1314,24 @@ function DB.kit(t)
     local _,name=reaper.TrackFX_GetFormattedParamValue(t.track,fx,9,"")
     return name or ""
 end
+-- Resolve the saved kit against the actual host file-slider choices. Never
+-- guess from directory ordering, which may differ across installations.
+function DB.find_kit(t,name)
+    local r=reaper
+    local fx=locate(t)
+    if fx==nil or not r.TrackFX_FormatParamValue or name=="" then return nil end
+    local _,lo,hi=r.TrackFX_GetParam(t.track,fx,9)
+    if not lo or not hi or lo<0 or hi<lo or hi-lo>10000 then return nil end
+    local found
+    for v=math.ceil(lo),math.floor(hi) do
+        local ok,label=r.TrackFX_FormatParamValue(t.track,fx,9,v,"")
+        if ok and label==name then
+            if found~=nil then return nil end
+            found=v
+        end
+    end
+    return found
+end
 function DB.read(path,limit)
     local f,err=io.open(path,"rb")
     if not f then error(err or ("Cannot open "..path),0) end
@@ -1584,6 +1602,7 @@ function DB.send(session,op,record,blob)
     r.gmem_write(DB.base+1,session.id);r.gmem_write(DB.base+2,session.key)
     r.gmem_write(DB.base+3,record or -1);r.gmem_write(DB.base+4,values and #values or 0)
     r.gmem_write(DB.base+5,0);r.gmem_write(DB.base+6,session.token)
+    r.gmem_write(DB.base+7,op==6 and session.switch_kit~=nil and session.switch_kit+1 or 0)
     session.pending=op;session.deadline=r.time_precise()+4
     r.gmem_write(DB.base,op)
 end
@@ -1635,11 +1654,19 @@ function DB.manual_choice(session,cmd)
             if not name then error("No matching recovery backup exists yet.",0) end
             session.target=DB.index(session.dir,name,true)
         end
-        local prompt="Replace all section patterns and row settings? The current arrangement will be backed up first."
         if session.target.kit~=session.kit then
-            prompt="Replace all section patterns while keeping the currently selected drum kit? Notes will be matched by MIDI note/channel and unused rows added as needed. The current arrangement will be backed up first."
-        end
-        if r.MB(prompt,"Load Drum Pattern Set",4)~=6 then return false end
+            local answer=r.MB("Saved kit: "..session.target.kit.."\nCurrent kit: "..session.kit.."\n\nYES: Switch to the saved kit and load all patterns.\nNO: Keep the current kit and load all patterns.\nCANCEL: Do not load.\n\nThe current arrangement will be backed up first.","Different Drum Kit",3)
+            if answer==2 then return false end
+            if answer==6 then
+                local supported=r.gmem_read(DB.base+3120+session.id)==session.key
+                local index=supported and DB.find_kit(session.t,session.target.kit) or nil
+                if index~=nil then session.switch_kit=index
+                else
+                    local why=supported and "The saved kit could not be uniquely located on this system." or "Update Drum Arranger to enable automatic kit switching."
+                    if r.MB(why.."\n\nLoad with the current kit instead?\nChoose No to cancel and select the saved kit manually.","Saved Kit Unavailable",4)~=6 then return false end
+                end
+            elseif answer~=7 then return false end
+        elseif r.MB("Replace all section patterns and row settings? The current arrangement will be backed up first.","Load Drum Pattern Set",4)~=6 then return false end
     end
     return true
 end
@@ -1685,7 +1712,7 @@ function DB.advance(session)
         DB.commit_backup(session)
         if session.savepath then DB.write_manual(session.savepath,DB.pack_set(session)) end
         if not session.target then DB.finish(session);return end
-        if session.target.kit~=session.kit then
+        if session.target.kit~=session.kit and session.switch_kit==nil then
             session.target=DB.remap_set(session.target,session)
         end
         -- Begin staged load only after complete, successful pre-load backup.
@@ -1704,7 +1731,12 @@ function DB.advance(session)
     else session.record=session.record+1 end
     if r.GetPlayStateEx(session.project)~=0 or DB.kit(session.t)~=session.kit then error("Transport or kit changed during load; no staged load was committed.",0) end
     if session.record<=79 then DB.send(session,4,session.record,session.target.records[session.record+2])
-    else DB.send(session,6,-1) end
+    else
+        if session.switch_kit~=nil and DB.find_kit(session.t,session.target.kit)~=session.switch_kit then
+            error("The saved kit is no longer available. No staged load was committed.",0)
+        end
+        DB.send(session,6,-1)
+    end
 end
 function DB.tick()
     local r=reaper
