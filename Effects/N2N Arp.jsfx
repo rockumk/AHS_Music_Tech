@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.4.0-dev.18
+version: 12.4.0-dev.19
 author: Rock Kennedy
 about:
-  # N2N Arp v12.4.0-dev.18
+  # N2N Arp v12.4.0-dev.19
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -33,7 +33,7 @@ slider18:0<-500,500,1>-Visual Sync (ms)
 @init
 scale_dirty = 0;
 last_input_mode = -1;
-thisversion = "v12.4.0-dev.18";
+thisversion = "v12.4.0-dev.19";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -3700,11 +3700,14 @@ gx_r = 0; loop(calc_rows,
       // OFF mode: highlight set 0
       // ON mode: highlight RH set 0 and LH Bass set 0 (old RH -3)
       is_hilite_set = (slider14 == 1) ? ((lane_set_num == 0) || (lane_set_num == -3)) : (lane_set_num == 0);
+      // Emphasize only the Low/root lane in the highlighted bass octave.
+      root_lane_glow = role_idx == 7 && ((slider14 == 1 && lane_set_num == -3) || (slider14 == 2 && lane_set_num == 0));
         
         is_main_row ? ( 
             role_idx == 1 ? (r=COL_H_R; g=COL_H_G; b=COL_H_B;) : role_idx == 4 ? (r=COL_M_R; g=COL_M_G; b=COL_M_B;) : (r=COL_L_R; g=COL_L_G; b=COL_L_B;); 
             r*=LANE_BG_DIM; g*=LANE_BG_DIM; b*=LANE_BG_DIM; is_sel ? (r+=0.1; g+=0.1; b+=0.1;); 
             is_hilite_set ? ( r+=0.08; g+=0.08; b+=0.08; );
+             root_lane_glow ? (r=0.52; g=0.065; b=0.055; is_sel ? (r+=0.10;g+=0.06;b+=0.06;););
             is_extreme ? ( r*=0.3; g*=0.3; b*=0.3; ); // DIM EXTREME LANES BG ONLY
             rect(grid_x, ry, grid_w, ROW_HEIGHT, r, g, b, 1); 
         ) : ( 
@@ -3717,6 +3720,7 @@ gx_r = 0; loop(calc_rows,
         is_main_row ? ( 
             role_idx == 1 ? (lr=COL_H_R; lg=COL_H_G; lb=COL_H_B;) : role_idx == 4 ? (lr=COL_M_R; lg=COL_M_G; lb=COL_M_B;) : (lr=COL_L_R; lg=COL_L_G; lb=COL_L_B;); 
             lr*=LABEL_BRIGHTNESS; lg*=LABEL_BRIGHTNESS; lb*=LABEL_BRIGHTNESS; lr>1?lr=1; lg>1?lg=1; lb>1?lb=1;
+             root_lane_glow ? (lr=1;lg=0.42;lb=0.35;);
             gfx_set(lr, lg, lb, 1); sprintf(#oct_s, "%d", oct_num); gfx_x = 4; gfx_y = ry + 2; gfx_drawstr(#oct_s);
             gfx_set(lr, lg, lb, 1); role_idx == 1 ? strcpy(#r_str, "H") : role_idx == 4 ? strcpy(#r_str, "M") : strcpy(#r_str, "L"); gfx_x = 28; gfx_y = ry + 2; gfx_drawstr(#r_str);
         );
@@ -3822,6 +3826,14 @@ gx_s+=1;
         );
     );
 gfx_set(0,0,0,1); gfx_line(grid_x, ry, grid_x+grid_w, ry); gfx_line(grid_x, ry+ROW_HEIGHT, grid_x+grid_w, ry+ROW_HEIGHT);
+    root_lane_glow ? (
+        // Soft inner red glow and bright edge, drawn after notes and grid lines.
+        rect(grid_x,ry+1,grid_w,1,1,0.23,0.16,0.42);
+        rect(grid_x,ry+ROW_HEIGHT-2,grid_w,1,1,0.23,0.16,0.42);
+        rect(grid_x,ry,grid_w,1,1,0.34,0.25,0.92);
+        rect(grid_x,ry+ROW_HEIGHT-1,grid_w,1,1,0.34,0.25,0.92);
+        rect(grid_x-3,ry+1,2,ROW_HEIGHT-2,1,0.34,0.25,0.92);
+    );
 
     // --- SPLIT MODE BLUE DIVIDER LINE & TEXT (Drawn OVER grid) ---
     (slider14 == 1 && r_idx == 72) ? (
