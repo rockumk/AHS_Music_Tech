@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.21
+-- @version 2.0.4-dev.22
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -3612,7 +3612,7 @@ Form: I V C V C B C O]]
             local active = (i==2 and recording) or (i==3 and playing) or (i==5 and paused) or (i==6 and repeat_on)
             local accent = i==2 and 0xCF7777FF or i==3 and 0x9DC6A7FF or 0xD3B86DFF
             local icon_color = active and accent or (i==2 and 0xBA8585FF or 0xCCCCCCFF)
-            if v[1]~="" then DrawFloatingLabel(v[1],x,y,nav_btn_w,0x929292FF) end
+            if v[1]~="" then DrawFloatingLabel(v[1],x,y,nav_btn_w,0xE0E0E0FF) end
             local click = reaper.ImGui_InvisibleButton(ctx,"##n2ntransport"..i,nav_btn_w,btn_height)
             local hover = reaper.ImGui_IsItemHovered(ctx)
             local pressed = reaper.ImGui_IsItemActive(ctx)
