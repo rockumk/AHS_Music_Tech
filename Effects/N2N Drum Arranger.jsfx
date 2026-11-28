@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.26
+version: 7.8.0-dev.27
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.26 -
+  # N2N Drum Arranger v7.8.0-dev.27 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -139,7 +139,7 @@ slider17:0<-100,100,0.01>-N2N Mix Intensity
 slider18:0<-500,500,1>-Visual Sync (ms)
 
 @init
-version_display = "v7.8.0-dev.26";
+version_display = "v7.8.0-dev.27";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -1596,10 +1596,18 @@ function bank_stage_record(t,n) local(i,j,p,base,cnt,ok,pos,l,idx) (
     ok ? mem[bank_seen+t+1]=1;
     ok;
 );
-function bank_apply_staged() local(i,j,l,pos,ok) (
+function bank_apply_staged() local(i,j,l,pos,ok,kit_request,kit_handle) (
     i=0;ok=1;loop(TOTAL_TABS+1,!mem[bank_seen+i] ? ok=0;i+=1;);
+    kit_request=gmem[BANK_BASE+7];
+    // The optional original-kit request uses a verified file index plus one.
+    ok && kit_request>0 ? (
+        kit_handle=file_open(kit_request-1);
+        kit_handle>0 ? file_close(kit_handle) : ok=0;
+    );
     ok && play_state==0 && bank_stage_epoch==bank_epoch ? (
-        // Kit selection and instance identity are intentionally not touched.
+        // Commit kit selection with the staged rows, never reload the map over them.
+        kit_request>0 ? (slider10=kit_request-1;last_kit_idx=slider10;sliderchange(slider10););
+        // Instance identity is intentionally not touched.
         slider1=mem[bank_meta];slider2=mem[bank_meta+1];slider3=mem[bank_meta+2];
         slider4=mem[bank_meta+3];slider6=mem[bank_meta+4];slider7=mem[bank_meta+5];
         slider8=mem[bank_meta+6];slider9=mem[bank_meta+7];slider11=mem[bank_meta+8];
@@ -1631,7 +1639,7 @@ function service_drum_bank() local(now,addr,op,t,n,tok,ok) (
         addr=BANK_BASE+32+(my_slot-1)*4;
         now>=bank_announce_at || gmem[addr]!=my_key ? (
             gmem[addr]!=my_key ? (gmem[addr+2]=0;gmem[addr+3]=0;gmem[BANK_BASE+2080+my_slot]=0;);
-            gmem[addr]=my_key;gmem[addr+1]=now;bank_announce_at=now+.25;
+            gmem[addr]=my_key;gmem[addr+1]=now;gmem[BANK_BASE+3120+my_slot]=my_key;bank_announce_at=now+.25;
         );
         op=gmem[BANK_BASE];
         op>0 && gmem[BANK_BASE+1]==my_slot && gmem[BANK_BASE+2]==my_key &&
@@ -1643,7 +1651,7 @@ function service_drum_bank() local(now,addr,op,t,n,tok,ok) (
                 ) : gmem[BANK_BASE]=-1;
             ) : op==3 ? (
                 play_state==0 ? (
-                    bank_stage_token=tok;bank_stage_epoch=bank_epoch;memset(bank_seen,0,TOTAL_TABS+1);
+                    bank_stage_token=tok;bank_stage_epoch=bank_epoch;gmem[BANK_BASE+7]=0;memset(bank_seen,0,TOTAL_TABS+1);
                     gmem[BANK_BASE+5]=bank_epoch;gmem[BANK_BASE]=5;
                 ) : gmem[BANK_BASE]=-1;
             ) : op==4 ? (
@@ -1651,7 +1659,9 @@ function service_drum_bank() local(now,addr,op,t,n,tok,ok) (
                 t>=-1 && t<TOTAL_TABS && t==floor(t) && n>=0 && n<=BANK_CAP && n==floor(n) && bank_stage_record(t,n) ?
                     gmem[BANK_BASE]=5 : gmem[BANK_BASE]=-1;
             ) : op==6 ? (
-                tok==bank_stage_token && bank_apply_staged() ? gmem[BANK_BASE]=7 : gmem[BANK_BASE]=-1;
+                ok=tok==bank_stage_token && bank_apply_staged();
+                gmem[BANK_BASE+7]=0;
+                gmem[BANK_BASE]=ok?7:-1;
             );
         );
     );
