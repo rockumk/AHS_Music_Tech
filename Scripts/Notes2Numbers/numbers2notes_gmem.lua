@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.17
+-- @version 1.9.18
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -547,13 +547,45 @@ end
 -- UI requests from the arranger: per-instance key, command, timestamp, payload.
 -- 1 instrument, 2 hub, 3 mixer, 4 section playback (tab*3 + pre-roll bars).
 local HUB_UI_BASE=8320000
-local function play_arranger_section(project, id, key, payload, stretched_index)
+local pending_arranger_play
+-- Negative payload is a failure acknowledgement, consumed by the requesting FX.
+local function arranger_play_failed(id,key,stamp,payload)
+    local r=reaper
+    local base=HUB_UI_BASE+4+(id-1)*4
+    if r.gmem_read(base)==key and r.gmem_read(base+1)==0
+        and r.gmem_read(base+2)==stamp and r.gmem_read(base+3)==payload then
+        r.gmem_write(base+3,-payload)
+    end
+end
+local function service_pending_arranger_play(project,now)
+    local p=pending_arranger_play
+    if not p then return end
+    local r=reaper
+    if p.project~=project or r.gmem_read(REG_BASE+p.id)~=p.key then
+        pending_arranger_play=nil
+        return
+    end
+    if now>=p.deadline then
+        pending_arranger_play=nil
+        arranger_play_failed(p.id,p.key,p.stamp,p.payload)
+        return
+    end
+    -- A separate defer iteration, a short settle interval and confirmed stop
+    -- prevent a seek during playback and give REAPER time to flush old notes.
+    if now<p.ready or r.GetPlayStateEx(project)~=0 then return end
+    pending_arranger_play=nil
+    r.SetEditCurPos2(project,p.target,true,false)
+    r.Main_OnCommand(1007,0)
+end
+local function play_arranger_section(project, id, key, stamp, payload, stretched_index)
     local r=reaper
     if type(stretched_index)~="function" or payload~=math.floor(payload) or payload<3 or payload>236 then return end
     local tab,preroll=math.floor(payload/3),payload%3
     -- Rebuild from the active project's rendered regions before resolving the request.
-    if not export.PublishSongForm(stretched_index,true) then return end
-    if r.gmem_read(FORM_BASE+10+id)~=key then return end
+    if not export.PublishSongForm(stretched_index,true) or r.gmem_read(FORM_BASE+10+id)~=key then
+        arranger_play_failed(id,key,stamp,payload)
+        return
+    end
     local pos=(r.GetPlayStateEx(project)&1)~=0 and r.GetPlayPositionEx(project) or r.GetCursorPositionEx(project)
     local q=r.TimeMap2_timeToQN(project,pos)
     local first,upcoming,current
@@ -569,7 +601,7 @@ local function play_arranger_section(project, id, key, payload, stretched_index)
     end
     local start=current or upcoming or first
     if not start then
-        r.MB("This section/variation is not present in the rendered song structure.","Numbers2Notes",0)
+        arranger_play_failed(id,key,stamp,payload)
         return
     end
     local target=r.TimeMap2_QNToTime(project,start)
@@ -577,9 +609,17 @@ local function play_arranger_section(project, id, key, payload, stretched_index)
         local _,measure=r.TimeMap2_timeToBeats(project,target)
         target=r.TimeMap2_beatsToTime(project,0,math.max(0,measure-preroll))
     end
-    r.Main_OnCommand(1016,0)
-    r.SetEditCurPos2(project,math.max(0,target),true,false)
-    r.Main_OnCommand(1007,0)
+    pending_arranger_play=nil
+    target=math.max(0,target)
+    if r.GetPlayStateEx(project)~=0 then
+        r.Main_OnCommand(1016,0)
+        local now=r.time_precise()
+        pending_arranger_play={project=project,id=id,key=key,stamp=stamp,payload=payload,
+            target=target,ready=now+0.05,deadline=now+2}
+    else
+        r.SetEditCurPos2(project,target,true,false)
+        r.Main_OnCommand(1007,0)
+    end
 end
 function export.ServiceArrangerUIRequests(stretched_index)
     local r=reaper
@@ -601,7 +641,7 @@ function export.ServiceArrangerUIRequests(stretched_index)
                         if t.id==id and locate(t) then
                             if cmd==2 then raise=true
                             elseif cmd==3 then mix=true
-                            elseif cmd==4 then play_arranger_section(project,id,key,payload,stretched_index)
+                            elseif cmd==4 then play_arranger_section(project,id,key,stamp,payload,stretched_index)
                             else
                                 local tr=t.track
                                 local fx=r.TrackFX_GetInstrument(tr)
@@ -637,6 +677,7 @@ function export.ServiceArrangerUIRequests(stretched_index)
             end
         end
     end
+    service_pending_arranger_play(project,now)
     return raise,mix
 end
 function export.PublishTrackIdentity(force)
