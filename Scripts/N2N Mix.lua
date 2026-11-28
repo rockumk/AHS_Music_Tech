@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.15
+-- @version 0.2.16
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -44,7 +44,7 @@ function ui.header_width()
   return 161+3*(22+3)+6+(ui.role and 153 or 35)+(ui.timbre and 153 or 35)
 end
 local ALL_W=68
-local TARGET_H=48
+local TARGET_H=CELL_H
 local edit_mode="levels"
 local show_parameters=false
 local pan_dirty={}
@@ -288,15 +288,17 @@ local function has_position(t,f)
   local _,lo,hi=r.TrackFX_GetParam(t.track,f,10)
   return ok and (name:lower():find("position",1,true) or name:lower():find("pan",1,true)) and lo and hi and lo<=-100 and hi>=100
 end
+function ui.has_volume_envelope(t)
+  return active_env(r.GetTrackEnvelopeByChunkName(t.track,"<VOLENV2")) or active_env(r.GetTrackEnvelopeByChunkName(t.track,"<VOLENV")) or active_env(r.GetTrackEnvelopeByName(t.track,"Volume"))
+end
+function ui.set_unity_unless_automated(t)
+  if not ui.has_volume_envelope(t) then r.SetMediaTrackInfo_Value(t.track,"D_VOL",1) end
+end
 local function safe_row(t)
   if not valid(t.track) then return false,"Track no longer exists: "..t.name end
   if r.GetMediaTrackInfo_Value(t.track,"I_FXEN")==0 then return false,"Track FX chain bypassed: "..t.name end
   local mode=r.GetMediaTrackInfo_Value(t.track,"I_AUTOMODE")
   if mode>1 then return false,"Change automation mode to Trim/Read or Read: "..t.name end
-  local e=r.GetTrackEnvelopeByChunkName(t.track,"<VOLENV2")
-  if active_env(e) or active_env(r.GetTrackEnvelopeByName(t.track,"Volume")) then
-    return false,"Active conventional volume envelope: "..t.name..". Disable it first; it will not be overwritten."
-  end
   local i=fx_index(t)
   if i and i~=r.TrackFX_GetCount(t.track)-1 then return false,"Move owned N2N meter to end of FX chain: "..t.name end
   if i then
@@ -332,7 +334,7 @@ local function ensure_fx(t)
   r.GetSetMediaTrackInfo_String(t.track,"P_EXT:N2N_MIX_FX",t.fxguid,true)
   return f
 end
-local function envelope(t,live,fx,param)
+local function envelope(t,live,fx,param,force_hidden)
   local f=fx or ensure_fx(t)
   param=param or 0
   local env=r.GetFXEnvelope(t.track,f,param,true)
@@ -344,7 +346,7 @@ local function envelope(t,live,fx,param)
   lo,hi=tonumber(lo),tonumber(hi)
   if not lo or not hi or hi<=lo then error("Unrecognized PARMENV range: "..t.name) end
   c=c:gsub("([\r\n]ACT%s+)%d+", function(p) return p.."1" end,1)
-  c=c:gsub("([\r\n]VIS%s+)%d+", function(p) return p..(show_parameters and "1" or "0") end,1)
+  c=c:gsub("([\r\n]VIS%s+)%d+", function(p) return p..(show_parameters and not force_hidden and "1" or "0") end,1)
   c=c:gsub("([\r\n]ARM%s+)%d+", function(p) return p.."0" end,1)
   if live then return env,lo,hi,c end
   if not r.SetEnvelopeStateChunk(env,c,false) then error("Cannot configure gain envelope: "..t.name) end
@@ -353,10 +355,10 @@ local function envelope(t,live,fx,param)
   r.DeleteEnvelopePointRangeEx(env,-1,-1e9,1e9)
   return env,lo,hi
 end
-local function write_points(t,pts,fx,minval,maxval,param)
+local function write_points(t,pts,fx,minval,maxval,param,force_hidden)
   minval,maxval=minval or -60,maxval or 30
   local live=(r.GetPlayStateEx(proj)&1)~=0
-  local env,lo,hi,chunk=envelope(t,live,fx,param)
+  local env,lo,hi,chunk=envelope(t,live,fx,param,force_hidden)
   if live then
     -- Replace the point list in one host update during playback, rather than
     -- leaving a temporarily empty gain envelope between individual calls.
@@ -663,6 +665,51 @@ function ui.pan_contour(t)
   end
   return all,map
 end
+-- Display mirrors use the identical contour, not the native track fader.
+-- Look up by label rather than assuming contiguous JSFX parameter indices:
+-- the Drum Arranger leaves slider13/14 unused.
+function ui.mirror_mix_points(t,pts,kind)
+  if not valid(t.track) then return end
+  local label=kind=="level" and "n2n mix level" or "n2n mix position"
+  local lo,hi=kind=="level" and -60 or -100,kind=="level" and 30 or 100
+  for fx=0,r.TrackFX_GetCount(t.track)-1 do
+    local _,name=r.TrackFX_GetFXName(t.track,fx,"")
+    local n=(name or ""):lower()
+    if n:find("n2n arp",1,true) or n:find("n2n drum arranger",1,true) then
+      for p=0,r.TrackFX_GetNumParams(t.track,fx)-1 do
+        local ok,pname=r.TrackFX_GetParamName(t.track,fx,p,"")
+        if ok and pname:lower():gsub("^%-","")==label then
+          local _,a,b=r.TrackFX_GetParam(t.track,fx,p)
+          if a and b and math.abs(a-lo)<.001 and math.abs(b-hi)<.001 then
+            local env=r.GetFXEnvelope(t.track,fx,p,false)
+            if not env or r.CountAutomationItems(env)==0 then
+              local success,err=pcall(write_points,t,pts,fx,lo,hi,p,true)
+              if not success then r.ShowConsoleMsg("N2N Mix display mirror: "..t.name..": "..tostring(err).."\n") end
+            else r.ShowConsoleMsg("N2N Mix display mirror: automation items on "..t.name.."; skipped.\n") end
+          end
+          break
+        end
+      end
+    end
+  end
+end
+function ui.mirror_existing_gain(t)
+  local fx=fx_index(t)
+  if not fx then return end
+  local env=r.GetFXEnvelope(t.track,fx,0,false)
+  if not env or not active_env(env) or r.CountAutomationItems(env)>0 then return end
+  local ok,c=r.GetEnvelopeStateChunk(env,"",false)
+  if not ok then return end
+  local lo,hi=c:match("<PARMENV%s+%S+%s+([%+%-%.%deE]+)%s+([%+%-%.%deE]+)")
+  lo,hi=tonumber(lo),tonumber(hi)
+  if not lo or not hi or hi<=lo then return end
+  local pts={}
+  for i=0,r.CountEnvelopePointsEx(env,-1)-1 do
+    local got,time,v,shape=r.GetEnvelopePointEx(env,-1,i)
+    if got then pts[#pts+1]={time,-60+90*(v-lo)/(hi-lo),shape} end
+  end
+  if #pts>0 then ui.mirror_mix_points(t,pts,"level") end
+end
 local function apply_pan(t,f)
   local state=r.GetPlayStateEx(proj)
   if (state&4)~=0 or r.GetGlobalAutomationOverride()>1 or r.GetMediaTrackInfo_Value(t.track,"I_AUTOMODE")>1 then error("Use Read or Trim/Read before editing pan: "..t.name,0) end
@@ -672,7 +719,9 @@ local function apply_pan(t,f)
   local e=r.GetFXEnvelope(t.track,f,10,false)
   if e and r.CountAutomationItems(e)>0 then error("Position envelope contains automation items: "..t.name,0) end
   local bars=ui.pan_contour(t)
-  write_points(t,contour_points(bars,0),f,-100,100,10)
+  local pts=contour_points(bars,0)
+  write_points(t,pts,f,-100,100,10)
+  ui.mirror_mix_points(t,pts,"position")
 end
 local function configure_perf(t)
   local f=perf_index(t)
@@ -782,7 +831,9 @@ local function apply_row(t)
       if z-a>1e-9 then result[#result+1]={a=b.a+(b.b-b.a)*a,b=b.a+(b.b-b.a)*z,g0=value(a),g1=value(z)} end
     end
   end
-  write_points(t,contour_points(result,t.initial or 0))
+  local pts=contour_points(result,t.initial or 0)
+  write_points(t,pts)
+  ui.mirror_mix_points(t,pts,"level")
 end
 -- Global silence is applied at the master, after effects and busses.
 -- Normal section intensity stays at the sources; only the portion below Soft
@@ -943,7 +994,7 @@ local function complete_pass(stats)
   if p.kind=="track" then
     for _,t in ipairs(p.rows) do
       if not t.skip_analysis then
-      r.SetMediaTrackInfo_Value(t.track,"D_VOL",1)
+      ui.set_unity_unless_automated(t)
       for j,v in pairs(t.reports) do
         t.base[j]=calc_base(t,j,v)
         put("base:"..t.key..":"..sections[j].key,t.base[j] or "")
@@ -999,7 +1050,13 @@ local function arm(p)
     if not existing then job.temporary[t.track]=t.fxguid end
     -- The current-audition option can suspend non-soloed tracks. Do not
     -- change their performance FX in advance of a report.
-    if not job.keep_solo or r.GetMediaTrackInfo_Value(t.track,"I_SOLO")~=0 or r.GetMediaTrackInfo_Value(t.track,"B_SOLO_DEFEAT")~=0 then configure_perf(t) end
+    if not job.keep_solo or r.GetMediaTrackInfo_Value(t.track,"I_SOLO")~=0 or r.GetMediaTrackInfo_Value(t.track,"B_SOLO_DEFEAT")~=0 then
+      local pf,msg=ensure_position_fx(t)
+      configure_perf(t)
+      pf=perf_index(t)
+      if has_position(t,pf) then apply_pan(t,pf)
+      elseif msg then r.ShowConsoleMsg("N2N Mix Pan: "..t.name..": "..msg.."\n") end
+    end
     f=fx_index(t)
     r.TrackFX_SetNamedConfigParm(t.track,f,"force_auto_bypass","0")
     if not r.TrackFX_SetParam(t.track,f,1,i) or not r.TrackFX_SetParam(t.track,f,2,tok) then error("Cannot arm meter: "..t.name,0) end
@@ -1012,7 +1069,7 @@ local function arm(p)
     for j=1,#sections do r.gmem_write(4096+((i-1)*256+j-1)*8,0) end
   end
   if p.kind=="master" then
-    ensure_fx(master);r.SetMediaTrackInfo_Value(master.track,"D_VOL",1);apply_master(0)
+    ensure_fx(master);ui.set_unity_unless_automated(master);apply_master(0)
   end
   p.token=tok; p.phase="armed";pass=p
   r.gmem_write(0,p.kind=="track" and 1 or 0)
@@ -1071,7 +1128,10 @@ local function start(policy)
   q[#q+1]={kind="master",name="Master",rows={master}}
   q[#q+1]={kind="verify",name="Master verification",rows={master}}
   for _,p in ipairs(q) do for _,t in ipairs(p.rows) do selected[t]=true end end
-  for t in pairs(selected) do local ok,e=safe_row(t);if not ok then status=e;return end end
+  for t in pairs(selected) do
+    local ok,e=safe_row(t);if not ok then status=e;return end
+    if ui.has_volume_envelope(t) then r.ShowConsoleMsg("N2N Mix: preserving conventional volume automation and fader on "..t.name..". Per-track targets are pre-fader; downstream and master analysis include its effect.\n") end
+  end
   local a,b=r.GetSet_LoopTimeRange2(proj,false,false,0,0,false)
   r.Undo_BeginBlock2(proj)
   job={queue=q,index=1,kind="Auto Mix",cmd=cmd,a=a,b=b,cursor=r.GetCursorPositionEx(proj),repeat_state=r.GetSetRepeatEx(proj,-1),ready_at=r.time_precise(),perf={},states={},temporary={},renders=0,keep_solo=policy=="current" and r.AnyTrackSolo(proj)}
@@ -1930,6 +1990,7 @@ local function install_visible_position()
       if t.model<0 or not t.timbre_allowed then position_only(t,f)
       else r.TrackFX_SetEnabled(t.track,f,true) end
       apply_pan(t,f)
+      ui.mirror_existing_gain(t)
     end)
     t.position_ready=ok
     if ok then ready=ready+1 else missing=missing+1;r.ShowConsoleMsg("N2N Mix Pan: "..t.name..": "..tostring(err).."\n") end
@@ -2214,21 +2275,18 @@ local function show_target_popup()
   if job or pending_start then return end
   if not stopped() then status="Stop transport before Auto Mix.";return end
   ui.section_hover=nil
-  ui.target_x,ui.target_y=r.ImGui_GetItemRectMin(ctx)
-  target_popup=true
+  target_popup=not target_popup
 end
 local function master_options()
-  if target_popup then
-    r.ImGui_OpenPopup(ctx,"Auto Mix Settings")
-    r.ImGui_SetNextWindowPos(ctx,(ui.target_x or 0)+10,(ui.target_y or 0)+10,r.ImGui_Cond_Always())
-    target_popup=false
-  end
+  if not target_popup then return end
+  r.ImGui_SetNextWindowPos(ctx,ui.target_x+10,ui.target_y+10,r.ImGui_Cond_Always(),0,0)
+  r.ImGui_SetNextWindowBgAlpha(ctx,1)
   local chosen,custom_requested
-  r.ImGui_PushStyleColor(ctx,r.ImGui_Col_PopupBg(),0x000000FF)
+  r.ImGui_PushStyleColor(ctx,r.ImGui_Col_WindowBg(),0x000000FF)
   r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Text(),0xFFFFFFFF)
   r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Border(),0x515151FF)
-  local flags=r.ImGui_WindowFlags_AlwaysAutoResize()|r.ImGui_WindowFlags_NoTitleBar()|r.ImGui_WindowFlags_NoSavedSettings()|r.ImGui_WindowFlags_NoMove()
-  if r.ImGui_BeginPopupModal(ctx,"Auto Mix Settings",nil,flags) then
+  local flags=r.ImGui_WindowFlags_AlwaysAutoResize()|r.ImGui_WindowFlags_NoTitleBar()|r.ImGui_WindowFlags_NoSavedSettings()|r.ImGui_WindowFlags_NoMove()|r.ImGui_WindowFlags_NoResize()|r.ImGui_WindowFlags_NoDocking()
+  if r.ImGui_Begin(ctx,"Auto Mix Settings##target",nil,flags) then
     r.ImGui_Text(ctx,"Choose master loudness")
     local n=mono_push(true)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),4)
@@ -2266,8 +2324,8 @@ local function master_options()
     r.ImGui_SetCursorPosX(ctx,r.ImGui_GetCursorPosX(ctx)+math.max(0,(avail-100)/2))
     local cancel=r.ImGui_Button(ctx,"Cancel",100,26)
     r.ImGui_PopStyleColor(ctx,n)
-    if chosen or custom_requested or cancel then r.ImGui_CloseCurrentPopup(ctx) end
-    r.ImGui_EndPopup(ctx)
+    if chosen or custom_requested or cancel then target_popup=false end
+    r.ImGui_End(ctx)
   end
   r.ImGui_PopStyleColor(ctx,3)
   if custom_requested then
@@ -2306,13 +2364,16 @@ local function target_cell(t,j,b,w,plan,bus_offset)
     end
   end
   local label=energy>0 and duration>0 and string.format("%.1f",t.target+10*math.log(energy/duration,10)) or "Mute"
-  local report=t.reports[j]
-  local measured=report and (report.state==1 and string.format("M %.1f",report.lufs) or report.state==2 and "M quiet" or "M —") or "M —"
   local base=t.base[j]
-  local gain=base and string.format("G %+.1f",base) or "G —"
-  centered(dl,x,y,w,16,label,0x101010FF)
-  centered(dl,x,y+16,w,16,measured,0x252525FF)
-  centered(dl,x,y+32,w,16,gain,0x252525FF)
+  local gain=base and string.format("G%+.1f",base) or "G—"
+  local line=label.." / "..gain
+  local tw,th=r.ImGui_CalcTextSize(ctx,line)
+  local native_size=r.ImGui_GetFontSize(ctx)
+  local size=math.min(10,native_size*math.max(1,w-4)/math.max(1,tw))
+  if r.ImGui_DrawList_AddTextEx and r.ImGui_GetFont then
+    local scale=size/native_size
+    r.ImGui_DrawList_AddTextEx(dl,r.ImGui_GetFont(ctx),size,x+(w-tw*scale)/2,y+(TARGET_H-th*scale)/2,0x101010FF,line)
+  else centered(dl,x,y,w,TARGET_H,line,0x101010FF) end
 end
 local function target_section_cell(c,contour)
   local s=sections[c.j]
@@ -2401,7 +2462,10 @@ local function draw()
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),5)
     r.ImGui_PushStyleColor(ctx,r.ImGui_Col_Button(),0xDADADAFF)
     if not job then
-      if pending_start then r.ImGui_Button(ctx,"Preparing...") else button("Auto Mix",show_target_popup) end
+      if pending_start then r.ImGui_Button(ctx,"Preparing...") else
+        ui.target_x,ui.target_y=r.ImGui_GetCursorScreenPos(ctx)
+        button("Auto Mix",show_target_popup)
+      end
     else button("Cancel",function() finish("Cancelled. Undo to revert partial changes.") end) end
     r.ImGui_PopStyleVar(ctx)
     r.ImGui_PopStyleColor(ctx,nmono+1)
@@ -2414,7 +2478,6 @@ local function draw()
       r.ImGui_PopStyleColor(ctx,n)
     end
     same();r.ImGui_TextWrapped(ctx,status)
-    master_options()
     if job then
       local d,n=poll()
       r.ImGui_ProgressBar(ctx,n>0 and d/n or 0,-1,0,n>0 and string.format("Stage %d/%d | %d/%d reports",job.index,#job.queue,d,n) or string.format("Stage %d/%d | Native render statistics",job.index,#job.queue))
@@ -2626,7 +2689,7 @@ local function draw()
     end
     r.ImGui_End(ctx)
   end
-  ui.section_play_strip()
+  if target_popup then ui.section_hover=nil;master_options() else ui.section_play_strip() end
   alert_window()
   if ui_font then r.ImGui_PopFont(ctx) end
   r.ImGui_PopStyleColor(ctx,5);r.ImGui_PopStyleVar(ctx,4)
