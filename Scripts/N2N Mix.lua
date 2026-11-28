@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.4
+-- @version 0.2.5
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -1101,10 +1101,94 @@ local function transition_fills(t)
   end
   return map
 end
+-- Use the same view-only editor mailbox as the Numbers2Notes Tracks panel.
+-- Pattern numbers in the published song form are shared by Arp and Drums.
+local function section_pattern_slot(s)
+  local n=(s.name or ""):upper():match("^%s*(.-)%s*$"):gsub("^%{(.*)%}$","%1")
+  local fixed={["#"]=77,["COUNT IN"]=77,["COUNT-IN"]=77,D=75,DROP=75,X=76,BREAKDOWN=76,F=78,FADEOUT=78,["1"]=27,["USER 1"]=27,["2"]=28,["USER 2"]=28,["3"]=29,["USER 3"]=29}
+  if fixed[n] then return fixed[n],false end
+  local single={I=1,INTRO=1,B=17,BRIDGE=17,M=17,["MIDDLE 8"]=17,S=44,SOLO=44,O=71,OUTRO=71}
+  if single[n] then return single[n],true end
+  for _,family in ipairs({{{"V","VERSE"},{5,32,59}},{{"P","PC","PRE","PRE-CHORUS","PRE CHORUS","R","RAMP"},{9,36,63}},{{"C","CHORUS"},{13,40,67}}}) do
+    for _,p in ipairs(family[1]) do
+      for i=1,3 do
+        if n==p..i or n==p.." "..i or (i==1 and n==p) then return family[2][i],true end
+      end
+    end
+  end
+  return 26,false
+end
+local function is_arranger_name(name)
+  name=name:lower()
+  if name:find("n2n drum arranger",1,true) then return "N2N Drum Arranger" end
+  if name:find("n2n arp",1,true) then return "N2N Arp" end
+end
+local function open_track_plugin(t,fx,j,b,arranger)
+  if job or pending_start or not valid(t.track) then return end
+  if arranger and j and r.TrackFX_GetEnabled(t.track,fx) and not r.TrackFX_GetOffline(t.track,fx) then
+    local s=sections[j]
+    local instance=math.floor(r.TrackFX_GetParam(t.track,fx,4)+0.5)
+    if s and instance>=1 and instance<=512 then
+      -- Never send a view command to an ambiguous instance ID.
+      local matches=0
+      for i=0,r.CountTracks(proj)-1 do
+        local tr=r.GetTrack(proj,i)
+        for f=0,r.TrackFX_GetCount(tr)-1 do
+          local _,name=r.TrackFX_GetFXName(tr,f,"")
+          if is_arranger_name(name or "") and math.floor(r.TrackFX_GetParam(tr,f,4)+0.5)==instance then matches=matches+1 end
+        end
+      end
+      if matches==1 then
+        r.gmem_attach("N2N_Ecosystem_RSKennedy")
+        local key=r.gmem_read(8000000+instance)
+        if key>0 then
+          local slot,variants=section_pattern_slot(s)
+          local q=r.TimeMap2_timeToQN(proj,b and s.bars[b].a or s.a)
+          local base=6000000
+          local rev=r.gmem_read(base+1)
+          local count=math.floor(r.gmem_read(base+2))
+          if r.gmem_read(base)==0x4E324631 and rev>0 and rev%2==0 and count>=0 and count<=4096 and r.gmem_read(base+10+instance)==key then
+            for i=0,count-1 do
+              local p=base+1024+i*3
+              local a,z,candidate=r.gmem_read(p),r.gmem_read(p+1),math.floor(r.gmem_read(p+2))
+              if q>=a-1e-7 and q<z-1e-7 then
+                -- Accept only a slot from the matching region family.
+                if variants and candidate>=slot and candidate<=slot+3 and r.gmem_read(base+1)==rev then slot=candidate end
+                break
+              end
+            end
+          end
+          local mailbox=8300000+(instance-1)*2
+          r.gmem_write(mailbox,key)
+          r.gmem_write(mailbox+1,slot+1)
+        end
+        attach()
+      end
+    end
+  end
+  r.TrackFX_Show(t.track,fx,3)
+end
+local function plugin_menu(t,j,b)
+  local inst=r.TrackFX_GetInstrument(t.track)
+  local arrangers={}
+  for fx=0,r.TrackFX_GetCount(t.track)-1 do
+    local _,name=r.TrackFX_GetFXName(t.track,fx,"")
+    local kind=is_arranger_name(name or "")
+    if kind then arrangers[#arrangers+1]={fx=fx,label=kind};if inst==fx then inst=-1 end end
+  end
+  if inst>=0 or #arrangers>0 then
+    r.ImGui_Separator(ctx)
+    if inst>=0 and r.ImGui_Selectable(ctx,"Open Instrument",false) then open_track_plugin(t,inst,j,b,false) end
+    for _,a in ipairs(arrangers) do
+      if r.ImGui_Selectable(ctx,"Open "..a.label.."##"..a.fx,false) then open_track_plugin(t,a.fx,j,b,true) end
+    end
+  end
+end
 local function popup_level(t,j,b,v,id)
   local n=mono_push(true)
   if r.ImGui_BeginPopupContextItem(ctx,"##options"..id) then
-    for _,k in ipairs(tool_ids) do
+    for i=#tool_ids-1,1,-1 do
+      local k=tool_ids[i]
       if k~=9 then
       local label=traditional and (trad[k].."  "..simple[k]) or simple[k]
       if r.ImGui_Selectable(ctx,label,k==v) then
@@ -1117,6 +1201,7 @@ local function popup_level(t,j,b,v,id)
       if b then t.cells[j][b]=9;t.ramps[j][b]=ramp else for k=1,#t.cells[j] do t.cells[j][k]=9;t.ramps[j][k]=ramp end end
       save_cells(t,j);dirty[t]=true;transition_start=nil
     end
+    plugin_menu(t,j,b)
     r.ImGui_EndPopup(ctx)
   end
   r.ImGui_PopStyleColor(ctx,n)
@@ -1168,16 +1253,17 @@ local function row_level_cell(t)
     end
     local n=mono_push(true)
     if r.ImGui_BeginPopupContextItem(ctx,"##alloptions"..t.key) then
-      for _,k in ipairs(tool_ids) do
+      for i=#tool_ids-1,1,-1 do
+        local k=tool_ids[i]
         if k~=9 then
           local label=traditional and (trad[k].."  "..simple[k]) or simple[k]
           if r.ImGui_Selectable(ctx,label,v==k) then set_row_level(t,k) end
         end
       end
+      plugin_menu(t,nil,nil)
       r.ImGui_EndPopup(ctx)
     end
     r.ImGui_PopStyleColor(ctx,n)
-    if hover then r.ImGui_SetTooltip(ctx,tool==9 and "Whole row: choose a fixed level. Transition is unavailable." or ("Whole row: "..simple[tool]..". Right-click for levels.")) end
   end
 end
 local function cell(t,j,b,w,fills,ri,ci)
@@ -1238,10 +1324,6 @@ local function cell(t,j,b,w,fills,ri,ci)
       elseif stroke.tool==9 and stroke.t==t then stroke.endj=j;stroke.endb=b end
     end
     popup_level(t,j,b,v,id)
-  end
-  if hovered and not stroke then
-    local b0=t.base[j]
-    r.ImGui_SetTooltip(ctx,string.format("%s | %s%s\nTarget %.1f LUFS | calibration %s%s",t.name,s.name,b and (" | Bar "..b) or "",t.target,b0 and string.format("%+.2f dB",b0) or "unmeasured",report and string.format("\nReport %.2f LUFS / %.0f%% coverage",report.lufs,report.coverage*100) or ""))
   end
 end
 local function set_intensity(j,b,v,ramp)
@@ -1316,7 +1398,8 @@ local function all_intensity_cell()
     if clicked then set_all(intensity_tool) end
     local n=mono_push(true)
     if r.ImGui_BeginPopupContextItem(ctx,"##allintensityoptions") then
-      for _,k in ipairs(intensity_ids) do
+      for i=#intensity_ids-1,1,-1 do
+        local k=intensity_ids[i]
         if k~=5 and r.ImGui_Selectable(ctx,intens_names[k],v==k) then intensity_tool=k;set_all(k) end
       end
       r.ImGui_EndPopup(ctx)
@@ -1365,7 +1448,8 @@ local function intensity_cell(c,contour,ci)
   end
   local n=mono_push(true)
   if not job and not s.countin and r.ImGui_BeginPopupContextItem(ctx,"##opts"..id) then
-    for _,k in ipairs(intensity_ids) do if r.ImGui_Selectable(ctx,intens_names[k],v==k) then intensity_tool=k;set_intensity(c.j,c.b,k) end end
+    for i=#intensity_ids-1,1,-1 do local k=intensity_ids[i];if r.ImGui_Selectable(ctx,intens_names[k],v==k) then intensity_tool=k;set_intensity(c.j,c.b,k) end end
+    if r.ImGui_Selectable(ctx,"Transition",v==5) then intensity_tool=5;set_intensity(c.j,c.b,5) end
     r.ImGui_EndPopup(ctx)
   end
   r.ImGui_PopStyleColor(ctx,n)
@@ -1423,7 +1507,6 @@ local function track_header(t)
   r.ImGui_DrawList_PushClipRect(dl,x+5,y,x+w-5,y+CELL_H,true)
   r.ImGui_DrawList_AddText(dl,x+6,y+(CELL_H-th)/2,contrast(rr,gg,bb),t.name)
   r.ImGui_DrawList_PopClipRect(dl)
-  if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,t.name) end
 end
 local function tool_button(i)
   local dl=r.ImGui_GetWindowDrawList(ctx)
