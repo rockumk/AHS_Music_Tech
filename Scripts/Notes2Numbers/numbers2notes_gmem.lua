@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.14
+-- @version 1.9.15
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -992,9 +992,10 @@ function export.DrawTracks(ctx,font,open_topline)
     r.ImGui_PopStyleVar(ctx,3)
     if normal_font then r.ImGui_PopFont(ctx) end
     -- Launch advanced cueing in place of the temporary width fields.
-    -- Cueing on the left, zoom in the middle, and Topline at the right edge.
+    -- Draw both launchers consecutively, separated by a real layout spacer.
     local zoom_button,readout_width,launcher_width=24,52,196
     local topline_width=math.max(220,r.ImGui_CalcTextSize(ctx,"Open N2N Topline Editor")+12)
+    local spacer=math.max(1,math.floor((panel_width-launcher_width-topline_width-2*zoom_button-readout_width-18)/2))
     local readout=("%d%%"):format(percent)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),3,1)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),2,2)
@@ -1002,7 +1003,15 @@ function export.DrawTracks(ctx,font,open_topline)
     r.ImGui_SetCursorPosX(ctx,box_x)
     if r.ImGui_Button(ctx,"N2N Advanced Cueing",launcher_width,footer_height) then launch_cue() end
     if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,"Open N2NCue for manual cue placement and live cueing") end
-    r.ImGui_SameLine(ctx,box_x+(panel_width-(2*zoom_button+readout_width+6))/2)
+    r.ImGui_SameLine(ctx)
+    r.ImGui_Dummy(ctx,spacer,1)
+    r.ImGui_SameLine(ctx)
+    if r.ImGui_Button(ctx,"Open N2N Topline Editor",topline_width,footer_height) then
+        if open_topline then open_topline() else export.OpenEditor("n2ntopline","N2N Topline") end
+    end
+    r.ImGui_SameLine(ctx)
+    r.ImGui_Dummy(ctx,spacer,1)
+    r.ImGui_SameLine(ctx)
     if percent<=TRACK_SCALE_MIN then r.ImGui_BeginDisabled(ctx) end
     if r.ImGui_Button(ctx,"-##track_zoom",zoom_button,footer_height) then adjust_track_scale(-TRACK_SCALE_STEP) end
     if percent<=TRACK_SCALE_MIN then r.ImGui_EndDisabled(ctx) end
@@ -1015,10 +1024,6 @@ function export.DrawTracks(ctx,font,open_topline)
     if percent>=TRACK_SCALE_MAX then r.ImGui_BeginDisabled(ctx) end
     if r.ImGui_Button(ctx,"+##track_zoom",zoom_button,footer_height) then adjust_track_scale(TRACK_SCALE_STEP) end
     if percent>=TRACK_SCALE_MAX then r.ImGui_EndDisabled(ctx) end
-    r.ImGui_SameLine(ctx,box_x+panel_width-topline_width)
-    if r.ImGui_Button(ctx,"Open N2N Topline Editor",topline_width,footer_height) then
-        if open_topline then open_topline() else export.OpenEditor("n2ntopline","N2N Topline") end
-    end
     r.ImGui_PopStyleVar(ctx,2)
     if id_popup then
         if id_popup_open then r.ImGui_OpenPopup(ctx,"N2N Instance ID"); id_popup_open=false end
