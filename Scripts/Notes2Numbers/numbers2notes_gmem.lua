@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.23
+-- @version 1.9.24
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -396,7 +396,7 @@ local function service_pattern_library(LIB,is_arp)
     local op=r.gmem_read(LIB)
     if op==8 or op==9 or op==10 then
         r.gmem_write(LIB,0)
-        if op==8 then r.MB("No notes in the selected pattern match the current drum map. The destination pattern was not changed.",kind.." Pattern Library",0)
+        if op==8 then r.MB("The selected pattern needs additional MIDI note/channel rows, but there are not enough unused rows available. The destination pattern and existing drum map were not changed.",kind.." Pattern Library",0)
         elseif op==9 then r.MB("Pattern loaded, but some notes did not match the current drum map.",kind.." Pattern Library",0)
         else r.MB("The destination section is no longer valid. No pattern was loaded.",kind.." Pattern Library",0) end
         return
