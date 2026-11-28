@@ -1,13 +1,14 @@
 desc:N2N Arp
-version: 12.4.0-dev.17
+version: 12.4.0-dev.18
 author: Rock Kennedy
 about:
-  # N2N Arp v12.4.0-dev.17
+  # N2N Arp v12.4.0-dev.18
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
 
 options:gmem=N2N_Ecosystem_RSKennedy
+options:maxmem=24000000
 
 slider1:110<1,127,1>-Default Row Velocity
 slider2:0<0,25,1>-Global Humanize
@@ -32,7 +33,7 @@ slider18:0<-500,500,1>-Visual Sync (ms)
 @init
 scale_dirty = 0;
 last_input_mode = -1;
-thisversion = "v12.4.0-dev.17";
+thisversion = "v12.4.0-dev.18";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -1329,9 +1330,132 @@ function library_request(op,t,entry,revision) local(n,r,k,p,a) (
 );
 
 
+// Full-pattern-set mailbox; separate from the single-pattern library.
+ARP_BANK=6700000; ARP_DATA=6704096; ARP_META=777;
+arp_stage_header=mem_pos; mem_pos+=ARP_META;
+arp_stage_offsets=mem_pos; mem_pos+=TOTAL_TABS;
+arp_stage_sizes=mem_pos; mem_pos+=TOTAL_TABS;
+arp_stage_seen=mem_pos; mem_pos+=TOTAL_TABS+1;
+// Sparse staging: reserve address space, touch only received records.
+arp_stage_data=mem_pos; mem_pos+=TOTAL_TABS*(7+4*vel_stride_tab);
+arp_epoch+=1; arp_stage_token=0;
+function arp_bank_request(cmd) local(a,now) (
+    now=time_precise(); a=ARP_BANK+32+(my_slot-1)*4;
+    my_slot>=1 && my_slot<=512 && gmem[reg_base+my_slot]==my_key && abs(now-gmem[ARP_BANK+8])<3 ? (
+        gmem[a]=my_key;gmem[a+3]=now;gmem[a+2]=cmd;
+    ) : gfx_showmenu("#Open updated Numbers2Notes first");
+);
+function arp_bank_read(t) local(i,n,p,v,g,l,base) (
+    t==-1 ? (
+        gmem[ARP_DATA]=slider1;gmem[ARP_DATA+1]=slider2;gmem[ARP_DATA+2]=slider3;
+        gmem[ARP_DATA+3]=slider4;gmem[ARP_DATA+4]=slider6;gmem[ARP_DATA+5]=slider9;
+        gmem[ARP_DATA+6]=slider12;gmem[ARP_DATA+7]=slider13;gmem[ARP_DATA+8]=slider14;
+        i=0;loop(MAX_ROWS,
+            gmem[ARP_DATA+9+i]=mem[row_mute_base+i];
+            gmem[ARP_DATA+9+128+i]=mem[row_solo_base+i];
+            gmem[ARP_DATA+9+256+i]=mem[row_level_base+i];
+            gmem[ARP_DATA+9+384+i]=mem[row_human_base+i];
+            gmem[ARP_DATA+9+512+i]=mem[row_len_base+i];
+            gmem[ARP_DATA+9+640+i]=mem[row_color_base+i];i+=1;
+        );
+        ARP_META;
+    ) : (
+        gmem[ARP_DATA]=mem[bars_ov_base+t];gmem[ARP_DATA+1]=mem[subdiv_ov_base+t];
+        gmem[ARP_DATA+2]=mem[hum_ov_base+t];gmem[ARP_DATA+3]=mem[swing_ov_base+t];
+        gmem[ARP_DATA+4]=mem[half_speed_ov_base+t];gmem[ARP_DATA+5]=mem[tab_mute_base+t];
+        n=7;i=0;base=t*vel_stride_tab;
+        loop(vel_stride_tab,
+            p=base+i;v=mem[vel_base+p];g=mem[grid_base+p];l=mem[step_len_base+p];
+            v!=0 || g!=0 || l!=0 ? (
+                gmem[ARP_DATA+n]=i;gmem[ARP_DATA+n+1]=v;
+                gmem[ARP_DATA+n+2]=g;gmem[ARP_DATA+n+3]=l;n+=4;
+            );i+=1;
+        );
+        gmem[ARP_DATA+6]=(n-7)/4;n;
+    );
+);
+function arp_bank_stage(t,n) local(i,c,ok,p,last,idx) (
+    ok=0;
+    t==-1 ? (
+        n==ARP_META ? (i=0;loop(n,mem[arp_stage_header+i]=gmem[ARP_DATA+i];i+=1;);ok=1;);
+    ) : (
+        c=gmem[ARP_DATA+6];ok=c>=0 && c<=vel_stride_tab && c==floor(c) && n==7+c*4;
+        ok ? (
+            i=0;last=-1;loop(c,
+                idx=gmem[ARP_DATA+7+i*4];
+                idx<=last || idx<0 || idx>=vel_stride_tab || idx!=floor(idx) ? ok=0;
+                last=idx;i+=1;
+            );
+        );
+        ok && !mem[arp_stage_seen+t+1] ? (
+            p=arp_stage_used;mem[arp_stage_offsets+t]=p;mem[arp_stage_sizes+t]=n;
+            i=0;loop(n,mem[arp_stage_data+p+i]=gmem[ARP_DATA+i];i+=1;);
+            arp_stage_used+=n;
+        ) : ok=0;
+    );
+    ok ? mem[arp_stage_seen+t+1]=1;
+    ok;
+);
+function arp_bank_commit() local(i,t,p,j,c,idx,base,ok) (
+    i=0;ok=1;loop(TOTAL_TABS+1,!mem[arp_stage_seen+i]?ok=0;i+=1;);
+    ok && play_state==0 && arp_stage_epoch==arp_epoch ? (
+        slider1=mem[arp_stage_header];slider2=mem[arp_stage_header+1];slider3=mem[arp_stage_header+2];
+        slider4=mem[arp_stage_header+3];slider6=mem[arp_stage_header+4];slider9=mem[arp_stage_header+5];
+        slider12=mem[arp_stage_header+6];slider13=mem[arp_stage_header+7];slider14=mem[arp_stage_header+8];
+        sliderchange(slider1);sliderchange(slider2);sliderchange(slider3);sliderchange(slider4);
+        sliderchange(slider6);sliderchange(slider9);sliderchange(slider12);sliderchange(slider13);sliderchange(slider14);
+        memcpy(row_mute_base,arp_stage_header+9,MAX_ROWS);
+        memcpy(row_solo_base,arp_stage_header+9+128,MAX_ROWS);
+        memcpy(row_level_base,arp_stage_header+9+256,MAX_ROWS);
+        memcpy(row_human_base,arp_stage_header+9+384,MAX_ROWS);
+        memcpy(row_len_base,arp_stage_header+9+512,MAX_ROWS);
+        memcpy(row_color_base,arp_stage_header+9+640,MAX_ROWS);
+        memset(vel_base,0,TOTAL_TABS*vel_stride_tab);memset(grid_base,0,TOTAL_TABS*vel_stride_tab);
+        memset(step_len_base,0,TOTAL_TABS*vel_stride_tab);
+        t=0;loop(TOTAL_TABS,
+            p=arp_stage_data+mem[arp_stage_offsets+t];base=t*vel_stride_tab;
+            mem[bars_ov_base+t]=mem[p];mem[subdiv_ov_base+t]=mem[p+1];
+            mem[hum_ov_base+t]=mem[p+2];mem[swing_ov_base+t]=mem[p+3];
+            mem[half_speed_ov_base+t]=mem[p+4];mem[tab_mute_base+t]=mem[p+5];
+            c=mem[p+6];j=0;loop(c,
+                i=p+7+j*4;idx=base+mem[i];mem[vel_base+idx]=mem[i+1];
+                mem[grid_base+idx]=mem[i+2];mem[step_len_base+idx]=mem[i+3];j+=1;
+            );t+=1;
+        );
+        scan_all_tabs();needs_tab_update=1;last_play_tab=-99;input_dirty=1;
+        arp_stage_token=0;1;
+    ) : 0;
+);
+function service_arp_bank() local(a,now,op,t,n,tok) (
+    now=time_precise();a=ARP_BANK+32+(my_slot-1)*4;
+    my_slot>=1 && my_slot<=512 && gmem[reg_base+my_slot]==my_key ? (
+        now>=arp_announce_at || gmem[a]!=my_key ? (
+            gmem[a]!=my_key ? (gmem[a+2]=0;gmem[a+3]=0;);
+            gmem[a]=my_key;gmem[a+1]=now;arp_announce_at=now+.25;
+        );
+        op=gmem[ARP_BANK];
+        op>0 && gmem[ARP_BANK+1]==my_slot && gmem[ARP_BANK+2]==my_key && abs(now-gmem[ARP_BANK+8])<3 ? (
+            t=gmem[ARP_BANK+3];n=gmem[ARP_BANK+4];tok=gmem[ARP_BANK+6];
+            op==1 ? (
+                play_state==0 && t>=-1 && t<TOTAL_TABS && t==floor(t) ? (
+                    gmem[ARP_BANK+4]=arp_bank_read(t);gmem[ARP_BANK+5]=arp_epoch;gmem[ARP_BANK]=2;
+                ) : gmem[ARP_BANK]=-1;
+            ) : op==3 ? (
+                play_state==0 ? (
+                    arp_stage_token=tok;arp_stage_epoch=arp_epoch;arp_stage_used=0;
+                    memset(arp_stage_seen,0,TOTAL_TABS+1);gmem[ARP_BANK+5]=arp_epoch;gmem[ARP_BANK]=5;
+                ) : gmem[ARP_BANK]=-1;
+            ) : op==4 ? (
+                tok==arp_stage_token && arp_stage_epoch==arp_epoch && play_state==0 && t>=-1 && t<TOTAL_TABS && t==floor(t) && n>=0 && n<=65543 && n==floor(n) && arp_bank_stage(t,n) ? gmem[ARP_BANK]=5 : gmem[ARP_BANK]=-1;
+            ) : op==6 ? (
+                tok==arp_stage_token && arp_bank_commit() ? gmem[ARP_BANK]=7 : gmem[ARP_BANK]=-1;
+            );
+        );
+    );
+);
 function show_pattern_library(t) local(base,rev,count,k,j,n,addr,builtins,first_file,sel,mode,p) (
     mode=slider14;
-    strcpy(#lib_menu,"Save Pattern...|Load Pattern...||Export Pattern to Presets...|Browse Presets...||Force Silence|Inherit (clear pattern)||#PRESETS");
+    strcpy(#lib_menu,"Save Pattern...|Load Pattern...||Save All Patterns...|Load All Patterns...||Export Pattern to Presets...|Browse Presets...||Force Silence|Inherit (clear pattern)||#PRESETS");
     mode==0 ? (
         strcat(#lib_menu,"|Ascending|Descending|Up and Down|Block Chords|Broken Chords|Syncopated"); builtins=6;
     ) : mode==1 ? (
@@ -1359,27 +1483,29 @@ function show_pattern_library(t) local(base,rev,count,k,j,n,addr,builtins,first_
     );
     sel=gfx_showmenu(#lib_menu);
     sel==1 || sel==2 ? library_request(sel,t,0,0) :
-    sel==3 ? library_request(4,t,0,0) :
-    sel==4 ? library_request(7,t,0,0) :
-    sel==5 || sel==6 ? (
+    sel==3 || sel==4 ? arp_bank_request(sel-2) :
+    sel==5 ? library_request(4,t,0,0) :
+    sel==6 ? library_request(7,t,0,0) :
+    sel==7 || sel==8 ? (
         memset(grid_base+t*vel_stride_tab,0,vel_stride_tab);
         memset(vel_base+t*vel_stride_tab,0,vel_stride_tab);
         memset(step_len_base+t*vel_stride_tab,0,vel_stride_tab);
-        mem[tab_mute_base+t]=sel==5?2:0;
+        mem[tab_mute_base+t]=sel==7?2:0;
         scan_active_tab(); needs_tab_update=1;
     ) :
-    sel>=8 && sel<=7+builtins ? (
-        p=sel-7;
+    sel>=10 && sel<=9+builtins ? (
+        p=sel-9;
         mode==0 ? (p>=4 ? p+=1;) : mode==1 ? (p+=7;) : (p+=10;);
         factory_pattern(p,t);
     ) :
-    sel>7+builtins && sel<=7+builtins+count ? (
-        library_request(6,t,sel-7-builtins,rev);
+    sel>9+builtins && sel<=9+builtins+count ? (
+        library_request(6,t,sel-9-builtins,rev);
     );
 );
 
 @serialize
 arp_loading=file_avail(0)>0;
+arp_loading ? (arp_epoch+=1;arp_stage_token=0;);
 file_mem(0, ui_base, 32);
 file_mem(0, row_mute_base, MAX_ROWS); file_mem(0, row_solo_base, MAX_ROWS); 
 file_mem(0, row_chan_base, MAX_ROWS); 
@@ -1445,6 +1571,7 @@ id_requested!=my_slot ? (
         ); check_tab_population(lib_t); flush_inventory_to_gmem();
     ); gmem[6400000]=0;
 );
+service_arp_bank();
 // --- SEND QUEUED RECORDING NOTES ---
 midi_trigger_queued >= 0 ? (
     midisend(0, 0x9F, midi_trigger_queued | (1 << 8));   // Note On Ch 16 at Velocity 1
