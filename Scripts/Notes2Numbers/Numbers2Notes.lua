@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.26
+-- @version 2.0.4-dev.27
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -59,6 +59,29 @@ local help = require("numbers2notes_help")
 local form = require("numbers2notes_form")
 local config = require("numbers2notes_config")
 local gmem_export = require("numbers2notes_gmem")
+local function Open_N2N_Topline_Editor()
+    local r=reaper
+    local sec="N2N_TOPLINE_HUB"
+    local hb=tonumber(r.GetExtState(sec,"heartbeat"))
+    local hwnd=r.JS_Window_Find and r.JS_Window_SetFocus and r.JS_Window_Find("N2N Topline",true)
+    if hb and math.abs(r.time_precise()-hb)<3 then
+        r.SetExtState(sec,"focus",tostring(r.time_precise()),false)
+        if hwnd then r.JS_Window_SetFocus(hwnd) end
+    elseif hwnd then
+        r.JS_Window_SetFocus(hwnd)
+    else
+        local path=canonical_script_path(script_path.."../N2N Topline.lua")
+        local file=io.open(path,"rb")
+        if file then
+            file:close()
+            local cmd=r.AddRemoveReaScript(true,0,path,true)
+            if cmd and cmd>0 then r.Main_OnCommand(cmd,0)
+            else r.MB("Could not launch N2N Topline:\n"..path,"Numbers2Notes",0) end
+        else
+            r.MB("N2N Topline.lua was not found at:\n"..path,"Numbers2Notes",0)
+        end
+    end
+end
 reaper.gmem_attach("N2N_Ecosystem_RSKennedy")
 local track_table = config.track_table
 local pluginsources = config.pluginsources
@@ -2448,7 +2471,16 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 11 then
-            gmem_export.DrawTracks(ctx, fontsmall)
+            -- Older installed helpers may not yet have the new footer slot.
+            -- Always offer a working launcher from the main script.
+            if not gmem_export.ToplineFooterLauncher then
+                local x=r.ImGui_GetCursorPosX(ctx)
+                local w=math.max(220,r.ImGui_CalcTextSize(ctx,"Open N2N Topline Editor")+16)
+                r.ImGui_SetCursorPosX(ctx,x+592-w)
+                if r.ImGui_Button(ctx,"Open N2N Topline Editor##tracksfallback",w,22) then Open_N2N_Topline_Editor() end
+                r.ImGui_SetCursorPosX(ctx,x)
+            end
+            gmem_export.DrawTracks(ctx, fontsmall, Open_N2N_Topline_Editor)
         end
         if feedback_tab_mode == 12 then
             r.ImGui_Dummy(ctx,0,8)
@@ -2493,28 +2525,8 @@ Form: I V C V C B C O]]
             r.ImGui_PopTextWrapPos(ctx)
             r.ImGui_Dummy(ctx,0,12)
             r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FrameRounding(),4)
-            if r.ImGui_Button(ctx,"Open N2N Topline Editor",180,30) then
-                local sec="N2N_TOPLINE_HUB"
-                local hb=tonumber(r.GetExtState(sec,"heartbeat"))
-                local hwnd=r.JS_Window_Find and r.JS_Window_SetFocus and r.JS_Window_Find("N2N Topline",true)
-                if hb and math.abs(r.time_precise()-hb)<3 then
-                    r.SetExtState(sec,"focus",tostring(r.time_precise()),false)
-                    if hwnd then r.JS_Window_SetFocus(hwnd) end
-                elseif hwnd then
-                    r.JS_Window_SetFocus(hwnd)
-                else
-                    local path=canonical_script_path(script_path.."../N2N Topline.lua")
-                    local file=io.open(path,"rb")
-                    if file then
-                        file:close()
-                        local cmd=r.AddRemoveReaScript(true,0,path,true)
-                        if cmd and cmd>0 then r.Main_OnCommand(cmd,0)
-                        else r.MB("Could not launch N2N Topline:\n"..path,"Numbers2Notes",0) end
-                    else
-                        r.MB("N2N Topline.lua was not found at:\n"..path,"Numbers2Notes",0)
-                    end
-                end
-            end
+            local topline_w=math.max(220,r.ImGui_CalcTextSize(ctx,"Open N2N Topline Editor")+24)
+            if r.ImGui_Button(ctx,"Open N2N Topline Editor",topline_w,30) then Open_N2N_Topline_Editor() end
             r.ImGui_PopStyleVar(ctx)
         end
 
