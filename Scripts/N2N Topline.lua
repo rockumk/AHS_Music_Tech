@@ -1,5 +1,5 @@
 -- @description N2N Topline
--- @version 5.4-dev.8
+-- @version 5.4-dev.9
 -- @author Rock Kennedy and Gemini 4 Hydrogen (which did an absolutely fabulous job of transforming the vision into solid Lua code)
 -- @about
 --   Numbers2Notes Topline Melody Editor (1200x640 minimum):
@@ -917,6 +917,7 @@ end
 function state.restore_preview_route()
   local route=state.preview_route
   state.preview_route=nil
+  state.preview_route_ready_at=nil
   if not route or not reaper.ValidatePtr2(owner_project,route.track,"MediaTrack*") then return end
   for _,k in ipairs({"I_RECARM","I_RECMON","I_RECINPUT","I_RECMODE"}) do
     if reaper.GetMediaTrackInfo_Value(route.track,k)==route.applied[k] then
@@ -947,23 +948,67 @@ function state.ensure_preview_route(chan)
     reaper.SetMediaTrackInfo_Value(tr,k,route.applied[k])
   end
   state.preview_route=route
-  state.preview_release_at=reaper.time_precise()+.4
+  state.preview_route_ready_at=reaper.time_precise()+.045
+  state.preview_release_at=reaper.time_precise()+5
   return true
 end
-local function send_midi_note_on(pitch, vel, chan)
+-- Queue note messages until the audio thread confirms input monitoring.
+-- Keep a short minimum gate so even a very quick mouse click is audible.
+state.preview_events={}
+state.preview_sounding={}
+local function send_midi_note_on(pitch,vel,chan)
   chan=clamp(math.floor(chan or 0),0,15)
   if not state.ensure_preview_route(chan) then return false end
-  reaper.StuffMIDIMessage(0,0x90+chan,clamp(math.floor(pitch),0,127),clamp(math.floor(vel or 100),1,127))
+  pitch=clamp(math.floor(pitch),0,127)
+  table.insert(state.preview_events,{on=true,pitch=pitch,chan=chan,vel=clamp(math.floor(vel or 100),1,127),queued=reaper.time_precise()})
+  state.preview_release_at=reaper.time_precise()+5
   return true
 end
-local function send_midi_note_off(pitch, chan)
-  reaper.StuffMIDIMessage(0,0x80+clamp(math.floor(chan or 0),0,15),clamp(math.floor(pitch),0,127),0)
-  state.preview_release_at=reaper.time_precise()+.4
+local function send_midi_note_off(pitch,chan)
+  chan=clamp(math.floor(chan or 0),0,15)
+  pitch=clamp(math.floor(pitch),0,127)
+  table.insert(state.preview_events,{on=false,pitch=pitch,chan=chan,queued=reaper.time_precise()})
+  state.preview_release_at=reaper.time_precise()+5
+end
+function state.dispatch_preview_events(now)
+  if #state.preview_events==0 then return end
+  local tr=state.output_track
+  if not tr or not reaper.ValidatePtr2(owner_project,tr,"MediaTrack*") then
+    state.preview_events={};state.preview_sounding={};return
+  end
+  -- B_RECMON_IN_EFFECT is the actual audio-thread state, rather than the
+  -- requested I_RECMON setting. Do not send the first note during startup.
+  if now<(state.preview_route_ready_at or 0) or reaper.GetMediaTrackInfo_Value(tr,"B_RECMON_IN_EFFECT")==0 then
+    if now-state.preview_events[1].queued>1 then
+      state.preview_events={};state.previews={};state.kbd_held_pitch=nil
+      state.status_msg="Input monitoring did not become active. Check the output track."
+      state.preview_release_at=now+1
+    end
+    return
+  end
+  while #state.preview_events>0 do
+    local e=state.preview_events[1]
+    local key=e.chan*128+e.pitch
+    local sounding=state.preview_sounding[key]
+    if not e.on and sounding and now-sounding.at<.085 then break end
+    table.remove(state.preview_events,1)
+    if e.on then
+      if sounding then reaper.StuffMIDIMessage(0,0x80+e.chan,e.pitch,0) end
+      reaper.StuffMIDIMessage(0,0x90+e.chan,e.pitch,e.vel)
+      state.preview_sounding[key]={pitch=e.pitch,chan=e.chan,at=now}
+    elseif sounding then
+      reaper.StuffMIDIMessage(0,0x80+e.chan,e.pitch,0)
+      state.preview_sounding[key]=nil
+    end
+  end
+  state.preview_release_at=now+5
 end
 function state.stop_preview_notes()
-  for _,pr in ipairs(state.previews) do send_midi_note_off(pr.pitch,pr.chan) end
+  state.preview_events={}
+  for _,pr in pairs(state.preview_sounding) do reaper.StuffMIDIMessage(0,0x80+pr.chan,pr.pitch,0) end
+  state.preview_sounding={}
   state.previews={}
-  if state.kbd_held_pitch then send_midi_note_off(state.kbd_held_pitch,state.kbd_held_chan);state.kbd_held_pitch=nil end
+  state.kbd_held_pitch=nil
   state.restore_preview_route()
 end
 function state.preview_key(pitch)
@@ -991,7 +1036,8 @@ end
 local function update_previews()
   local now = reaper.time_precise()
   for i = #state.previews, 1, -1 do if now >= state.previews[i].expire then send_midi_note_off(state.previews[i].pitch, state.previews[i].chan); table.remove(state.previews, i) end end
-  if state.preview_route and #state.previews==0 and not state.kbd_held_pitch and now>=(state.preview_release_at or 0) then state.restore_preview_route() end
+  state.dispatch_preview_events(now)
+  if state.preview_route and #state.previews==0 and #state.preview_events==0 and not next(state.preview_sounding) and not state.kbd_held_pitch and now>=(state.preview_release_at or 0) then state.restore_preview_route() end
 end
 
 local function on_script_exit()
