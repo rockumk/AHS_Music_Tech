@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.4.0-dev.12
+version: 12.4.0-dev.13
 author: Rock Kennedy
 about:
-  # N2N Arp v12.4.0-dev.12
+  # N2N Arp v12.4.0-dev.13
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -31,7 +31,7 @@ slider17:0<-100,100,0.01>-N2N Mix Intensity
 @init
 scale_dirty = 0;
 last_input_mode = -1;
-thisversion = "v12.4.0-dev.12";
+thisversion = "v12.4.0-dev.13";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -2082,7 +2082,7 @@ btn_h = 20;
 tab_start_x = 173;
 tab_right_x=tab_start_x+27*ttabw+special_tab_w-5;
 mix_speed_x=tab_right_x-stretch_w;
-mix_stretch_x=mix_speed_x-2*ttabw-5;
+mix_stretch_x=mix_speed_x-2*ttabw;
 mix_hub_x=tab_right_x+5;
 mix_level_x=mix_speed_x-29; 
 
