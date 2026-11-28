@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.22
+-- @version 1.9.23
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -339,9 +339,12 @@ end
 local function browse_pattern_file(dir,title,extension)
     local r=reaper
     if r.JS_Dialog_BrowseForOpenFiles then
-        local filter="N2N pattern files (*"..extension..")\0*"..extension.."\0"
+        local filter="N2N pattern files (*"..extension..")\0*"..extension.."\0\0"
         local result,path=r.JS_Dialog_BrowseForOpenFiles(title,dir,"",filter,false)
-        return result>0 and path and path~="",path
+        if result==0 then return false,"" end
+        if result<0 then error("File browser failed (code "..result..").",0) end
+        if type(path)~="string" or path=="" then error("File browser returned no selected file.",0) end
+        return true,path
     end
     return r.GetUserFileNameForRead(dir.."/",title,extension)
 end
@@ -391,14 +394,26 @@ local function service_pattern_library(LIB,is_arp)
     r.gmem_attach("N2N_Ecosystem_RSKennedy")
     r.gmem_write(LIB+8,r.time_precise())
     local op=r.gmem_read(LIB)
-    if op==3 and (r.time_precise()-r.gmem_read(LIB+11)>30 or r.gmem_read(8000000+math.floor(r.gmem_read(LIB+1)))~=r.gmem_read(LIB+12)) then
+    if op==8 or op==9 or op==10 then
         r.gmem_write(LIB,0)
+        if op==8 then r.MB("No notes in the selected pattern match the current drum map. The destination pattern was not changed.",kind.." Pattern Library",0)
+        elseif op==9 then r.MB("Pattern loaded, but some notes did not match the current drum map.",kind.." Pattern Library",0)
+        else r.MB("The destination section is no longer valid. No pattern was loaded.",kind.." Pattern Library",0) end
+        return
+    end
+    if op==3 then
+        local invalid=r.gmem_read(8000000+math.floor(r.gmem_read(LIB+1)))~=r.gmem_read(LIB+12)
+        if invalid or r.time_precise()-r.gmem_read(LIB+11)>5 then
+            r.gmem_write(LIB,0)
+            r.MB(invalid and "The target instance changed before the pattern could be loaded." or "The pattern file was read, but the target FX did not acknowledge the load. Check that FX processing is enabled while stopped and the track is not bypassed or offline.",kind.." Pattern Library",0)
+        end
         return
     end
     if op~=1 and op~=2 and op~=4 and op~=6 and op~=7 then return end
     local id=math.floor(r.gmem_read(LIB+1))
     if id<1 or id>512 or r.gmem_read(8000000+id)~=r.gmem_read(LIB+12) then
         r.gmem_write(LIB,0)
+        r.MB("The target FX is not registered. Check that it is online and processing.",kind.." Pattern Library",0)
         return
     end
     r.gmem_write(LIB,5)
