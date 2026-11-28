@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.23
+version: 7.8.0-dev.24
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.23 -
+  # N2N Drum Arranger v7.8.0-dev.24 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -139,7 +139,7 @@ slider17:0<-100,100,0.01>-N2N Mix Intensity
 slider18:0<-500,500,1>-Visual Sync (ms)
 
 @init
-version_display = "v7.8.0-dev.23";
+version_display = "v7.8.0-dev.24";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -1626,7 +1626,7 @@ function service_drum_bank() local(now,addr,op,t,n,tok,ok) (
     my_slot>=1 && my_slot<=512 && gmem[reg_base+my_slot]==my_key ? (
         addr=BANK_BASE+32+(my_slot-1)*4;
         now>=bank_announce_at || gmem[addr]!=my_key ? (
-            gmem[addr]!=my_key ? (gmem[addr+2]=0;gmem[addr+3]=0;);
+            gmem[addr]!=my_key ? (gmem[addr+2]=0;gmem[addr+3]=0;gmem[BANK_BASE+2080+my_slot]=0;);
             gmem[addr]=my_key;gmem[addr+1]=now;bank_announce_at=now+.25;
         );
         op=gmem[BANK_BASE];
@@ -3403,16 +3403,17 @@ t_e = mem[ui_edit_tab];
     // Use the actual flow position so it stays aligned with both speed buttons.
     track_label_x=draw_x; track_label_w=90;
     bank_online=abs(time_precise()-gmem[8320000])<2 && abs(time_precise()-gmem[BANK_BASE+8])<3;
-    !bank_online ? (
+    bank_status=my_slot>=1 && my_slot<=512 ? gmem[BANK_BASE+2080+my_slot] : 0;
+    !bank_online || bank_status<0 ? (
         rect(track_label_x,row1_y,track_label_w,22,.52,.22,.12,1);
         gfx_setfont(1,os_font,fontsize,'b');
-        draw_text(track_label_x+13,row1_y+4,"OFFLINE",1,.87,.5);
+        draw_text(track_label_x+13,row1_y+4,bank_online?"BACKUP ERR":"OFFLINE",1,.87,.5);
         bank_warn_bri=.65+.35*abs(sin(time_precise()*3));
         gfx_setfont(1,os_font,30,'b');
         draw_text(track_label_x+35,ROW2_Y+4,"!",1,bank_warn_bri,.1);
         gfx_setfont(1,os_font,fontsize-1,'b');
-        draw_text(track_label_x+15,ROW2_Y+39,"RUN N2N",1,.8,.35);
-        draw_text(track_label_x+8,ROW2_Y+55,"NO BACKUP",1,.8,.35);
+        draw_text(track_label_x+15,ROW2_Y+39,bank_online?"RETRYING":"RUN N2N",1,.8,.35);
+        draw_text(track_label_x+8,ROW2_Y+55,bank_online?"CHECK N2N":"NO BACKUP",1,.8,.35);
         gfx_setfont(1,os_font,fontsize,'b');
     ) : track_num>0 ? (
         rect(track_label_x,row1_y,track_label_w,22,track_r,track_g,track_b,1);
