@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.10
+-- @version 0.2.11
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -2097,7 +2097,7 @@ local function transport()
     local icon=active and accent or (i==2 and 0xBA8585FF or 0xCCCCCCFF)
     if v[1]~="" then
       local tw,th=r.ImGui_CalcTextSize(ctx,v[1])
-      r.ImGui_DrawList_AddText(dl,x+(w-tw)/2,y-th-1,0x929292FF,v[1])
+      r.ImGui_DrawList_AddText(dl,x+(w-tw)/2,y-th-1,0xE0E0E0FF,v[1])
     end
     local click=r.ImGui_InvisibleButton(ctx,"##mixtransport"..i,w,h)
     local hover=r.ImGui_IsItemHovered(ctx)
