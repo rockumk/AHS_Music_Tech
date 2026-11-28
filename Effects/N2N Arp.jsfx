@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.4.0-dev.15
+version: 12.4.0-dev.16
 author: Rock Kennedy
 about:
-  # N2N Arp v12.4.0-dev.15
+  # N2N Arp v12.4.0-dev.16
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -32,7 +32,7 @@ slider18:0<-500,500,1>-Visual Sync (ms)
 @init
 scale_dirty = 0;
 last_input_mode = -1;
-thisversion = "v12.4.0-dev.15";
+thisversion = "v12.4.0-dev.16";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -2143,19 +2143,30 @@ function help_sync_button(x,y,w,label) local(tw,th,hover) (
     gfx_measurestr(label,tw,th);draw_text(x+(w-tw)/2,y+(24-th)/2,label,1,1,1);
     help_click && hover;
 );
-function draw_visual_sync(x,y) local(delta,old) (
+function draw_visual_sync(x,y) local(delta,old,sx,sy,sw,knob,hover,tw,th) (
     gfx_setfont(1,os_font,fontsize,'b');
     draw_text(x,y,"VISUAL SYNC (ms)",.8,.9,.9);
     old=slider18;delta=shift_dn?1:10;
-    help_sync_button(x,y+22,48,"-") ? slider18=max(-500,slider18-delta);
-    rect(x+53,y+22,100,24,.12,.12,.12,1);
+    // Absolute click/drag across the full range, even outside the track after capture.
+    sx=x+8;sy=y+22;sw=494;
+    hover=mx>=sx-8 && mx<sx+sw+8 && my>=sy-3 && my<sy+24;
+    help_click && hover ? visual_sync_drag=1;
+    !(mouse_cap&1) ? visual_sync_drag=0;
+    visual_sync_drag ? slider18=max(-500,min(500,floor((mx-sx)*1000/sw-500+.5)));
+    help_sync_button(x,y+50,48,"-") ? slider18=max(-500,slider18-delta);
+    help_sync_button(x+158,y+50,48,"+") ? slider18=min(500,slider18+delta);
+    help_sync_button(x+216,y+50,64,"RESET") ? slider18=0;
+    rect(sx,sy+8,sw,5,.12,.12,.12,1);
+    gfx_set(.55,.55,.55,1);gfx_line(sx+sw/2,sy+3,sx+sw/2,sy+18);
+    knob=sx+(slider18+500)*sw/1000;
+    rect(min(knob,sx+sw/2),sy+8,abs(knob-sx-sw/2),5,.35,.73,.75,1);
+    rect(knob-4,sy+1,8,19,.85,.9,.9,1);
+    rect(x+53,y+50,100,24,.12,.12,.12,1);
     sprintf(#visual_sync_text,"%+d ms",slider18);
-    gfx_measurestr(#visual_sync_text,vs_tw,vs_th);
-    draw_text(x+53+(100-vs_tw)/2,y+22+(24-vs_th)/2,#visual_sync_text,1,1,1);
-    help_sync_button(x+158,y+22,48,"+") ? slider18=min(500,slider18+delta);
-    help_sync_button(x+216,y+22,64,"RESET") ? slider18=0;
+    gfx_measurestr(#visual_sync_text,tw,th);
+    draw_text(x+53+(100-tw)/2,y+50+(24-th)/2,#visual_sync_text,1,1,1);
     slider18!=old ? sliderchange(slider18);
-    draw_text(x,y+52,"+ delays the display; - advances it. Shift-click for 1 ms.",.8,.8,.8);
+    draw_text(x,y+80,"+ delays the display; - advances it. Shift-click +/- for 1 ms.",.8,.8,.8);
 );
 
 // Display-only mix controls and guarded requests to the running N2N hub.
@@ -3809,7 +3820,7 @@ mix_hover && !help_active && !chan_popup_active && !color_popup_active && !mb &&
 
 help_active ? (
     rect(0,0,gfx_w,gfx_h,0,0,0,.85);
-    help_w=550;help_h=475;help_x=(gfx_w-help_w)/2;help_y=(gfx_h-help_h)/2;
+    help_w=550;help_h=495;help_x=(gfx_w-help_w)/2;help_y=(gfx_h-help_h)/2;
     rect(help_x,help_y,help_w,help_h,.2,.2,.2,1);
     gfx_setfont(1,os_font,fontsize,'b');
     draw_text(help_x+20,help_y+20,"N2N ARP HELP",.5,1,1);
