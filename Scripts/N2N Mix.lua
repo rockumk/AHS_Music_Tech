@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.12
+-- @version 0.2.13
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -2067,6 +2067,24 @@ function ui.transport_icon(dl,i,x,y,color)
     rect(5,-6,7,6);tri(-4,-6,-4,6,4,0)
   end
 end
+-- Canonicalize script paths before registering actions or loading modules.
+-- Preserve Windows drive/UNC roots and Unix roots; do not treat "." as a module.
+function ui.canonical_script_path(path)
+    path=path:gsub("\\","/")
+    local root,rest=path:match("^(//[^/]+/[^/]+/?)/*(.*)$")
+    if not root then root,rest=path:match("^(%a:/)/*(.*)$") end
+    if not root then root,rest=path:match("^(/)/*(.*)$") end
+    root,rest=root or "",rest or path
+    if root~="" and root:sub(-1)~="/" then root=root.."/" end
+    local parts={}
+    for part in rest:gmatch("[^/]+") do
+        if part==".." then
+            if #parts>0 and parts[#parts]~=".." then parts[#parts]=nil
+            elseif root=="" then parts[#parts+1]=part end
+        elseif part~="." then parts[#parts+1]=part end
+    end
+    return root..table.concat(parts,"/")
+end
 function ui.open_numbers2notes()
   local sec="N2N_EDITOR_WINDOWS"
   local hb=tonumber(r.GetExtState(sec,"numbers2notes:heartbeat"))
@@ -2096,8 +2114,8 @@ function ui.open_numbers2notes()
       i=i+1
     end
   end
-  local source=debug.getinfo(1,"S").source:sub(2)
-  local dir=source:match("^(.*[/\\])")
+  local source=ui.canonical_script_path(debug.getinfo(1,"S").source:gsub("^@",""))
+  local dir=source:match("^(.*[/])")
   local path
   if dir then
     local candidate=dir.."Notes2Numbers/Numbers2Notes.lua"
@@ -2106,6 +2124,7 @@ function ui.open_numbers2notes()
   end
   path=path or search(r.GetResourcePath().."/Scripts",0)
   if not path then r.MB("Install Numbers2Notes.lua first.","N2N Mix",0);return end
+  path=ui.canonical_script_path(path)
   local cmd=r.AddRemoveReaScript(true,0,path,true)
   if cmd and cmd>0 then r.Main_OnCommand(cmd,0)
   else r.MB("Could not launch Numbers2Notes.","N2N Mix",0) end
