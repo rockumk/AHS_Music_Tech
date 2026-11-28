@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.27
+-- @version 1.9.28
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -537,6 +537,12 @@ local function is_topline(tr,name)
     return tag=="1" or (recipe or ""):match("^41_")~=nil
         or (name or ""):lower():find("n2n topline",1,true)~=nil
 end
+local function is_sustained(tr,name)
+    local _,recipe=reaper.GetSetMediaTrackInfo_String(tr,"P_EXT:N2N:ID","",false)
+    if recipe=="16_2" or recipe=="17_2" or recipe=="20_2" then return true end
+    local lower=(name or ""):lower()
+    return lower:find("^n2n%s+sust%.?%s+chord")~=nil or lower:find("^n2n%s+sust%.?%s+bass")~=nil
+end
 local function scan(project)
     local result, counts={},{}
     for i=0,reaper.CountTracks(project)-1 do
@@ -550,6 +556,8 @@ local function scan(project)
         end
         if is_topline(tr,name) then
             result[#result+1]={track=tr,guid=reaper.GetTrackGUID(tr),name=name,number=i+1,kind="Topline",r=red,g=green,b=blue}
+        elseif is_sustained(tr,name) then
+            result[#result+1]={track=tr,guid=reaper.GetTrackGUID(tr),name=name,number=i+1,kind="Sustained",r=red,g=green,b=blue}
         end
         for fx=0,reaper.TrackFX_GetCount(tr)-1 do
             local kind=kind_of(tr,fx)
@@ -922,11 +930,8 @@ local function topline_grid(ctx,t,regions,width,scale,gap)
         if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,sec.name.."\nOpen this region in N2N Topline") end
     end
 end
--- Independent Tracks-tab zoom. Fonts are attached once, outside the frame.
-local TRACK_SCALE_MIN, TRACK_SCALE_MAX, TRACK_SCALE_STEP, TRACK_SCALE_DEFAULT = 75, 175, 5, 170
-local track_scale = tonumber(reaper.GetExtState("Numbers2Notes","TracksPanelScale")) or TRACK_SCALE_DEFAULT
-track_scale = math.max(TRACK_SCALE_MIN, math.min(TRACK_SCALE_MAX,
-    math.floor(track_scale/TRACK_SCALE_STEP+.5)*TRACK_SCALE_STEP))
+-- Fixed Tracks-tab scale. Ignore obsolete saved zoom preferences.
+local TRACK_SCALE_DEFAULT=175
 local track_fonts, track_small_fonts = {}, {}
 -- Header rectangle widths in unscaled pixels, in display order.
 -- The five footer fields show/edit their actual scaled pixel widths.
@@ -947,16 +952,10 @@ function export.InitTrackFonts(ctx, family, normal_size, small_size)
         end
         return cache[size]
     end
-    for percent=TRACK_SCALE_MIN,TRACK_SCALE_MAX,TRACK_SCALE_STEP do
-        -- Shorter header row, smaller header font; pattern labels unchanged.
-        local text_scale=.85+(percent-100)*.002
-        track_fonts[percent]=font_at(normal_size*text_scale)
-        track_small_fonts[percent]=font_at(small_size*(1+(percent-100)*.003))
-    end
-end
-local function adjust_track_scale(delta)
-    track_scale=math.max(TRACK_SCALE_MIN,math.min(TRACK_SCALE_MAX,track_scale+delta))
-    reaper.SetExtState("Numbers2Notes","TracksPanelScale",tostring(track_scale),true)
+    local percent=TRACK_SCALE_DEFAULT
+    local text_scale=.85+(percent-100)*.002
+    track_fonts[percent]=font_at(normal_size*text_scale)
+    track_small_fonts[percent]=font_at(small_size*(1+(percent-100)*.003))
 end
 local function pattern_grid(ctx,t,width,scale,gap)
     local r=reaper
@@ -1019,7 +1018,9 @@ end
 export.ToplineFooterLauncher=true
 function export.DrawTracks(ctx,font,open_topline)
     local r=reaper
-    local percent=track_scale
+    local percent=TRACK_SCALE_DEFAULT
+    local main_x,main_y=r.ImGui_GetWindowPos(ctx)
+    local main_w,main_h=r.ImGui_GetWindowSize(ctx)
     local scale=percent/100
     local normal_font=track_fonts[percent]
     local small_font=track_small_fonts[percent] or font
@@ -1037,7 +1038,7 @@ function export.DrawTracks(ctx,font,open_topline)
     for id,n in pairs(duplicate) do if n>1 or id<1 or id>512 then conflict_count=conflict_count+1 end end
     if conflict_count>0 then
         r.ImGui_TextColored(ctx,0xFF7777FF,("%d ID conflict(s)"):format(conflict_count))
-    else r.ImGui_TextColored(ctx,0xA0E0A0FF,("%d instances | IDs OK"):format(#tracks)) end
+    else r.ImGui_TextColored(ctx,0xA0E0A0FF,("%d tracks / instances | IDs OK"):format(#tracks)) end
     r.ImGui_SameLine(ctx)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),2,0)
     if r.ImGui_SmallButton(ctx,"Refresh") then export.PublishTrackIdentity(true) end
@@ -1082,9 +1083,11 @@ function export.DrawTracks(ctx,font,open_topline)
         local regions
         for _,t in ipairs(tracks) do
             local top=t.kind=="Topline"
-            local fx=not top and locate(t)
-            if (top and valid_topline(t)) or fx then
-                if not top then t.fx=fx end
+            local sustained=t.kind=="Sustained"
+            local plain=top or sustained
+            local fx=not plain and locate(t)
+            if (plain and valid_topline(t)) or fx then
+                if not plain then t.fx=fx end
                 r.ImGui_SetCursorPosX(ctx,row_x)
                 r.ImGui_PushID(ctx,t.guid)
                 local label=("%d. %s"):format(t.number,t.name)
@@ -1109,15 +1112,17 @@ function export.DrawTracks(ctx,font,open_topline)
                 r.ImGui_PopStyleVar(ctx)
                 if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,t.name) end
                 r.ImGui_SameLine(ctx)
-                if r.ImGui_Button(ctx,t.kind,arpw,row_height) then
+                if sustained then
+                    r.ImGui_Dummy(ctx,arpw,row_height)
+                elseif r.ImGui_Button(ctx,t.kind,arpw,row_height) then
                     if top then launch_topline(t) else open_fx(t.track,fx) end
                 end
                 r.ImGui_SameLine(ctx)
                 local inst=r.TrackFX_GetInstrument(t.track)
                 if inst<0 or inst==fx then r.ImGui_BeginDisabled(ctx) end
-                if r.ImGui_Button(ctx,"Instrument",top and instw+idw+track_gap or instw,row_height) then open_fx(t.track,inst) end
+                if r.ImGui_Button(ctx,"Instrument",plain and instw+idw+track_gap or instw,row_height) then open_fx(t.track,inst) end
                 if inst<0 or inst==fx then r.ImGui_EndDisabled(ctx) end
-                if not top then
+                if not plain then
                 r.ImGui_SameLine(ctx)
                 local bad=(duplicate[t.id] or 0)>1 or t.id<1 or t.id>512
                 if bad then
@@ -1135,24 +1140,24 @@ function export.DrawTracks(ctx,font,open_topline)
                 -- Hover alone opens the interactive flyout. There is no click-open menu.
                 r.ImGui_Button(ctx,"FX",fxw,row_height)
                 if r.ImGui_IsItemHovered(ctx) then
-                    if not fx_hover or fx_hover.guid~=t.guid then
-                        local right=r.ImGui_GetItemRectMax(ctx)
-                        local _,top=r.ImGui_GetItemRectMin(ctx)
-                        hover_pos={right+3,top}
-                    end
+                    local left,button_top=r.ImGui_GetItemRectMin(ctx)
+                    local _,button_bottom=r.ImGui_GetItemRectMax(ctx)
+                    hover_pos={left,button_top,button_bottom}
                     fx_hover=t
                     hover_until=r.time_precise()+.5
                 end
                 r.ImGui_PopStyleColor(ctx,4)
-                r.ImGui_SetCursorPosX(ctx,row_x)
-                if small_font then r.ImGui_PushFont(ctx,small_font) end
-                if top then
-                    regions=regions or topline_regions()
-                    topline_grid(ctx,t,regions,pattern_width,scale,track_gap)
-                else pattern_grid(ctx,t,pattern_width,scale,track_gap) end
-                if small_font then r.ImGui_PopFont(ctx) end
-                r.ImGui_SetCursorPosX(ctx,row_x)
-                r.ImGui_Separator(ctx)
+                if not sustained then
+                    r.ImGui_SetCursorPosX(ctx,row_x)
+                    if small_font then r.ImGui_PushFont(ctx,small_font) end
+                    if top then
+                        regions=regions or topline_regions()
+                        topline_grid(ctx,t,regions,pattern_width,scale,track_gap)
+                    else pattern_grid(ctx,t,pattern_width,scale,track_gap) end
+                    if small_font then r.ImGui_PopFont(ctx) end
+                    r.ImGui_SetCursorPosX(ctx,row_x)
+                    r.ImGui_Separator(ctx)
+                end
                 r.ImGui_PopID(ctx)
             end
         end
@@ -1161,39 +1166,19 @@ function export.DrawTracks(ctx,font,open_topline)
     r.ImGui_PopStyleColor(ctx)
     r.ImGui_PopStyleVar(ctx,3)
     if normal_font then r.ImGui_PopFont(ctx) end
-    -- Launch advanced cueing in place of the temporary width fields.
-    -- Draw both launchers consecutively, separated by a real layout spacer.
-    local zoom_button,readout_width,launcher_width=24,52,196
+    -- Two launchers, aligned with the left and right edges of the panel.
+    local launcher_width=196
     local topline_width=math.max(220,r.ImGui_CalcTextSize(ctx,"Open N2N Topline Editor")+12)
-    local spacer=math.max(1,math.floor((panel_width-launcher_width-topline_width-2*zoom_button-readout_width-18)/2))
-    local readout=("%d%%"):format(percent)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),3,1)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),2,2)
     r.ImGui_SetCursorPosY(ctx,r.ImGui_GetCursorPosY(ctx)+footer_gap)
     r.ImGui_SetCursorPosX(ctx,box_x)
     if r.ImGui_Button(ctx,"N2N Advanced Cueing",launcher_width,footer_height) then launch_cue() end
     if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,"Open N2NCue for manual cue placement and live cueing") end
-    r.ImGui_SameLine(ctx)
-    r.ImGui_Dummy(ctx,spacer,1)
-    r.ImGui_SameLine(ctx)
+    r.ImGui_SameLine(ctx,box_x+math.max(launcher_width+3,panel_width-topline_width))
     if r.ImGui_Button(ctx,"Open N2N Topline Editor",topline_width,footer_height) then
         if open_topline then open_topline() else export.OpenEditor("n2ntopline","N2N Topline") end
     end
-    r.ImGui_SameLine(ctx)
-    r.ImGui_Dummy(ctx,spacer,1)
-    r.ImGui_SameLine(ctx)
-    if percent<=TRACK_SCALE_MIN then r.ImGui_BeginDisabled(ctx) end
-    if r.ImGui_Button(ctx,"-##track_zoom",zoom_button,footer_height) then adjust_track_scale(-TRACK_SCALE_STEP) end
-    if percent<=TRACK_SCALE_MIN then r.ImGui_EndDisabled(ctx) end
-    r.ImGui_SameLine(ctx)
-    if r.ImGui_Button(ctx,readout.."##track_zoom_reset",readout_width,footer_height) then adjust_track_scale(TRACK_SCALE_DEFAULT-percent) end
-    if r.ImGui_IsItemHovered(ctx) then
-        r.ImGui_SetTooltip(ctx,("Tracks size: %d%% | Target row width: %.0f px\nClick to reset to %d%%"):format(percent,px(340),TRACK_SCALE_DEFAULT))
-    end
-    r.ImGui_SameLine(ctx)
-    if percent>=TRACK_SCALE_MAX then r.ImGui_BeginDisabled(ctx) end
-    if r.ImGui_Button(ctx,"+##track_zoom",zoom_button,footer_height) then adjust_track_scale(TRACK_SCALE_STEP) end
-    if percent>=TRACK_SCALE_MAX then r.ImGui_EndDisabled(ctx) end
     r.ImGui_PopStyleVar(ctx,2)
     if id_popup then
         if id_popup_open then r.ImGui_OpenPopup(ctx,"N2N Instance ID"); id_popup_open=false end
@@ -1229,10 +1214,31 @@ function export.DrawTracks(ctx,font,open_topline)
     -- standard tooltip (which cannot receive clicks reliably).
     if id_popup then fx_hover=nil end
     if fx_hover and r.time_precise()<=hover_until and
-        ((fx_hover.kind=="Topline" and valid_topline(fx_hover)) or locate(fx_hover)) then
+        (((fx_hover.kind=="Topline" or fx_hover.kind=="Sustained") and valid_topline(fx_hover)) or locate(fx_hover)) then
         local t=fx_hover
-        r.ImGui_SetNextWindowPos(ctx,hover_pos[1],hover_pos[2])
-        local flags=r.ImGui_WindowFlags_NoTitleBar()|r.ImGui_WindowFlags_AlwaysAutoResize()|r.ImGui_WindowFlags_NoSavedSettings()|r.ImGui_WindowFlags_NoFocusOnAppearing()|r.ImGui_WindowFlags_NoMove()|r.ImGui_WindowFlags_NoResize()
+        local n=r.TrackFX_GetCount(t.track)
+        local width=math.max(200,r.ImGui_CalcTextSize(ctx,t.name.." FX")+28,
+            r.ImGui_CalcTextSize(ctx,"Click: Open   Shift+Click: Bypass")+28)
+        for fx=0,n-1 do
+            local _,name=r.TrackFX_GetFXName(t.track,fx,"")
+            -- Reserve space for state prefixes so bypassing does not move the flyout.
+            width=math.max(width,r.ImGui_CalcTextSize(ctx,"[Bypassed] "..(name or ""))+36)
+        end
+        local line=r.ImGui_GetTextLineHeightWithSpacing(ctx)
+        local height=math.max(68,(n+2)*line+30)
+        local inset=4
+        local left=main_x+inset
+        local upper=main_y+inset
+        local lower=main_y+main_h-inset
+        width=math.min(width,math.max(80,hover_pos[1]-left-2))
+        height=math.min(height,math.max(60,lower-upper))
+        local x=math.max(left,hover_pos[1]-width-2)
+        local y=hover_pos[2]
+        if y+height>lower then y=hover_pos[3]-height end
+        y=math.max(upper,math.min(y,lower-height))
+        r.ImGui_SetNextWindowPos(ctx,x,y)
+        r.ImGui_SetNextWindowSize(ctx,width,height)
+        local flags=r.ImGui_WindowFlags_NoTitleBar()|r.ImGui_WindowFlags_NoSavedSettings()|r.ImGui_WindowFlags_NoFocusOnAppearing()|r.ImGui_WindowFlags_NoMove()|r.ImGui_WindowFlags_NoResize()|r.ImGui_WindowFlags_HorizontalScrollbar()
         local vis=r.ImGui_Begin(ctx,"##N2NHoverFX",nil,flags)
         if vis then
             -- Keep the flyout alive as the mouse travels from the FX
@@ -1240,7 +1246,7 @@ function export.DrawTracks(ctx,font,open_topline)
             if r.ImGui_IsWindowHovered(ctx) then hover_until=r.time_precise()+.5 end
             r.ImGui_Text(ctx,t.name.." FX")
             r.ImGui_Separator(ctx)
-            for fx=0,r.TrackFX_GetCount(t.track)-1 do
+            for fx=0,n-1 do
                 local _,name=r.TrackFX_GetFXName(t.track,fx,"")
                 local enabled=r.TrackFX_GetEnabled(t.track,fx)
                 local offline=r.TrackFX_GetOffline(t.track,fx)
