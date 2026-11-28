@@ -1,5 +1,5 @@
 -- @description N2N Mix
--- @version 0.2.11
+-- @version 0.2.12
 -- @noindex
 -- First functional test. Requires the unchanged N2N Mix Meter.jsfx and ReaImGui.
 local r=reaper
@@ -2067,6 +2067,49 @@ function ui.transport_icon(dl,i,x,y,color)
     rect(5,-6,7,6);tri(-4,-6,-4,6,4,0)
   end
 end
+function ui.open_numbers2notes()
+  local sec="N2N_EDITOR_WINDOWS"
+  local hb=tonumber(r.GetExtState(sec,"numbers2notes:heartbeat"))
+  if hb and math.abs(r.time_precise()-hb)<3 then
+    r.SetExtState(sec,"numbers2notes:focus",tostring(r.time_precise()),false)
+    return
+  end
+  if r.JS_Window_Find and r.JS_Window_SetFocus then
+    local hwnd=r.JS_Window_Find("Numbers2Notes - Nashville Number Charts for Reaper",true)
+    if hwnd then r.JS_Window_SetFocus(hwnd);return end
+  end
+  local function search(dir,depth)
+    if depth>7 then return end
+    local i=0
+    while true do
+      local name=r.EnumerateFiles(dir,i)
+      if not name then break end
+      if name:lower()=="numbers2notes.lua" then return dir.."/"..name end
+      i=i+1
+    end
+    i=0
+    while true do
+      local sub=r.EnumerateSubdirectories(dir,i)
+      if not sub then break end
+      local path=search(dir.."/"..sub,depth+1)
+      if path then return path end
+      i=i+1
+    end
+  end
+  local source=debug.getinfo(1,"S").source:sub(2)
+  local dir=source:match("^(.*[/\\])")
+  local path
+  if dir then
+    local candidate=dir.."Notes2Numbers/Numbers2Notes.lua"
+    local f=io.open(candidate,"rb")
+    if f then f:close();path=candidate end
+  end
+  path=path or search(r.GetResourcePath().."/Scripts",0)
+  if not path then r.MB("Install Numbers2Notes.lua first.","N2N Mix",0);return end
+  local cmd=r.AddRemoveReaScript(true,0,path,true)
+  if cmd and cmd>0 then r.Main_OnCommand(cmd,0)
+  else r.MB("Could not launch Numbers2Notes.","N2N Mix",0) end
+end
 local function transport()
   local repeat_on=r.GetSetRepeat(-1)==1
   local state=r.GetPlayStateEx(proj)
@@ -2118,6 +2161,17 @@ local function transport()
       end
     end
   end
+  r.ImGui_SameLine(ctx,0,12)
+  local x,y=r.ImGui_GetCursorScreenPos(ctx)
+  local label="Open Numbers2Notes"
+  local bw=r.ImGui_CalcTextSize(ctx,label)+18
+  local click=r.ImGui_InvisibleButton(ctx,"##openNumbers2Notes",bw,h)
+  local hover=r.ImGui_IsItemHovered(ctx)
+  local pressed=r.ImGui_IsItemActive(ctx)
+  r.ImGui_DrawList_AddRectFilled(dl,x,y,x+bw,y+h,pressed and 0x4A4A4AFF or hover and 0x393939FF or 0x252525FF,4)
+  r.ImGui_DrawList_AddRect(dl,x,y,x+bw,y+h,0x515151FF,4,0,1)
+  centered(dl,x,y,bw,h,label,0xCCCCCCFF)
+  if click and not pending_start then ui.open_numbers2notes() end
   r.ImGui_EndGroup(ctx)
 end
 
@@ -2272,10 +2326,19 @@ local function draw()
   -- notation selector, even if a previously saved window was narrower.
   LEFT_W=ui.header_width()
   local _,section_w=section_tool_width()
+  local transport_w=10*26+7*3+2*6+12+r.ImGui_CalcTextSize(ctx,"Open Numbers2Notes")+18
   local min_w=math.max(LEFT_W,300)+ALL_W+12+math.max(section_w,cell_palette_width()+2*(notation_width()+8))+28
+  -- Keep the added launcher clear of the centered tool palette even when
+  -- the Role and Timbre columns are collapsed.
+  min_w=math.max(min_w,2*transport_w+cell_palette_width()-LEFT_W-ALL_W+52)
   r.ImGui_SetNextWindowSizeConstraints(ctx,min_w,300,100000,100000)
   r.ImGui_SetNextWindowSize(ctx,math.max(1300,min_w),480,r.ImGui_Cond_FirstUseEver())
   r.ImGui_SetNextWindowBgAlpha(ctx,1)
+  local focus=r.GetExtState("N2N_EDITOR_WINDOWS","n2nmix:focus")
+  if focus~="" then
+    r.DeleteExtState("N2N_EDITOR_WINDOWS","n2nmix:focus",false)
+    r.ImGui_SetNextWindowFocus(ctx)
+  end
   local visible,open=r.ImGui_Begin(ctx,"N2N Mix",true)
   if visible then
     local wx,wy=r.ImGui_GetWindowPos(ctx)
@@ -2554,6 +2617,7 @@ traditional=num("traditional",0)==1
 refresh()
 local function loop()
   if r.EnumProjects(-1,"")~=proj then if job then fail("Project changed") end;return end
+  r.SetExtState("N2N_EDITOR_WINDOWS","n2nmix:heartbeat",tostring(r.time_precise()),false)
   if not job and not stroke and not transition_start and not ui.pan_start and not ui.pan_stroke and not next(dirty) and not next(pan_dirty) and not master_dirty and r.time_precise()>=refresh_at and stopped() then
     refresh_at=r.time_precise()+0.75
     if project_layout_signature()~=layout_sig then refresh() end
@@ -2572,5 +2636,9 @@ local function loop()
   if not ok then if job then fail(open) end;r.ShowConsoleMsg("N2N Mix GUI error: "..tostring(open).."\n");return end
   if open then r.defer(loop) elseif job then finish("Closed. Undo to revert partial changes.") end
 end
-r.atexit(function() if job then finish("Closed. Undo to revert partial changes.") end end)
+r.atexit(function()
+  r.DeleteExtState("N2N_EDITOR_WINDOWS","n2nmix:heartbeat",false)
+  r.DeleteExtState("N2N_EDITOR_WINDOWS","n2nmix:focus",false)
+  if job then finish("Closed. Undo to revert partial changes.") end
+end)
 loop()
