@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.4.0-dev.14
+version: 12.4.0-dev.15
 author: Rock Kennedy
 about:
-  # N2N Arp v12.4.0-dev.14
+  # N2N Arp v12.4.0-dev.15
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -27,11 +27,12 @@ slider14:0<0,2,1{Chords,Split (Chords and Bass),Bass}>-Input Mode
 slider15:0<0,9,1>-N2N Mix Prominence
 slider16:0<-100,100,0.01>-N2N Mix Position
 slider17:0<-100,100,0.01>-N2N Mix Intensity
+slider18:0<-500,500,1>-Visual Sync (ms)
 
 @init
 scale_dirty = 0;
 last_input_mode = -1;
-thisversion = "v12.4.0-dev.14";
+thisversion = "v12.4.0-dev.15";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -2130,6 +2131,33 @@ function centered_btn(x,y,w,h,txt) local(tw,th) (
 );
 function btn(x,y,w,h,txt) ( rect(x,y,w,h, 0.3,0.3,0.3,1); draw_text(x+5,y+2,txt,1,1,1); (mb && p_mb == 0 && mx>=x && mx<x+w && my>=y && my<y+h); );
 
+// Saved visual-only delay in milliseconds. Never used by the MIDI engine.
+function visual_sync_phase(phase,total,source) local(rate,steps_per_sec) (
+    rate=eff_half(source)?0.5:1;
+    steps_per_sec=tempo/60*rate*eff_sub(source)/4;
+    fmod_pos(phase-slider18*.001*steps_per_sec,total);
+);
+function help_sync_button(x,y,w,label) local(tw,th,hover) (
+    hover=mx>=x && mx<x+w && my>=y && my<y+24;
+    rect(x,y,w,24,hover?.4:.29,hover?.4:.29,hover?.4:.29,1);
+    gfx_measurestr(label,tw,th);draw_text(x+(w-tw)/2,y+(24-th)/2,label,1,1,1);
+    help_click && hover;
+);
+function draw_visual_sync(x,y) local(delta,old) (
+    gfx_setfont(1,os_font,fontsize,'b');
+    draw_text(x,y,"VISUAL SYNC (ms)",.8,.9,.9);
+    old=slider18;delta=shift_dn?1:10;
+    help_sync_button(x,y+22,48,"-") ? slider18=max(-500,slider18-delta);
+    rect(x+53,y+22,100,24,.12,.12,.12,1);
+    sprintf(#visual_sync_text,"%+d ms",slider18);
+    gfx_measurestr(#visual_sync_text,vs_tw,vs_th);
+    draw_text(x+53+(100-vs_tw)/2,y+22+(24-vs_th)/2,#visual_sync_text,1,1,1);
+    help_sync_button(x+158,y+22,48,"+") ? slider18=min(500,slider18+delta);
+    help_sync_button(x+216,y+22,64,"RESET") ? slider18=0;
+    slider18!=old ? sliderchange(slider18);
+    draw_text(x,y+52,"+ delays the display; - advances it. Shift-click for 1 ms.",.8,.8,.8);
+);
+
 // Display-only mix controls and guarded requests to the running N2N hub.
 function mix_request(cmd,payload) local(addr,now) (
     now=time_precise();
@@ -2244,6 +2272,12 @@ local(bw, bh, i, r, c, bx, by, bit, is_set, current_mask, base_ptr)
 );
 
 mx=mouse_x; my=mouse_y; mb=mouse_cap&1; rmb=mouse_cap&2; p_mb=l_mb; l_mb=mb; p_rmb=l_rmb; l_rmb=rmb; gfx_clear = 0.05; p_mx=l_mx; l_mx=mx; 
+// Help is modal: preserve raw click edge but suppress all underlying controls.
+help_click=help_active && mb && !p_mb;
+!mb && !rmb ? help_block_until_release=0;
+help_active || help_block_until_release ? (
+    mb=0;rmb=0;mouse_wheel=0;mouse_hwheel=0;capture_id=0;
+);
 UI_TOP_X=10; UI_TOP_Y=10; HDR_X=UI_TOP_X; HDR_Y=UI_TOP_Y;
 
 
@@ -2482,6 +2516,12 @@ gfx_seq_before%2==0 ? (
         gfx_vis_step=gfx_tmp_step; gfx_vis_phase=gfx_tmp_phase;
         gfx_vis_total=gfx_tmp_total; gfx_vis_running=gfx_tmp_running;
     );
+);
+// Shift only the frame-local visual clock, not the raw snapshot or MIDI clock.
+gfx_draw_phase=gfx_vis_phase;gfx_draw_step=gfx_vis_step;
+gfx_vis_running && gfx_vis_total>0 && gfx_vis_source>0 ? (
+    gfx_draw_phase=visual_sync_phase(gfx_vis_phase,gfx_vis_total,gfx_vis_source);
+    gfx_draw_step=floor(gfx_draw_phase);
 );
 // Hub pattern navigation: keyed by registration token; never writes a cue or lock.
 hub_edit_addr=8300000+(my_slot-1)*2;
@@ -3105,6 +3145,10 @@ mem[ui_tab_view_mode] == 0 ? draw_text(vw_x + 37, vw_y+3, "SLOTS", 0,1,1) : draw
     mem[ui_tab_view_mode] = !mem[ui_tab_view_mode];
     capture_id = -2;
 );
+centered_btn(vw_x+vw_w+5,vw_y,19,vw_h,"?") ? (
+    help_active=1;help_block_until_release=1;help_click=0;mb=0;rmb=0;
+    chan_popup_active=0;capture_id=0;
+);
 
 
 
@@ -3582,7 +3626,7 @@ gx_r = 0; loop(calc_rows,
                     ) : ( cr=0.8; cg=0.8; cb=0.8; );
                 );
                 min_b = (c_idx == 0) ? 0.60 : 0.50; v_scale = min_b + ((1-min_b) * (v_disp / 127)); 
-                (gfx_highlight_actual && !mem[row_mute_base+r_idx] && gx_s==gfx_vis_step) ? ( gfx_set(1,1,1,0.95); ) : ( gfx_set(cr * v_scale, cg * v_scale, cb * v_scale, 1); );
+                (gfx_highlight_actual && !mem[row_mute_base+r_idx] && gx_s==gfx_draw_step) ? ( gfx_set(1,1,1,0.95); ) : ( gfx_set(cr * v_scale, cg * v_scale, cb * v_scale, 1); );
                 gfx_rect(cx, ry+1, w_px-1, ROW_HEIGHT-2); 
             ) : (!is_tail) ? ( 
                 (gx_s % steps_per_bar == 0) ? rect(cx, ry, cw, ROW_HEIGHT, 1, 1, 1, 0.20) : (gx_s % (steps_per_bar/4) == 0) ? rect(cx, ry, cw, ROW_HEIGHT, 1, 1, 1, 0.04) : 0; 
@@ -3619,7 +3663,7 @@ gx_s+=1;
                 min_b = (c_idx == 0) ? 0.60 : 0.50;
                 v_scale = min_b + ((1-min_b) * (v_disp / 127)); 
                 
-                (gfx_highlight_ghost && !mem[row_mute_base+r_idx] && s_g==gfx_vis_step) ? (
+                (gfx_highlight_ghost && !mem[row_mute_base+r_idx] && s_g==gfx_draw_step) ? (
                     gfx_set(1, 1, 1, 0.95); 
                 ) : (
                     gfx_set(cr*v_scale, cg*v_scale, cb*v_scale, 1); 
@@ -3745,7 +3789,7 @@ mouse_hwheel = 0;
 // Use the same source and step clock as the note highlights.
 // Never draw an unrelated playhead over a manually browsed pattern.
 (gfx_highlight_actual || gfx_highlight_ghost) && gfx_vis_total>0 ? (
-    ph_x=grid_x+(gfx_vis_phase/gfx_vis_total)*vel_w;
+    ph_x=grid_x+(gfx_draw_phase/gfx_vis_total)*vel_w;
     grid_h=visible_rows*ROW_HEIGHT;
     grid_y+grid_h>gfx_h ? grid_h=gfx_h-grid_y;
     gfx_set(0,1,0,0.9); gfx_rect(ph_x-1,grid_y,2,grid_h);
@@ -3754,11 +3798,40 @@ mouse_hwheel = 0;
 mem[ui_power_off] ? (rect(0,0,gfx_w,gfx_h,0,0,0,0.62); draw_power_button(10,ROW2_Y););
 
 // Display-only hover popup overlays the grid.
-mix_hover && !chan_popup_active && !color_popup_active && !mb && !rmb ? (
+mix_hover && !help_active && !chan_popup_active && !color_popup_active && !mb && !rmb ? (
     gfx_setfont(1,os_font,fontsize,'b');
     gfx_measurestr("Display only! Click to open N2N Mix.",mix_tip_w,mix_tip_h);
     mix_tip_x=max(0,min(mx+10,gfx_w-mix_tip_w-12));mix_tip_y=my+22;
     rect(mix_tip_x,mix_tip_y,mix_tip_w+10,mix_tip_h+8,.09,.09,.09,1);
     gfx_set(.55,.55,.55,1);gfx_rect(mix_tip_x,mix_tip_y,mix_tip_w+10,mix_tip_h+8,0);
     draw_text(mix_tip_x+5,mix_tip_y+4,"Display only! Click to open N2N Mix.",1,1,1);
+);
+
+help_active ? (
+    rect(0,0,gfx_w,gfx_h,0,0,0,.85);
+    help_w=550;help_h=475;help_x=(gfx_w-help_w)/2;help_y=(gfx_h-help_h)/2;
+    rect(help_x,help_y,help_w,help_h,.2,.2,.2,1);
+    gfx_setfont(1,os_font,fontsize,'b');
+    draw_text(help_x+20,help_y+20,"N2N ARP HELP",.5,1,1);
+    gfx_measurestr(thisversion,help_tw,help_th);
+    draw_text(help_x+help_w-help_tw-20,help_y+20,thisversion,.5,1,1);
+    draw_text(help_x+20,help_y+48,"SCOPE OF SETTINGS:",1,1,1);
+    draw_text(help_x+20,help_y+66," - Global / Pattern / Row settings apply to their respective scopes.",.85,.85,.85);
+    draw_text(help_x+20,help_y+94,"SECTIONS & TRANSPORT:",1,1,1);
+    draw_text(help_x+20,help_y+112," - Click a section to view it; click its lock to lock playback.",.85,.85,.85);
+    draw_text(help_x+20,help_y+128," - Shift-click: Play from one bar before the section.",.85,.85,.85);
+    draw_text(help_x+20,help_y+144," - Right-click: -2, -1, Play, Stop, Pause.",.85,.85,.85);
+    draw_text(help_x+20,help_y+160," - Follow Song Structure releases the lock; MIDI cues can override.",.85,.85,.85);
+    draw_text(help_x+20,help_y+188,"GRID EDITING:",1,1,1);
+    draw_text(help_x+20,help_y+206," - Click/drag: Paint notes; drag velocity bars to edit dynamics.",.85,.85,.85);
+    draw_text(help_x+20,help_y+222," - Ctrl: Same step in each bar. Shift: Same step in each beat of bar.",.85,.85,.85);
+    draw_text(help_x+20,help_y+238," - Ctrl+Shift: Same step in every beat. Right-drag: Note duration.",.85,.85,.85);
+    draw_text(help_x+20,help_y+266,"MODE & MIX:",1,1,1);
+    draw_text(help_x+20,help_y+284," - MODE: Chords, Split (Chords and Bass), or Bass.",.85,.85,.85);
+    draw_text(help_x+20,help_y+300," - INST opens the instrument; N2N opens Numbers2Notes.",.85,.85,.85);
+    draw_text(help_x+20,help_y+316," - Level / INT / PAN: display only; click to open N2N Mix.",.85,.85,.85);
+    draw_visual_sync(help_x+20,help_y+344);
+    help_sync_button(help_x+help_w-80,help_y+help_h-40,60,"OK") ? (
+        help_active=0;help_block_until_release=1;
+    );
 );
