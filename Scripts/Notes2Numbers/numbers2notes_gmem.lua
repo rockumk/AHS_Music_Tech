@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.19
+-- @version 1.9.20
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -1238,6 +1238,397 @@ function export.DrawTracks(ctx,font,open_topline)
             r.ImGui_End(ctx)
         end
     else fx_hover=nil end
+end
+
+
+-- =========================================================
+-- Drum pattern-set backup: immutable per-section files and complete manifests.
+-- No REAPER FX presets, state-chunk replacement, or executable serialization.
+-- =========================================================
+local drum_bank={base=6600000,data=6604096,maxvalues=65544,interval=30,keep=8,
+    due={},observed={},poll=0,serial=0}
+local DB=drum_bank
+DB.setsig="N2N_DRUM_SET 1\n"
+DB.idxsig="N2N_DRUM_INDEX 1\n"
+function DB.slot(id) return DB.base+32+(id-1)*4 end
+function DB.status(id,value) reaper.gmem_write(DB.base+2080+id,value) end
+function DB.safe_id(value)
+    local v=tostring(value or ""):gsub("[^%w%-]","")
+    if v=="" then error("Missing project, track or FX identity",0) end
+    return v
+end
+function DB.project_id(project)
+    local r=reaper
+    local _,path=r.EnumProjects(-1,"")
+    local ok,id=r.GetProjExtState(project,"N2N_DrumSet","id")
+    local _,oldpath=r.GetProjExtState(project,"N2N_DrumSet","path")
+    -- Save As creates an independent backup family; the first Save of an
+    -- unsaved project keeps its original ID. Store the identity in the RPP.
+    if ok==0 or id=="" or (oldpath~="" and path~="" and oldpath~=path) then
+        id=r.genGuid()
+        r.SetProjExtState(project,"N2N_DrumSet","id",id)
+        r.MarkProjectDirty(project)
+    end
+    if path~=oldpath then
+        r.SetProjExtState(project,"N2N_DrumSet","path",path)
+        r.MarkProjectDirty(project)
+    end
+    return DB.safe_id(id)
+end
+function DB.folder(project,t)
+    local r=reaper
+    local dir=r.GetResourcePath().."/Data/AHS_Music_Tech/DrumArranger/Backups/"
+        ..DB.project_id(project).."/"..DB.safe_id(r.GetTrackGUID(t.track)).."_"..DB.safe_id(t.guid)
+    r.RecursiveCreateDirectory(dir,0)
+    return dir
+end
+function DB.kit(t)
+    local fx=locate(t)
+    if fx==nil then error("Drum Arranger no longer exists",0) end
+    local _,name=reaper.TrackFX_GetFormattedParamValue(t.track,fx,9,"")
+    return name or ""
+end
+function DB.read(path,limit)
+    local f,err=io.open(path,"rb")
+    if not f then error(err or ("Cannot open "..path),0) end
+    local data=f:read(limit+1);f:close()
+    if not data or #data>limit then error("Invalid or oversized drum set file: "..path,0) end
+    return data
+end
+function DB.write_new(path,data)
+    local tmp=path..".tmp"
+    local f,err=io.open(tmp,"wb")
+    if not f then error(err or "Cannot write drum backup",0) end
+    local ok,why=f:write(data);local closed,cerr=f:close()
+    if not ok or not closed then os.remove(tmp);error(why or cerr or "Incomplete drum backup",0) end
+    local renamed,msg=os.rename(tmp,path)
+    if not renamed then os.remove(tmp);error(msg or "Cannot finalize drum backup",0) end
+end
+function DB.write_manual(path,data)
+    local f=io.open(path,"rb")
+    if not f then DB.write_new(path,data);return end
+    f:close()
+    -- Preserve the previous file even on Windows, where rename does not
+    -- replace an existing destination. User already confirmed overwrite.
+    local old=path..".old_"..DB.safe_id(reaper.genGuid())
+    local moved,err=os.rename(path,old)
+    if not moved then error(err or "Cannot protect previous pattern set",0) end
+    local ok,why=pcall(DB.write_new,path,data)
+    if not ok then os.rename(old,path);error(why,0) end
+    os.remove(old)
+end
+function DB.values(data,record)
+    if type(data)~="string" or #data%8~=0 or #data>DB.maxvalues*8 then error("Invalid drum record size",0) end
+    local a={}
+    for i=1,#data,8 do
+        local v=string.unpack("<d",data,i)
+        if not valid_number(v,-1000000,1000000) then error("Invalid number in drum record",0) end
+        a[#a+1]=v
+    end
+    local function integer(v,lo,hi) return valid_number(v,lo,hi) and v%1==0 end
+    if record==-1 then
+        if #a<1417 or #a>35000 then error("Invalid drum settings record",0) end
+        local ranges={{1,127},{0,25},{0,4},{1,4},{0,100},{1,128},{0,128},{0,1},{10,30}}
+        for i,v in ipairs(ranges) do if not valid_number(a[i],v[1],v[2]) then error("Invalid drum global setting",0) end end
+        for row=1,128 do
+            if not integer(a[9+256+row],-1,127) or not integer(a[9+384+row],1,16) then error("Invalid drum row map",0) end
+        end
+        local pos=1290
+        for row=1,128 do
+            local n=a[pos]
+            if not integer(n,0,255) or pos+n>#a then error("Invalid drum row name",0) end
+            for j=1,n do if not integer(a[pos+j],0,255) then error("Invalid drum row name byte",0) end end
+            pos=pos+n+1
+        end
+        if pos~=#a+1 then error("Invalid trailing row settings",0) end
+    else
+        if #a<7 or not integer(a[7],0,16384) or #a~=7+a[7]*4 then error("Invalid drum section record",0) end
+        if not integer(a[1],0,4) or not integer(a[2],-1,4) or not valid_number(a[3],-1,25)
+            or not valid_number(a[4],-1,100) or not integer(a[5],0,1) or not integer(a[6],0,3) then error("Invalid section settings",0) end
+        local last=-1
+        for i=8,#a,4 do
+            if not integer(a[i],0,16383) or a[i]<=last or not valid_number(a[i+1],0,127)
+                or not valid_number(a[i+2],0,127) or not valid_number(a[i+3],0,1000000) then error("Invalid drum step",0) end
+            last=a[i]
+        end
+    end
+    return a
+end
+function DB.pack_set(snapshot)
+    local out={DB.setsig,string.pack("<s4",snapshot.kit)}
+    for i=1,81 do out[#out+1]=string.pack("<s4",snapshot.records[i]) end
+    return table.concat(out)
+end
+function DB.unpack_set(data)
+    if data:sub(1,#DB.setsig)~=DB.setsig then error("Not an N2N drum pattern set",0) end
+    local kit,pos=string.unpack("<s4",data,#DB.setsig+1)
+    if #kit>4096 then error("Invalid kit name",0) end
+    local snapshot={kit=kit,records={}}
+    for i=1,81 do
+        local blob;blob,pos=string.unpack("<s4",data,pos)
+        DB.values(blob,i-2)
+        snapshot.records[i]=blob
+    end
+    if pos~=#data+1 then error("Unexpected data in drum pattern set",0) end
+    return snapshot
+end
+function DB.list(dir,prefix)
+    local r=reaper
+    local out={}
+    r.EnumerateFiles(dir,-1)
+    local i=0
+    while true do
+        local name=r.EnumerateFiles(dir,i)
+        if not name then break end
+        if name:match("^"..prefix.."_%d+%.n2idx$") then out[#out+1]=name end
+        i=i+1
+    end
+    table.sort(out,function(a,b) return a>b end)
+    return out
+end
+function DB.index(dir,name,load_records)
+    local data=DB.read(dir.."/"..name,16384)
+    if data:sub(1,#DB.idxsig)~=DB.idxsig then error("Invalid drum backup index",0) end
+    local key,epoch,kit,pos=string.unpack("<dds4",data,#DB.idxsig+1)
+    if #kit>4096 then error("Invalid backup kit name",0) end
+    local a={kit=kit,key=key,epoch=epoch,names={},records={},index=data}
+    for i=1,81 do
+        local file;file,pos=string.unpack("<s4",data,pos)
+        if not file:match("^record_%d+_%d+%.bin$") then error("Invalid drum backup record name",0) end
+        a.names[i]=file
+        if load_records then
+            local blob=DB.read(dir.."/"..file,DB.maxvalues*8)
+            DB.values(blob,i-2)
+            a.records[i]=blob
+        end
+    end
+    if pos~=#data+1 then error("Invalid drum backup index tail",0) end
+    return a
+end
+function DB.cleanup(dir)
+    local names=DB.list(dir,"manifest")
+    local pins=DB.list(dir,"protected")
+    local refs={}
+    -- Only prune after *every* retained index is readable. Never remove an
+    -- old section blob still referenced by a retained backup.
+    local function preserve(name)
+        local a=DB.index(dir,name,false)
+        for _,file in ipairs(a.names) do refs[file]=true end
+    end
+    for i=1,math.min(DB.keep,#names) do preserve(names[i]) end
+    if pins[1] then preserve(pins[1]) end
+    for i=DB.keep+1,#names do
+        if not os.remove(dir.."/"..names[i]) then return end
+    end
+    for i=2,#pins do if not os.remove(dir.."/"..pins[i]) then return end end
+    local files={}
+    reaper.EnumerateFiles(dir,-1)
+    local i=0
+    while true do
+        local name=reaper.EnumerateFiles(dir,i)
+        if not name then break end
+        if name:match("^record_%d+_%d+%.bin$") and not refs[name] then files[#files+1]=name end
+        i=i+1
+    end
+    for _,name in ipairs(files) do os.remove(dir.."/"..name) end
+end
+function DB.commit_backup(session)
+    local dir,records=session.dir,session.records
+    local list=DB.list(dir,"manifest")
+    local previous=list[1] and DB.index(dir,list[1],true) or nil
+    local changed=not previous or previous.kit~=session.kit
+    for i=1,81 do if not previous or records[i]~=previous.records[i] then changed=true;break end end
+    local observed=DB.observed[dir] or previous
+    if not changed then DB.observed[dir]={key=session.key,epoch=session.epoch};return end
+    local last=list[1] and tonumber(list[1]:match("_(%d+)")) or 0
+    local pins=DB.list(dir,"protected")
+    local lastpin=pins[1] and tonumber(pins[1]:match("_(%d+)")) or 0
+    local revision=string.format("%015.0f",math.max(os.time()*1000,last+1,lastpin+1))
+    local refs={}
+    -- State loads (including native presets/undo/project reopen) may replace
+    -- every section. Pin the last pre-load snapshot before advancing Latest.
+    if previous and observed and (observed.key~=session.key or observed.epoch~=session.epoch) then
+        DB.write_new(dir.."/protected_"..revision..".n2idx",previous.index)
+    end
+    for i=1,81 do
+        if previous and records[i]==previous.records[i] then refs[i]=previous.names[i]
+        else
+            local file="record_"..revision.."_"..i..".bin"
+            DB.write_new(dir.."/"..file,records[i])
+            refs[i]=file
+        end
+    end
+    local out={DB.idxsig,string.pack("<dds4",session.key,session.epoch,session.kit)}
+    for _,file in ipairs(refs) do out[#out+1]=string.pack("<s4",file) end
+    -- Publish a complete manifest last; incomplete writes never replace Latest.
+    DB.write_new(dir.."/manifest_"..revision..".n2idx",table.concat(out))
+    DB.observed[dir]={key=session.key,epoch=session.epoch}
+    pcall(DB.cleanup,dir)
+end
+function DB.send(session,op,record,blob)
+    local r=reaper
+    if r.gmem_read(DB.base)~=0 then error("Drum-set transfer mailbox is occupied",0) end
+    local values=blob and DB.values(blob,record) or nil
+    if values then for i,v in ipairs(values) do r.gmem_write(DB.data+i-1,v) end end
+    r.gmem_write(DB.base+1,session.id);r.gmem_write(DB.base+2,session.key)
+    r.gmem_write(DB.base+3,record or -1);r.gmem_write(DB.base+4,values and #values or 0)
+    r.gmem_write(DB.base+5,0);r.gmem_write(DB.base+6,session.token)
+    session.pending=op;session.deadline=r.time_precise()+4
+    r.gmem_write(DB.base,op)
+end
+function DB.live(session)
+    local r=reaper
+    if r.EnumProjects(-1,"")~=session.project or r.gmem_read(REG_BASE+session.id)~=session.key then return false end
+    local fx=locate(session.t)
+    if fx==nil or math.floor(r.TrackFX_GetParam(session.t.track,fx,4)+.5)~=session.id then return false end
+    local addr=DB.slot(session.id)
+    return r.gmem_read(addr)==session.key and math.abs(r.time_precise()-r.gmem_read(addr+1))<4
+end
+function DB.abort(message)
+    local r=reaper
+    local s=DB.active
+    if not s then return end
+    if r.gmem_read(DB.base+6)==s.token then r.gmem_write(DB.base,0) end
+    DB.status(s.id,-1)
+    DB.due[s.duekey]=r.time_precise()+DB.interval
+    DB.active=nil
+    if s.manual then r.MB(tostring(message),"Drum Pattern Set",0) end
+end
+function DB.finish(session)
+    DB.status(session.id,1)
+    DB.due[session.duekey]=reaper.time_precise()+DB.interval
+    DB.active=nil
+end
+function DB.manual_choice(session,cmd)
+    local r=reaper
+    local dir=r.GetResourcePath().."/Data/AHS_Music_Tech/DrumArranger/Pattern Sets"
+    r.RecursiveCreateDirectory(dir,0)
+    if cmd==1 then
+        local accepted,name=r.GetUserInputs("Save Drum Pattern Set",1,"Set name:","My Arrangement")
+        if not accepted then return false end
+        name=name:match("^%s*(.-)%s*$")
+        if name=="" or name=="." or name==".." or name:find("[/\\:*?\"<>|%c]") then error("Invalid pattern set name",0) end
+        if name:sub(-10):lower()~=".n2drumset" then name=name..".n2drumset" end
+        session.savepath=dir.."/"..name
+        local f=io.open(session.savepath,"rb")
+        if f then f:close();if r.MB("Replace the existing pattern set?","Save Pattern Set",4)~=6 then return false end end
+    else
+        if r.GetPlayStateEx(session.project)~=0 then error("Stop playback before loading or restoring a drum pattern set.",0) end
+        if cmd==2 then
+            local accepted,path=r.GetUserFileNameForRead(dir.."/","Load Drum Pattern Set",".n2drumset")
+            if not accepted then return false end
+            session.target=DB.unpack_set(DB.read(path,45000000))
+        else
+            local names=DB.list(session.dir,cmd==5 and "protected" or "manifest")
+            local name=names[cmd==4 and 2 or 1]
+            if not name then error("No matching recovery backup exists yet.",0) end
+            session.target=DB.index(session.dir,name,true)
+        end
+        if session.target.kit~=session.kit then
+            error("This set uses drum map:\n"..session.target.kit.."\n\nSelect that file in Drum Arranger first, then try again. No patterns were changed.",0)
+        end
+        if r.MB("Replace all section patterns and row settings? The current arrangement will be backed up first.","Load Drum Pattern Set",4)~=6 then return false end
+    end
+    return true
+end
+function DB.begin(project,t,cmd,key)
+    local r=reaper
+    DB.serial=(DB.serial%1000000000)+1
+    local token=math.floor(r.time_precise()*1000)%1000000000+DB.serial
+    local session={project=project,t=t,id=t.id,key=key,token=token,manual=cmd>0,
+        duekey=tostring(project)..":"..t.guid,phase="capture",record=-1,records={}}
+    DB.active=session
+    session.dir=DB.folder(project,t);session.kit=DB.kit(t)
+    if cmd>0 and not DB.manual_choice(session,cmd) then DB.active=nil;return end
+    DB.status(t.id,2)
+    DB.send(session,1,-1)
+end
+function DB.advance(session)
+    local r=reaper
+    if not DB.live(session) then error("Drum Arranger became unavailable during transfer.",0) end
+    local op=r.gmem_read(DB.base)
+    if r.gmem_read(DB.base+6)~=session.token then error("Drum-set transfer ownership changed.",0) end
+    if op==-1 then error("Drum Arranger rejected the pattern-set operation; no staged load was committed.",0) end
+    local expected=session.pending==1 and 2 or session.pending==6 and 7 or 5
+    if op~=expected then
+        if r.time_precise()>session.deadline then error("Drum-set transfer timed out. Enable FX processing while stopped and retry.",0) end
+        return
+    end
+    if session.phase=="capture" then
+        local n=r.gmem_read(DB.base+4)
+        local epoch=r.gmem_read(DB.base+5)
+        if not valid_number(n,1,DB.maxvalues) or n%1~=0 then error("Invalid drum transfer size",0) end
+        if session.epoch~=nil and session.epoch~=epoch then error("Drum state changed during backup; retrying on next cycle.",0) end
+        session.epoch=epoch
+        local parts={}
+        for i=0,n-1 do parts[i+1]=string.pack("<d",r.gmem_read(DB.data+i)) end
+        local blob=table.concat(parts)
+        DB.values(blob,session.record)
+        session.records[session.record+2]=blob
+        r.gmem_write(DB.base,0)
+        if session.record<79 then
+            session.record=session.record+1;DB.send(session,1,session.record);return
+        end
+        if DB.kit(session.t)~=session.kit then error("Drum map changed during backup; retrying on next cycle.",0) end
+        DB.commit_backup(session)
+        if session.savepath then DB.write_manual(session.savepath,DB.pack_set(session)) end
+        if not session.target then DB.finish(session);return end
+        -- Begin staged load only after complete, successful pre-load backup.
+        if r.GetPlayStateEx(session.project)~=0 then error("Transport started; pattern set was not loaded.",0) end
+        session.phase="stage";session.record=-1
+        DB.send(session,3,-1);return
+    end
+    r.gmem_write(DB.base,0)
+    if session.pending==6 then
+        r.MarkProjectDirty(session.project)
+        DB.finish(session);return
+    end
+    if session.pending==3 then
+        if r.gmem_read(DB.base+5)~=session.epoch then error("Drum state changed before load; no patterns were changed.",0) end
+        session.record=-1
+    else session.record=session.record+1 end
+    if r.GetPlayStateEx(session.project)~=0 or DB.kit(session.t)~=session.kit then error("Transport or kit changed during load; no staged load was committed.",0) end
+    if session.record<=79 then DB.send(session,4,session.record,session.target.records[session.record+2])
+    else DB.send(session,6,-1) end
+end
+function DB.tick()
+    local r=reaper
+    r.gmem_attach("N2N_Ecosystem_RSKennedy")
+    local now=r.time_precise()
+    r.gmem_write(DB.base+8,now)
+    local project=r.EnumProjects(-1,"")
+    if DB.project~=project then
+        if DB.active then DB.abort("Project changed; transfer cancelled.") end
+        DB.project=project;DB.poll=0;r.gmem_write(DB.base,0)
+    end
+    if DB.active then DB.advance(DB.active);return end
+    if now<DB.poll then return end
+    DB.poll=now+.25
+    local inventory,counts=scan(project)
+    local automatic,auto_key
+    for _,t in ipairs(inventory) do
+        if t.kind=="DRUM" and t.id>=1 and t.id<=512 and counts[t.id]==1 then
+            local addr=DB.slot(t.id)
+            local key=r.gmem_read(REG_BASE+t.id)
+            if key>0 and key==r.gmem_read(addr) and math.abs(now-r.gmem_read(addr+1))<3 then
+                local cmd=r.gmem_read(addr+2)
+                if cmd>=1 and cmd<=5 then
+                    r.gmem_write(addr+2,0)
+                    if math.abs(now-r.gmem_read(addr+3))<30 then DB.begin(project,t,cmd,key);return end
+                end
+                local due=DB.due[tostring(project)..":"..t.guid] or 0
+                if not automatic and now>=due then automatic=t;auto_key=key end
+            end
+        end
+    end
+    if automatic then DB.begin(project,automatic,0,auto_key) end
+end
+function export.ServiceDrumPatternSets()
+    local ok,err=pcall(DB.tick)
+    if not ok then
+        if DB.active then DB.abort(err)
+        else DB.poll=reaper.time_precise()+DB.interval end
+    end
 end
 
 return export
