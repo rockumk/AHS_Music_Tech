@@ -1,10 +1,11 @@
 -- @description N2N Drum System
--- @version 2.0
+-- @version 2.1
 
 local script_path = debug.getinfo(1, "S").source:match("@(.*[\\/])")
 package.path = package.path .. ";" .. script_path .. "?.lua"
 
 local drum_map = require("MapDrumsToLaunchpad")
+reaper.gmem_attach("N2N_Ecosystem_RSKennedy")
 
 --------------------------------------------------
 -- USER SETTINGS
@@ -476,9 +477,8 @@ local function scan_tracks()
                     }
 
                     if is_initial_scan then
-                        local active_preset = (current_a ~= "") and current_a or preset_b
-                        -- Fire Init sequence on script boot!
-                        trigger_device_init_sequence(active_preset)
+                        -- Only the arranger's file selection controls the hardware map.
+                        trigger_device_init_sequence(current_a:gsub("%.[Tt][Xx][Tt]$",""))
                     end
                 end
             end
@@ -496,23 +496,24 @@ local function sync_pair(data)
     local current_b = data.fx_b and get_preset_name(track, data.fx_b) or ""
 
     local a_changed = (data.fx_a ~= nil and current_a ~= data.last_a)
-    local b_changed = (data.fx_b ~= nil and current_b ~= data.last_b)
-
     if a_changed then
-        if data.fx_b ~= nil then
-            reaper.TrackFX_SetPreset(track, data.fx_b, current_a)
-            current_b = get_preset_name(track, data.fx_b)
+        local name=current_a:gsub("\\","/"):match("([^/]+)$") or ""
+        local preset=name:gsub("%.[Tt][Xx][Tt]$","")
+        -- The running Numbers2Notes hub owns instrument synchronization.
+        -- Standalone mode retains the original one-way Monster Drums algorithm.
+        local hub_online=math.abs(reaper.time_precise()-reaper.gmem_read(6600009))<2
+        if not hub_online and preset:match("^%[[^%]]+%]%s+%d%d%s+") and data.fx_b ~= nil then
+            if reaper.GetPlayState()~=0 then return end
+            if current_b~=preset and current_b~=name then
+                local ok=reaper.TrackFX_SetPreset(track,data.fx_b,preset)
+                if not ok and name~=preset then reaper.TrackFX_SetPreset(track,data.fx_b,name) end
+            end
         end
-
         data.last_a = current_a
-        data.last_b = current_b
-        -- Fire fast switch when actively changing kits
-        update_launchpad_kit_only(current_b ~= "" and current_b or current_a)
-
-    elseif b_changed then
-        data.last_b = current_b
-        update_launchpad_kit_only(current_b)
+        -- Never derive the Launchpad layout or arranger map from instrument presets.
+        update_launchpad_kit_only(preset)
     end
+    data.last_b = current_b
 end
 
 --------------------------------------------------
