@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.29
+-- @version 2.0.4-dev.30
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -59,16 +59,26 @@ local help = require("numbers2notes_help")
 local form = require("numbers2notes_form")
 local config = require("numbers2notes_config")
 local gmem_export = require("numbers2notes_gmem")
+local function Raise_N2N_Window(title)
+    local r=reaper
+    local hwnd=r.JS_Window_Find and r.JS_Window_Find(title,true)
+    if not hwnd and r.JS_Window_FindTop then hwnd=r.JS_Window_FindTop(title,true) end
+    if not hwnd then return false end
+    if r.JS_Window_IsVisible and not r.JS_Window_IsVisible(hwnd) and r.JS_Window_Show then r.JS_Window_Show(hwnd,"SHOW") end
+    if r.JS_Window_SetZOrder then r.JS_Window_SetZOrder(hwnd,"TOP") end
+    if r.JS_Window_SetForeground then r.JS_Window_SetForeground(hwnd) end
+    if r.JS_Window_SetFocus then r.JS_Window_SetFocus(hwnd) end
+    return true
+end
 local function Open_N2N_Topline_Editor()
     local r=reaper
     local sec="N2N_TOPLINE_HUB"
     local hb=tonumber(r.GetExtState(sec,"heartbeat"))
-    local hwnd=r.JS_Window_Find and r.JS_Window_SetFocus and r.JS_Window_Find("N2N Topline",true)
     if hb and math.abs(r.time_precise()-hb)<3 then
         r.SetExtState(sec,"focus",tostring(r.time_precise()),false)
-        if hwnd then r.JS_Window_SetFocus(hwnd) end
-    elseif hwnd then
-        r.JS_Window_SetFocus(hwnd)
+        Raise_N2N_Window("N2N Topline")
+    elseif Raise_N2N_Window("N2N Topline") then
+        return
     else
         local path=canonical_script_path(script_path.."../N2N Topline.lua")
         local file=io.open(path,"rb")
@@ -1754,6 +1764,7 @@ function IM_GUI_Loop()
     if focus_request ~= "" then
         reaper.DeleteExtState(window_sec,"numbers2notes:focus",false)
         reaper.ImGui_SetNextWindowFocus(ctx)
+        Raise_N2N_Window("Numbers2Notes - Nashville Number Charts for Reaper")
     end
     if gmem_export then
         gmem_export.PublishSongForm(Get_Stretched_ABCD_Index, false)
@@ -2489,11 +2500,9 @@ Form: I V C V C B C O]]
                 local hb=tonumber(r.GetExtState(sec,"n2nmix:heartbeat"))
                 if hb and math.abs(r.time_precise()-hb)<3 then
                     r.SetExtState(sec,"n2nmix:focus",tostring(r.time_precise()),false)
+                    Raise_N2N_Window("N2N Mix")
                 else
-                    local hwnd=r.JS_Window_Find and r.JS_Window_SetFocus and r.JS_Window_Find("N2N Mix",true)
-                    if hwnd then
-                        r.JS_Window_SetFocus(hwnd)
-                    else
+                    if not Raise_N2N_Window("N2N Mix") then
                         local path=canonical_script_path(script_path.."../N2N Mix.lua")
                         local file=io.open(path,"rb")
                         if file then
