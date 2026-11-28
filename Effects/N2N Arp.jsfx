@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.4.0-dev.8
+version: 12.4.0-dev.9
 author: Rock Kennedy
 about:
-  # N2N Arp v12.4.0-dev.8
+  # N2N Arp v12.4.0-dev.9
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -23,11 +23,14 @@ slider11:12<10,30,1>-Grid Row Height
 slider12:20<1,127,1>-Global Note Len
 slider13:100<0,100,1>-Global Row Level
 slider14:0<0,2,1{Chords,Split (Chords and Bass),Bass}>-Input Mode
+// Display-only mirrors written by N2N Mix; never used in MIDI generation.
+slider15:0<-60,30,0.01>-N2N Mix Level
+slider16:0<-100,100,0.01>-N2N Mix Position
 
 @init
 scale_dirty = 0;
 last_input_mode = -1;
-thisversion = "v12.4.0-dev.8";
+thisversion = "v12.4.0-dev.9";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
