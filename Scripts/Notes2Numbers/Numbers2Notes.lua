@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.19
+-- @version 2.0.4-dev.20
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -3618,6 +3618,21 @@ Form: I V C V C B C O]]
         )
         if reaper.ImGui_Button(ctx, "||", nav_btn_w, btn_height) then
             reaper.Main_OnCommand(1008, 0)
+        end
+        reaper.ImGui_PopStyleColor(ctx, 2)
+        r.ImGui_SameLine(ctx)
+
+        -- Loop/repeat toggle follows REAPER's current transport state.
+        local repeat_on = reaper.GetSetRepeat(-1) == 1
+        reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Text(), repeat_on and black_color or white_color)
+        local repeat_gray = repeat_on and 0.72 or 0.30
+        reaper.ImGui_PushStyleColor(ctx, reaper.ImGui_Col_Button(),
+            reaper.ImGui_ColorConvertDouble4ToU32(repeat_gray, repeat_gray, repeat_gray, 1.0))
+        if reaper.ImGui_Button(ctx, "↻##N2N_Repeat", nav_btn_w, btn_height) then
+            reaper.GetSetRepeat(repeat_on and 0 or 1)
+        end
+        if reaper.ImGui_IsItemHovered(ctx) then
+            reaper.ImGui_SetTooltip(ctx, repeat_on and "Loop: On" or "Loop: Off")
         end
         reaper.ImGui_PopStyleColor(ctx, 2)
         r.ImGui_SameLine(ctx)
