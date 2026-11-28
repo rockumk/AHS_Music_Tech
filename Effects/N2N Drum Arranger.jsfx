@@ -1,8 +1,8 @@
 desc: N2N Drum Arranger
-version: 7.8.0-dev.22
+version: 7.8.0-dev.23
 author: Rock Kennedy
 about:
-  # N2N Drum Arranger v7.8.0-dev.22 -
+  # N2N Drum Arranger v7.8.0-dev.23 -
   GMEM song-form following, independent power switch, and pattern library.
 provides:[data] ../Data/DrumArranger/[8-BIT] 01 Game Over.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 01 Game Over.txt
 provides:[data] ../Data/DrumArranger/[8-BIT] 02 Krusty Kit.txt > AHS_Music_Tech/DrumArranger/[8-BIT] 02 Krusty Kit.txt
@@ -139,7 +139,7 @@ slider17:0<-100,100,0.01>-N2N Mix Intensity
 slider18:0<-500,500,1>-Visual Sync (ms)
 
 @init
-version_display = "v7.8.0-dev.22";
+version_display = "v7.8.0-dev.23";
 init_gate = 0;
 
 fontsize = 12; // use 16 for PC and 11 for Mac
@@ -1407,6 +1407,15 @@ active_row_list = mem_pos; mem_pos += 128;
 FORM_MAX=4096; FORM_BASE=6000000;
 form_cache=mem_pos; mem_pos+=FORM_MAX*3;
 form_stage=mem_pos; mem_pos+=FORM_MAX*3;
+// Drum pattern-set transfer: independent of the single-pattern library.
+BANK_BASE=6600000; BANK_DATA=BANK_BASE+4096; BANK_CAP=65544;
+bank_v=mem_pos; mem_pos+=TOTAL_TABS*vel_stride_tab;
+bank_g=mem_pos; mem_pos+=TOTAL_TABS*vel_stride_tab;
+bank_l=mem_pos; mem_pos+=TOTAL_TABS*vel_stride_tab;
+bank_h=mem_pos; mem_pos+=TOTAL_TABS*6;
+bank_meta=mem_pos; mem_pos+=35000;
+bank_seen=mem_pos; mem_pos+=TOTAL_TABS+1;
+bank_epoch+=1; bank_stage_token=0; bank_announce_at=0;
 form_count=0; form_rev=-1;
 function form_find(q) local(lo,hi,m,ans) (
     lo=0; hi=form_count-1; ans=-1;
@@ -1506,6 +1515,143 @@ function factory_pattern(p,t) local(r,n,kick,snare,hat,i,step,sub,hit,v,ptr,name
         scan_active_tab(); needs_tab_update=1;
     );
 );
+// The set mailbox has a per-instance command and one globally owned transfer.
+// Metadata record -1: globals, 10 row attributes, UTF-8 row names.
+// Section records 0..79: six raw overrides, count, sparse row/step tuples.
+function bank_request(cmd) local(addr,now) (
+    now=time_precise();addr=BANK_BASE+32+(my_slot-1)*4;
+    abs(now-gmem[BANK_BASE+8])<3 && my_slot>=1 && my_slot<=512 &&
+        gmem[reg_base+my_slot]==my_key ? (
+        gmem[addr]=my_key;gmem[addr+3]=now;gmem[addr+2]=cmd;
+    ) : gfx_showmenu("#Open updated Numbers2Notes first");
+);
+function bank_read_record(t) local(i,j,n,p,v,g,l,base) (
+    n=0;
+    t==-1 ? (
+        gmem[BANK_DATA]=slider1;gmem[BANK_DATA+1]=slider2;
+        gmem[BANK_DATA+2]=slider3;gmem[BANK_DATA+3]=slider4;
+        gmem[BANK_DATA+4]=slider6;gmem[BANK_DATA+5]=slider7;
+        gmem[BANK_DATA+6]=slider8;gmem[BANK_DATA+7]=slider9;
+        gmem[BANK_DATA+8]=slider11;n=9;
+        i=0;loop(MAX_ROWS*10,gmem[BANK_DATA+n]=mem[row_mute_base+i];n+=1;i+=1;);
+        i=0;loop(MAX_ROWS,
+            j=0;l=min(255,strlen(row_name_str_base+i));
+            gmem[BANK_DATA+n]=l;n+=1;
+            loop(l,gmem[BANK_DATA+n]=str_getchar(row_name_str_base+i,j);n+=1;j+=1;);
+            i+=1;
+        );
+    ) : (
+        gmem[BANK_DATA]=mem[bars_ov_base+t];
+        gmem[BANK_DATA+1]=mem[subdiv_ov_base+t];
+        gmem[BANK_DATA+2]=mem[hum_ov_base+t];
+        gmem[BANK_DATA+3]=mem[swing_ov_base+t];
+        gmem[BANK_DATA+4]=mem[half_speed_ov_base+t];
+        gmem[BANK_DATA+5]=mem[tab_mute_base+t];
+        n=7;i=0;base=t*vel_stride_tab;
+        loop(vel_stride_tab,
+            p=base+i;v=mem[vel_base+p];g=mem[grid_base+p];l=mem[step_len_base+p];
+            v!=0 || g!=0 || l!=0 ? (
+                gmem[BANK_DATA+n]=i;gmem[BANK_DATA+n+1]=v;
+                gmem[BANK_DATA+n+2]=g;gmem[BANK_DATA+n+3]=l;n+=4;
+            );i+=1;
+        );
+        gmem[BANK_DATA+6]=(n-7)/4;
+    );
+    n;
+);
+function bank_stage_record(t,n) local(i,j,p,base,cnt,ok,pos,l,idx) (
+    ok=0;
+    t==-1 ? (
+        n>=9+MAX_ROWS*11 && n<=35000 ? (
+            pos=9+MAX_ROWS*10;i=0;ok=1;
+            loop(MAX_ROWS,
+                pos<n ? (
+                    l=gmem[BANK_DATA+pos];
+                    l>=0 && l<=255 && l==floor(l) && pos+1+l<=n ? pos+=1+l : ok=0;
+                ) : ok=0;
+                i+=1;
+            );
+            pos!=n ? ok=0;
+            ok ? (i=0;loop(n,mem[bank_meta+i]=gmem[BANK_DATA+i];i+=1;););
+        );
+    ) : (
+        cnt=gmem[BANK_DATA+6];ok=cnt>=0 && cnt<=vel_stride_tab && cnt==floor(cnt) && n==7+4*cnt;
+        ok ? (
+            base=t*vel_stride_tab;i=0;
+            loop(cnt,idx=gmem[BANK_DATA+7+i*4];idx<0 || idx>=vel_stride_tab || idx!=floor(idx) ? ok=0;i+=1;);
+            ok ? (
+                memset(bank_v+base,0,vel_stride_tab);memset(bank_g+base,0,vel_stride_tab);memset(bank_l+base,0,vel_stride_tab);
+                i=0;loop(6,mem[bank_h+t*6+i]=gmem[BANK_DATA+i];i+=1;);
+                i=0;loop(cnt,
+                    p=BANK_DATA+7+i*4;idx=base+gmem[p];
+                    mem[bank_v+idx]=gmem[p+1];mem[bank_g+idx]=gmem[p+2];mem[bank_l+idx]=gmem[p+3];i+=1;
+                );
+            );
+        );
+    );
+    ok ? mem[bank_seen+t+1]=1;
+    ok;
+);
+function bank_apply_staged() local(i,j,l,pos,ok) (
+    i=0;ok=1;loop(TOTAL_TABS+1,!mem[bank_seen+i] ? ok=0;i+=1;);
+    ok && play_state==0 && bank_stage_epoch==bank_epoch ? (
+        // Kit selection and instance identity are intentionally not touched.
+        slider1=mem[bank_meta];slider2=mem[bank_meta+1];slider3=mem[bank_meta+2];
+        slider4=mem[bank_meta+3];slider6=mem[bank_meta+4];slider7=mem[bank_meta+5];
+        slider8=mem[bank_meta+6];slider9=mem[bank_meta+7];slider11=mem[bank_meta+8];
+        sliderchange(slider1);sliderchange(slider2);sliderchange(slider3);sliderchange(slider4);
+        sliderchange(slider6);sliderchange(slider7);sliderchange(slider8);sliderchange(slider9);sliderchange(slider11);
+        memcpy(row_mute_base,bank_meta+9,MAX_ROWS*10);
+        pos=9+MAX_ROWS*10;i=0;
+        loop(MAX_ROWS,
+            l=mem[bank_meta+pos];pos+=1;strcpy(row_name_str_base+i,"");j=0;
+            loop(l,str_setchar(row_name_str_base+i,j,mem[bank_meta+pos+j]);j+=1;);
+            pos+=l;i+=1;
+        );
+        memcpy(vel_base,bank_v,TOTAL_TABS*vel_stride_tab);
+        memcpy(grid_base,bank_g,TOTAL_TABS*vel_stride_tab);
+        memcpy(step_len_base,bank_l,TOTAL_TABS*vel_stride_tab);
+        i=0;loop(TOTAL_TABS,
+            pos=bank_h+i*6;mem[bars_ov_base+i]=mem[pos];
+            mem[subdiv_ov_base+i]=mem[pos+1];mem[hum_ov_base+i]=mem[pos+2];
+            mem[swing_ov_base+i]=mem[pos+3];mem[half_speed_ov_base+i]=mem[pos+4];
+            mem[tab_mute_base+i]=mem[pos+5];i+=1;
+        );
+        scan_all_tabs();needs_tab_update=1;last_play_tab=-99;
+        bank_stage_token=0;1;
+    ) : 0;
+);
+function service_drum_bank() local(now,addr,op,t,n,tok,ok) (
+    now=time_precise();
+    my_slot>=1 && my_slot<=512 && gmem[reg_base+my_slot]==my_key ? (
+        addr=BANK_BASE+32+(my_slot-1)*4;
+        now>=bank_announce_at || gmem[addr]!=my_key ? (
+            gmem[addr]!=my_key ? (gmem[addr+2]=0;gmem[addr+3]=0;);
+            gmem[addr]=my_key;gmem[addr+1]=now;bank_announce_at=now+.25;
+        );
+        op=gmem[BANK_BASE];
+        op>0 && gmem[BANK_BASE+1]==my_slot && gmem[BANK_BASE+2]==my_key &&
+          abs(now-gmem[BANK_BASE+8])<3 ? (
+            t=gmem[BANK_BASE+3];n=gmem[BANK_BASE+4];tok=gmem[BANK_BASE+6];
+            op==1 ? (
+                t>=-1 && t<TOTAL_TABS && t==floor(t) ? (
+                    gmem[BANK_BASE+4]=bank_read_record(t);gmem[BANK_BASE+5]=bank_epoch;gmem[BANK_BASE]=2;
+                ) : gmem[BANK_BASE]=-1;
+            ) : op==3 ? (
+                play_state==0 ? (
+                    bank_stage_token=tok;bank_stage_epoch=bank_epoch;memset(bank_seen,0,TOTAL_TABS+1);
+                    gmem[BANK_BASE+5]=bank_epoch;gmem[BANK_BASE]=5;
+                ) : gmem[BANK_BASE]=-1;
+            ) : op==4 ? (
+                tok==bank_stage_token && bank_stage_epoch==bank_epoch && play_state==0 &&
+                t>=-1 && t<TOTAL_TABS && t==floor(t) && n>=0 && n<=BANK_CAP && n==floor(n) && bank_stage_record(t,n) ?
+                    gmem[BANK_BASE]=5 : gmem[BANK_BASE]=-1;
+            ) : op==6 ? (
+                tok==bank_stage_token && bank_apply_staged() ? gmem[BANK_BASE]=7 : gmem[BANK_BASE]=-1;
+            );
+        );
+    );
+);
 function library_request(op,t,entry,revision) (
     // Mailbox shared with Numbers2Notes; user pattern I/O is serviced by its Lua loop.
     gmem[6200000]==0 && abs(time_precise()-gmem[6200008])<3 ? (
@@ -1532,7 +1678,7 @@ function library_request(op,t,entry,revision) (
 
 function show_pattern_library(t) local(base,rev,count,k,j,n,addr,builtins,first_file,sel,mode,p) (
     mode=0;
-    strcpy(#lib_menu,"Save Pattern...|Load Pattern...|Export Factory Pattern...|Browse Factory Patterns...|Force Silence|Inherit (clear pattern)");
+    strcpy(#lib_menu,"Save Pattern...|Load Pattern...|Export Factory Pattern...|Browse Factory Patterns...|Force Silence|Inherit (clear pattern)|Save Pattern Set...|Load Pattern Set...|Restore Last Arrangement|Restore Previous Backup|Restore Pre-Load Backup");
     strcat(#lib_menu,"|Backbeat|Four on the Floor|Half-Time|Double-Time|Shuffle|Basic Funk|Basic Hip-Hop|Count-In"); builtins=8;
     base=6300000+mode*16384;
     rev=gmem[base]; count=0;
@@ -1562,13 +1708,14 @@ function show_pattern_library(t) local(base,rev,count,k,j,n,addr,builtins,first_
         mem[tab_mute_base+t]=sel==5?2:0;
         scan_active_tab(); needs_tab_update=1;
     ) :
-    sel>=7 && sel<=6+builtins ? (
-        p=sel-6;
+    sel>=7 && sel<=11 ? bank_request(sel-6) :
+    sel>=12 && sel<=11+builtins ? (
+        p=sel-11;
         
         factory_pattern(p,t);
     ) :
-    sel>6+builtins && sel<=6+builtins+count ? (
-        library_request(6,t,sel-6-builtins,rev);
+    sel>11+builtins && sel<=11+builtins+count ? (
+        library_request(6,t,sel-11-builtins,rev);
     );
 );
 
@@ -1581,6 +1728,7 @@ row_settings_size = MAX_ROWS * 10;
 tab_grid_size = vel_stride_tab; 
 
 file_avail(0) > 0 ? (
+    bank_epoch+=1;bank_stage_token=0;
     // =========================================================
     // LOADING SECTION
     // =========================================================
@@ -1827,6 +1975,8 @@ mem[LOCAL_GROOVE_DB + 32] = max_gr;
         ); check_tab_population(lib_t); flush_inventory_to_gmem(); needs_tab_update=1;
     ); gmem[6200000]=0;
 );
+
+service_drum_bank();
 
 // 1. REPORT TYPE (I am Drums)
 (slider5 > 0) ? ( gmem[GMEM_TYPE_REPORT + slider5 - 1] = MY_TYPE_ID; );
@@ -3252,7 +3402,19 @@ t_e = mem[ui_edit_tab];
     // TRACK identity occupies the unused two-button-wide area above half-speed.
     // Use the actual flow position so it stays aligned with both speed buttons.
     track_label_x=draw_x; track_label_w=90;
-    track_num>0 ? (
+    bank_online=abs(time_precise()-gmem[8320000])<2 && abs(time_precise()-gmem[BANK_BASE+8])<3;
+    !bank_online ? (
+        rect(track_label_x,row1_y,track_label_w,22,.52,.22,.12,1);
+        gfx_setfont(1,os_font,fontsize,'b');
+        draw_text(track_label_x+13,row1_y+4,"OFFLINE",1,.87,.5);
+        bank_warn_bri=.65+.35*abs(sin(time_precise()*3));
+        gfx_setfont(1,os_font,30,'b');
+        draw_text(track_label_x+35,ROW2_Y+4,"!",1,bank_warn_bri,.1);
+        gfx_setfont(1,os_font,fontsize-1,'b');
+        draw_text(track_label_x+15,ROW2_Y+39,"RUN N2N",1,.8,.35);
+        draw_text(track_label_x+8,ROW2_Y+55,"NO BACKUP",1,.8,.35);
+        gfx_setfont(1,os_font,fontsize,'b');
+    ) : track_num>0 ? (
         rect(track_label_x,row1_y,track_label_w,22,track_r,track_g,track_b,1);
         lum=track_r*.299+track_g*.587+track_b*.114;
         gfx_setfont(1,os_font,fontsize,'b');
