@@ -1,5 +1,5 @@
 -- @description Numbers2Notes
--- @version 2.0.4-dev.27
+-- @version 2.0.4-dev.28
 -- @author Rock Kennedy
 -- @about
 --   # Numbers2Notes 2.0.3
@@ -2471,16 +2471,21 @@ Form: I V C V C B C O]]
             end
         end
         if feedback_tab_mode == 11 then
-            -- Older installed helpers may not yet have the new footer slot.
-            -- Always offer a working launcher from the main script.
-            if not gmem_export.ToplineFooterLauncher then
-                local x=r.ImGui_GetCursorPosX(ctx)
-                local w=math.max(220,r.ImGui_CalcTextSize(ctx,"Open N2N Topline Editor")+16)
-                r.ImGui_SetCursorPosX(ctx,x+592-w)
-                if r.ImGui_Button(ctx,"Open N2N Topline Editor##tracksfallback",w,22) then Open_N2N_Topline_Editor() end
-                r.ImGui_SetCursorPosX(ctx,x)
-            end
+            local x=r.ImGui_GetCursorPosX(ctx)
             gmem_export.DrawTracks(ctx, fontsmall, Open_N2N_Topline_Editor)
+            -- An older helper ends its footer with the zoom buttons at the
+            -- right edge. Insert the fallback into the unused space between
+            -- the cueing button and zoom controls, on that very same row.
+            if not gmem_export.ToplineFooterLauncher then
+                local w=math.max(220,r.ImGui_CalcTextSize(ctx,"Open N2N Topline Editor")+16)
+                local zoom_width=2*24+52+6
+                local offset=math.max(224,592-zoom_width-8-w)
+                r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),3,1)
+                r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),2,2)
+                r.ImGui_SameLine(ctx,x+offset,0)
+                if r.ImGui_Button(ctx,"Open N2N Topline Editor##tracksfallback",w,22) then Open_N2N_Topline_Editor() end
+                r.ImGui_PopStyleVar(ctx,2)
+            end
         end
         if feedback_tab_mode == 12 then
             r.ImGui_Dummy(ctx,0,8)
