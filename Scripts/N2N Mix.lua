@@ -1649,6 +1649,7 @@ local function pan_cell(t,j,b,w)
   local x,y=r.ImGui_GetCursorScreenPos(ctx)
   local id="##pan"..t.key..":"..(j or 0)..":"..(b or 0)
   local v=pan_summary(t,j,b)
+  local available=has_position(t,perf_index(t)) and t.position_ready~=false
   r.ImGui_InvisibleButton(ctx,id,w,CELL_H)
   local hover=r.ImGui_IsItemHovered(ctx)
   local rr,gg,bb=rgb(r.GetTrackColor(t.track))
@@ -1660,20 +1661,22 @@ local function pan_cell(t,j,b,w)
   r.ImGui_DrawList_AddLine(dl,x+w/2,y+2,x+w/2,y+CELL_H-2,0xFFFFFFA0,1)
   if v~=nil then r.ImGui_DrawList_AddLine(dl,split,y,split,y+CELL_H,0x111111FF,2) end
   r.ImGui_DrawList_AddRect(dl,x,y,x+w,y+CELL_H,hover and 0xFFFFFFFF or 0x00000060,0,0,hover and 2 or 1)
-  local label=v==nil and "Mixed" or v==0 and "C" or (v<0 and "L" or "R")..math.abs(v)
+  local label=not available and "No Pan FX" or v==nil and "Mixed" or v==0 and "C" or (v<0 and "L" or "R")..math.abs(v)
   centered(dl,x,y,w,CELL_H,label,0x101010FF)
   if not job and not pending_start then
-    if hover and r.ImGui_IsMouseClicked(ctx,0) then pan_drag={id=id} end
-    if pan_drag and pan_drag.id==id and r.ImGui_IsMouseDown(ctx,0) then
+    if available and hover and r.ImGui_IsMouseClicked(ctx,0) then pan_drag={id=id} end
+    if available and pan_drag and pan_drag.id==id and r.ImGui_IsMouseDown(ctx,0) then
       local mx=r.ImGui_GetMousePos(ctx)
       local p=clamp(math.floor(((mx-x)/w*200-100)+0.5),-100,100)
       if v~=p then set_pan(t,j,b,p) end
     end
     local n=mono_push(true)
     if r.ImGui_BeginPopupContextItem(ctx,id.."menu") then
-      if r.ImGui_Selectable(ctx,"Center",v==0) then set_pan(t,j,b,0) end
-      if r.ImGui_Selectable(ctx,"Hard Left",v==-100) then set_pan(t,j,b,-100) end
-      if r.ImGui_Selectable(ctx,"Hard Right",v==100) then set_pan(t,j,b,100) end
+      if available then
+        if r.ImGui_Selectable(ctx,"Center",v==0) then set_pan(t,j,b,0) end
+        if r.ImGui_Selectable(ctx,"Hard Left",v==-100) then set_pan(t,j,b,-100) end
+        if r.ImGui_Selectable(ctx,"Hard Right",v==100) then set_pan(t,j,b,100) end
+      else r.ImGui_Text(ctx,"Position slider 11 unavailable") end
       plugin_menu(t,j,b)
       r.ImGui_EndPopup(ctx)
     end
@@ -1711,12 +1714,14 @@ local function install_visible_position()
   r.Undo_BeginBlock2(proj)
   for _,t in ipairs(rows) do
     local ok,err=pcall(function()
+      if r.GetMediaTrackInfo_Value(t.track,"I_FXEN")==0 or r.GetMediaTrackInfo_Value(t.track,"I_AUTOMODE")>1 or r.GetGlobalAutomationOverride()>1 then error("Enable FX and use Read or Trim/Read first.",0) end
       local f,msg=ensure_position_fx(t)
       if not f then error(msg,0) end
       if t.model<0 or not t.timbre_allowed then position_only(t,f)
       else r.TrackFX_SetEnabled(t.track,f,true) end
       apply_pan(t,f)
     end)
+    t.position_ready=ok
     if ok then ready=ready+1 else missing=missing+1;r.ShowConsoleMsg("N2N Mix Pan: "..t.name..": "..tostring(err).."\n") end
   end
   r.Undo_EndBlock2(proj,"N2N Mix: initialize track position",-1)
