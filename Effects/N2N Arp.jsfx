@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.4.0-dev.13
+version: 12.4.0-dev.14
 author: Rock Kennedy
 about:
-  # N2N Arp v12.4.0-dev.13
+  # N2N Arp v12.4.0-dev.14
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -31,7 +31,7 @@ slider17:0<-100,100,0.01>-N2N Mix Intensity
 @init
 scale_dirty = 0;
 last_input_mode = -1;
-thisversion = "v12.4.0-dev.13";
+thisversion = "v12.4.0-dev.14";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -2974,13 +2974,13 @@ x2 += item_w + ui_gap_small;
     item_w = 113;
     sw_x = x2; 
     draw_text(sw_x, ctrl_y+2, "SWING:", 0.7,0.7,0.7); is_sw_local = (mem[swing_ov_base+t_e] >= 0);
-    rect(sw_x+52, ctrl_y, 20, 19, 0.2,0.2,0.2,1); is_sw_local ? draw_text(sw_x+58, ctrl_y+2, "M", 1,0.5,0) : draw_text(sw_x+58, ctrl_y+2, "P", 0,1,1);
-    rect(sw_x+77, ctrl_y, 34, 19, 0.2,0.2,0.2,1); curr_sw = eff_swing(t_e); sprintf(#s, "%d", curr_sw); draw_text(sw_x+85, ctrl_y+2, #s, 1,1,1);
-(mb && p_mb==0 && mx>=sw_x+52 && mx<sw_x+72 && my>=ctrl_y && my<ctrl_y+19) ? (
+    rect(sw_x+55, ctrl_y, 20, 19, 0.2,0.2,0.2,1); is_sw_local ? draw_text(sw_x+61, ctrl_y+2, "M", 1,0.5,0) : draw_text(sw_x+61, ctrl_y+2, "P", 0,1,1);
+    rect(sw_x+80, ctrl_y, 34, 19, 0.2,0.2,0.2,1); curr_sw = eff_swing(t_e); sprintf(#s, "%d", curr_sw); draw_text(sw_x+88, ctrl_y+2, #s, 1,1,1);
+(mb && p_mb==0 && mx>=sw_x+55 && mx<sw_x+75 && my>=ctrl_y && my<ctrl_y+19) ? (
     is_sw_local ? mem[swing_ov_base+t_e]=-1 : mem[swing_ov_base+t_e]=curr_sw;
 );
 
-(mb && p_mb==0 && mx>=sw_x+77 && mx<sw_x+111 && my>=ctrl_y && my<ctrl_y+19) ? (
+(mb && p_mb==0 && mx>=sw_x+80 && mx<sw_x+114 && my>=ctrl_y && my<ctrl_y+19) ? (
     capture_id = 4004;
     capture_min=0;
     capture_max=100;
