@@ -1,8 +1,8 @@
 desc:N2N Arp
-version: 12.4.0-dev.20
+version: 12.4.0-dev.21
 author: Rock Kennedy
 about:
-  # N2N Arp v12.4.0-dev.20
+  # N2N Arp v12.4.0-dev.21
   - Shared song form, revised sections, independent OFF, and pattern library.
 provides:
   [main] .
@@ -33,7 +33,7 @@ slider18:0<-500,500,1>-Visual Sync (ms)
 @init
 scale_dirty = 0;
 last_input_mode = -1;
-thisversion = "v12.4.0-dev.20";
+thisversion = "v12.4.0-dev.21";
 
 
 fontsize = 12;       // use 12 for PC and 11 for Mac
@@ -2337,7 +2337,36 @@ function mix_request(cmd,payload) local(addr,now) (
         1;
     ) : 0;
 );
+// Register only the hovered control; draw once after all other UI.
+function tip_offer(x,y,w,h,txt) (
+    !mb && !rmb && mx>=x && mx<x+w && my>=y && my<y+h ? (
+        tip_seen=1; tip_x=x; tip_y=y; tip_w=w; tip_h=h;
+        strcpy(#tip_current,txt);
+    );
+);
+function tip_draw() local(tw,th,x,y) (
+    tip_seen && !mb && !rmb && !help_active && !color_popup_active && !chan_popup_active && capture_id==0 ? (
+        strcmp(#tip_current,#tip_last)!=0 || tip_x!=tip_last_x || tip_y!=tip_last_y ? (
+            strcpy(#tip_last,#tip_current);
+            tip_last_x=tip_x;tip_last_y=tip_y;tip_since=time_precise();
+        );
+        time_precise()-tip_since>=1 ? (
+            gfx_setfont(1,os_font,max(10,fontsize-1));
+            gfx_measurestr(#tip_current,tw,th);
+            x=max(0,min(tip_x+(tip_w-tw-10)/2,gfx_w-tw-10));
+            y=tip_y-th-12;
+            y<0 ? y=tip_y+tip_h+4;
+            y=max(0,min(y,gfx_h-th-8));
+            rect(x,y,tw+10,th+8,0,0,0,1);
+            draw_text(x+5,y+4,#tip_current,1,1,1);
+            gfx_setfont(1,os_font,fontsize,'b');
+        );
+    ) : (
+        strcpy(#tip_last,"");tip_since=0;
+    );
+);
 function panic_button(x,y,w,h) local(hov,tw,th) (
+    tip_offer(x,y,w,h,"MIDI Panic: release stuck notes and stop hanging sounds.");
     hov=mx>=x && mx<x+w && my>=y && my<y+h;
     gfx_setfont(1,os_font,fontsize,'b');
     rect(x,y,w,h,hov?.37:.30,hov?.27:.30,hov?.12:.30,1);
@@ -2355,6 +2384,7 @@ function section_play_request(tab,preroll) (
     );
 );
 function mix_hub_button(x,y,w,label,cmd) local(hov,online,tw,th) (
+    cmd==1 ? tip_offer(x,y,w,20,"Open this track's instrument (requires Numbers2Notes).") : tip_offer(x,y,w,20,"Open or focus Numbers2Notes.");
     online=abs(time_precise()-gmem[8320000])<2;
     hov=mx>=x && mx<x+w && my>=y && my<y+20;
     rect(x,y,w,20,hov&&online?.33:.18,hov&&online?.33:.18,hov&&online?.33:.18,1);
@@ -2363,6 +2393,9 @@ function mix_hub_button(x,y,w,label,cmd) local(hov,online,tw,th) (
     online && hov && mb && !p_mb && capture_id==0 && !chan_popup_active && !color_popup_active ? mix_request(cmd,0);
 );
 function mix_display(x,y,w,kind) local(p,cx,cy,i,a,v,px,hov,mx0,mw) (
+    kind==0 ? tip_offer(x,y,w,20,"Mix prominence. Click to open N2N Mix.") :
+    kind==1 ? tip_offer(x,y,w,20,"Performance intensity. Click to open N2N Mix.") :
+    tip_offer(x,y,w,20,"Pan. Click to open N2N Mix.");
     hov=mx>=x && mx<x+w && my>=y && my<y+20;
     rect(x,y,w,20,hov?.25:.16,hov?.25:.16,hov?.25:.16,1);
     hov && !chan_popup_active && !color_popup_active ? (
@@ -2496,6 +2529,7 @@ function dr_pat_mem(x, y, w, lab, val_in, min_v, max_v, mem_ptr, id_offset) (
 
 // =========================================================
 // ROW 1: GLOBAL SETTINGS & HEADER
+tip_seen=0;
 // =========================================================
 row1_y = UI_TOP_Y - 3; 
 
@@ -2522,6 +2556,7 @@ gfx_setfont(1, os_font, fontsize, 'b');
 
 
 // SOURCE (N2N vs MIDI)
+tip_offer(draw_x,draw_y,70,20,"Choose chord source: Numbers2Notes or incoming MIDI.");
 draw_text(draw_x, draw_y+4, "SRC:", 0.6,0.6,0.6);
 rect(draw_x+35, draw_y, 35, 20, 0.2, 0.2, 0.2, 1);
 slider10 == 0 ? ( draw_text(draw_x+40, draw_y+4, "N2N", 0,1,1); ) : ( draw_text(draw_x+40, draw_y+4, "MIDI", 1,0.6,0); );
@@ -2530,16 +2565,20 @@ slider10 == 0 ? ( draw_text(draw_x+40, draw_y+4, "N2N", 0,1,1); ) : ( draw_text(
 draw_x += 70 + ui_gap_small;
 // GRID HEIGHT
 height_w = 73;
+
+tip_offer(draw_x,draw_y,height_w,20,"Drag to adjust the height of the note lanes.");
 dr_slider(draw_x, draw_y, height_w, "HEIGHT:", slider11, 10, 30, 0, 11, 0); 
 draw_x += height_w + ui_gap_small;
 
 // INSTANCE ID
 id_w = 73;
+tip_offer(draw_x,draw_y,id_w,20,"Unique instance ID used by Numbers2Notes.");
 dr_slider(draw_x, draw_y, id_w, "INST ID:", slider5, 1, 512, 0, 5, 0); 
 draw_x += id_w + ui_gap_small;
 
 // TRANSPOSE
 trans_w = 73;
+tip_offer(draw_x,draw_y,trans_w,20,"Drag to transpose all output notes by octaves.");
 rect(draw_x, draw_y, trans_w, 20, 0.2, 0.2, 0.2, 1); 
 draw_text(draw_x+5, draw_y+3, "TRANSP:", 0.7,0.7,0.7); 
 sprintf(#s, "%d", mem[ui_oct_transpose]); 
@@ -2552,11 +2591,13 @@ draw_x += trans_w + ui_gap_small;
 // Stack them below the row buttons so they aren't hidden by the grid
 
 gllen_w = 112;
+tip_offer(draw_x,draw_y,gllen_w,20,"Default note duration for lanes without a length override.");
 dr_slider (draw_x, draw_y, gllen_w, "GLB LENGTH:", slider12, 1, 127, 0, 12, 0); 
 draw_x += gllen_w + ui_gap_small;
 
 gllev_w = 112;
 // Fixed: Used gllev_w instead of gllen_w
+tip_offer(draw_x,draw_y,gllev_w,20,"Global velocity level for lanes without a level override.");
 dr_slider (draw_x, draw_y, gllev_w, "GLB  LEVEL:", slider13, 0, 100, 0, 13, 0);  
 draw_x += gllev_w + ui_gap_small;
 
@@ -2565,6 +2606,7 @@ draw_x += gllev_w + ui_gap_small;
 glchan_w = 151;
 mask = input_filter_mask;
 rect(draw_x, draw_y, glchan_w, 20, 0.2,0.2,0.2,1); 
+tip_offer(draw_x,draw_y,glchan_w,20,"Choose MIDI input channels for live chord detection.");
 draw_text(draw_x+5, draw_y+3, "GLOBAL CHAN IN:", 0.7,0.7,0.7); 
 set_cnt=0; bit_i=0; loop(16, (mask & (1<<bit_i)) ? set_cnt+=1; bit_i+=1;); 
 set_cnt == 0 ? strcpy(#cs, "None") : set_cnt == 16 ? strcpy(#cs, "All") : sprintf(#cs, "%d Set", set_cnt); 
@@ -2582,6 +2624,7 @@ draw_x += glchan_w + ui_gap_small;
 // Global CH OUT Button
 mask = global_out_mask;
 rect(draw_x, draw_y, glchan_w, 20, 0.2,0.2,0.2,1); 
+tip_offer(draw_x,draw_y,glchan_w,20,"Choose default MIDI output channels.");
 draw_text(draw_x+5, draw_y+3, "GLOBAL CHAN OUT:", 0.7,0.7,0.7); 
 set_cnt=0; bit_i=0; loop(16, (mask & (1<<bit_i)) ? set_cnt+=1; bit_i+=1;); 
 set_cnt == 0 ? strcpy(#cs, "None") : set_cnt == 16 ? strcpy(#cs, "All") : sprintf(#cs, "%d Set", set_cnt); 
@@ -2607,10 +2650,12 @@ drawhold_y  = draw_y;
 // Restore normal font and original 55px / 8px scale spacing.
 draw_x=997; draw_y=drawhold_y+136;
 gfx_setfont(1,os_font,fontsize,'b');
+tip_offer(949,draw_y,45,20,"Groove status: green active, grey none, red excessive.");
 draw_text(949,draw_y+4,"GRV:",.6,.6,.6);
 gr_max=mem[LOCAL_GROOVE_DB+32];
 gr_max==0?gfx_set(.3,.3,.3,1):gr_max>1?gfx_set(1,0,0,1):gfx_set(0,1,0,1);
 gfx_circle(987,draw_y+10,4.5,1);
+tip_offer(draw_x,draw_y,max(55,mix_level_x-draw_x-5),20,"Current scale notes; red marks the tonic.");
 draw_text(draw_x,draw_y+4,"SCALE:",.6,.6,.6);
 note_x=draw_x+55;
 scale_tonic==-1 ? draw_text(note_x,draw_y+4,"---",1,.2,.2) : (
@@ -2740,7 +2785,8 @@ loop(3,
     current_tab_row == 1 ? (
         rec_cues_active=0;
         power_x=10; power_y=draw_y;
-        draw_power_button(power_x,power_y);
+        tip_offer(power_x,power_y,51,26,"Turn pattern playback on or off.");
+draw_power_button(power_x,power_y);
         (mb && !p_mb && mx>=power_x && mx<power_x+51 && my>=power_y && my<power_y+26) ? (
             mem[ui_power_off]=!mem[ui_power_off]; needs_tab_update=1;
         );
@@ -2772,7 +2818,8 @@ loop(3,
             gfx_triangle(FOLLOW_BOX_X+22,follow_lock_y-7,FOLLOW_BOX_X+22,follow_lock_y+3,FOLLOW_BOX_X+30,follow_lock_y-2);
         );
         gfx_setfont(1,os_font,fontsize,'b');
-        (mb && !p_mb && mx>=follow_group_x && mx<follow_group_x+follow_group_w && my>=follow_group_y && my<follow_group_y+follow_group_h) ? (
+        tip_offer(follow_group_x,follow_group_y,follow_group_w,follow_group_h,"Follow song sections instead of locking to one pattern.");
+(mb && !p_mb && mx>=follow_group_x && mx<follow_group_x+follow_group_w && my>=follow_group_y && my<follow_group_y+follow_group_h) ? (
             mem[ui_locked_tab]=-1; gmem[GM_BASE+1]=-1; mem[ui_follow_mode]=1; gfx_follow_target=-1; hub_browse=0; cue_release_requested=1; needs_tab_update=1;
         );
     );
@@ -3109,14 +3156,16 @@ fb_pat_l_ptr = step_len_base + fb_tab*vel_stride_tab;
                 );
                 x2 += item_w + ui_gap_small;
         item_w=sectw-5;
-        centered_btn(x2,ctrl_y,item_w,18,"LIBRARY") ? (
+        tip_offer(x2,ctrl_y,item_w,18,"Save, load or browse patterns and complete pattern sets.");
+centered_btn(x2,ctrl_y,item_w,18,"LIBRARY") ? (
             gfx_x=x2; gfx_y=ctrl_y+20;
             show_pattern_library(t_e);
         );
         x2+=item_w+ui_gap_small;
         item_w = 3*ttabw-5;
   
-    is_ghosting ? (
+    tip_offer(x2,ctrl_y,item_w,18,"Copy the suggested inherited pattern into this section.");
+is_ghosting ? (
         centered_btn(x2, ctrl_y, item_w, 18, "USE SUGGESTED") ? ( 
             memcpy(curr_pat_v_ptr, fb_pat_v_ptr, vel_stride_tab);
             memcpy(curr_pat_g_ptr, fb_pat_g_ptr, vel_stride_tab);
@@ -3159,7 +3208,8 @@ fb_pat_l_ptr = step_len_base + fb_tab*vel_stride_tab;
 
     item_w = 73;
 
-    dr_pat_mem(x2, ctrl_y, item_w, "BARS:", eff_bars(t_e), 1, 4, bars_ov_base + t_e, 1); 
+    tip_offer(x2,ctrl_y,item_w,18,"Drag to set the number of bars in this pattern.");
+dr_pat_mem(x2, ctrl_y, item_w, "BARS:", eff_bars(t_e), 1, 4, bars_ov_base + t_e, 1); 
     
     x2 += item_w + ui_gap_small;
 
@@ -3169,6 +3219,7 @@ fb_pat_l_ptr = step_len_base + fb_tab*vel_stride_tab;
 item_w = 112;
 item_h = 18;
 rect(x2, ctrl_y, item_w, item_h, 0.2,0.2,0.2,1);
+tip_offer(x2,ctrl_y,item_w,item_h,"Drag to choose steps per bar, including triplet grids.");
 draw_text(x2+5, ctrl_y+2, "SUB DIVISION:", 0.7,0.7,0.7); 
 sub_v==8?strcpy(#s,"8"):sub_v==12?strcpy(#s,"12"):sub_v==16?strcpy(#s,"16"):sub_v==24?strcpy(#s,"24"):strcpy(#s,"32"); 
 draw_text(x2+88, ctrl_y+2, #s, 1,1,1);
@@ -3185,13 +3236,15 @@ x2 += item_w + ui_gap_small;
     
     
     item_w = 113;
-    dr_pat_mem(x2, ctrl_y, item_w, "PAT HUMANIZE:", eff_hum(t_e), 0, 25, hum_ov_base + t_e, 3);
+    tip_offer(x2,ctrl_y,item_w,18,"Drag to vary timing and velocity in this pattern.");
+dr_pat_mem(x2, ctrl_y, item_w, "PAT HUMANIZE:", eff_hum(t_e), 0, 25, hum_ov_base + t_e, 3);
     x2 += item_w + ui_gap_small;
     
 
     item_w = 113;
     sw_x = x2; 
-    draw_text(sw_x, ctrl_y+2, "SWING:", 0.7,0.7,0.7); is_sw_local = (mem[swing_ov_base+t_e] >= 0);
+    tip_offer(sw_x,ctrl_y,114,19,"Swing: M uses a manual override; P follows the global swing.");
+draw_text(sw_x, ctrl_y+2, "SWING:", 0.7,0.7,0.7); is_sw_local = (mem[swing_ov_base+t_e] >= 0);
     rect(sw_x+55, ctrl_y, 20, 19, 0.2,0.2,0.2,1); is_sw_local ? draw_text(sw_x+61, ctrl_y+2, "M", 1,0.5,0) : draw_text(sw_x+61, ctrl_y+2, "P", 0,1,1);
     rect(sw_x+80, ctrl_y, 34, 19, 0.2,0.2,0.2,1); curr_sw = eff_swing(t_e); sprintf(#s, "%d", curr_sw); draw_text(sw_x+88, ctrl_y+2, #s, 1,1,1);
 (mb && p_mb==0 && mx>=sw_x+55 && mx<sw_x+75 && my>=ctrl_y && my<ctrl_y+19) ? (
@@ -3229,7 +3282,8 @@ x2 += item_w + ui_gap_small;
     hf_x=mix_speed_x; hf_w=stretch_w;
     (curr_sub_val == 24 || curr_sub_val == 32) ? (
         box_h=19; hf_act=eff_half(t_e);
-        rect(hf_x,ctrl_y,hf_w,box_h,.2,.2,.2,1);
+        tip_offer(hf_x,ctrl_y,hf_w,box_h,"Toggle normal or half-speed playback for this pattern.");
+rect(hf_x,ctrl_y,hf_w,box_h,.2,.2,.2,1);
         (mb && !p_mb && mx>=hf_x && mx<hf_x+hf_w && my>=ctrl_y && my<ctrl_y+box_h) ? (
             mem[half_speed_ov_base+t_e]=!mem[half_speed_ov_base+t_e];
         );
@@ -3240,7 +3294,8 @@ x2 += item_w + ui_gap_small;
     );
 
     st_x=mix_stretch_x;
-    centered_btn(st_x,ctrl_y,2*ttabw-5,19,"STRETCH") ? ( 
+    tip_offer(st_x,ctrl_y,2*ttabw-5,19,"Stretch note spacing 2x or 4x for the pattern or selected lane.");
+centered_btn(st_x,ctrl_y,2*ttabw-5,19,"STRETCH") ? ( 
         gfx_x = st_x; gfx_y = ctrl_y + 20;
         sel_stretch = gfx_showmenu("Stretch Pattern 2x (Short)|Stretch Pattern 2x (Long)|Stretch Pattern 4x (Short)|Stretch Pattern 4x (Long)||Stretch Selected Lane 2x (Short)|Stretch Selected Lane 2x (Long)|Stretch Selected Lane 4x (Short)|Stretch Selected Lane 4x (Long)");
         
@@ -3281,12 +3336,15 @@ mix_display(mix_hub_x,ctrl_y+23,90,2);
 // We define fixed positions for the view toggles so they don't jump around on Tab 0
 
 mode_x = drawhold_x - 10;
-mode_w = 96;
+// Align the panic button with the actual right edge of Drop.
+mode_view_width=tab_right_x-mode_x-53;
+mode_w=96-floor((196-mode_view_width)/2);
 mode_h = 19;
 mode_y=row1_y+3;
 
+tip_offer(mode_x,mode_y,mode_w,mode_h,"Choose Chords, Split (Chords and Bass), or Bass.");
 rect(mode_x, mode_y, mode_w, mode_h, 0.2, 0.2, 0.2, 1);
-draw_text(mode_x+5, mode_y+3, "MODE:", 0.7,0.7,0.7);
+draw_text(mode_x+4, mode_y+3, "MODE:", 0.7,0.7,0.7);
 
 // Determine short label name
 slider14 == 0 ? strcpy(#md, "CHORDS") : 
@@ -3295,7 +3353,7 @@ slider14 == 1 ? strcpy(#md, "SPLIT") :
 
 // Green for split, Orange/Yellow for standard single-engine modes
 slider14 == 1 ? gfx_set(0,1,0,1) : gfx_set(1,0.8,0.2,1);
-gfx_x = mode_x + 43; gfx_y = mode_y+3; gfx_drawstr(#md);
+gfx_x = mode_x + 41; gfx_y = mode_y+3; gfx_drawstr(#md);
 
 (mb && p_mb == 0 && mx >= mode_x && mx < mode_x + mode_w && my >= mode_y && my < mode_y + mode_h) ? (
     gfx_x = mx; gfx_y = my;
@@ -3312,17 +3370,19 @@ gfx_x = mode_x + 43; gfx_y = mode_y+3; gfx_drawstr(#md);
 vw_x = mode_x+mode_w+5;
 ctrl_y += 23;
 vw_y=mode_y;
-vw_w = 100;
+vw_w=mode_view_width-mode_w;
 vw_h = 19;
 
+tip_offer(vw_x,vw_y,vw_w,vw_h,"Switch between section patterns and slot view.");
 rect(vw_x, vw_y, vw_w, vw_h, 0.2, 0.2, 0.2, 1);
-draw_text(vw_x+5, vw_y+3, "VIEW:", 0.7, 0.7, 0.7);
-mem[ui_tab_view_mode] == 0 ? draw_text(vw_x + 37, vw_y+3, "SLOTS", 0,1,1) : draw_text(vw_x + 37, vw_y+3, "SECTIONS", 1,0.6,0);
+draw_text(vw_x+4, vw_y+3, "VIEW:", 0.7, 0.7, 0.7);
+mem[ui_tab_view_mode] == 0 ? draw_text(vw_x + 35, vw_y+3, "SLOTS", 0,1,1) : draw_text(vw_x + 35, vw_y+3, "SECTIONS", 1,0.6,0);
 
 (mb && p_mb == 0 && mx >= vw_x && mx < vw_x + vw_w && my >= vw_y && my < vw_y + vw_h) ? (
     mem[ui_tab_view_mode] = !mem[ui_tab_view_mode];
     capture_id = -2;
 );
+tip_offer(vw_x+vw_w+5,vw_y,19,vw_h,"Open help and visual synchronization settings.");
 centered_btn(vw_x+vw_w+5,vw_y,19,vw_h,"?") ? (
     help_active=1;help_block_until_release=1;help_click=0;mb=0;rmb=0;
     chan_popup_active=0;capture_id=0;
@@ -3989,14 +4049,7 @@ mouse_hwheel = 0;
 mem[ui_power_off] ? (rect(0,0,gfx_w,gfx_h,0,0,0,0.62); draw_power_button(10,ROW2_Y););
 
 // Display-only hover popup overlays the grid.
-mix_hover && !help_active && !chan_popup_active && !color_popup_active && !mb && !rmb ? (
-    gfx_setfont(1,os_font,fontsize,'b');
-    gfx_measurestr("Display only! Click to open N2N Mix.",mix_tip_w,mix_tip_h);
-    mix_tip_x=max(0,min(mx+10,gfx_w-mix_tip_w-12));mix_tip_y=my+22;
-    rect(mix_tip_x,mix_tip_y,mix_tip_w+10,mix_tip_h+8,.09,.09,.09,1);
-    gfx_set(.55,.55,.55,1);gfx_rect(mix_tip_x,mix_tip_y,mix_tip_w+10,mix_tip_h+8,0);
-    draw_text(mix_tip_x+5,mix_tip_y+4,"Display only! Click to open N2N Mix.",1,1,1);
-);
+tip_draw();
 
 help_active ? (
     rect(0,0,gfx_w,gfx_h,0,0,0,.85);
