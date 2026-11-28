@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.28
+-- @version 1.9.29
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -910,7 +910,7 @@ local function topline_grid(ctx,t,regions,width,scale,gap)
     local x=r.ImGui_GetCursorPosX(ctx)
     local cols=7
     local w=(width-(cols-1)*gap)/cols
-    local h=math.floor(10*scale+.5)
+    local h=math.floor(math.floor(10*scale+.5)*.75+.5)
     if #regions==0 then
         r.ImGui_TextDisabled(ctx,"No song regions. Render the song form first.")
         return
@@ -955,7 +955,7 @@ function export.InitTrackFonts(ctx, family, normal_size, small_size)
     local percent=TRACK_SCALE_DEFAULT
     local text_scale=.85+(percent-100)*.002
     track_fonts[percent]=font_at(normal_size*text_scale)
-    track_small_fonts[percent]=font_at(small_size*(1+(percent-100)*.003))
+    track_small_fonts[percent]=font_at(math.min(12,small_size*(1+(percent-100)*.003)))
 end
 local function pattern_grid(ctx,t,width,scale,gap)
     local r=reaper
@@ -965,7 +965,7 @@ local function pattern_grid(ctx,t,width,scale,gap)
     -- The final two single-button groups each get half a full group.
     local groupw=(width-6*gap)/6
     local lastw=groupw/2
-    local h=math.floor(10*scale+.5)
+    local h=math.floor(math.floor(10*scale+.5)*.75+.5)
     local known=t.id>=1 and t.id<=512 and duplicate[t.id]==1 and r.gmem_read(REG_BASE+t.id)>0 and r.TrackFX_GetEnabled(t.track,t.fx) and not r.TrackFX_GetOffline(t.track,t.fx)
     local bits={}
     if known then for i=0,3 do bits[i]=math.floor(r.gmem_read(INV_BASE+(t.id-1)*4+i)) end end
@@ -1044,15 +1044,17 @@ function export.DrawTracks(ctx,font,open_topline)
     if r.ImGui_SmallButton(ctx,"Refresh") then export.PublishTrackIdentity(true) end
     r.ImGui_PopStyleVar(ctx)
     local box_x=r.ImGui_GetCursorPosX(ctx)
+    local box_screen_x=r.ImGui_GetCursorScreenPos(ctx)
+    local footer_width=math.min(panel_width,r.ImGui_GetContentRegionAvail(ctx))
     if normal_font then r.ImGui_PushFont(ctx,normal_font) end
     -- Four pixels at 170%: old two-pixel vertical gap plus two.
     -- All intra-track gaps, including between variants, are identical.
     local track_gap=math.max(1,math.floor(4*percent/170+.5))
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_ItemSpacing(),track_gap,track_gap)
-    r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),px(2),px(1))
+    r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_FramePadding(),px(2),0)
     r.ImGui_PushStyleVar(ctx,r.ImGui_StyleVar_WindowPadding(),4,4)
     r.ImGui_PushStyleColor(ctx,r.ImGui_Col_ChildBg(),0x000000FF)
-    local row_height=px(14)
+    local row_height=math.floor(px(14)*.75+.5)
     local actual_widths={}
     local max_header_width=0
     local border_flag=r.ImGui_ChildFlags_Borders and r.ImGui_ChildFlags_Borders()
@@ -1175,7 +1177,12 @@ function export.DrawTracks(ctx,font,open_topline)
     r.ImGui_SetCursorPosX(ctx,box_x)
     if r.ImGui_Button(ctx,"N2N Advanced Cueing",launcher_width,footer_height) then launch_cue() end
     if r.ImGui_IsItemHovered(ctx) then r.ImGui_SetTooltip(ctx,"Open N2NCue for manual cue placement and live cueing") end
-    r.ImGui_SameLine(ctx,box_x+math.max(launcher_width+3,panel_width-topline_width))
+    -- SameLine's absolute offset is relative to the current group in ImGui.
+    -- Position in screen coordinates instead to avoid double-counting the right panel.
+    r.ImGui_SameLine(ctx)
+    local next_x,next_y=r.ImGui_GetCursorScreenPos(ctx)
+    local right_x=box_screen_x+footer_width-topline_width
+    if right_x>next_x then r.ImGui_SetCursorScreenPos(ctx,right_x,next_y) end
     if r.ImGui_Button(ctx,"Open N2N Topline Editor",topline_width,footer_height) then
         if open_topline then open_topline() else export.OpenEditor("n2ntopline","N2N Topline") end
     end
