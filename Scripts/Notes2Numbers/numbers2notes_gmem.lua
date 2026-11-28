@@ -1,5 +1,5 @@
 -- @description numbers2notes_gmem
--- @version 1.9.24
+-- @version 1.9.25
 -- @author Rock Kennedy
 -- @noindex
 -- @about
@@ -1398,6 +1398,91 @@ function DB.unpack_set(data)
     if pos~=#data+1 then error("Unexpected data in drum pattern set",0) end
     return snapshot
 end
+-- For a different kit, preserve the destination's row map and kit-specific
+-- settings. Match used source rows by MIDI note/channel, not row order.
+-- Unmatched rows may use truly unassigned destination map slots.
+function DB.remap_set(target,current)
+    local src=DB.values(target.records[1],-1)
+    local dst=DB.values(current.records[1],-1)
+    local function names(a)
+        local out,pos={},1290
+        for row=1,128 do
+            local n=a[pos]
+            local bytes={}
+            for i=0,n do bytes[#bytes+1]=a[pos+i] end
+            out[row]=bytes
+            pos=pos+n+1
+        end
+        return out
+    end
+    local sn,dn=names(src),names(dst)
+    local function slot(group,row) return 9+group*128+row end
+    local function pack(a)
+        local out={}
+        for i,v in ipairs(a) do out[i]=string.pack("<d",v) end
+        return table.concat(out)
+    end
+    local sections,used={},{}
+    for i=2,81 do
+        local a=DB.values(target.records[i],i-2)
+        sections[i]=a
+        for p=8,#a,4 do used[math.floor(a[p]/128)+1]=true end
+    end
+    local mapping,taken={},{}
+    -- Reserve all existing matches before allocating any new rows.
+    for row=1,128 do
+        if used[row] and src[slot(2,row)]>=0 then
+            for d=1,128 do
+                if not taken[d] and dst[slot(2,d)]==src[slot(2,row)] and dst[slot(3,d)]==src[slot(3,row)] then
+                    mapping[row]=d;taken[d]=true;break
+                end
+            end
+        end
+    end
+    for row=1,128 do
+        if used[row] and not mapping[row] then
+            local free
+            for d=1,128 do
+                if not taken[d] and dst[slot(2,d)]==-1 and dn[d][1]==0 then free=d;break end
+            end
+            if not free then
+                error("Not enough unused drum rows to preserve every note/channel in this pattern set. The current arrangement and kit were not changed.",0)
+            end
+            mapping[row]=free;taken[free]=true
+            for group=0,9 do dst[slot(group,free)]=src[slot(group,row)] end
+            dn[free]=sn[row]
+            if dn[free][1]==0 and src[slot(2,row)]>=0 then
+                local name="Drum "..math.floor(src[slot(2,row)])
+                dn[free]={#name}
+                for p=1,#name do dn[free][#dn[free]+1]=name:byte(p) end
+            end
+        end
+    end
+    -- Preserve destination display and existing row settings, but restore
+    -- the pattern set's inherited musical defaults.
+    for i=1,5 do dst[i]=src[i] end
+    dst[8]=src[8]
+    local meta={}
+    for i=1,1289 do meta[i]=dst[i] end
+    for row=1,128 do for _,v in ipairs(dn[row]) do meta[#meta+1]=v end end
+    local out={kit=current.kit,records={pack(meta)}}
+    DB.values(out.records[1],-1)
+    for i=2,81 do
+        local a=sections[i]
+        local steps={}
+        for p=8,#a,4 do
+            local row=math.floor(a[p]/128)+1
+            steps[#steps+1]={(mapping[row]-1)*128+a[p]%128,a[p+1],a[p+2],a[p+3]}
+        end
+        table.sort(steps,function(x,y) return x[1]<y[1] end)
+        local vals={}
+        for p=1,7 do vals[p]=a[p] end
+        for _,step in ipairs(steps) do for _,v in ipairs(step) do vals[#vals+1]=v end end
+        out.records[i]=pack(vals)
+        DB.values(out.records[i],i-2)
+    end
+    return out
+end
 function DB.list(dir,prefix)
     local r=reaper
     local out={}
@@ -1550,10 +1635,11 @@ function DB.manual_choice(session,cmd)
             if not name then error("No matching recovery backup exists yet.",0) end
             session.target=DB.index(session.dir,name,true)
         end
+        local prompt="Replace all section patterns and row settings? The current arrangement will be backed up first."
         if session.target.kit~=session.kit then
-            error("This set uses drum map:\n"..session.target.kit.."\n\nSelect that file in Drum Arranger first, then try again. No patterns were changed.",0)
+            prompt="Replace all section patterns while keeping the currently selected drum kit? Notes will be matched by MIDI note/channel and unused rows added as needed. The current arrangement will be backed up first."
         end
-        if r.MB("Replace all section patterns and row settings? The current arrangement will be backed up first.","Load Drum Pattern Set",4)~=6 then return false end
+        if r.MB(prompt,"Load Drum Pattern Set",4)~=6 then return false end
     end
     return true
 end
@@ -1599,6 +1685,9 @@ function DB.advance(session)
         DB.commit_backup(session)
         if session.savepath then DB.write_manual(session.savepath,DB.pack_set(session)) end
         if not session.target then DB.finish(session);return end
+        if session.target.kit~=session.kit then
+            session.target=DB.remap_set(session.target,session)
+        end
         -- Begin staged load only after complete, successful pre-load backup.
         if r.GetPlayStateEx(session.project)~=0 then error("Transport started; pattern set was not loaded.",0) end
         session.phase="stage";session.record=-1
